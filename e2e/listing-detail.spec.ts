@@ -396,6 +396,51 @@ test.describe('listing detail — mobile', () => {
     await expect.poll(() => new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
   })
 
+  // Back wrote the category's address behind Next's router (Nov 17): the
+  // router still held the listing's, and wrote it back into the address on
+  // its next commit. The test above caught that about 1 run in 13, whenever
+  // something committed just after the tap; coming back to the app does it
+  // every time, since RefreshContentOnReturn refreshes the page. A reload
+  // then opened the listing the visitor had closed.
+  //
+  // The refresh is caused, not waited for: the content version is answered
+  // as changed, the throttle is let run out, and the return is dispatched
+  // (Playwright's bringToFront() fires no events; see return-to-app.spec.ts).
+  test('a listing’s own page keeps the category’s address after Back, through a refresh', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithListings(request, community)
+    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
+    const item = (await res.json()).resources[0] as { id: string; name: string }
+    await page.route(
+      (url) => url.pathname === '/api/content-version',
+      (route) => route.fulfill({ json: { ok: true, version: 'changed-by-listing-detail-spec' } }),
+    )
+
+    await page.goto(`/${community}/${category.id}/${item.id}`)
+    await dismissLocationPrompt(page)
+    const listing = page.getByTestId('listing-page')
+    await expect(listing).toBeVisible()
+    await page.locator('header').getByRole('button', { name: category.pluralLabel }).click()
+    await expect(listing).toHaveCount(0)
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
+
+    // Past RefreshContentOnReturn's ten-second throttle, counted from load.
+    await page.waitForTimeout(11_000)
+    const refreshed = page.waitForResponse(
+      (r) => r.request().headers()['rsc'] === '1' && !r.request().headers()['next-router-prefetch'],
+      { timeout: 10_000 },
+    )
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await refreshed
+
+    const row = page.getByRole('button', { name: `Show details for ${item.name}` }).first()
+    await expect(row).toBeVisible()
+    await expect(listing).toHaveCount(0)
+    // The refresh's render commits a moment after its response.
+    await page.waitForTimeout(1_000)
+    expect(new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
+  })
+
   // The page's content rises into place as it appears (fadeIn: a 6px
   // transform, 180ms; Back slides it instead). An overlay drawn inside it
   // was measured from that moving box, not the screen, for as long as it

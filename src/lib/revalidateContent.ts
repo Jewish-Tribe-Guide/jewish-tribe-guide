@@ -34,12 +34,29 @@ import { routes } from './routes'
 // by the time the create test asked for the page (PR 387, Nov 16). Adding a
 // community is rare and its admin is the one waiting, so the one blocking
 // read is worth it.
-export async function revalidatePublicContent({ newCommunity = false }: { newCommunity?: boolean } = {}): Promise<void> {
+//
+// Expiring isn't enough on its own (Nov 18): Next hands a read the result of
+// a fill another request already started, without checking whether it began
+// before the invalidation (use-cache-wrapper.js, "joining pending
+// cross-request invocation"). A fill begun before the insert, still running
+// at the expiry, answered without the new community. That fill's entry is
+// stamped with its start, so it's expired as it lands and the read after it
+// is a fresh one: asking until the list has the slug settles it, in two reads
+// at most, before the admin is sent to the new address.
+const NEW_COMMUNITY_READS = 5
+
+export async function revalidatePublicContent({ newCommunity }: { newCommunity?: string } = {}): Promise<void> {
   // The stamp first, so a page regenerated after the invalidation below is
   // built with the new one and an open tab's check sees it once (Nov 16).
   const [communities] = await Promise.all([listCommunities().catch(() => []), bumpContentStamp()])
 
   revalidateTag(TAGS.communities, newCommunity ? { expire: 0 } : 'max')
+  if (newCommunity) {
+    for (let read = 0; read < NEW_COMMUNITY_READS; read++) {
+      const listed = await listCommunities().catch(() => [])
+      if (listed.some((c) => c.slug === newCommunity)) break
+    }
+  }
   for (const community of communities) {
     for (const tag of allCommunityTags(community.slug)) {
       // 'max' keeps serving the stale value while the fresh one regenerates,

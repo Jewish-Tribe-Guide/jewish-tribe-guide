@@ -191,6 +191,29 @@ are unbalanced; about 6–7 min looks reachable.
     old test 5 of 5 red, new 5 of 5 green. Also: the site's CSP refuses
     `waitForFunction`'s string eval, so it can never see a page flag; poll
     `page.evaluate` instead.
+  - Closed Nov 18: `community-editor.spec.ts:61` (a new community's page
+    404'd straight after Create), 1 run in 4 with two workers. Expiring the
+    community list wasn't enough: Next hands a `use cache` read the result
+    of a fill another request already started, without checking whether it
+    began before the invalidation (`use-cache-wrapper.js`, "joining pending
+    cross-request invocation"; 468 joins in one local run). A fill begun
+    before the insert answered after the expiry. The create route now reads
+    the list until it holds the new slug (two reads at most, five allowed)
+    before answering. A real bug for an admin too, not just the test. Unit
+    test red against the old code; the race itself didn't reproduce on
+    demand (25/25 before and after locally).
+  - Nov 17, not reproduced: `places.spec.ts:77` and
+    `read-questions.spec.ts:80` failed together in run 43994304148. The
+    runner's own direct Supabase calls in the test hooks took 2–3.8s in
+    that 40s window, against 100–450ms elsewhere in the same run. So the
+    test database was slow, not the app. The test project is also dev's
+    and every preview's database; separating them is the user's call.
+  - Open, not reproduced: `category-editor.spec.ts:116`, the Delete
+    question vanished 6s after it was asked (run 43937547841), with the
+    editor still open. 0 of 18 locally (4× CPU slowdown, and beside the
+    community tests on two workers). Ruled out: the clone writing to the
+    source, cached reads, sort-order renumbering, triggers. The trace from
+    the next failure (retained since cc591c7a) should name what remounted.
   - Moderation's 15s waits (from Nov 3) are the approve request itself,
     about ten database round trips in a row; left as they are.
   - The combined jobs read made 105 database requests, about 65 of them
@@ -371,11 +394,25 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   Then Edit listing is the filled blue pill on these listings too, as on
   every other (the user: "bring back the regular edit listing color"); it
   was outlined from Oct 6, beside the big filled Join. **Changes** that.
-- Found Nov 17, not fixed: `e2e/listing-detail.spec.ts:375` (mobile) —
-  a Cemetery listing's own page, header Back: the list shows but the
-  address stays on the listing, about 1 run in 13 (3 of 40 on the code
-  before the pills, 3 of 41 after). A real Back that doesn't write its
-  address, not a slow test: the poll waits 5s.
+- Fixed Nov 17: Back from a listing's own page (`/philly/cemetery/<id>`
+  on a phone) wrote the category's address with `replaceState`, handing
+  it `window.history.state`. That state carries Next's `__NA` mark, and
+  Next's patched `replaceState` passes such a call through as its own, so
+  the router kept the listing's address and wrote it back on its next
+  commit: about 1 run in 13 in `e2e/listing-detail.spec.ts:375`, and
+  every time on coming back to the app (RefreshContentOnReturn's
+  refresh), after which a reload reopened the closed listing.
+  `closeOpenListing` now drops the mark, so Next moves its own address
+  with no navigation. New test "keeps the category's address after Back,
+  through a refresh": red 5 of 5 before, green 10 of 10 after; the old
+  test 40 of 40 after.
+- Found Nov 17, not fixed: `FindResourcesConnected`'s `replace` sync (the
+  search box, Open now, filters, `?item=`) writes the address the same
+  way, so Next never learns those either: by the same mechanism a refresh
+  (coming back to the app) should drop them from the address. Read from
+  Next's code, not yet seen in a browser. Left alone for now: telling
+  the router re-renders everything reading `useSearchParams`, the cascade
+  that sync was written to avoid.
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,
