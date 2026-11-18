@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { DEFAULT_CATEGORY_ICON, type CategoryConfig } from '@/lib/categories'
 import ImageUploadField from '@/components/ImageUploadField'
+import { withCommunity } from '@/lib/useCommunityData'
 import CategoryIcon from '@/components/CategoryIcon'
 import { categoryColorUsage, PIN_COLORS, type ColorUser } from '@/lib/categoryColor'
 
@@ -154,6 +155,7 @@ export function CardBandImageField({
   cardImageUrl,
   onChange,
   token,
+  community,
   originalSource,
   onOriginalSourceChange,
 }: {
@@ -162,6 +164,7 @@ export function CardBandImageField({
   /** The new banner photo, and the older pasted one (always cleared). */
   onChange: (cardBandImageUrl: string, cardImageUrl: string) => void
   token: string
+  community: string
   originalSource?: File | string | null
   onOriginalSourceChange?: (source: File | string | null) => void
 }) {
@@ -169,7 +172,7 @@ export function CardBandImageField({
     <ImageUploadField
       value={cardBandImageUrl.trim() || cardImageUrl.trim()}
       onChange={(url) => onChange(url, '')}
-      uploadUrl="/api/admin/categories/band"
+      uploadUrl={withCommunity('/api/admin/categories/band', community)}
       token={token}
       shape="square"
       aspect={5}

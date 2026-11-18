@@ -700,6 +700,7 @@ function CategoryEditorScreen({
                   set('cardImageUrl', card)
                 }}
                 token={token}
+                community={community}
                 originalSource={bannerOriginal}
                 onOriginalSourceChange={setBannerOriginal}
               />
