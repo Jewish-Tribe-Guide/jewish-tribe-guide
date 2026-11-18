@@ -434,7 +434,10 @@ Kept up card stays a card above the search, chevron and all (decided Nov
 14: it's how people find out they can trust the site, and opening it shows
 how everything is checked).
 
-**Drawn Nov 18, waiting on the user** (canvas
+**Drawn Nov 18, parked by the user the same day** ("maybe it's fine the
+way it is now idk" → "Park it for now"; today's home stays). If it comes
+back, my recommendation was Flip C plain (the weekday board with small
+square pictures); the full-pictures board got an "uch". (Canvas
 https://claude.ai/artifact/AR8hb7s66iPhAdqsqhbQsU, "Phone home: boxes and
 rows"): the user asked whether Right now should be a box and the
 categories rows ("these bunched up boxes and pictures"). Three boards:
