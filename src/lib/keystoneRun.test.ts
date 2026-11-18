@@ -58,10 +58,19 @@ const bagel = {
   details: { kosherCert: 'Keystone-K', k: 'https://keystone-k.org/kosher/new-york-bagel/' },
 }
 
-function setDb(listings: unknown[], earlier: unknown[]) {
-  mockFrom.mockImplementation((table: string) =>
-    table === 'resource' ? chainable({ data: listings, error: null }) : chainable({ data: earlier, error: null }),
-  )
+/** `queued`: the queue's pending new places, from anyone (the read that
+ *  asks for status 'pending'); `earlier`: what this watch filed before. */
+function setDb(listings: unknown[], earlier: unknown[], queued: unknown[] = []) {
+  mockFrom.mockImplementation((table: string) => {
+    if (table === 'resource') return chainable({ data: listings, error: null })
+    const b = chainable({ data: earlier, error: null })
+    const eq = b.eq as (col: string, val: unknown) => unknown
+    b.eq = vi.fn((col: string, val: unknown) => {
+      if (col === 'status' && val === 'pending') b.then = (resolve: (v: unknown) => void) => resolve({ data: queued, error: null })
+      return eq(col, val)
+    })
+    return b
+  })
 }
 
 const run = (dry = false) => runKeystoneWatch('philly', LIST, { dry })
@@ -179,6 +188,28 @@ describe('runKeystoneWatch', () => {
     const lines = body.ok ? body.differences : []
     expect(lines).toContain('Sababa Falafel: On the list, not in the guide (closed on Google, not filed)')
     expect(lines).toContain(`${names[0]}: On the list, not in the guide`)
+  })
+
+  // Mekor Habracha's watch files many of the same places, and the two run
+  // side by side: a new place already waiting in the queue, from anyone,
+  // isn't filed again (Mekor's run has always checked; Keystone's didn't).
+  it('doesn’t suggest a new place already waiting in the queue', async () => {
+    const byMekor = { id: 's1', payload: { category: 'restaurant', name: 'Sababa Falafel', address: null, phone: null, details: {} } }
+    setDb([], [], [byMekor])
+    const body = await run()
+    expect(mockCreate.mock.calls.map(([, p]) => p.name)).not.toContain('Sababa Falafel')
+    expect(mockGoogle.mock.calls.map(([name]) => name)).not.toContain('Sababa Falafel')
+    expect(mockCreate).toHaveBeenCalled() // the rest still are
+    expect(body.ok && body.differences).toContain('Sababa Falafel: On the list, not in the guide (filed before)')
+  })
+
+  it('doesn’t suggest a new place Google says is one already waiting under another name', async () => {
+    mockGoogle.mockImplementation(async (name: string) => ({ placeId: name === 'Sababa Falafel' ? 'p-waiting' : `p-${name}`, name, businessStatus: 'OPERATIONAL' }))
+    const other = { id: 's1', payload: { category: 'restaurant', name: 'Sababa Grill', address: '1 Elsewhere St', phone: null, details: { placeId: 'p-waiting' } } }
+    setDb([], [], [other])
+    await run()
+    expect(mockCreate.mock.calls.map(([, p]) => p.name)).not.toContain('Sababa Falafel')
+    expect(mockCreate).toHaveBeenCalled()
   })
 
   // A closed place is never filed, so nothing remembered Google's answer:

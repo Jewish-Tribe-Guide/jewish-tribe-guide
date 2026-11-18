@@ -28,7 +28,8 @@ import {
   type GuideListing,
   type MekorEntry,
   type MekorFinding,
-  type PendingCreate,
+  pendingCreates,
+  queuedPlaceIds,
 } from '@/lib/mekorWatch'
 
 /** Fewer places than this means the page changed shape, not that Mekor
@@ -116,16 +117,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
     .eq('operation', 'create')
     .eq('target_type', 'listing')
   if (queuedError) return { ok: false, error: `Couldn’t read the queue: ${queuedError.message}` }
-  const pending: PendingCreate[] = (queued ?? [])
-    .map((s) => ({ id: s.id as string, p: (s.payload ?? {}) as Record<string, unknown> }))
-    .filter(({ p }) => CATEGORIES.includes(String(p.category)))
-    .map(({ id, p }) => ({
-      id,
-      name: String(p.name ?? ''),
-      address: (p.address as string | null) ?? null,
-      phone: (p.phone as string | null) ?? null,
-      details: (p.details ?? {}) as Record<string, unknown>,
-    }))
+  const pending = pendingCreates(queued ?? [], CATEGORIES)
 
   const findings = compareMekor(entries, (rows ?? []) as GuideListing[], pending)
   const agree = mekorAgrees(entries, (rows ?? []) as GuideListing[], findings)
@@ -153,7 +145,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
   // Google's place for each new place already waiting or suggested in this
   // run. Mekor lists some places twice, under two names (the Brodsky
   // Center, filed twice on Nov 4), and a name match can't see that.
-  const queuedPlaces = new Set(pending.map((p) => p.details.placeId).filter((id): id is string => typeof id === 'string' && id !== ''))
+  const queuedPlaces = queuedPlaceIds(pending)
   for (const f of unfiled) {
     let note = findingNote(f, updated)
     if (f.kind === 'new') {

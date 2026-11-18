@@ -17,6 +17,7 @@ import { KOSHER_SECTION } from '@/lib/boxDates'
 import { listDifference, type ListRead } from '@/lib/watches'
 import { KEYSTONE_NAME } from '@/lib/sourceNames'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
+import { alreadyQueued, pendingCreates, queuedPlaceIds } from '@/lib/mekorWatch'
 import {
   KEYSTONE_WATCH_NAME,
   compareKeystone,
@@ -166,7 +167,23 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
     .eq('submitted_by->>name', KEYSTONE_WATCH_NAME)
   if (earlierError) return { ok: false, error: `Couldn\u2019t read earlier suggestions: ${earlierError.message}` }
   const filed = new Set((earlier ?? []).map(submissionKey).filter(Boolean))
-  const unfiled = findings.filter((f) => !filed.has(findingKey(f)))
+
+  // New places already in the queue, from anyone: Mekor Habracha's watch
+  // files many of the same places, and the two run side by side. Checked by
+  // name, address or phone, then by Google's place (Mekor's run, the same).
+  const { data: queued, error: queuedError } = await supabase
+    .from('submission')
+    .select('id,payload')
+    .eq('community_id', community)
+    .eq('status', 'pending')
+    .eq('operation', 'create')
+    .eq('target_type', 'listing')
+  if (queuedError) return { ok: false, error: `Couldn\u2019t read the queue: ${queuedError.message}` }
+  const pending = pendingCreates(queued ?? [], ['restaurant', 'grocery'])
+  const queuedPlaces = queuedPlaceIds(pending)
+  const waiting = (f: WatchFinding) =>
+    f.kind === 'new' && alreadyQueued({ name: f.entry.name, address: f.entry.address, phone: f.entry.phone }, pending)
+  const unfiled = findings.filter((f) => !filed.has(findingKey(f)) && !waiting(f))
 
   const notes = new Map<WatchFinding, string>()
   const placeIds = new Map<WatchFinding, string>()
@@ -185,8 +202,12 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
         closedNow.add(f)
         continue
       }
+      if (g.placeId && queuedPlaces.has(g.placeId)) continue
       note += `\n${g.line}`
-      if (g.placeId) placeIds.set(f, g.placeId)
+      if (g.placeId) {
+        placeIds.set(f, g.placeId)
+        queuedPlaces.add(g.placeId)
+      }
     }
     notes.set(f, note)
     fresh.push(f)
@@ -194,7 +215,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
 
   const differences = findings.map((f) => {
     const d = describe(f)
-    return listDifference(d.name, d.what, filed.has(findingKey(f)) ? 'before' : closedNow.has(f) ? 'closed' : 'now')
+    return listDifference(d.name, d.what, filed.has(findingKey(f)) || waiting(f) ? 'before' : closedNow.has(f) ? 'closed' : 'now')
   })
 
   if (dry) {
