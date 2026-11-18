@@ -24,6 +24,11 @@ import { isOwnStepBack, moveBackTo, moveTo } from './useScreenHistory'
 // `owner`: see stepAddress.ts. `inner`: the parameters of screens inside
 // this one's steps (a change's Edit, inside what a read found), which a
 // step closed here closes too: their entries are stepped back over with it.
+//
+// `reopen` returns false when the screen can't open that path at all (Add
+// a place's form after a reload, with nothing it was given): the address
+// is put back to what the screen shows, in place, with no entry of its own,
+// and the steps inside it go with it.
 
 /** How long a reopening may take to arrive before the screen is taken as
  *  showing all of it it can (a row since removed, say). */
@@ -32,13 +37,15 @@ const REOPEN_MS = 1500
 export function useStepsInAddress(
   param: StepParam | null,
   path: readonly string[],
-  reopen: (path: string[]) => void,
+  reopen: (path: string[]) => void | false,
   { owner, inner = [] }: { owner?: string; inner?: readonly StepParam[] } = {},
 ) {
   const router = useRouter()
   const now = useRef({ path, reopen })
+  const innerNow = useRef(inner)
   useEffect(() => {
     now.current = { path, reopen }
+    innerNow.current = inner
   })
   // What the address has, or will once the moves under way have landed.
   const written = useRef<string[] | null>(null)
@@ -52,7 +59,13 @@ export function useStepsInAddress(
       written.current = to
       if (samePath(to, now.current.path)) return
       reopening.current = { to, until: Date.now() + REOPEN_MS }
-      now.current.reopen(to)
+      if (now.current.reopen(to) !== false) return
+      reopening.current = null
+      const shows = [...now.current.path]
+      written.current = shows
+      void moveTo(router, 'replace', () =>
+        withSteps(window.location.pathname, new URL(withoutSteps(window.location.pathname, window.location.search, innerNow.current), window.location.origin).search, param, shows, owner),
+      )
     }
     take(read())
     const onPop = () => {
@@ -63,6 +76,7 @@ export function useStepsInAddress(
       window.removeEventListener('popstate', onPop)
       written.current = null
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the router is one for the page
   }, [param, owner])
 
   const key = path.join('\n')

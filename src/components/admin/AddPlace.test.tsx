@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { makeCategory } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -38,8 +38,18 @@ const shul = makeCategory({
   ],
 })
 
+// The router writes the address, as Next's does: Add's moves wait for each
+// to land (useScreenHistory.ts), on one queue for the whole file.
+beforeEach(() => {
+  window.history.replaceState({}, '', '/philly/admin/places?add=synagogue')
+  mockRouter.push.mockImplementation((url: string) => window.history.pushState({}, '', url))
+  mockRouter.replace.mockImplementation((url: string) => window.history.replaceState({}, '', url))
+})
+
 afterEach(() => {
   cleanup()
+  mockRouter.push.mockClear()
+  mockRouter.replace.mockClear()
   vi.mocked(fetchJson).mockReset()
   vi.mocked(fetchJson).mockImplementation(async () => ({}))
   vi.unstubAllGlobals()
@@ -345,6 +355,30 @@ describe('Add a place', () => {
       await giveEmail(user)
       await readEmail(user)
       await waitFor(() => expect(sourceWords()).toContain('office@ohev.org · Oct 30'))
+    })
+  })
+
+  // Nov 18: the form after Find was only state, so the browser's Back left
+  // Add altogether, and a reload on the form had no address to land on.
+  describe('in the address', () => {
+    it('the form is an entry: Back goes to Find, Forward to the form again', async () => {
+      const user = userEvent.setup()
+      renderAdd()
+      await user.click(screen.getByRole('button', { name: 'Fill it in yourself' }))
+      await waitFor(() => expect(window.location.search).toBe('?add=synagogue&step=finish'))
+
+      act(() => history.back())
+      expect(await screen.findByLabelText('Find the place')).toBeInTheDocument()
+      act(() => history.forward())
+      expect(await screen.findByTestId('editor-row-name')).toBeInTheDocument()
+    })
+
+    it('a reload on the form, or a source screen over it, is Find, and the address says so in place', async () => {
+      window.history.replaceState({}, '', '/philly/admin/places?add=synagogue&step=finish&row=hours&over=page.add')
+      renderAdd()
+      expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
+      await waitFor(() => expect(window.location.search).toBe('?add=synagogue'))
+      expect(mockRouter.push).not.toHaveBeenCalled()
     })
   })
 })

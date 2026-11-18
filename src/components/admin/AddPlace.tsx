@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { isCategorySyncEligible, type CategoryConfig } from '@/lib/categories'
 import { sectionFlags, type EditorRow, type EditorValues } from '@/lib/editorRows'
 import { fetchJson } from '@/lib/fetchJson'
@@ -24,6 +24,7 @@ import { addRowSources, foundLines, type AddLine, type AddRead, type AddSlot, ty
 import ListingEditorScreen from './ListingEditorScreen'
 import { RowJob, SourceScreen, SourceWords, type SourceScreenProps } from './PlaceListing'
 import { sourceActions } from './sourceActions'
+import { useStepsInAddress } from './useStepsInAddress'
 
 // Add a place (boards AddFind8, AddRows11, AddSelf11, Nov 1): find it on
 // Google first, as visitors do, then the rows and lines of a saved listing,
@@ -36,6 +37,9 @@ type Found = { id: string; payload: unknown }
 type PageReply = { pages?: { watch: { id: string; url: string; lastError?: string | null } }[] }
 /** Added: being read, a page that couldn't be, or what's found. */
 type AddedAs = { listing: DirectoryResource; stage: 'reading' | 'failed' | 'found' | 'no-email' | 'done'; lines: string[]; fromEmail?: boolean; retry?: { job: 'hours' | 'times'; watchId: string; was: string }; notSaved?: string[] }
+
+/** What a Change or Add a source screen asks for. */
+type ScreenSpec = { title: string; label: string; slot: AddSlot; placeholder?: string }
 
 /** No email has come: the guide has to be on its list (EmailNone14). */
 export function SignUpLine({ account }: { account: string | null }) {
@@ -67,7 +71,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   const [picked, setPicked] = useState<Partial<Record<CheckedField, string>> | null>(null)
   const [given, setGiven] = useState<GivenSources>({})
   const [stopped, setStopped] = useState<ReadonlySet<CheckedField>>(new Set())
-  const [screen, setScreen] = useState<{ title: string; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> } | null>(null)
+  const [screen, setScreen] = useState<{ key: string; title: string; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> } | null>(null)
   const [addedAs, setAddedAs] = useState<AddedAs | null>(null)
   const [takeFailed, setTakeFailed] = useState(false)
   const [reads, setReads] = useState<Partial<Record<AddSlot, AddRead>>>({})
@@ -108,6 +112,38 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
 
   const back = googleFirst ? () => setStep('find') : onClose
   useSetScreenHeader(step === 'find', 'Add a place', onClose)
+
+  // The form after Find, and a source's Change or Add a source over it, each
+  // have an address and an entry (?step=finish, ?over=page.change), so Back
+  // goes to Find rather than out of Add, and Forward and a reload land on
+  // each (Nov 18: both were only state). What was typed isn't kept, so a
+  // reload on the form is Find again, as Add starts; Forward, with the form
+  // still here, is the form.
+  const beenToForm = useRef(step === 'finish')
+  if (step === 'finish') beenToForm.current = true
+  useStepsInAddress(
+    googleFirst ? 'step' : null,
+    step === 'finish' ? ['finish'] : [],
+    ([to]) => {
+      if (to === 'finish' && !beenToForm.current) return false
+      setStep(to === 'finish' ? 'finish' : 'find')
+    },
+    { inner: ['row', 'over'] },
+  )
+  // The Change and Add a source the lines have offered, for one to open again.
+  const screensSeen = useRef(new Map<string, ScreenSpec>())
+  const [overAsked, setOverAsked] = useState<string | null>(null)
+  useStepsInAddress('over', screen ? [screen.key] : [], ([to]) => {
+    if (to && googleFirst && !beenToForm.current) return false
+    setOverAsked(to ?? null)
+    if (!to) setScreen(null)
+  })
+  useEffect(() => {
+    const spec = overAsked ? screensSeen.current.get(overAsked) : undefined
+    if (!overAsked || !spec) return
+    setOverAsked(null)
+    openScreen(overAsked, spec)
+  })
 
   if (step === 'find') {
     return (
@@ -196,8 +232,9 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     setKosherUsed(on.name)
   }
 
-  const openScreen = (title: string, label: string, slot: AddSlot, placeholder?: string) =>
+  function openScreen(key: string, { title, label, slot, placeholder }: ScreenSpec) {
     setScreen({
+      key,
       title,
       props: {
         label,
@@ -210,6 +247,13 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
         },
       },
     })
+  }
+  /** A Change or Add a source on a line: offered, and so can open again. */
+  const screenControl = (words: string, spec: ScreenSpec, kind: 'change' | 'add') => {
+    const key = `${spec.slot}.${kind}`
+    screensSeen.current.set(key, spec)
+    return control(words, () => openScreen(key, spec))
+  }
 
   const control = (words: string, onClick: () => void) => (
     <button type="button" onClick={onClick} className={LINE_LINK}>
@@ -229,11 +273,11 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     }
     if (line.change) {
       const c = line.change
-      out.push(control('Change', () => openScreen('Change', c.label, c.slot, c.placeholder)))
+      out.push(screenControl('Change', { title: 'Change', label: c.label, slot: c.slot, placeholder: c.placeholder }, 'change'))
     }
     if (line.add) {
       const a = line.add
-      out.push(control(a.words ?? 'Add a source', () => openScreen(a.words ?? 'Add a source', a.label, a.slot, a.placeholder)))
+      out.push(screenControl(a.words ?? 'Add a source', { title: a.words ?? 'Add a source', label: a.label, slot: a.slot, placeholder: a.placeholder }, 'add'))
     }
     if (line.googleStop) {
       const f = line.googleStop

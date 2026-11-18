@@ -183,3 +183,49 @@ test('a change in To do: a minyan in the box it changes', async ({ page }) => {
   ])
   await expect(page).toHaveURL(/\/philly\/admin\?open=[^&]+$/)
 })
+
+// Add a place's form after Find, and a source's Add over a row of it (Nov
+// 18: both were only state, so Back left Add altogether). Not walk(): a
+// reload on the form is Find again, since what was typed isn't kept, and
+// the address says so in place. Writes nothing: nothing is added.
+test('Add a place: Find, the form, a row, a source over it', async ({ page }) => {
+  await page.goto('/philly/admin/places?add=synagogue')
+  const find = page.getByLabel('Find the place')
+  const form = visible(page, page.getByRole('button', { name: /^Usual weekday times/ }))
+  const row = visible(page, page.getByRole('button', { name: 'Add a minyan' }))
+  const over = visible(page, page.getByRole('heading', { name: 'Add a source' }))
+  const at = (query: string) => expect.poll(() => new URL(page.url()).search, { timeout: 20_000 }).toBe(query)
+  await expect(find).toBeVisible({ timeout: 20_000 })
+
+  await page.getByRole('button', { name: 'Fill it in yourself' }).click()
+  await expect(form).toBeVisible()
+  await at('?add=synagogue&step=finish')
+  await form.click()
+  await expect(row).toBeVisible()
+  await at('?add=synagogue&step=finish&row=minyans%3Aweekday')
+  await visible(page, page.getByRole('button', { name: 'Add a source' })).click()
+  await expect(over).toBeVisible()
+  await at('?add=synagogue&step=finish&row=minyans%3Aweekday&over=page.add')
+
+  await page.goBack()
+  await expect(row).toBeVisible()
+  await expect(over).not.toBeVisible()
+  await page.goBack()
+  await expect(form).toBeVisible()
+  await page.goBack()
+  await expect(find).toBeVisible()
+  await at('?add=synagogue')
+  for (const shows of [form, row, over]) {
+    await page.goForward()
+    await expect(shows).toBeVisible()
+  }
+
+  await page.reload()
+  await expect(find).toBeVisible({ timeout: 20_000 })
+  await at('?add=synagogue')
+  // And the form, opened again, is an entry again.
+  await page.getByRole('button', { name: 'Fill it in yourself' }).click()
+  await at('?add=synagogue&step=finish')
+  await page.goBack()
+  await expect(find).toBeVisible()
+})
