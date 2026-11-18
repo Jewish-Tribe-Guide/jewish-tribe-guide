@@ -1047,6 +1047,21 @@ describe('runListingPageWatch: a mikvah’s sections, each filed on its own', ()
     expect(await run()).toMatchObject({ ok: true, filed: 0, check: { queue: 'before' } })
   })
 
+  // A part waiting kept the old fingerprint, so the page read as changed,
+  // and was AI-read, every night until an admin decided. Once nothing
+  // waits, the page is read again (stoodBehind) (Nov 18 review).
+  it('the nightly run reads a page once while a part of it waits, not every night', async () => {
+    m.readMessage.mockResolvedValue(reading([men]))
+    m.pending = [filedFor('menTevillah', { ...place.details, men_s_hours: { sun: { open: '06:00', close: '10:00' } } }, 'https://other.example/')]
+    const daily = (w: Parameters<typeof runListingPageWatch>[0]) => runListingPageWatch(w, newMenuReadBudget(), { apiKey: 'k', now: NOW })
+    const first = await daily({ ...changed, resourceId: 'mk' })
+    expect(first).toMatchObject({ ok: true, filed: 0, pageHash: await hashOfPage(), check: { queue: 'waiting' } })
+    m.readMessage.mockClear()
+    // As the runner saves it, read since notes are (NOTES_READ_FROM).
+    await daily({ ...changed, resourceId: 'mk', pageHash: first.ok ? first.pageHash! : null, lastCheck: first.ok && first.check ? { ...first.check, at: NOTES_READ_FROM } : null })
+    expect(m.readMessage).not.toHaveBeenCalled()
+  })
+
   it('anything else waiting, a person’s edit, still holds back the lot', async () => {
     m.readMessage.mockResolvedValue(reading([women]))
     m.pending = [{ id: 'p', payload: { details: {} } }]

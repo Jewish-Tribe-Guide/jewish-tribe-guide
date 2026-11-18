@@ -1043,14 +1043,17 @@ async function readAndFile(
   if (parts.length) {
     if (blocked) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting') }
     const { queue, filed } = await fileParts(watch, listing, proposal, parts, waitingNow, source.text, { now: opts.now, seen: changed ? 'changed' : 'read' })
-    return { ok: true, filed: filed.length, ...(queue === 'waiting' && watch.pageHash ? {} : { pageHash }), check: check(queue) }
+    // Read, so its fingerprint is kept even with a part waiting: once
+    // nothing waits it's read again (stoodBehind), and keeping the old one
+    // read it with the AI every night till then (Nov 18 review).
+    return { ok: true, filed: filed.length, pageHash, check: check(queue) }
   }
   // A mikvah's hours: filed as the sections they change, each on its own.
   const sections = reads.kind === 'hours' ? splitSections(hoursSections(category, reads.keys), listing, proposal.submission.details) : []
   if (sections.length) {
     if (blocked) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting') }
     const { queue, filed } = await fileSections(watch, category, listing, sections, waitingNow, source.text, { now: opts.now, seen: changed ? 'changed' : 'read' })
-    return { ok: true, filed: filed.length, ...(queue === 'waiting' && watch.pageHash ? {} : { pageHash }), check: check(queue) }
+    return { ok: true, filed: filed.length, pageHash, check: check(queue) }
   }
   // Only a check gets here with one waiting: it says so, files nothing, and
   // a change stays news for the daily run.
