@@ -147,6 +147,10 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
   const closed: string[] = []
   const closedNow = new Set<MekorFinding>()
   const fresh: MekorFinding[] = []
+  // Google's place for each new place already waiting or suggested in this
+  // run. Mekor lists some places twice, under two names (the Brodsky
+  // Center, filed twice on Nov 4), and a name match can't see that.
+  const queuedPlaces = new Set(pending.map((p) => p.details.placeId).filter((id): id is string => typeof id === 'string' && id !== ''))
   for (const f of unfiled) {
     let note = findingNote(f, updated)
     if (f.kind === 'new') {
@@ -156,8 +160,12 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
         closedNow.add(f)
         continue
       }
+      if (g.placeId && queuedPlaces.has(g.placeId)) continue
       note += `\n${g.line}`
-      if (g.placeId) placeIds.set(f, g.placeId)
+      if (g.placeId) {
+        placeIds.set(f, g.placeId)
+        queuedPlaces.add(g.placeId)
+      }
     }
     notes.set(f, note)
     fresh.push(f)
