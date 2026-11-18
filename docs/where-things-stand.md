@@ -759,6 +759,12 @@ With no choice made it's the first two categories with hours, as before
     bar (16-40 now; they sit ~25px over it).
 
 Nov 14, later, the user's yes to both:
+- Fixed Nov 17 (the user: WhatsApp Groups on a computer, narrowed to a
+  phone and widened again, "the search bar gets weird"): the category
+  page's search bar stayed in its docked look (white box, border, shadow)
+  on an unscrolled page. Crossing the phone/computer line remounts its
+  scroll marker and the docked check kept watching the old one.
+  `e2e/category-controls-resize.spec.ts`, red 3/3 before.
 - **The Kept up card is one line**, as tall as the search box (48px; it
   was 59px on two lines, the bigger box on the page): "Kept up by the
   community · 149 places", still a card with its chevron. A longer trust

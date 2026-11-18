@@ -722,11 +722,21 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // needs to re-render whenever stuck-ness actually changes — polling
   // getComputedStyle on every scroll frame just to catch that would be far
   // more work for the same answer an observer gives you for free.
+  //
+  // Re-run on crossing the phone/computer line (isMobile): that remounts
+  // the sentinel (CategoryBandFrame wraps the list only on a computer), and
+  // an observer left on the old, detached node read top 0, "stuck", so the
+  // bar kept its docked white box on an unscrolled page (the user, Nov 17:
+  // desktop → phone → desktop). Keyed on isMobile, not a callback ref held
+  // as state: that cost a second render on every load. And not watched at
+  // all on a phone, where the docked look is never drawn: there each change
+  // re-rendered the page under an open sheet, and a shul's sheet opened from
+  // its address lost its Edit button mid-test (one-sheet.spec, 2 runs in 15).
   const controlsSentinelRef = useRef<HTMLDivElement>(null)
   const [controlsStuck, setControlsStuck] = useState(false)
   useEffect(() => {
     const sentinel = controlsSentinelRef.current
-    if (!sentinel) return
+    if (!sentinel || isMobile) return
     // rootMargin's top matches `lg:top-14` (56px) below — the sentinel sits
     // in normal flow immediately above the controls bar, so it stops
     // "intersecting" at exactly the scroll position where the bar's own
@@ -797,7 +807,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       if (resizeTimer != null) clearTimeout(resizeTimer)
       observer.disconnect()
     }
-  }, [])
+  }, [isMobile])
   const scrollItemIntoView = (id: string, behavior: ScrollBehavior) => {
     const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
     // A listing open in the list's column (desktop): its row is hidden, so
