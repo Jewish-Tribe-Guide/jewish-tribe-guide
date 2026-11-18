@@ -347,6 +347,20 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   instead of 14, and Map's wider padding starts at 390 instead of 375.
   **Changes** the row's text size on small phones; 390 and up and the
   computer are unchanged.
+- Built Nov 17, boards A4/B4/D5 (canvas HDnTE69LPCKmyMHvUHjpGr): a listing
+  whose main thing is its one link (WhatsApp groups, Networking, a
+  cemetery with only a website; `mainThing` = `join`) opens with Join or
+  Visit and Share as two pills under the name, then the box with who it's
+  for and the link's date. On a phone the pills split the row two thirds
+  and one; from 640 wide each is as wide as its words. The box loses its
+  own Edit when it is the listing's only box and Edit listing is under it.
+  **Changes** Oct 6's one box (Join was inside it, after the description)
+  and Oct 10's Edit under every box, on these listings only.
+- Found Nov 17, not fixed: `e2e/listing-detail.spec.ts:375` (mobile) —
+  a Cemetery listing's own page, header Back: the list shows but the
+  address stays on the listing, about 1 run in 13 (3 of 40 on the code
+  before the pills, 3 of 41 after). A real Back that doesn't write its
+  address, not a slow test: the poll waits 5s.
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,

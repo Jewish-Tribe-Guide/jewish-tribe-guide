@@ -364,19 +364,15 @@ export default function ListingView({ item, category, color, place = null, upvot
   // ── 2 · Actions ────────────────────────────────────────────────────────
   const { buttons, extra } = listingActions(item, category)
   const join = main === 'join' ? primaryLink(item, category) : null
-  const actions = join ? (
-    // One box (Oct 6): who it's for, then Join with Share beside it, so the
-    // listing isn't one big button over another (Suggest an edit is outlined
-    // under it on these listings, ListingEditBar).
-    <Card
-      testId="listing-join-box"
-      footer={confirmAt?.at === 'join' ? <JoinLinkCheck item={item} joined={joined} /> : undefined}
-      onEdit={editRows(rowIds.has('about') ? 'Link and description' : contactTitle, ['contact', 'about'])}
-    >
-      {joinAbout.map((f) => (
-        <p key={f.key} className="whitespace-pre-line pt-2.5 text-[15.5px] leading-snug text-slate-800">{String(item[f.key]).trim()}</p>
-      ))}
-      <div className="flex items-center gap-2.5 pt-3.5 pb-1">
+  // Join (or Visit) and Share first, under the name, outside the box (the
+  // user, Nov 17, boards A4/B4/D5): what the listing is for, before what it
+  // says. Two pills, the main one filled, Share written out and tinted.
+  // Never a wide pill with a circle beside it: that shape is Edit listing
+  // and Remove's alone (the user). On a phone the row is split two thirds
+  // and one; from 640 wide each pill is as wide as its words, so the pair
+  // never reads as a second Edit listing bar.
+  const joinRow = join && (
+    <div className="flex gap-2.5" data-testid="listing-join-row">
       <a
         href={join.href}
         target="_blank"
@@ -385,16 +381,31 @@ export default function ListingView({ item, category, color, place = null, upvot
           track('listing_action', { action: join.field.linkLabel ?? join.field.label })
           setJoined(true)
         }}
-        className={`flex h-12 flex-1 items-center justify-center gap-2 rounded-full px-5 text-[15.5px] font-bold text-white transition-colors sm:max-w-sm ${
+        className={`flex h-12 min-w-0 flex-[2_1_0%] items-center justify-center gap-2 rounded-full px-5 text-[15.5px] font-bold text-white transition-colors sm:flex-none sm:px-7 ${
           isWhatsApp(category) ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-primary hover:bg-primary-dark'
         }`}
       >
-        {isWhatsApp(category) ? <JoinIcon className="h-5 w-5" /> : <GlobeIcon className="h-5 w-5" />}
-        {joinLabel(join.field, category, join.href)}
+        {isWhatsApp(category) ? <JoinIcon className="h-5 w-5 shrink-0" /> : <GlobeIcon className="h-5 w-5 shrink-0" />}
+        <span className="truncate">{joinLabel(join.field, category, join.href)}</span>
       </a>
-      <ShareButton path={path} name={item.name} round />
-      </div>
-    </Card>
+      <ShareButton path={path} name={item.name} pill />
+    </div>
+  )
+  // Then who it's for, and the link's date (Oct 6), in a box. Its own Edit
+  // only when the listing has another box: on a listing that's this box
+  // alone, Edit listing right under it is the same thing (the user, Nov 17).
+  const joinFooter = confirmAt?.at === 'join' ? <JoinLinkCheck item={item} joined={joined} /> : undefined
+  const joinBox = (onlyBox: boolean) =>
+    join &&
+    (joinAbout.length > 0 || joinFooter) && (
+      <Card testId="listing-join-box" footer={joinFooter} onEdit={onlyBox ? undefined : editRows(rowIds.has('about') ? 'Link and description' : contactTitle, ['contact', 'about'])}>
+        {joinAbout.map((f) => (
+          <p key={f.key} className="whitespace-pre-line pt-2.5 text-[15.5px] leading-snug text-slate-800">{String(item[f.key]).trim()}</p>
+        ))}
+      </Card>
+    )
+  const actions = join ? (
+    joinRow
   ) : (
     // Spread across a phone's width, where they fill it; in the desktop
     // column, a set gap from the left, or the gaps grow with the column
@@ -848,12 +859,17 @@ export default function ListingView({ item, category, color, place = null, upvot
     arranged = placed.map((p) => <Fragment key={p.id}>{p.node}</Fragment>)
   }
 
+  // The join box is the listing's one box: no other box here has an Edit,
+  // and Edit listing is under it (foot).
+  const onlyBox = !!foot && ![leadBoxView, caveatBox, mainSection, ...boxes, walks, shabbos, emptyItems, details, about].some(Boolean)
+
   return (
     <div className="space-y-5" data-testid="listing-view">
       {who}
       {foundBox}
       <TappedMinyanBox item={item} category={category} />
       {actions}
+      {joinBox(onlyBox)}
       {arranged ?? (
         <>
       {/* A link's own box, what isn't kosher and the main thing, in the
@@ -1097,12 +1113,13 @@ function SetLocationRow({ item }: { item: DirectoryResource }) {
   )
 }
 
-function ShareButton({ path, name, round = false }: { path: string; name: string; round?: boolean }) {
+function ShareButton({ path, name, pill = false }: { path: string; name: string; pill?: boolean }) {
   const { share, copied } = useShareLink(path, name)
-  if (round) {
+  if (pill) {
     return (
-      <button type="button" onClick={(e) => share(e)} aria-label={copied ? 'Link copied' : `Share ${name}`} className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/15">
-        <ShareIcon className="h-5 w-5" />
+      <button type="button" onClick={(e) => share(e)} aria-label={copied ? 'Link copied' : `Share ${name}`} className="flex h-12 min-w-0 flex-[1_1_0%] cursor-pointer items-center justify-center gap-2 rounded-full bg-primary/10 px-4 text-[15.5px] font-bold text-primary transition-colors hover:bg-primary/15 sm:flex-none sm:px-6">
+        <ShareIcon className="h-5 w-5 shrink-0" />
+        {copied ? 'Copied!' : 'Share'}
       </button>
     )
   }

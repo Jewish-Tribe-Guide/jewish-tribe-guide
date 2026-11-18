@@ -57,6 +57,10 @@ work is in `docs/where-things-stand.md`.
   hover instead (board G5b, Nov 11: "those two + kept up by the community
   can lose the chevrons and just have hover"). A row is the name, the
   answer, and when it was checked. Details live in the listing.
+- **A wide pill with a circle beside it is Edit listing and Remove's
+  alone** (Nov 17: "I just don't want to copy the edit and remove layout").
+  Nothing else on a listing takes that shape: a group's Join and Share are
+  two pills, Share tinted and written out (board A4).
 - **Whole-text links.** A link is one action phrase ("Fill it in yourself"),
   not a question with a clickable tail.
 - **No emoji as icons.** They read as "childish, cheap, and more AI obvious".

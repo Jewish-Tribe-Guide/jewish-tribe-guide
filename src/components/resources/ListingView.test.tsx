@@ -268,13 +268,14 @@ describe('ListingView — the main thing', () => {
     expect(screen.queryByTestId('listing-about')).not.toBeInTheDocument()
   })
 
-  it('a WhatsApp group: what it’s for under the name, then Join, and no Directions', () => {
+  it('a WhatsApp group: Join under the name, then what it’s for, and no Directions', () => {
     const link: CategoryField = { key: 'link', label: 'Join group', type: 'url', renderAs: 'row', linkLabel: 'Join group', showInHeader: true }
     const groups = makeCategory({ id: 'whatsapp', label: 'WhatsApp Group', hasAddress: false, detailFields: [{ key: 'description', label: 'Description', type: 'textarea', renderAs: 'row' }, link] })
     view({ item: makeListing({ address: '', description: 'For people keeping kosher', link: 'https://chat.whatsapp.com/x' }), category: groups })
     const join = screen.getByRole('link', { name: /Join the group/ })
     expect(join).toHaveAttribute('href', 'https://chat.whatsapp.com/x')
-    expect(screen.getByText('For people keeping kosher').compareDocumentPosition(join) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // The action first (the user, Nov 17, board A4).
+    expect(join.compareDocumentPosition(screen.getByText('For people keeping kosher')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.queryByText('Directions')).not.toBeInTheDocument()
     expect(screen.queryByTestId('listing-about')).not.toBeInTheDocument()
   })
@@ -316,18 +317,59 @@ describe('ListingView — a mikvah’s boxes (Oct 6)', () => {
   })
 })
 
-describe('ListingView — the join box (Oct 6)', () => {
-  it('who it’s for, Join and Share in one box', () => {
-    const link: CategoryField = { key: 'link', label: 'Join group', type: 'url', renderAs: 'row', linkLabel: 'Join group', showInHeader: true }
-    const groups = makeCategory({ id: 'whatsapp', label: 'WhatsApp Group', hasAddress: false, detailFields: [{ key: 'description', label: 'Description', type: 'textarea', renderAs: 'row' }, link] })
-    view({ item: makeListing({ address: '', description: 'For people keeping kosher', link: 'https://chat.whatsapp.com/x' }), category: groups })
+// The user, Nov 17 (boards A4, B4, D5): Join or Visit and Share first, as
+// two pills outside the box; the box says who it's for and dates the link.
+describe('ListingView — Join and Share, then the box (Nov 17)', () => {
+  const link: CategoryField = { key: 'link', label: 'Join group', type: 'url', renderAs: 'row', linkLabel: 'Join group', showInHeader: true }
+  const description: CategoryField = { key: 'description', label: 'Description', type: 'textarea', renderAs: 'row' }
+  const groups = makeCategory({ id: 'whatsapp', label: 'WhatsApp Group', hasAddress: false, detailFields: [description, link] })
+  const group = makeListing({ address: '', description: 'For people keeping kosher', link: 'https://chat.whatsapp.com/x' })
+
+  it('Join and Share in a row above the box, which says who it’s for and dates the link', () => {
+    view({ item: group, category: groups })
+    const row = screen.getByTestId('listing-join-row')
     const box = screen.getByTestId('listing-join-box')
+    expect(row.nextElementSibling).toBe(box)
+    expect(within(row).getByRole('link', { name: 'Join the group' })).toBeInTheDocument()
+    expect(within(box).queryByRole('link')).not.toBeInTheDocument()
     expect(box).toHaveTextContent('For people keeping kosher')
-    // One line on a phone: the listing says WhatsApp right above it.
-    expect(within(box).getByRole('link', { name: 'Join the group' })).toBeInTheDocument()
-    expect(within(box).getByRole('button', { name: /Share/ })).toBeInTheDocument()
-    // Its link's date at the box's foot, not floating under it.
     expect(within(box).getByTestId('freshness')).toHaveTextContent('Join link')
+  })
+
+  it('Share is a tinted pill that says Share, never a circle: a pill with a circle beside it is Edit listing and Remove’s', () => {
+    view({ item: group, category: groups })
+    const share = within(screen.getByTestId('listing-join-row')).getByRole('button', { name: /Share/ })
+    expect(share).toHaveTextContent('Share')
+    expect(share.className).toMatch(/bg-primary\/10/)
+    expect(share.className).not.toMatch(/\bw-12\b/)
+  })
+
+  it('two thirds and one on a phone; from 640 wide each pill is as wide as its words', () => {
+    view({ item: group, category: groups })
+    const row = screen.getByTestId('listing-join-row')
+    const join = within(row).getByRole('link', { name: 'Join the group' })
+    const share = within(row).getByRole('button', { name: /Share/ })
+    expect(join.className).toMatch(/flex-\[2_1_0%\]/)
+    expect(share.className).toMatch(/flex-\[1_1_0%\]/)
+    for (const pill of [join, share]) expect(pill.className).toMatch(/sm:flex-none/)
+    expect(join.className).not.toMatch(/max-w/)
+  })
+
+  it('no Edit on the box when it is the listing’s only box: Edit listing is right under it', () => {
+    view({ item: group, category: groups })
+    expect(within(screen.getByTestId('listing-join-box')).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+  })
+
+  it('keeps its Edit when the listing has another box', () => {
+    const withPhone = makeCategory({ id: 'whatsapp', label: 'WhatsApp Group', hasAddress: false, detailFields: [description, link] })
+    view({ item: makeListing({ ...group, phone: '2155551234' }), category: withPhone })
+    expect(screen.getByTestId('listing-details')).toBeInTheDocument()
+    expect(within(screen.getByTestId('listing-join-box')).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+  })
+
+  it('keeps its Edit where there is no Edit listing under it', () => {
+    view({ item: group, category: groups, foot: undefined })
+    expect(within(screen.getByTestId('listing-join-box')).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
   })
 })
 
@@ -336,7 +378,7 @@ describe('ListingView — a network’s one link (Oct 6)', () => {
     const w: CategoryField = { key: 'w', label: 'Website', type: 'url', renderAs: 'row', showInHeader: true }
     const networking = makeCategory({ id: 'young-professional', label: 'Networking', hasAddress: false, detailFields: [{ key: 'd', label: 'Description', type: 'textarea', renderAs: 'row' }, w] })
     view({ item: makeListing({ address: '', d: 'We’re here to connect you', w: 'https://www.tribe12.org/' }), category: networking })
-    const visit = within(screen.getByTestId('listing-join-box')).getByRole('link', { name: 'Visit tribe12.org' })
+    const visit = within(screen.getByTestId('listing-join-row')).getByRole('link', { name: 'Visit tribe12.org' })
     expect(visit).toHaveAttribute('href', 'https://www.tribe12.org/')
     expect(visit.className).toMatch(/bg-primary/)
   })
