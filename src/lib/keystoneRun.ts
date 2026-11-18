@@ -6,17 +6,14 @@
 //
 // Run daily for every keystone_list watch by /api/cron/watches, and on
 // demand from the admin Watches tab. `dry` says what it would file and
-// files nothing.
+// files nothing. The run itself is kosherListRun.ts, shared with Mekor
+// Habracha's list; this is what is Keystone-K's own.
 
-import { getAdminClient } from '@/lib/supabase/admin'
 import type { WatchDigestItem } from '@/lib/email'
 import { submitListingCreate, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
-import { canAskGoogle, findPlaceStatus, namesOverlap } from '@/lib/googlePlaces'
-import { confirmFromSource } from '@/lib/sourceConfirm'
-import { KOSHER_SECTION } from '@/lib/boxDates'
-import { listDifference, type ListRead } from '@/lib/watches'
 import { KEYSTONE_NAME } from '@/lib/sourceNames'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
+import { runKosherListWatch, withPlaceId, type KosherList, type KosherListRun } from '@/lib/kosherListRun'
 import {
   KEYSTONE_WATCH_NAME,
   compareKeystone,
@@ -43,64 +40,7 @@ function describe(f: WatchFinding): WatchDigestItem {
   return { name: f.listing.name, what: f.changes.join('; ') }
 }
 
-/** Keystone-K's list lags: a place can close and stay on it for a year
- *  (Shalom Pizzeria, closed on Google, still listed Oct 5). So a place the
- *  guide lacks is asked about on Google before it's suggested: permanently
- *  closed is not suggested at all, anything else is said on the card. Only
- *  new places are asked; the guide's own listings are already checked every
- *  night by the Google sync. */
-async function googleSays(f: Extract<WatchFinding, { kind: 'new' }>): Promise<GoogleSays> {
-  return askGoogleIfOpen(f.entry.name, f.entry.address)
-}
-
-/** `placeId`: the place Google found, to file with a new place, so
- *  approving it fills the listing from Google at once (the user, Nov 2). */
-type GoogleSays = { closed: boolean; line: string; placeId?: string }
-
-/** Whether Google says a place a list names is still open, as a line for
- *  its card. Shared with Mekor Habracha's watch (mekorRun.ts). */
-export async function askGoogleIfOpen(name: string, address: string): Promise<GoogleSays> {
-  // Run with no Google key (the test project's daily run, which leaves
-  // Google's paid calls out): said so, never "couldn't find it", so the
-  // admin checks it's open before approving.
-  if (!canAskGoogle()) return { closed: false, line: 'Google wasn\u2019t asked whether it\u2019s still open.' }
-  const g = await findPlaceStatus(name, address)
-  if (!g) return { closed: false, line: 'Google: couldn\u2019t find it.' }
-  const as = g.name ? ` (as "${g.name}")` : ''
-  if (g.businessStatus === 'CLOSED_PERMANENTLY') return { closed: true, line: `Google: permanently closed${as}.` }
-  // Kept only when Google's name for it is the list's, as approval asks of
-  // a place picked by address (withResolvedPlaceId): Find Place's first
-  // answer can be the building, or the shop next door.
-  const place = g.name && namesOverlap(g.name, name) ? { placeId: g.placeId } : {}
-  if (g.businessStatus === 'CLOSED_TEMPORARILY') return { closed: false, line: `Google: temporarily closed${as}.`, ...place }
-  return { closed: false, line: `Google: open${as}.`, ...place }
-}
-
-/** A new place's details with Google's place, unless it has one. Shared
- *  with mekorRun.ts. */
-export function withPlaceId<T extends Record<string, unknown>>(details: T, placeId: string | undefined): T {
-  return placeId && !details.placeId ? { ...details, placeId } : details
-}
-
-export type KeystoneRun =
-  | { ok: false; error: string }
-  | {
-      ok: true
-      entries: number
-      /** The list as read, kept on its watch (WatchCheck.listRead). */
-      listRead: ListRead
-      findings: number
-      filed: number
-      /** Listings the list names that agree with it. */
-      matching: number
-      closedOnGoogle: string[]
-      /** Every place it differs on, a line each (listDifference). */
-      differences: string[]
-      /** Listings the list agreed with, dated today. */
-      confirmed?: number
-      /** A dry run's suggestions, unfiled. */
-      wouldFile?: (WatchDigestItem & { kind: WatchFinding['kind']; note: string })[]
-    }
+export type KeystoneRun = KosherListRun<WatchFinding['kind']>
 
 /** Keystone-K's list, read now: every entry on it, or why it couldn't be.
  *  Shared with the Kosher certification page (/api/admin/watches/kosher). */
@@ -123,118 +63,71 @@ export async function readKeystoneList(url: string): Promise<{ entries: Keystone
   return { entries }
 }
 
-export async function runKeystoneWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<KeystoneRun> {
-  const list = await readKeystoneList(url)
-  if ('error' in list) return { ok: false, error: list.error }
-  const { entries } = list
-
-  const supabase = getAdminClient()
-  const { data: rows, error } = await supabase
-    .from('resource')
-    .select('id,category,name,address,phone,anchor_id,distance,details')
-    .eq('community_id', community)
-    .eq('status', 'approved')
-    .in('category', ['restaurant', 'grocery'])
-  if (error) return { ok: false, error: `Couldn\u2019t read the guide's listings: ${error.message}` }
-
-  const findings = compareKeystone(entries, (rows ?? []) as WatchedListing[])
-  const agree = keystoneAgrees(entries, (rows ?? []) as WatchedListing[], findings)
-
-  // Everything this watch has filed before, whatever became of it: a
-  // suggestion an admin rejected isn't made again until the list changes.
-  const { data: earlier, error: earlierError } = await supabase
-    .from('submission')
-    .select('operation,target_id,payload,note')
-    .eq('community_id', community)
-    .eq('submitted_by->>name', KEYSTONE_WATCH_NAME)
-  if (earlierError) return { ok: false, error: `Couldn\u2019t read earlier suggestions: ${earlierError.message}` }
-  const filed = new Set((earlier ?? []).map(submissionKey).filter(Boolean))
-  const unfiled = findings.filter((f) => !filed.has(findingKey(f)))
-
-  const notes = new Map<WatchFinding, string>()
-  const placeIds = new Map<WatchFinding, string>()
-  const closed: string[] = []
-  const closedNow = new Set<WatchFinding>()
-  const fresh: WatchFinding[] = []
-  for (const f of unfiled) {
-    let note = findingNote(f)
-    if (f.kind === 'new') {
-      const g = await googleSays(f)
-      if (g.closed) {
-        closed.push(f.entry.name)
-        closedNow.add(f)
-        continue
+/** Keystone-K's part of a kosher list's run (kosherListRun.ts). */
+function keystoneList(community: string, url: string): KosherList<KeystoneEntry, WatchFinding> {
+  return {
+    watchName: KEYSTONE_WATCH_NAME,
+    sourceName: KEYSTONE_NAME,
+    async read() {
+      const list = await readKeystoneList(url)
+      return 'error' in list ? list : { updated: null, entries: list.entries }
+    },
+    async compare(supabase, entries) {
+      const { data: rows, error } = await supabase
+        .from('resource')
+        .select('id,category,name,address,phone,anchor_id,distance,details')
+        .eq('community_id', community)
+        .eq('status', 'approved')
+        .in('category', ['restaurant', 'grocery'])
+      if (error) return { error: `Couldn\u2019t read the guide's listings: ${error.message}` }
+      const findings = compareKeystone(entries, (rows ?? []) as WatchedListing[])
+      return { findings, agree: keystoneAgrees(entries, (rows ?? []) as WatchedListing[], findings) }
+    },
+    findingKey,
+    submissionKey,
+    note: (f) => findingNote(f),
+    describe,
+    newPlace: (f) => (f.kind === 'new' ? { name: f.entry.name, address: f.entry.address } : null),
+    async file(f, note, placeId, by) {
+      if (f.kind === 'new') {
+        await submitListingCreate(
+          community,
+          {
+            category: f.category,
+            name: f.entry.name,
+            anchorId: 'community',
+            distance: null,
+            address: f.entry.address,
+            phone: f.entry.phone,
+            details: withPlaceId(f.details, placeId),
+            submittedBy: by,
+          },
+          note,
+        )
+      } else if (f.kind === 'gone' && f.remove) {
+        await submitListingDelete(community, f.listing.id, note, by)
+      } else {
+        const l = f.listing
+        await submitListingUpdate(
+          community,
+          l.id,
+          {
+            category: l.category,
+            name: l.name,
+            anchorId: l.anchor_id,
+            distance: l.distance,
+            address: l.address ?? '',
+            phone: l.phone ?? '',
+            details: f.details,
+          },
+          note,
+          by,
+        )
       }
-      note += `\n${g.line}`
-      if (g.placeId) placeIds.set(f, g.placeId)
-    }
-    notes.set(f, note)
-    fresh.push(f)
+    },
   }
+}
 
-  const differences = findings.map((f) => {
-    const d = describe(f)
-    return listDifference(d.name, d.what, filed.has(findingKey(f)) ? 'before' : closedNow.has(f) ? 'closed' : 'now')
-  })
-
-  if (dry) {
-    return {
-      ok: true,
-      entries: entries.length,
-      listRead: { updated: null, entries },
-      findings: findings.length,
-      filed: 0,
-      matching: agree.length,
-      closedOnGoogle: closed,
-      differences,
-      wouldFile: fresh.map((f) => ({ kind: f.kind, ...describe(f), note: notes.get(f)! })),
-    }
-  }
-
-  const by = { name: KEYSTONE_WATCH_NAME }
-  const items: WatchDigestItem[] = []
-  for (const f of fresh) {
-    const note = notes.get(f)!
-    if (f.kind === 'new') {
-      await submitListingCreate(
-        community,
-        {
-          category: f.category,
-          name: f.entry.name,
-          anchorId: 'community',
-          distance: null,
-          address: f.entry.address,
-          phone: f.entry.phone,
-          details: withPlaceId(f.details, placeIds.get(f)),
-          submittedBy: by,
-        },
-        note,
-      )
-    } else if (f.kind === 'gone' && f.remove) {
-      await submitListingDelete(community, f.listing.id, note, by)
-    } else {
-      const l = f.listing
-      await submitListingUpdate(
-        community,
-        l.id,
-        {
-          category: l.category,
-          name: l.name,
-          anchorId: l.anchor_id,
-          distance: l.distance,
-          address: l.address ?? '',
-          phone: l.phone ?? '',
-          details: f.details,
-        },
-        note,
-        by,
-      )
-    }
-    items.push(describe(f))
-  }
-
-  // What a kosher list says is the certification: that's what it dates.
-  const confirmed = await confirmFromSource(community, agree, KEYSTONE_NAME, [KOSHER_SECTION])
-
-  return { ok: true, entries: entries.length, listRead: { updated: null, entries }, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }
+export async function runKeystoneWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<KeystoneRun> {
+  return runKosherListWatch(community, keystoneList(community, url), { dry })
 }

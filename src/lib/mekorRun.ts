@@ -6,16 +6,13 @@
 //
 // Run daily by /api/cron/watches for a website watch on Mekor's list, and on
 // demand from the admin Watches tab. `dry` says what it would file and
-// files nothing.
+// files nothing. The run itself is kosherListRun.ts, shared with
+// Keystone-K's list; this is what is Mekor's own.
 
-import { getAdminClient } from '@/lib/supabase/admin'
 import type { WatchDigestItem } from '@/lib/email'
 import { submitListingCreate, submitListingUpdate } from '@/lib/submissionStore'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
-import { askGoogleIfOpen, withPlaceId } from '@/lib/keystoneRun'
-import { confirmFromSource } from '@/lib/sourceConfirm'
-import { KOSHER_SECTION } from '@/lib/boxDates'
-import { listDifference, type ListRead } from '@/lib/watches'
+import { runKosherListWatch, withPlaceId, type KosherList, type KosherListRun } from '@/lib/kosherListRun'
 import {
   MEKOR_NAME,
   MEKOR_WATCH_NAME,
@@ -51,25 +48,7 @@ function describe(f: MekorFinding): WatchDigestItem {
   return { name: f.listing.name, what }
 }
 
-export type MekorRun =
-  | { ok: false; error: string }
-  | {
-      ok: true
-      entries: number
-      /** The list as read, kept on its watch (WatchCheck.listRead). */
-      listRead: ListRead
-      findings: number
-      filed: number
-      /** Listings the list names that agree with it. */
-      matching: number
-      closedOnGoogle: string[]
-      /** Every place it differs on, a line each (listDifference). */
-      differences: string[]
-      /** Listings the list agreed with, dated today. */
-      confirmed?: number
-      /** A dry run's suggestions, unfiled. */
-      wouldFile?: (WatchDigestItem & { kind: MekorFinding['kind']; note: string })[]
-    }
+export type MekorRun = KosherListRun<MekorFinding['kind']>
 
 /** Mekor Habracha's list, read now: its entries and its "Last Updated"
  *  date, or why it couldn't be. Shared with the Kosher certification page. */
@@ -88,145 +67,95 @@ export async function readMekorList(url: string): Promise<{ updated: string | nu
   return { updated, entries }
 }
 
-export async function runMekorWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<MekorRun> {
-  const list = await readMekorList(url)
-  if ('error' in list) return { ok: false, error: list.error }
-  const { updated, entries } = list
+/** Mekor Habracha's part of a kosher list's run (kosherListRun.ts). */
+function mekorList(community: string, url: string): KosherList<MekorEntry, MekorFinding> {
+  return {
+    watchName: MEKOR_WATCH_NAME,
+    sourceName: MEKOR_NAME,
+    read: () => readMekorList(url),
+    async compare(supabase, entries) {
+      // Archived listings too: a place Mekor still lists that the guide took
+      // down is said as such, not suggested as if the guide never had it.
+      const { data: rows, error } = await supabase
+        .from('resource')
+        .select('id,category,name,address,phone,anchor_id,distance,details,status')
+        .eq('community_id', community)
+        .in('status', ['approved', 'archived'])
+        .in('category', CATEGORIES)
+      if (error) return { error: `Couldn’t read the guide's listings: ${error.message}` }
 
-  const supabase = getAdminClient()
-  // Archived listings too: a place Mekor still lists that the guide took
-  // down is said as such, not suggested as if the guide never had it.
-  const { data: rows, error } = await supabase
-    .from('resource')
-    .select('id,category,name,address,phone,anchor_id,distance,details,status')
-    .eq('community_id', community)
-    .in('status', ['approved', 'archived'])
-    .in('category', CATEGORIES)
-  if (error) return { ok: false, error: `Couldn’t read the guide's listings: ${error.message}` }
+      // New places already in the queue, from anyone: Keystone-K's watch files
+      // many of the same places.
+      const { data: queued, error: queuedError } = await supabase
+        .from('submission')
+        .select('id,payload')
+        .eq('community_id', community)
+        .eq('status', 'pending')
+        .eq('operation', 'create')
+        .eq('target_type', 'listing')
+      if (queuedError) return { error: `Couldn’t read the queue: ${queuedError.message}` }
+      const pending: PendingCreate[] = (queued ?? [])
+        .map((s) => ({ id: s.id as string, p: (s.payload ?? {}) as Record<string, unknown> }))
+        .filter(({ p }) => CATEGORIES.includes(String(p.category)))
+        .map(({ id, p }) => ({
+          id,
+          name: String(p.name ?? ''),
+          address: (p.address as string | null) ?? null,
+          phone: (p.phone as string | null) ?? null,
+          details: (p.details ?? {}) as Record<string, unknown>,
+        }))
 
-  // New places already in the queue, from anyone: Keystone-K's watch files
-  // many of the same places.
-  const { data: queued, error: queuedError } = await supabase
-    .from('submission')
-    .select('id,payload')
-    .eq('community_id', community)
-    .eq('status', 'pending')
-    .eq('operation', 'create')
-    .eq('target_type', 'listing')
-  if (queuedError) return { ok: false, error: `Couldn’t read the queue: ${queuedError.message}` }
-  const pending: PendingCreate[] = (queued ?? [])
-    .map((s) => ({ id: s.id as string, p: (s.payload ?? {}) as Record<string, unknown> }))
-    .filter(({ p }) => CATEGORIES.includes(String(p.category)))
-    .map(({ id, p }) => ({
-      id,
-      name: String(p.name ?? ''),
-      address: (p.address as string | null) ?? null,
-      phone: (p.phone as string | null) ?? null,
-      details: (p.details ?? {}) as Record<string, unknown>,
-    }))
-
-  const findings = compareMekor(entries, (rows ?? []) as GuideListing[], pending)
-  const agree = mekorAgrees(entries, (rows ?? []) as GuideListing[], findings)
-
-  // Everything this watch has filed before, whatever became of it: a
-  // suggestion an admin rejected isn't made again until the list changes.
-  const { data: earlier, error: earlierError } = await supabase
-    .from('submission')
-    .select('operation,target_id,payload,note')
-    .eq('community_id', community)
-    .eq('submitted_by->>name', MEKOR_WATCH_NAME)
-  if (earlierError) return { ok: false, error: `Couldn’t read earlier suggestions: ${earlierError.message}` }
-  const filed = new Set((earlier ?? []).map(submissionKey).filter(Boolean))
-  const unfiled = findings.filter((f) => !filed.has(findingKey(f)))
-
-  // Mekor's list lags, as Keystone-K's does: a place it lists that the
-  // guide lacks is asked about on Google first, and a permanently closed
-  // one isn't suggested.
-  const notes = new Map<MekorFinding, string>()
-  const placeIds = new Map<MekorFinding, string>()
-  const closed: string[] = []
-  const closedNow = new Set<MekorFinding>()
-  const fresh: MekorFinding[] = []
-  for (const f of unfiled) {
-    let note = findingNote(f, updated)
-    if (f.kind === 'new') {
-      const g = await askGoogleIfOpen(f.entry.name, f.entry.address)
-      if (g.closed) {
-        closed.push(f.entry.name)
-        closedNow.add(f)
-        continue
+      const findings = compareMekor(entries, (rows ?? []) as GuideListing[], pending)
+      return { findings, agree: mekorAgrees(entries, (rows ?? []) as GuideListing[], findings) }
+    },
+    findingKey,
+    submissionKey,
+    note: findingNote,
+    describe,
+    newPlace: (f) => (f.kind === 'new' ? { name: f.entry.name, address: f.entry.address } : null),
+    async file(f, note, placeId, by) {
+      if (f.kind === 'new') {
+        // An archived listing's own name and address, which the guide had
+        // already tidied; otherwise Mekor's.
+        const from = f.archived
+        await submitListingCreate(
+          community,
+          {
+            category: 'restaurant',
+            name: from?.name ?? f.entry.name,
+            anchorId: 'community',
+            distance: null,
+            address: from?.address ?? f.entry.address,
+            phone: from?.phone ?? phone(f.entry.phone),
+            details: withPlaceId(f.details, placeId),
+            submittedBy: by,
+          },
+          note,
+        )
+      } else {
+        const l = f.listing
+        await submitListingUpdate(
+          community,
+          l.id,
+          {
+            category: l.category,
+            name: l.name,
+            anchorId: l.anchor_id,
+            distance: l.distance,
+            address: l.address ?? '',
+            phone: l.phone ?? '',
+            details: f.details,
+          },
+          note,
+          by,
+        )
       }
-      note += `\n${g.line}`
-      if (g.placeId) placeIds.set(f, g.placeId)
-    }
-    notes.set(f, note)
-    fresh.push(f)
+    },
   }
+}
 
-  const differences = findings.map((f) => {
-    const d = describe(f)
-    return listDifference(d.name, d.what, filed.has(findingKey(f)) ? 'before' : closedNow.has(f) ? 'closed' : 'now')
-  })
-
-  if (dry) {
-    return {
-      ok: true,
-      entries: entries.length,
-      listRead: { updated, entries },
-      findings: findings.length,
-      filed: 0,
-      matching: agree.length,
-      closedOnGoogle: closed,
-      differences,
-      wouldFile: fresh.map((f) => ({ kind: f.kind, ...describe(f), note: notes.get(f)! })),
-    }
-  }
-
-  const by = { name: MEKOR_WATCH_NAME }
-  const items: WatchDigestItem[] = []
-  for (const f of fresh) {
-    const note = notes.get(f)!
-    if (f.kind === 'new') {
-      // An archived listing's own name and address, which the guide had
-      // already tidied; otherwise Mekor's.
-      const from = f.archived
-      await submitListingCreate(
-        community,
-        {
-          category: 'restaurant',
-          name: from?.name ?? f.entry.name,
-          anchorId: 'community',
-          distance: null,
-          address: from?.address ?? f.entry.address,
-          phone: from?.phone ?? phone(f.entry.phone),
-          details: withPlaceId(f.details, placeIds.get(f)),
-          submittedBy: by,
-        },
-        note,
-      )
-    } else {
-      const l = f.listing
-      await submitListingUpdate(
-        community,
-        l.id,
-        {
-          category: l.category,
-          name: l.name,
-          anchorId: l.anchor_id,
-          distance: l.distance,
-          address: l.address ?? '',
-          phone: l.phone ?? '',
-          details: f.details,
-        },
-        note,
-        by,
-      )
-    }
-    items.push(describe(f))
-  }
-
-  // What a kosher list says is the certification: that's what it dates.
-  const confirmed = await confirmFromSource(community, agree, MEKOR_NAME, [KOSHER_SECTION])
-
-  return { ok: true, entries: entries.length, listRead: { updated, entries }, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }
+export async function runMekorWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<MekorRun> {
+  // Mekor's list lags, as Keystone-K's does: a place it lists that the
+  // guide lacks is asked about on Google first (kosherListRun.ts).
+  return runKosherListWatch(community, mekorList(community, url), { dry })
 }
