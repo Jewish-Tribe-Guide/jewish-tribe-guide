@@ -1,23 +1,17 @@
-import { revalidatePublicContent } from '@/lib/revalidateContent'
+import { adminRead, adminWrite } from '@/lib/adminRoute'
 import { isPlaceKind, type PlaceKind } from '@/lib/placeKinds'
 import { parseListingParts, type ListingParts } from '@/lib/listingParts'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { listCategoriesUncached, createCategory } from '@/lib/categoryStore'
 import { countApprovedByCategory } from '@/lib/resourceStore'
 import { isHttpUrl } from '@/lib/validation'
 import { isValidPinColor } from '@/lib/categoryColor'
 import type { CategoryCapabilities, CategoryField, CategoryKind } from '@/lib/categories'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // GET /api/admin/categories — every category (resolved config, incl. fields and
 // capabilities) for the admin category manager. Admin only. The public
 // GET /api/categories serves the same data to the site; this route exists so the
 // manager can require auth and evolve independently.
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (request: Request, { community }) => {
   try {
     // ?counts=1: how many places each has, for Category pages' rows.
     const withCounts = new URL(request.url).searchParams.get('counts') === '1'
@@ -30,7 +24,7 @@ export async function GET(request: Request) {
     console.error('[admin/categories] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load categories.'] }, { status: 502 })
   }
-}
+})
 
 type CreateBody = {
   label?: string
@@ -58,11 +52,7 @@ type CreateBody = {
 
 // POST /api/admin/categories — create a category directly (the admin equivalent
 // of approving a suggestion, but with full control over fields + capabilities).
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const POST = adminWrite(async (request: Request, { community }) => {
   let body: CreateBody
   try {
     body = (await request.json()) as CreateBody
@@ -106,12 +96,10 @@ export async function POST(request: Request) {
       placeKind: isPlaceKind(body.placeKind) ? body.placeKind : undefined,
       listingParts: body.listingParts ? parseListingParts(body.listingParts) : undefined,
     })
-    // The public site caches this content; drop it so the edit shows up.
-    await revalidatePublicContent()
     return Response.json({ ok: true, category })
   } catch (err) {
     console.error('[admin/categories] POST failed:', err)
     const message = err instanceof Error ? err.message : 'Could not create category.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }
-}
+})

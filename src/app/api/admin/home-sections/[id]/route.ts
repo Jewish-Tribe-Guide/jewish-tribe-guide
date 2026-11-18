@@ -1,8 +1,6 @@
-import { revalidatePublicContent } from '@/lib/revalidateContent'
+import { adminWrite } from '@/lib/adminRoute'
 import type { NextRequest } from 'next/server'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { updateHomeSection, deleteHomeSection } from '@/lib/homeSectionStore'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 type PatchBody = {
   title?: string
@@ -14,11 +12,7 @@ type PatchBody = {
 // PATCH /api/admin/home-sections/:id — rename a section, change its card
 // membership/order, or move it (sortOrder). Only the provided keys change.
 // Admin only.
-export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/home-sections/[id]'>) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx: RouteContext<'/api/admin/home-sections/[id]'>) => {
   const { id } = await ctx.params
 
   let body: PatchBody
@@ -40,31 +34,23 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     if (!section) {
       return Response.json({ ok: false, errors: ['Section not found.'] }, { status: 404 })
     }
-    // The public site caches this content; drop it so the edit shows up.
-    await revalidatePublicContent()
     return Response.json({ ok: true, section })
   } catch (err) {
     console.error('[admin/home-sections/:id] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not update section.'] }, { status: 502 })
   }
-}
+})
 
 // DELETE /api/admin/home-sections/:id — permanently remove a section. The
 // cards that were in it aren't deleted anywhere else — they just fall into
 // the home page's trailing "More" section until reassigned. Admin only.
-export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin/home-sections/[id]'>) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const DELETE = adminWrite(async (request: NextRequest, { community }, ctx: RouteContext<'/api/admin/home-sections/[id]'>) => {
   const { id } = await ctx.params
   try {
     await deleteHomeSection(community.slug, id)
-    // The public site caches this content; drop it so the edit shows up.
-    await revalidatePublicContent()
     return Response.json({ ok: true })
   } catch (err) {
     console.error('[admin/home-sections/:id] DELETE failed:', err)
     return Response.json({ ok: false, errors: ['Could not delete section.'] }, { status: 502 })
   }
-}
+})

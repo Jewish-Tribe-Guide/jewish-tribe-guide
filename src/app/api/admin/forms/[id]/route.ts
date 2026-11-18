@@ -1,9 +1,7 @@
-import { revalidatePublicContent } from '@/lib/revalidateContent'
+import { adminWrite } from '@/lib/adminRoute'
 import type { NextRequest } from 'next/server'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { saveDraft, deleteForm } from '@/lib/formStore'
 import type { FormStep } from '@/lib/forms'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 type PatchBody = {
   title?: string
@@ -17,11 +15,7 @@ type PatchBody = {
 // PATCH /api/admin/forms/:id — save a full draft copy of the form's title,
 // wizard chrome text, and steps. Never touches the published content the live
 // wizard reads — see /publish to promote a draft. Admin only.
-export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/forms/[id]'>) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx: RouteContext<'/api/admin/forms/[id]'>) => {
   const { id } = await ctx.params
 
   let body: PatchBody
@@ -48,34 +42,26 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
       icon: body.icon,
     })
     if (!form) return Response.json({ ok: false, errors: ['Form not found.'] }, { status: 404 })
-    // The public site caches this content; drop it so the edit shows up.
-    await revalidatePublicContent()
     return Response.json({ ok: true, form })
   } catch (err) {
     console.error('[admin/forms/:id] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not save draft.'] }, { status: 502 })
   }
-}
+})
 
 // DELETE /api/admin/forms/:id — permanently delete a form and every response
 // to it. Blocked for 'support'/'volunteer' (see deleteForm — they're wired
 // directly into the home screen and their own wizard components). Admin
 // only. To discard a pending draft instead (leaving the form itself intact),
 // see DELETE /api/admin/forms/:id/draft.
-export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin/forms/[id]'>) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const DELETE = adminWrite(async (request: NextRequest, { community }, ctx: RouteContext<'/api/admin/forms/[id]'>) => {
   const { id } = await ctx.params
   try {
     const { responses } = await deleteForm(community.slug, id)
-    // The public site caches this content; drop it so the edit shows up.
-    await revalidatePublicContent()
     return Response.json({ ok: true, responses })
   } catch (err) {
     console.error('[admin/forms/:id] DELETE failed:', err)
     const message = err instanceof Error ? err.message : 'Could not delete form.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }
-}
+})

@@ -1,18 +1,12 @@
-import { revalidatePublicContent } from '@/lib/revalidateContent'
+import { adminWrite } from '@/lib/adminRoute'
 import type { NextRequest } from 'next/server'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { setFormActive } from '@/lib/formStore'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // PATCH /api/admin/forms/:id/active — turns a form's public visibility
 // on/off. Separate from the main PATCH (which only ever writes a draft) and
 // from publish (which promotes that draft) — this applies immediately to
 // the published row, regardless of any pending draft. Admin only.
-export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/forms/[id]/active'>) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx: RouteContext<'/api/admin/forms/[id]/active'>) => {
   const { id } = await ctx.params
 
   let body: { active?: boolean }
@@ -29,10 +23,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     const form = await setFormActive(community.slug, id, body.active)
     if (!form) return Response.json({ ok: false, errors: ['Form not found.'] }, { status: 404 })
     // The public site caches this content; drop it so the change shows up.
-    await revalidatePublicContent()
     return Response.json({ ok: true, form })
   } catch (err) {
     console.error('[admin/forms/:id/active] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not update form.'] }, { status: 502 })
   }
-}
+})

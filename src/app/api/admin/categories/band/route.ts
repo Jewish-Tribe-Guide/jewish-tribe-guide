@@ -1,5 +1,4 @@
-import { revalidatePublicContent } from '@/lib/revalidateContent'
-import { getAdminUser } from '@/lib/adminAuth'
+import { siteAdminWrite } from '@/lib/adminRoute'
 import { getAdminClient } from '@/lib/supabase/admin'
 
 // Same bucket every admin-uploaded image goes to (see
@@ -20,10 +19,7 @@ async function ensureBucket() {
 // Admin only. Doesn't touch the category row itself — same as
 // that old icon upload, the editor sets the returned URL on its draft, batched
 // into the normal Save changes flow via PATCH /api/admin/categories/:id.
-export async function POST(request: Request) {
-  const admin = await getAdminUser(request)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const POST = siteAdminWrite(async (request: Request) => {
   let form: FormData
   try {
     form = await request.formData()
@@ -54,11 +50,9 @@ export async function POST(request: Request) {
     if (uploadError) throw uploadError
 
     const { data } = getAdminClient().storage.from(BUCKET).getPublicUrl(path)
-    // The public site caches this content; drop it so the edit shows up.
-    await revalidatePublicContent()
     return Response.json({ ok: true, url: data.publicUrl })
   } catch (err) {
     console.error('[admin/categories/band] upload failed:', err)
     return Response.json({ ok: false, errors: ['Upload failed. Please try again.'] }, { status: 502 })
   }
-}
+})

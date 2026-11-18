@@ -19,9 +19,14 @@ import { describe, expect, it } from 'vitest'
 const HERO_ROUTE = readFileSync('src/app/api/admin/site-settings/hero-image/route.ts', 'utf-8')
 const LOGO_ROUTE = readFileSync('src/app/api/admin/site-settings/logo/route.ts', 'utf-8')
 
+// Since Nov 18 the routes check through adminWrite (src/lib/adminRoute.ts),
+// which is getAdminUserForCommunity; siteAdminWrite is the global-only one.
+const COMMUNITY_SCOPED = /getAdminUserForCommunity\(|= adminWrite\(/
+
 describe('the hero photo / logo upload routes use community-scoped admin auth', () => {
   it('hero-image: checks getAdminUserForCommunity, not the global-only getAdminUser', () => {
-    expect(HERO_ROUTE).toMatch(/getAdminUserForCommunity\(/)
+    expect(HERO_ROUTE).toMatch(COMMUNITY_SCOPED)
+    expect(HERO_ROUTE).not.toMatch(/siteAdminWrite/)
     // Not `getAdminUser(` on its own — note "getAdminUserForCommunity(" does
     // NOT match this pattern (the char right after "getAdminUser" there is
     // "F", not "("), so this only catches the bare, global-only call.
@@ -29,7 +34,8 @@ describe('the hero photo / logo upload routes use community-scoped admin auth', 
   })
 
   it('logo: checks getAdminUserForCommunity, not the global-only getAdminUser', () => {
-    expect(LOGO_ROUTE).toMatch(/getAdminUserForCommunity\(/)
+    expect(LOGO_ROUTE).toMatch(COMMUNITY_SCOPED)
+    expect(LOGO_ROUTE).not.toMatch(/siteAdminWrite/)
     expect(LOGO_ROUTE).not.toMatch(/getAdminUser\(/)
   })
 })
