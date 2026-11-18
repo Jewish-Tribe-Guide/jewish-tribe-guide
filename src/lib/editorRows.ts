@@ -1,7 +1,7 @@
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, fieldIsVisible, selectValues, type CategoryConfig, type CategoryField, type FieldType } from './categories'
 import { readContacts, sameContacts } from './contacts'
-import { isMinyanim, TEFILLAH_LABELS, type Minyan } from './davening'
+import { isMinyanim, parseTimeToMinutes, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from './davening'
 import { formatHoursSummary, hasAnyHours } from './hours'
 import { sameFieldValue } from './listingDiff'
 import { boxesOf, fixedPlaceOf, isBasicField, mainCardOf, parseListingParts, shabbosFieldsOf } from './listingParts'
@@ -313,6 +313,19 @@ function minyanText(m: Minyan, timeText: (m: Minyan) => string): string {
   return `${TEFILLAH_LABELS[m.tefillah]} ${timeText(m)}`
 }
 
+/** A box's minyanim in the order its line reads them, since the line has
+ *  no days to go by (Nov 18: "Shacharis 8 AM · 7 AM · 6:45 AM", as saved):
+ *  the week's by tefillah, then time; Shabbos's Friday first, then time.
+ *  A time set by a zman comes after the clock times beside it. */
+function inLineOrder(rows: readonly Minyan[], box: MinyanBox): Minyan[] {
+  const at = (m: Minyan) => (m.anchor ? Infinity : parseTimeToMinutes(m.time))
+  const byTime = (a: Minyan, b: Minyan) => at(a) - at(b) || 0
+  const tefillah = (a: Minyan, b: Minyan) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah)
+  const friday = (m: Minyan) => (m.days.includes('fri') && m.tefillah !== 'shacharis' ? 0 : 1)
+  if (box === 'shabbos') return [...rows].sort((a, b) => friday(a) - friday(b) || byTime(a, b) || tefillah(a, b))
+  return [...rows].sort((a, b) => tefillah(a, b) || byTime(a, b))
+}
+
 /** The line under a row's title: what the listing says there now, short.
  *  Empty when it says nothing yet. */
 export function rowSummary(row: EditorRow, values: EditorValues, timeText: (m: Minyan) => string): string {
@@ -325,7 +338,7 @@ export function rowSummary(row: EditorRow, values: EditorValues, timeText: (m: M
   }
   if (row.kind === 'minyans') {
     const rows = minyanimForBox(isMinyanim(d[row.fields[0].key]) ? (d[row.fields[0].key] as Minyan[]) : [], row.box!)
-    return rows.map((m) => minyanText(m, timeText)).join(' · ')
+    return inLineOrder(rows, row.box!).map((m) => minyanText(m, timeText)).join(' · ')
   }
   if (row.kind === 'items') {
     const f = row.fields[0]
