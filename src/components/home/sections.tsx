@@ -27,8 +27,8 @@ export type CardDef = {
   /** Hidden search terms — the words people type that should surface this card
    *  (e.g. "shul" for Synagogues, "supermarket" for Grocery Stores). */
   keywords?: string[]
-  /** One emoji shown above the title — from the category's own `icon` field
-   *  where there is one; a few hand-built cards set a fixed one directly. */
+  /** The category's own `icon` field, where there is one. Never drawn as
+   *  an emoji: the card draws its id's line icon (CategoryGlyph). */
   icon?: string
   /** Stable id (category id, or a fixed one for hand-built cards like 'map',
    *  'support') — used to sort cards into home-screen sections; title alone
@@ -90,11 +90,7 @@ function CompactCard({
       // for yet.
       prefetch={false}
     >
-      {card.icon ? (
-        <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
-      ) : (
-        <span className="h-9 w-9 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
-      )}
+      <CategoryIcon icon={card.icon ?? ''} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
       {/* min-w-0 on the COLUMN, not just the label: without it the flex item
           takes its content's intrinsic width and the truncate below never
           fires, so a long category name pushes the row wider than its grid
@@ -497,7 +493,6 @@ export function useEntryCards(
       ? [{
           title: supportForm?.title ?? 'Patient & Family Support',
           id: 'support',
-          icon: supportForm?.icon || '🤝',
           keywords: [
             'request support', 'support', 'help', 'assistance', 'request', 'patient', 'patients',
             'family', 'families', 'need help', 'meal', 'meals', 'food', 'kosher food', 'dinner',
@@ -514,7 +509,6 @@ export function useEntryCards(
       ? [{
           title: volunteerForm?.title ?? 'Volunteer for Patients',
           id: 'volunteer',
-          icon: volunteerForm?.icon || '💛',
           keywords: [
             'volunteer', 'volunteering', 'help out', 'give', 'give back', 'chesed', 'mitzvah', 'cook',
             'cook for a family', 'deliver meals', 'host', 'hosting', 'drive', 'rides', 'give rides',
@@ -527,7 +521,6 @@ export function useEntryCards(
     ...customForms.map((f) => ({
       title: f.title,
       id: f.id,
-      icon: f.icon,
       go: () => onOpenFlow(f.id),
       href: routes.slug(communitySlug, f.id),
     })),

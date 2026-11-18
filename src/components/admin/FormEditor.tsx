@@ -7,7 +7,6 @@ import Wizard from '@/components/wizard/Wizard'
 import FormStepEditor from './FormStepEditor'
 import { useStepsInAddress } from './useStepsInAddress'
 import FormPreview, { resolvePreviewSteps } from './FormPreview'
-import { IconField } from './CategoryFormFields'
 import { fetchJson } from '@/lib/fetchJson'
 import { stableJson } from '@/lib/stableJson'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -392,7 +391,6 @@ export default function FormEditor({
             <AdminField label="Name">
               <input value={draft.title} onChange={(e) => set('title', e.target.value)} className={adminInputClass} />
             </AdminField>
-            <IconField icon={draft.icon ?? ''} onChange={(v) => set('icon', v)} />
           </div>
         </AdminBox>
 
