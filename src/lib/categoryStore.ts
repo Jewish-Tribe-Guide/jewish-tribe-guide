@@ -308,9 +308,8 @@ export async function createCategory(community: string, input: {
 }
 
 // Updates an existing category's presentation, fields, and capabilities. Only
-// the provided keys are changed. The slug (`id`) isn't among them — renaming
-// it is its own, separate operation (see renameCategoryId below) since it has
-// to cascade to every listing's `resource.category`, not just update this row.
+// the provided keys are changed. The slug (`id`) never is: it's the
+// category's address, and other rows name it.
 export async function updateCategory(
   community: string,
   id: string,
@@ -392,72 +391,6 @@ export async function updateCategory(
     throw new Error(`Failed to update category: ${error.message}`)
   }
   return data ? toConfig(data as CategoryRow) : null
-}
-
-// Renames a category's own URL slug, migrating every listing that currently
-// points at the old one (`resource.category` has no DB foreign key, so
-// nothing does this automatically — see the schema migration's own comment).
-// Called only when the admin explicitly changes the id field in
-// CategoryEditor, and only after they've confirmed against a listing count
-// (see the id-usage route) — same shape as applyFieldOptionRenames'
-// confirm-then-cascade flow, just for the category's own identity instead of
-// one field's option values.
-//
-// The category row is updated FIRST, then the listings — if the listings
-// update somehow failed after the id changed, the category would still
-// resolve at its new slug (nothing broken there), just with some listings
-// still filed under the stale id until a retry; the reverse order would risk
-// listings pointing at a category that briefly doesn't exist under the old
-// id yet either. Neither order is a true transaction (Supabase's JS client
-// has no multi-table one), but this is the safer of the two to fail
-// partway through.
-export async function renameCategoryId(community: string, oldId: string, newId: string): Promise<{ listings: number }> {
-  if (oldId === newId) return { listings: 0 }
-  assertUsableSlug(newId)
-  const supabase = getAdminClient()
-
-  const { data: collision } = await supabase
-    .from('category')
-    .select('id')
-    .eq('community_id', community)
-    .eq('id', newId)
-    .maybeSingle()
-  if (collision) throw new Error(`"${newId}" is already used by another category.`)
-
-  const { count } = await supabase
-    .from('resource')
-    .select('id', { count: 'exact', head: true })
-    .eq('community_id', community)
-    .eq('category', oldId)
-
-  const { error: catErr } = await supabase
-    .from('category')
-    .update({ id: newId })
-    .eq('community_id', community)
-    .eq('id', oldId)
-  if (catErr) throw new Error(`Failed to rename category: ${catErr.message}`)
-
-  const { error: resErr } = await supabase
-    .from('resource')
-    .update({ category: newId })
-    .eq('community_id', community)
-    .eq('category', oldId)
-  if (resErr) throw new Error(`Failed to migrate the category's listings: ${resErr.message}`)
-
-  return { listings: count ?? 0 }
-}
-
-// How many listings currently sit under this category id — checked before
-// offering to rename it (see the id-usage route), so the confirmation dialog
-// can tell the admin the real scope of the migration instead of a vague
-// warning.
-export async function countCategoryListings(community: string, id: string): Promise<number> {
-  const { count } = await getAdminClient()
-    .from('resource')
-    .select('id', { count: 'exact', head: true })
-    .eq('community_id', community)
-    .eq('category', id)
-  return count ?? 0
 }
 
 // Permanently deletes a category and every listing in it. Listings are removed

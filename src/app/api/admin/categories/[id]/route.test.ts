@@ -15,7 +15,7 @@ vi.mock('@/lib/communityStore', () => ({
   communitySlugFromRequest: (r: Request) => new URL(r.url).searchParams.get('community'),
   resolveCommunity: m.resolveCommunity,
 }))
-vi.mock('@/lib/categoryStore', () => ({ updateCategory: m.updateCategory, deleteCategory: m.deleteCategory, categoryDeleteCounts: m.categoryDeleteCounts, renameCategoryId: vi.fn() }))
+vi.mock('@/lib/categoryStore', () => ({ updateCategory: m.updateCategory, deleteCategory: m.deleteCategory, categoryDeleteCounts: m.categoryDeleteCounts }))
 vi.mock('@/lib/resourceStore', () => ({ clearCategoryFieldData: vi.fn(), applyFieldOptionRenames: vi.fn() }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: m.revalidatePublicContent }))
 
@@ -140,6 +140,19 @@ describe('PATCH /api/admin/categories/:id — what each listing adds', () => {
 })
 
 // The Eruv's confirm says how many eruvim and watches go with it (Nov 4).
+// A category's id is its address, and every other row that names it
+// (banners, home sections, Right now, tabs, subscribers, pending
+// suggestions) points at it. No screen has offered to change it since Nov 5,
+// and a rename moved only the listings, so the route no longer takes one.
+describe('PATCH /api/admin/categories/:id — its id', () => {
+  it('leaves the id as it is when a body names a new one', async () => {
+    const res = await patch({ label: 'Shuls', newId: 'shuls' })
+    expect(res.status).toBe(200)
+    expect(m.updateCategory).toHaveBeenCalledWith('philly', 'synagogue', expect.anything())
+    expect(m.updateCategory).not.toHaveBeenCalledWith('philly', 'shuls', expect.anything())
+  })
+})
+
 describe('DELETE /api/admin/categories/:id', () => {
   const del = (q = '') =>
     DELETE(

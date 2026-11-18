@@ -23,7 +23,7 @@ import { CardBandImageField } from './CategoryFormFields'
 import { partnerOf, partnerRule } from '@/lib/fieldPartners'
 import FieldScreen from './FieldScreen'
 import FieldLooks from './FieldLooks'
-import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
+import { CleanupConfirm, RenameConfirm } from './CategorySaveConfirmations'
 import { draftMeaning, mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
 import { useCategoryFieldEditing } from './useCategoryFieldEditing'
 import { useCategorySaveWorkflow } from './useCategorySaveWorkflow'
@@ -223,7 +223,7 @@ function CategoryEditorScreen({
     }
   }
 
-  const { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, countAnswers, cancelCleanup, cancelRename, cancelIdRename } = useCategorySaveWorkflow({
+  const { saving, errors, pendingCleanup, pendingRename, save, countAnswers, cancelCleanup, cancelRename } = useCategorySaveWorkflow({
     draft,
     initial,
     isNew,
@@ -895,9 +895,7 @@ function CategoryEditorScreen({
             </ul>
           )}
 
-          {pendingIdRename ? (
-            <IdRenameConfirm rename={pendingIdRename} saving={saving} onCancel={cancelIdRename} onConfirm={() => save()} />
-          ) : pendingRename ? (
+          {pendingRename ? (
             <RenameConfirm rename={pendingRename} saving={saving} onCancel={cancelRename} onConfirm={() => save()} onSkip={() => save({ skipRename: true })} />
           ) : pendingCleanup ? (
             <CleanupConfirm cleanup={pendingCleanup} initial={initial} saving={saving} onCancel={cancelCleanup} onConfirm={() => save()} />
@@ -907,7 +905,7 @@ function CategoryEditorScreen({
         {!adding && !removing && preview}
       </div>
 
-      {!(pendingIdRename || pendingRename || pendingCleanup) && (
+      {!(pendingRename || pendingCleanup) && (
         <SaveBar
           changes={changes}
           saving={saving}
