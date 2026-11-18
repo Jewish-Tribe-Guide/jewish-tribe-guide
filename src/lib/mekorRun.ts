@@ -12,7 +12,7 @@
 import type { WatchDigestItem } from '@/lib/email'
 import { submitListingCreate, submitListingUpdate } from '@/lib/submissionStore'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
-import { runKosherListWatch, withPlaceId, type KosherList, type KosherListRun } from '@/lib/kosherListRun'
+import { runKosherListWatch, withPlaceId, type ClosedSeen, type KosherList, type KosherListRun } from '@/lib/kosherListRun'
 import {
   MEKOR_NAME,
   MEKOR_WATCH_NAME,
@@ -25,7 +25,6 @@ import {
   type GuideListing,
   type MekorEntry,
   type MekorFinding,
-  type PendingCreate,
 } from '@/lib/mekorWatch'
 
 /** Fewer places than this means the page changed shape, not that Mekor
@@ -72,8 +71,11 @@ function mekorList(community: string, url: string): KosherList<MekorEntry, Mekor
   return {
     watchName: MEKOR_WATCH_NAME,
     sourceName: MEKOR_NAME,
+    categories: CATEGORIES,
     read: () => readMekorList(url),
-    async compare(supabase, entries) {
+    // `pending`: new places already in the queue, from anyone (the run reads
+    // them): Keystone-K's watch files many of the same places.
+    async compare(supabase, entries, pending) {
       // Archived listings too: a place Mekor still lists that the guide took
       // down is said as such, not suggested as if the guide never had it.
       const { data: rows, error } = await supabase
@@ -83,27 +85,6 @@ function mekorList(community: string, url: string): KosherList<MekorEntry, Mekor
         .in('status', ['approved', 'archived'])
         .in('category', CATEGORIES)
       if (error) return { error: `Couldn’t read the guide's listings: ${error.message}` }
-
-      // New places already in the queue, from anyone: Keystone-K's watch files
-      // many of the same places.
-      const { data: queued, error: queuedError } = await supabase
-        .from('submission')
-        .select('id,payload')
-        .eq('community_id', community)
-        .eq('status', 'pending')
-        .eq('operation', 'create')
-        .eq('target_type', 'listing')
-      if (queuedError) return { error: `Couldn’t read the queue: ${queuedError.message}` }
-      const pending: PendingCreate[] = (queued ?? [])
-        .map((s) => ({ id: s.id as string, p: (s.payload ?? {}) as Record<string, unknown> }))
-        .filter(({ p }) => CATEGORIES.includes(String(p.category)))
-        .map(({ id, p }) => ({
-          id,
-          name: String(p.name ?? ''),
-          address: (p.address as string | null) ?? null,
-          phone: (p.phone as string | null) ?? null,
-          details: (p.details ?? {}) as Record<string, unknown>,
-        }))
 
       const findings = compareMekor(entries, (rows ?? []) as GuideListing[], pending)
       return { findings, agree: mekorAgrees(entries, (rows ?? []) as GuideListing[], findings) }
@@ -154,8 +135,12 @@ function mekorList(community: string, url: string): KosherList<MekorEntry, Mekor
   }
 }
 
-export async function runMekorWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<MekorRun> {
+export async function runMekorWatch(
+  community: string,
+  url: string,
+  options: { dry?: boolean; closedBefore?: readonly ClosedSeen[]; now?: number } = {},
+): Promise<MekorRun> {
   // Mekor's list lags, as Keystone-K's does: a place it lists that the
   // guide lacks is asked about on Google first (kosherListRun.ts).
-  return runKosherListWatch(community, mekorList(community, url), { dry })
+  return runKosherListWatch(community, mekorList(community, url), options)
 }

@@ -23,6 +23,6 @@ describe('SiteScreens', () => {
 
   it('has About and Privacy for the site owner, who keeps it for every community', () => {
     render(<SiteScreens isSuperAdmin />)
-    expect(screen.getByRole('link', { name: 'About and Privacy' })).toHaveAttribute('href', '/philly/admin/pages')
+    expect(screen.getByRole('link', { name: 'About and Privacy' })).toHaveAttribute('href', '/admin/pages')
   })
 })

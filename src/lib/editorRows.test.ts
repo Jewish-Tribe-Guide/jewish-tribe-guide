@@ -147,6 +147,37 @@ describe('what a row says', () => {
     ]
     expect(rowSummary(shabbos, values({ minyanim }), timeText)).toBe('Shacharis 9 AM')
   })
+  // Chabad of the Main Line's read "Shacharis 8 AM · Shacharis 7 AM ·
+  // Shacharis 6:45 AM", the order they were saved in (Nov 18 review).
+  it('a shul’s weekday times by tefillah, as the listing’s columns go, then by time', () => {
+    const weekday = editorRows(SHUL, {}).find((r) => r.id === 'minyans:weekday')!
+    const minyanim: Minyan[] = [
+      { id: 'm', tefillah: 'maariv', days: ['mon'], time: '8:00pm' },
+      { id: 'a', tefillah: 'shacharis', days: ['sun'], time: '8:00am' },
+      { id: 'r', tefillah: 'mincha_maariv', days: ['mon'], time: '10 min before sunset', anchor: 'sunset', offsetMinutes: -10 },
+      { id: 'b', tefillah: 'shacharis', days: ['mon', 'tue'], time: '7:00am' },
+      { id: 'c', tefillah: 'shacharis', days: ['mon', 'thu'], time: '6:45am' },
+      { id: 'n', tefillah: 'mincha', days: ['mon'], time: '1:30pm' },
+    ]
+    expect(rowSummary(weekday, values({ minyanim }), timeText).split(' · ')).toEqual([
+      'Shacharis 6:45 AM',
+      'Shacharis 7 AM',
+      'Shacharis 8 AM',
+      'Mincha 1:30 PM',
+      'Maariv 8 PM',
+      'Mincha & Maariv 10 min before sunset',
+    ])
+  })
+  it('a shul’s Shabbos times in the order of Shabbos', () => {
+    const shabbos = editorRows(SHUL, {}).find((r) => r.id === 'minyans:shabbos')!
+    const minyanim: Minyan[] = [
+      { id: 'a', tefillah: 'shacharis', days: ['sat'], time: '9:00am' },
+      { id: 'b', tefillah: 'mincha', days: ['sat'], time: '6:30pm' },
+      { id: 'c', tefillah: 'mincha', days: ['fri'], time: '7:00pm' },
+      { id: 'd', tefillah: 'shacharis', days: ['sat'], time: '7:30am' },
+    ]
+    expect(rowSummary(shabbos, values({ minyanim }), timeText).split(' · ')).toEqual(['Mincha 7 PM', 'Shacharis 7:30 AM', 'Shacharis 9 AM', 'Mincha 6:30 PM'])
+  })
   it('items: how many, and the first few', () => {
     const items = editorRows(GROCERY, {}).find((r) => r.id === 'items')!
     expect(rowSummary(items, values({ m: ['Challah', 'Wine'], m_sometimes: ['Steak'] }), timeText)).toBe('3 · Challah, Wine, Steak')

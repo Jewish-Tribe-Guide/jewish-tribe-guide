@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
-import { adminApi } from '@/lib/adminApi'
+import { useEffect, useState } from 'react'
 import { parseOkJson } from '@/lib/fetchJson'
 import type { PageEverywhere } from '@/lib/readyMade'
+import { useAdminApiFor } from './useAdminApi'
 
 // Every community's listing pages, for the ready-made lists. Loaded once a
 // visit: they change when an admin somewhere makes or edits a page, and a
@@ -11,7 +11,7 @@ let loaded: PageEverywhere[] | null = null
 export function useReadyMade(token: string, community: string): { pages: PageEverywhere[] | null; error: string | null } {
   const [pages, setPages] = useState<PageEverywhere[] | null>(loaded)
   const [error, setError] = useState<string | null>(null)
-  const api = useMemo(() => adminApi(token, community), [token, community])
+  const api = useAdminApiFor(token, community)
   useEffect(() => {
     if (loaded) return
     let cancelled = false

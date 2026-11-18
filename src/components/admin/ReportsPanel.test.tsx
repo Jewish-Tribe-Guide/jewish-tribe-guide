@@ -70,7 +70,9 @@ describe('ReportsPanel', () => {
     expect(within(box).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Mekor Habracha35', 'HipCityVeg25'])
   })
 
-  it('counts what was decided, taken and left', async () => {
+  // Approved and Rejected, the words on To do's own buttons: "Left 0"
+  // beside a To do count read as "nothing left to do" (Nov 18 review).
+  it('counts what was decided, approved and rejected', async () => {
     await renderPanel()
     const box = screen.getByRole('region', { name: 'Decided in October' })
     const rows = within(box).getAllByRole('row').slice(1)
@@ -79,8 +81,8 @@ describe('ReportsPanel', () => {
       ['Changes', '125', '23'],
       ['Removals', '7', '2'],
     ])
-    expect(within(box).getByRole('columnheader', { name: 'Taken' })).toBeInTheDocument()
-    expect(within(box).getByRole('columnheader', { name: 'Left' })).toBeInTheDocument()
+    expect(within(box).getByRole('columnheader', { name: 'Approved' })).toBeInTheDocument()
+    expect(within(box).getByRole('columnheader', { name: 'Rejected' })).toBeInTheDocument()
   })
 
   it('leads on to the searches that found nothing and to the history', async () => {

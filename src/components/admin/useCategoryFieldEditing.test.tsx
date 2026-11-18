@@ -38,16 +38,6 @@ describe('useCategoryFieldEditing — new-category naming', () => {
     expect(result.current.draft.id).toBe('food-trucks')
   })
 
-  it('stops auto-following the id once the admin has directly edited it', () => {
-    const { result } = renderHook(() => useCategoryFieldEditing(null))
-    act(() => result.current.setName('Food Trucks'))
-    act(() => result.current.setId('custom-slug'))
-    act(() => result.current.setName('Renamed Again'))
-    expect(result.current.draft.id).toBe('custom-slug')
-    // The plural/singular labels still follow the name — only id stopped.
-    expect(result.current.draft.pluralLabel).toBe('Renamed Again')
-  })
-
   it('never auto-follows the id for an existing category, touched or not', () => {
     const existing = baseCategory({ id: 'grocery' })
     const { result } = renderHook(() => useCategoryFieldEditing(existing))
@@ -55,11 +45,6 @@ describe('useCategoryFieldEditing — new-category naming', () => {
     expect(result.current.draft.id).toBe('grocery')
   })
 
-  it('lowercases direct id edits but does not live-slugify them (a trailing "-" survives mid-type)', () => {
-    const { result } = renderHook(() => useCategoryFieldEditing(null))
-    act(() => result.current.setId('Food-'))
-    expect(result.current.draft.id).toBe('food-')
-  })
 })
 
 // Boards 2, 11 and 12: a new page from a ready-made one, and fields added

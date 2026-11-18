@@ -237,6 +237,17 @@ describe('runMenuWatch: "Check now"', () => {
     expect(m.saveMenuReading).not.toHaveBeenCalled()
   })
 
+  // Nov 18 review: only "Check now" looked, so on the nightly run any
+  // change to the page (a price, a special) brought a skipped dish back
+  // to the Main dishes tab as new.
+  it('the nightly run doesn’t bring back a reading an admin skipped, or one already waiting, when the page changes', async () => {
+    for (const status of ['proposed', 'skipped']) {
+      m.getMenuReading.mockResolvedValue({ status, dishes: [{ name: 'shawarma' }] })
+      expect(await runMenuWatch({ ...watch, pageHash: 'old' }, newMenuReadBudget(), { apiKey: 'k' })).toMatchObject({ ok: true, filed: 0, pageHash: menuHash(page) })
+    }
+    expect(m.saveMenuReading).not.toHaveBeenCalled()
+  })
+
   it('says when the menu wouldn’t open', async () => {
     m.readMenuPage.mockResolvedValue(null)
     expect(await runMenuWatch(watch, undefined, full)).toMatchObject({ ok: false, check: { what: 'dishes', result: 'unreadable' } })

@@ -136,6 +136,16 @@ describe('A form', () => {
     expect(screen.queryByRole('button', { name: 'Delete this form' })).toBeNull()
   })
 
+  // The site draws a form's tile with a line icon and never its emoji (the
+  // no-emoji rule), so there's nothing to pick: its tile box is its name.
+  it('has no emoji to pick for its tile', async () => {
+    renderForms('form:support')
+    await screen.findByRole('region', { name: 'Questions' })
+    expect(screen.getByLabelText('Name')).toHaveValue('Patient & Family Support')
+    expect(screen.queryByLabelText('Icon')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Browse icons/ })).toBeNull()
+  })
+
   it('opens a question on its own screen, and Back returns to the form', async () => {
     const user = userEvent.setup()
     renderForms('form:support')

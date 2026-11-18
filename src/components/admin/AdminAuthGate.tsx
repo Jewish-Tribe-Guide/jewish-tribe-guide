@@ -1,5 +1,6 @@
 'use client'
 
+import { replaceAddress } from '@/lib/replaceAddress'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { getBrowserClient } from '@/lib/supabase/client'
@@ -86,6 +87,11 @@ export default function AdminAuthGate({
   // for the superadmin console, any ordinary community admin could reach it
   // the same way. null = not checked yet for the current session.
   const [authorized, setAuthorized] = useState<boolean | null>(null)
+  // The check couldn't be made (no signal, a server error): not a no. A no
+  // signs the admin out, and on hospital wifi a dropped signal read as one
+  // (Nov 18 review). Try again bumps `attempt` to check once more.
+  const [checkFailed, setCheckFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
 
   useEffect(() => {
@@ -146,21 +152,26 @@ export default function AdminAuthGate({
     let cancelled = false
     async function checkAuthorized(currentSession: Session) {
       setAuthorized(null)
+      setCheckFailed(false)
       try {
         const query = community ? `?community=${encodeURIComponent(community)}` : ''
         const res = await fetch(`/api/admin/whoami${query}`, {
           headers: { Authorization: `Bearer ${currentSession.access_token}` },
         })
-        const body = await res.json()
-        if (!cancelled) {
-          setAuthorized(!!body.ok)
+        // Only whoami's own answer is a no (401, or 403 from anything in
+        // front of it); any other failure is a check that wasn't made.
+        const refused = res.status === 401 || res.status === 403
+        const body = (await res.json().catch(() => null)) as { ok?: boolean; isSuperAdmin?: boolean } | null
+        if (cancelled) return
+        if (body?.ok) {
+          setAuthorized(true)
           setIsSuperAdmin(!!body.isSuperAdmin)
-        }
-      } catch {
-        if (!cancelled) {
+        } else if (refused || (body && res.status < 500)) {
           setAuthorized(false)
           setIsSuperAdmin(false)
-        }
+        } else setCheckFailed(true)
+      } catch {
+        if (!cancelled) setCheckFailed(true)
       }
     }
     checkAuthorized(session)
@@ -168,7 +179,7 @@ export default function AdminAuthGate({
     return () => {
       cancelled = true
     }
-  }, [email, community])
+  }, [email, community, attempt])
 
   // Supabase redirects back from a failed/declined Google sign-in with
   // ?error=...&error_description=... on the query string, rather than
@@ -180,7 +191,7 @@ export default function AdminAuthGate({
     const params = new URLSearchParams(window.location.search)
     const description = params.get('error_description')
     if (!description) return
-    history.replaceState(history.state, '', window.location.pathname)
+    replaceAddress(window.location.pathname)
     // Reading state Supabase's redirect set on the URL (external to React),
     // once on mount — the exact case the lint rule's own guidance carves out.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -206,7 +217,7 @@ export default function AdminAuthGate({
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
     const description = hash.get('error_description')
     if (!description) return
-    history.replaceState(history.state, '', window.location.pathname + window.location.search)
+    replaceAddress(window.location.pathname + window.location.search)
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSignInError(description.replace(/\+/g, ' '))
   }, [])
@@ -231,7 +242,7 @@ export default function AdminAuthGate({
   useEffect(() => {
     if (!ready) return
     if (!window.location.href.includes('#')) return
-    history.replaceState(history.state, '', window.location.pathname + window.location.search)
+    replaceAddress(window.location.pathname + window.location.search)
   }, [ready])
 
   // Local-dev-only shortcut: /admin?devToken=<DEV_ADMIN_BYPASS_SECRET> signs in
@@ -245,7 +256,7 @@ export default function AdminAuthGate({
     const devToken = params.get('devToken')
     if (!devToken) return
 
-    history.replaceState(history.state, '', window.location.pathname)
+    replaceAddress(window.location.pathname)
 
     fetch('/api/admin/dev-login', {
       method: 'POST',
@@ -318,6 +329,17 @@ export default function AdminAuthGate({
           sentMessage={community ? 'an authorized admin for this community' : 'an authorized superadmin'}
           community={community}
         />
+      </AdminShell>
+    )
+  }
+
+  if (checkFailed) {
+    return (
+      <AdminShell title={shellTitle} subtitle={shellSubtitle}>
+        <p className="text-sm text-slate-700">Couldn’t check your access.</p>
+        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="mt-3 min-h-11 cursor-pointer rounded-full bg-primary px-5 text-[15px] font-bold text-white">
+          Try again
+        </button>
       </AdminShell>
     )
   }

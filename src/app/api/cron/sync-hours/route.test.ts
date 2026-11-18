@@ -16,6 +16,7 @@ function chainable(result: unknown) {
     eq: vi.fn(self),
     not: vi.fn(self),
     limit: vi.fn(self),
+    order: vi.fn(self),
     update: vi.fn(self),
     then: (resolve: (v: unknown) => void) => resolve(result),
   })
@@ -122,6 +123,19 @@ describe('GET /api/cron/sync-hours', () => {
     const body = await (await runGet()).json()
     expect(body).toMatchObject({ total: 0 })
     expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
+  // Past the cap, an arbitrary 500 were asked every night and the rest
+  // never were (Nov 18 review): the longest-unasked go first.
+  it('asks the listings Google was asked about longest ago first', async () => {
+    mockFetchPlaceSync.mockResolvedValue(null)
+    const read = chainable({ data: [], error: null })
+    mockFrom.mockImplementation(() => read)
+    await runGet()
+    expect(read.order).toHaveBeenCalledWith('details->>googleStatusCheckedAt', { ascending: true, nullsFirst: true })
+    const order = (read.order as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]
+    const limit = (read.limit as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]
+    expect(order).toBeLessThan(limit)
   })
 
   it('persists a per-listing error when the Google fetch fails', async () => {

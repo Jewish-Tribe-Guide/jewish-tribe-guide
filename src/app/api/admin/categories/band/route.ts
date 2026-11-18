@@ -1,4 +1,4 @@
-import { siteAdminWrite } from '@/lib/adminRoute'
+import { adminWrite } from '@/lib/adminRoute'
 import { getAdminClient } from '@/lib/supabase/admin'
 
 // Same bucket every admin-uploaded image goes to (see
@@ -16,10 +16,12 @@ async function ensureBucket() {
 // POST /api/admin/categories/band — uploads an image file (multipart
 // form-data, field "file") to storage and returns its public URL, for use as
 // a category's desktop directory-banner photo (CategoryConfig.cardBandImageUrl).
-// Admin only. Doesn't touch the category row itself — same as
+// That community's admins (`?community=<slug>`), as the hero and logo
+// uploads: a community admin not on SUPERADMIN_EMAILS got "Not authorized"
+// here until Nov 18. Doesn't touch the category row itself — same as
 // that old icon upload, the editor sets the returned URL on its draft, batched
 // into the normal Save changes flow via PATCH /api/admin/categories/:id.
-export const POST = siteAdminWrite(async (request: Request) => {
+export const POST = adminWrite(async (request: Request) => {
   let form: FormData
   try {
     form = await request.formData()

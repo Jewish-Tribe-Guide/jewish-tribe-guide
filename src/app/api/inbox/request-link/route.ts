@@ -2,6 +2,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { isAllowedInboxEmail } from '@/lib/inboxAuth'
 import { sendInboxMagicLink } from '@/lib/email'
 import { enforceRateLimit } from '@/lib/rateLimit'
+import { linkOrigin } from '@/lib/linkOrigin'
 
 // POST /api/inbox/request-link  body: { email }
 // Sends a magic sign-in link ONLY if the email is allowlisted in INBOX_EMAILS —
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
   }
 
   const supabase = getAdminClient()
-  const origin = request.headers.get('origin') || new URL(request.url).origin
+  const origin = linkOrigin(request)
   const redirectTo = `${origin}/inbox`
 
   try {

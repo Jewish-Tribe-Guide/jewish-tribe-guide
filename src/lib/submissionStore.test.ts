@@ -433,7 +433,8 @@ describe('approveSubmission', () => {
 
     const applied = (resourceBuilder.update as ReturnType<typeof vi.fn>).mock.calls[0]![0] as { details: Record<string, unknown> }
     expect(applied.details).toMatchObject({ women_s_hours: '7:30 PM', call_before: '10:00 PM' })
-    const saved = (approveBuilder.update as ReturnType<typeof vi.fn>).mock.calls[0]![0] as { payload: { reviewEdit: { fields: string[]; asSent: Record<string, unknown> } } }
+    // The last: the first claims it (Nov 18).
+    const saved = (approveBuilder.update as ReturnType<typeof vi.fn>).mock.calls.at(-1)![0] as { payload: { reviewEdit: { fields: string[]; asSent: Record<string, unknown> } } }
     expect(saved.payload.reviewEdit).toMatchObject({ by: 'admin@x.co', fields: ['call_before'], asSent: { call_before: '9:00 PM' } })
   })
 

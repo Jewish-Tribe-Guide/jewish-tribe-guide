@@ -28,6 +28,8 @@ export default function FeedbackEditor({ token, onBack }: { token: string; onBac
   const [justSaved, setJustSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // `api` is kept across a new token (hourly, useAdminApi), so the draft
+  // isn't loaded again over what's being typed.
   const load = useCallback(async () => {
     try {
       const res = await api.fetch('/api/admin/site-settings')

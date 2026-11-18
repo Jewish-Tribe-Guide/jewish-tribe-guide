@@ -18,6 +18,9 @@ import { describe, expect, it } from 'vitest'
 // real community admin, not a local test failure.
 const HERO_ROUTE = readFileSync('src/app/api/admin/site-settings/hero-image/route.ts', 'utf-8')
 const LOGO_ROUTE = readFileSync('src/app/api/admin/site-settings/logo/route.ts', 'utf-8')
+// The category banner photo had the same check and was missed (Nov 18).
+const BAND_ROUTE = readFileSync('src/app/api/admin/categories/band/route.ts', 'utf-8')
+const BAND_FIELD = readFileSync('src/components/admin/CategoryFormFields.tsx', 'utf-8')
 
 // Since Nov 18 the routes check through adminWrite (src/lib/adminRoute.ts),
 // which is getAdminUserForCommunity; siteAdminWrite is the global-only one.
@@ -37,5 +40,14 @@ describe('the hero photo / logo upload routes use community-scoped admin auth', 
     expect(LOGO_ROUTE).toMatch(COMMUNITY_SCOPED)
     expect(LOGO_ROUTE).not.toMatch(/siteAdminWrite/)
     expect(LOGO_ROUTE).not.toMatch(/getAdminUser\(/)
+  })
+
+  it('category banner: checks getAdminUserForCommunity, and the editor sends the community', () => {
+    expect(BAND_ROUTE).toMatch(COMMUNITY_SCOPED)
+    expect(BAND_ROUTE).not.toMatch(/siteAdminWrite/)
+    expect(BAND_ROUTE).not.toMatch(/getAdminUser\(/)
+    // The community goes on through the editor's api (adminApi.ts).
+    expect(BAND_FIELD).toMatch(/useAdminApiFor\(token, community\)/)
+    expect(BAND_FIELD).toMatch(/uploadUrl=\{api\.url\('\/api\/admin\/categories\/band'\)\}/)
   })
 })

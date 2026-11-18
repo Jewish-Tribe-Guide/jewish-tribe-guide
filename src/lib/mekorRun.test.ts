@@ -139,6 +139,33 @@ describe('runMekorWatch', () => {
     expect(mockCreate.mock.calls.map(([, p]) => p.name)).not.toContain('Z Candy Bar')
   })
 
+  // Production, Nov 4: Mekor lists the Brodsky Enrichment Center twice,
+  // under two names and two street numbers, and both were filed 22ms
+  // apart, Google's one place on each (Nov 18 review).
+  it('files one new place once when Google finds two of the list’s entries are it', async () => {
+    mockGoogle.mockImplementation(async (name: string) => ({ placeId: 'one-place', name, businessStatus: 'OPERATIONAL' }))
+    setDb([], [], [])
+    await run()
+    expect(mockCreate.mock.calls.filter(([, p]) => p.details.placeId === 'one-place')).toHaveLength(1)
+  })
+
+  it('does not suggest a place waiting in the queue under another name, the same place on Google', async () => {
+    mockGoogle.mockImplementation(async (name: string) => (name === 'Z Candy Bar' ? { placeId: 'zc', name, businessStatus: 'OPERATIONAL' } : { placeId: 'other', name: 'Wawa', businessStatus: 'OPERATIONAL' }))
+    setDb([], [{ id: 'q1', payload: { category: 'restaurant', name: 'Zee’s Candy', address: '1 Elsewhere St', phone: null, details: { placeId: 'zc' } } }], [])
+    await run()
+    expect(mockCreate.mock.calls.map(([, p]) => p.name)).not.toContain('Z Candy Bar')
+    expect(mockCreate.mock.calls.length).toBeGreaterThan(0)
+  })
+
+  it('a place Google said is closed isn’t asked about again for 30 days', async () => {
+    mockGoogle.mockResolvedValue({ placeId: 'p', name: null, businessStatus: 'OPERATIONAL' })
+    setDb([], [], [])
+    const now = Date.parse('2026-11-18T07:00:00Z')
+    const body = await runMekorWatch('philly', LIST, { closedBefore: [{ name: 'Z Candy Bar', at: new Date(now - 10 * 86_400_000).toISOString() }], now })
+    expect(mockGoogle.mock.calls.map(([name]) => name)).not.toContain('Z Candy Bar')
+    expect(body.ok && body.closedOnGoogle).toContain('Z Candy Bar')
+  })
+
   it('does not file again what it filed before, whatever the admin decided', async () => {
     setDb([magical, zevis, shtetl], [], [])
     await run()

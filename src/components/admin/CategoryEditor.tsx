@@ -23,7 +23,7 @@ import { CardBandImageField } from './CategoryFormFields'
 import { partnerOf, partnerRule } from '@/lib/fieldPartners'
 import FieldScreen from './FieldScreen'
 import FieldLooks from './FieldLooks'
-import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
+import { CleanupConfirm, RenameConfirm } from './CategorySaveConfirmations'
 import { draftMeaning, mergeFieldsWithHidden, normalizeField, toDraft, type Draft } from './categoryEditorLogic'
 import { useCategoryFieldEditing } from './useCategoryFieldEditing'
 import { useCategorySaveWorkflow } from './useCategorySaveWorkflow'
@@ -167,7 +167,7 @@ function CategoryEditorScreen({
   useEffect(() => {
     if (!countId) return
     let cancelled = false
-    takeCategoryListings(countId)
+    takeCategoryListings(community, countId)
       .then(({ ok, resources }) => {
         if (!cancelled && ok) {
           setPlaceCount(resources.length)
@@ -178,7 +178,7 @@ function CategoryEditorScreen({
     return () => {
       cancelled = true
     }
-  }, [countId])
+  }, [countId, community])
   // What the positional rule would give this category, previewed under
   // "Automatic". For a category being created there is no id in the list yet,
   // so it lands on the neutral fallback — accurate enough, since its real
@@ -225,7 +225,7 @@ function CategoryEditorScreen({
     }
   }
 
-  const { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, countAnswers, cancelCleanup, cancelRename, cancelIdRename } = useCategorySaveWorkflow({
+  const { saving, errors, pendingCleanup, pendingRename, save, countAnswers, cancelCleanup, cancelRename } = useCategorySaveWorkflow({
     draft,
     initial,
     isNew,
@@ -702,6 +702,7 @@ function CategoryEditorScreen({
                   set('cardImageUrl', card)
                 }}
                 token={token}
+                community={community}
                 originalSource={bannerOriginal}
                 onOriginalSourceChange={setBannerOriginal}
               />
@@ -896,9 +897,7 @@ function CategoryEditorScreen({
             </ul>
           )}
 
-          {pendingIdRename ? (
-            <IdRenameConfirm rename={pendingIdRename} saving={saving} onCancel={cancelIdRename} onConfirm={() => save()} />
-          ) : pendingRename ? (
+          {pendingRename ? (
             <RenameConfirm rename={pendingRename} saving={saving} onCancel={cancelRename} onConfirm={() => save()} onSkip={() => save({ skipRename: true })} />
           ) : pendingCleanup ? (
             <CleanupConfirm cleanup={pendingCleanup} initial={initial} saving={saving} onCancel={cancelCleanup} onConfirm={() => save()} />
@@ -908,7 +907,7 @@ function CategoryEditorScreen({
         {!adding && !removing && preview}
       </div>
 
-      {!(pendingIdRename || pendingRename || pendingCleanup) && (
+      {!(pendingRename || pendingCleanup) && (
         <SaveBar
           changes={changes}
           saving={saving}

@@ -18,6 +18,7 @@ export type Json = Record<string, unknown> | unknown[]
 export type Method = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
 
 export type AdminApi = {
+  /** The token as it is now (it changes about once an hour). */
   readonly token: string
   readonly community: string | null
   /** The path with the community added (unchanged for a site-wide api). */
@@ -36,7 +37,11 @@ export type AdminApi = {
 
 const DEFAULT_FAILURE = 'Could not do that.'
 
-export function adminApi(token: string, community: string | null): AdminApi {
+/** `token`: the token, or how to read the latest one. A screen keeps one
+ *  api across Supabase's hourly new token (useAdminApi), so a load keyed on
+ *  the api doesn't run again and put the saved values back over a draft. */
+export function adminApi(tokenOf: string | (() => string), community: string | null): AdminApi {
+  const current = typeof tokenOf === 'function' ? tokenOf : () => tokenOf
   const url = (path: string) => (community === null ? path : withCommunity(path, community))
   const initOf = (init: { method?: Method; body?: unknown; signal?: AbortSignal } = {}): RequestInit => {
     // A FormData body (a photo upload) goes as it is, and the browser sets
@@ -45,7 +50,7 @@ export function adminApi(token: string, community: string | null): AdminApi {
     const json = init.body !== undefined && !form
     return {
       ...(init.method && init.method !== 'GET' ? { method: init.method } : {}),
-      headers: json ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } : { Authorization: `Bearer ${token}` },
+      headers: json ? { 'Content-Type': 'application/json', Authorization: `Bearer ${current()}` } : { Authorization: `Bearer ${current()}` },
       ...(form ? { body: init.body as FormData } : json ? { body: JSON.stringify(init.body) } : {}),
       ...(init.signal ? { signal: init.signal } : {}),
     }
@@ -56,7 +61,9 @@ export function adminApi(token: string, community: string | null): AdminApi {
   const send = <T,>(method: Method, path: string, body?: unknown, fallback = DEFAULT_FAILURE) =>
     fetchJson<T>(url(path), initOf({ method, body }), fallback)
   return {
-    token,
+    get token() {
+      return current()
+    },
     community,
     url,
     fetch: request,

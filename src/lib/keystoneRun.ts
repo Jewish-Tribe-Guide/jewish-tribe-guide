@@ -13,7 +13,8 @@ import type { WatchDigestItem } from '@/lib/email'
 import { submitListingCreate, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
 import { KEYSTONE_NAME } from '@/lib/sourceNames'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
-import { runKosherListWatch, withPlaceId, type KosherList, type KosherListRun } from '@/lib/kosherListRun'
+import { runKosherListWatch, withPlaceId, type ClosedSeen, type KosherList, type KosherListRun } from '@/lib/kosherListRun'
+import { alreadyQueued } from '@/lib/mekorWatch'
 import {
   KEYSTONE_WATCH_NAME,
   compareKeystone,
@@ -68,6 +69,7 @@ function keystoneList(community: string, url: string): KosherList<KeystoneEntry,
   return {
     watchName: KEYSTONE_WATCH_NAME,
     sourceName: KEYSTONE_NAME,
+    categories: ['restaurant', 'grocery'],
     async read() {
       const list = await readKeystoneList(url)
       return 'error' in list ? list : { updated: null, entries: list.entries }
@@ -83,6 +85,9 @@ function keystoneList(community: string, url: string): KosherList<KeystoneEntry,
       const findings = compareKeystone(entries, (rows ?? []) as WatchedListing[])
       return { findings, agree: keystoneAgrees(entries, (rows ?? []) as WatchedListing[], findings) }
     },
+    // A new place Mekor Habracha's watch (or anyone) already suggested, by
+    // name, address or phone; Google's place is checked by the run.
+    waiting: (f, pending) => f.kind === 'new' && alreadyQueued({ name: f.entry.name, address: f.entry.address, phone: f.entry.phone }, pending),
     findingKey,
     submissionKey,
     note: (f) => findingNote(f),
@@ -128,6 +133,10 @@ function keystoneList(community: string, url: string): KosherList<KeystoneEntry,
   }
 }
 
-export async function runKeystoneWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<KeystoneRun> {
-  return runKosherListWatch(community, keystoneList(community, url), { dry })
+export async function runKeystoneWatch(
+  community: string,
+  url: string,
+  options: { dry?: boolean; closedBefore?: readonly ClosedSeen[]; now?: number } = {},
+): Promise<KeystoneRun> {
+  return runKosherListWatch(community, keystoneList(community, url), options)
 }

@@ -215,3 +215,58 @@ describe('AdminAuthGate — stray trailing "#" cleanup', () => {
     await waitFor(() => expect(window.location.href).toBe('http://localhost:3000/philly/admin'))
   })
 })
+
+describe('AdminAuthGate — a check that couldn’t be made', () => {
+  // On hospital wifi the access check can fail for want of signal. It was
+  // read as "not an admin": the console said so and signed the admin out
+  // (Nov 18 review).
+  const session = { access_token: 'tok-1', user: { email: 'admin@example.com' } }
+  afterEach(() => vi.unstubAllGlobals())
+
+  function signedIn(...replies: (() => Promise<unknown>)[]) {
+    mockGetSession.mockResolvedValue({ data: { session } })
+    mockOnAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } })
+    const f = vi.fn()
+    for (const r of replies) f.mockImplementationOnce(r)
+    vi.stubGlobal('fetch', f)
+  }
+
+  it('no signal: says it couldn’t check, keeps the admin signed in, and Retry checks again', async () => {
+    signedIn(
+      () => Promise.reject(new TypeError('Failed to fetch')),
+      () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) }),
+    )
+    render(
+      <AdminAuthGate community="philly">
+        <div>children</div>
+      </AdminAuthGate>,
+    )
+    expect(await screen.findByText('Couldn’t check your access.')).toBeInTheDocument()
+    expect(screen.queryByText("That account isn't an admin for this community.")).toBeNull()
+    expect(mockSignOut).not.toHaveBeenCalled()
+    screen.getByRole('button', { name: 'Try again' }).click()
+    expect(await screen.findByText('children')).toBeInTheDocument()
+  })
+
+  it('a server error is the same, not a no', async () => {
+    signedIn(() => Promise.resolve({ ok: false, status: 503, json: () => Promise.reject(new SyntaxError('not JSON')) }))
+    render(
+      <AdminAuthGate community="philly">
+        <div>children</div>
+      </AdminAuthGate>,
+    )
+    expect(await screen.findByText('Couldn’t check your access.')).toBeInTheDocument()
+    expect(mockSignOut).not.toHaveBeenCalled()
+  })
+
+  it('a real no is still a no', async () => {
+    signedIn(() => Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({ ok: false }) }))
+    render(
+      <AdminAuthGate community="philly">
+        <div>children</div>
+      </AdminAuthGate>,
+    )
+    expect(await screen.findByText("That account isn't an admin for this community.")).toBeInTheDocument()
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalled())
+  })
+})

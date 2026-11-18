@@ -27,6 +27,9 @@ export const BUILT_IN_WATCHES: Pick<Watch, 'communityId' | 'kind' | 'url'>[] = [
   { communityId: 'philly', kind: 'keystone_list', url: KEYSTONE_LIST_URL },
 ]
 
+/** What Google said was closed, kept on the check for the next run. */
+const closedOf = (run: { closedSeen?: { name: string; at: string }[] }) => (run.closedSeen?.length ? { closedOnGoogle: run.closedSeen } : {})
+
 export async function runWatch(
   watch: Pick<Watch, 'communityId' | 'kind' | 'url'> & Partial<Pick<Watch, 'resourceId' | 'createdBy' | 'pageHash' | 'pageChangedAt' | 'createdAt' | 'lastFiled' | 'lastCheck'>>,
   budget?: MenuReadBudget,
@@ -41,14 +44,14 @@ export async function runWatch(
       return error ? { ok: false, error } : { ok: true, filed: watch.lastFiled ?? 0 }
     }
     if (watch.kind === 'keystone_list') {
-      const run = await runKeystoneWatch(watch.communityId, watch.url)
-      return run.ok ? { ok: true, filed: run.filed, check: { ...listCheck(run), listRead: run.listRead } } : { ok: false, error: run.error }
+      const run = await runKeystoneWatch(watch.communityId, watch.url, { closedBefore: watch.lastCheck?.closedOnGoogle, now })
+      return run.ok ? { ok: true, filed: run.filed, check: { ...listCheck(run), listRead: run.listRead, ...closedOf(run) } } : { ok: false, error: run.error }
     }
     // Mekor Habracha's kosher list, read place by place like Keystone-K's
     // (mekorWatch.ts). A website watch: no migration gave it a kind.
     if (isMekorList(watch.url)) {
-      const run = await runMekorWatch(watch.communityId, watch.url)
-      return run.ok ? { ok: true, filed: run.filed, check: { ...listCheck(run), listRead: run.listRead } } : { ok: false, error: run.error }
+      const run = await runMekorWatch(watch.communityId, watch.url, { closedBefore: watch.lastCheck?.closedOnGoogle, now })
+      return run.ok ? { ok: true, filed: run.filed, check: { ...listCheck(run), listRead: run.listRead, ...closedOf(run) } } : { ok: false, error: run.error }
     }
     // KCL's list of names, linked from its home page: it only dates the
     // hechsher of the places that say KCL and are on it (kclWatch.ts).

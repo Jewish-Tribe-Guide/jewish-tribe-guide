@@ -23,11 +23,9 @@ import { stableJson } from '@/lib/stableJson'
 // independently of the ~1000 lines of JSX that consume it. ──
 
 export type Draft = {
-  /** URL slug — see CategoryEditor's id field. Auto-follows `pluralLabel` on
-   *  a brand-new category until the admin touches this field directly (see
-   *  useCategoryFieldEditing's idTouched); always independently editable on
-   *  an existing one, since renaming it is now a supported (if migrating)
-   *  operation — see renameCategoryId. */
+  /** URL slug. Follows `pluralLabel` on a brand-new category
+   *  (useCategoryFieldEditing's setName); never changes on an existing one,
+   *  since banners, home sections, tabs and subscribers name it. */
   id: string
   label: string
   pluralLabel: string

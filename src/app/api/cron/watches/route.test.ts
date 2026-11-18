@@ -26,6 +26,10 @@ const mockSyncRefuah = vi.hoisted(() => vi.fn(async () => [] as unknown[]))
 vi.mock('@/lib/refuahMatchRun', () => ({ syncRefuahWatches: mockSyncRefuah }))
 const mockSyncHours = vi.hoisted(() => vi.fn(async () => [] as unknown[]))
 vi.mock('@/lib/hoursJobRun', () => ({ syncHoursWatches: mockSyncHours }))
+// Not mocked until Nov 18, it failed on every run here for want of a
+// database, and only the log said so.
+const mockSyncEruvSites = vi.hoisted(() => vi.fn(async () => [] as unknown[]))
+vi.mock('@/lib/eruvWebsiteRun', async (real) => ({ ...(await real<typeof import('@/lib/eruvWebsiteRun')>()), syncEruvWebsiteWatches: mockSyncEruvSites }))
 const mockListings = vi.hoisted(() => vi.fn(async () => ({ readsOf: (() => null) as (id: string) => 'times' | 'hours' | null, nameOf: () => null })))
 vi.mock('@/lib/listingReads', () => ({ loadListings: mockListings }))
 const mockListingPage = vi.hoisted(() => vi.fn())
@@ -158,6 +162,18 @@ describe('/api/cron/watches', () => {
     expect(body.results.map((r: { id: string }) => r.id)).toEqual(['site'])
   })
 
+  // Each step's failure went only to the log, and the run was recorded as
+  // fine: a broken step was never on the Watches tab or in an email
+  // (Nov 18 review).
+  it('a step that failed is in the run, not only the log', async () => {
+    mockSyncMenus.mockRejectedValueOnce(new Error('db down'))
+    mockSyncRefuah.mockRejectedValueOnce(new Error('Refuah answered 502'))
+    mockEruvLines.mockRejectedValueOnce(new Error('ORS down'))
+    mockList.mockResolvedValue({ available: true, watches: [watch({ id: 'site', url: 'https://bzbi.org/worship/' })] })
+    const body = await (await GET(request())).json()
+    expect(body.run.failedSteps).toEqual(['menu links', 'Refuah', 'eruv lines'])
+  })
+
   it('runs every active watch with its own reader, and saves each run', async () => {
     mockList.mockResolvedValue({
       available: true,
@@ -168,7 +184,7 @@ describe('/api/cron/watches', () => {
       ],
     })
     const body = await (await GET(request())).json()
-    expect(mockKeystone).toHaveBeenCalledWith('philly', 'https://keystone-k.org/establishments/')
+    expect(mockKeystone).toHaveBeenCalledWith('philly', 'https://keystone-k.org/establishments/', expect.objectContaining({ now: expect.any(Number) }))
     expect(mockWebsite).toHaveBeenCalledWith('https://bzbi.org/worship/')
     expect(body.results.map((r: { id: string }) => r.id)).toEqual(['k', 'site'])
     expect(mockUpdate.mock.calls.map(([, id]) => id)).toEqual(['k', 'site'])
@@ -184,6 +200,22 @@ describe('/api/cron/watches', () => {
     expect(mockWebsite).toHaveBeenCalled()
     const saved = mockUpdate.mock.calls.find(([, id]) => id === 'bad')![2]
     expect(saved).toMatchObject({ lastError: 'boom', failingSince: expect.any(String) })
+  })
+
+  // Nov 18 review: a save that failed (one Supabase blip) rejected the
+  // whole run, so every watch still in line went unread that night.
+  it('keeps going past a watch whose save fails, and counts it as not working', async () => {
+    mockList.mockResolvedValue({
+      available: true,
+      watches: [watch({ id: 'a', url: 'https://a.example/' }), watch({ id: 'b', url: 'https://b.example/' }), watch({ id: 'c', url: 'https://c.example/' })],
+    })
+    mockUpdate.mockImplementation(async (_c: string, id: string) => {
+      if (id === 'a') throw new Error('Couldn’t save the watch: connection reset')
+    })
+    const body = await (await GET(request())).json()
+    expect(mockUpdate.mock.calls.map(([, id]) => id).sort()).toEqual(['a', 'b', 'c'])
+    expect(body.results.find((r: { id: string }) => r.id === 'a')).toMatchObject({ ok: false, error: expect.stringContaining('connection reset') })
+    expect(body.run).toMatchObject({ ran: 3, notWorking: 1, left: 0 })
   })
 
   // So it isn't in the next night's email again: that reads failingSince.
@@ -206,7 +238,7 @@ describe('/api/cron/watches', () => {
     mockList.mockResolvedValue({ available: false, watches: [] })
     const body = await (await GET(request())).json()
     expect(body.recorded).toBe(false)
-    expect(mockKeystone).toHaveBeenCalledWith('philly', 'https://keystone-k.org/establishments/')
+    expect(mockKeystone).toHaveBeenCalledWith('philly', 'https://keystone-k.org/establishments/', expect.objectContaining({ now: expect.any(Number) }))
     expect(mockUpdate).not.toHaveBeenCalled()
   })
 

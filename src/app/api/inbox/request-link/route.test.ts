@@ -54,15 +54,24 @@ describe('POST /api/inbox/request-link', () => {
   })
 
   it('creates the viewer, links back to /inbox on the request origin, and emails the link', async () => {
-    const res = await post({ email: ' Viewer@X.co ' }, { origin: 'https://philly.example' })
+    const res = await post({ email: ' Viewer@X.co ' }, { origin: 'https://phillyjewishguide.com' })
     expect(await res.json()).toEqual({ ok: true })
     expect(m.createUser).toHaveBeenCalledWith({ email: 'Viewer@X.co', email_confirm: true })
     expect(m.generateLink).toHaveBeenCalledWith({
       type: 'magiclink',
       email: 'Viewer@X.co',
-      options: { redirectTo: 'https://philly.example/inbox' },
+      options: { redirectTo: 'https://phillyjewishguide.com/inbox' },
     })
     expect(m.sendInboxMagicLink).toHaveBeenCalledWith('Viewer@X.co', 'https://link')
+  })
+
+  // Anyone can post here with any Origin (curl sets what it likes). The
+  // link goes to a real viewer's inbox, and Supabase puts the session in
+  // the address it lands on, so a link back to another site hands that
+  // site the viewer's sign-in (Nov 18 review).
+  it('never links to a site that isn’t the guide, whatever the Origin header says', async () => {
+    await post({ email: 'viewer@x.co' }, { origin: 'https://evil.example' })
+    expect(m.generateLink.mock.calls[0][0].options.redirectTo).toBe('http://site.test/inbox')
   })
 
   it('falls back to the request URL’s origin when there is no Origin header', async () => {

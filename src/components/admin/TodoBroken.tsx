@@ -1,10 +1,9 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { editorRows } from '@/lib/editorRows'
-import { adminApi } from '@/lib/adminApi'
 import { listingSlug } from '@/lib/listingSlug'
 import { itemsField } from '@/lib/listingView'
 import { routes } from '@/lib/routes'
@@ -18,6 +17,7 @@ import { brokenRows, brokenView, googleRows, stoppedGoogleAnswers, type BrokenAc
 import type { Jobs } from './useWatchJobs'
 import { shortUrl } from './watchText'
 import { useEditorSteps, useStepsInAddress } from './useStepsInAddress'
+import { useAdminApiFor } from './useAdminApi'
 
 // A broken check, fixed where it's shown (boards R3Site, R2Menu, R2Google,
 // R6Give, O2Pizza): the listing's field in its own editor, where it's read
@@ -55,7 +55,7 @@ export default function TodoBroken({
 }) {
   const [now] = useState(() => Date.now())
   const view = brokenView(placeId, label, jobs, now)
-  const api = useMemo(() => adminApi(token, community), [token, community])
+  const api = useAdminApiFor(token, community)
   const post = <T,>(path: string, body: Record<string, unknown>) => api.post<T>(path, body)
   const actions = sourceActions(placeId, post)
 

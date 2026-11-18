@@ -94,6 +94,10 @@ export type WatchCheck = {
    *  listing both stay as they were, a page that agreed still agrees, and
    *  the daily run dates the listing again without the AI (Oct 23). */
   listedAs?: string
+  /** A kosher list's: the places on it Google said were permanently
+   *  closed, and when, so they aren't asked about again every night
+   *  (kosherListRun.ts's knownClosed, Nov 18). */
+  closedOnGoogle?: { name: string; at: string }[]
   /** A shul's page: the day (YYYY-MM-DD) the AI last read it, so it's
    *  read again each Friday and Saturday morning even when it hasn't
    *  changed (weeklyReadDue in listingPageRun.ts, Oct 26). Older checks

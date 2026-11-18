@@ -1,7 +1,6 @@
 'use client'
 
-import { Fragment, useMemo, useState } from 'react'
-import { adminApi } from '@/lib/adminApi'
+import { Fragment, useState } from 'react'
 import { sourceKind } from '@/lib/watchPurposes'
 import type { WatchedPlace } from '@/lib/watchPlaces'
 import { BoxRow, BoxRows, BUTTON, GO, LINK, Pill } from './JobBoxes'
@@ -24,6 +23,7 @@ import type { AdminEruv } from '@/lib/eruvStore'
 import type { EruvFinding } from '@/lib/eruvJob'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
+import { useAdminApiFor } from './useAdminApi'
 
 // A place opened on its own screen, PlacePage.tsx (openedPlaceBoxes.ts says
 // what goes in it).
@@ -269,7 +269,7 @@ export default function OpenedPlace({
   const [eruvEditing, setEruvEditing] = useState<{ eruv: AdminEruv; finding: EruvFinding } | null>(null)
   const isMobile = useIsMobile()
   const opened = openedPlace(place.id, jobs, now)
-  const api = useMemo(() => adminApi(token, community), [token, community])
+  const api = useAdminApiFor(token, community)
   const post = <T,>(path: string, body: Record<string, unknown>) => {
     wroteFor(place.id).push(path)
     return api.post<T>(path, body)

@@ -50,8 +50,19 @@ describe('runWatch: Mekor Habracha’s list', () => {
       filed: 18,
       check: { what: 'list', from: null, result: 'differs', read: [], differences: [], queue: 'filed', list: { listed: 78, matching: 60, differences: 18, filed: 18 } },
     })
-    expect(mekor.run).toHaveBeenCalledWith('philly', mekorList.url)
+    expect(mekor.run).toHaveBeenCalledWith('philly', mekorList.url, expect.objectContaining({ closedBefore: undefined }))
     expect(m.readWebsite).not.toHaveBeenCalled()
+  })
+
+  // Google's "permanently closed" is a paid call: the answer is kept on the
+  // watch and handed to the next run, which doesn't ask again for 30 days.
+  it('keeps what Google said was closed on the watch and hands it to the next run', async () => {
+    const closedSeen = [{ name: 'Z Candy Bar', at: '2026-10-10T00:00:00Z' }]
+    mekor.run.mockResolvedValue({ ok: true, entries: 78, matching: 60, findings: 1, filed: 0, closedOnGoogle: ['Z Candy Bar'], closedSeen })
+    const before = { ...mekorList, id: 'w1', createdAt: 'c', active: true, lastCheck: { what: 'list', at: '2026-10-21T00:00:00Z', closedOnGoogle: closedSeen } } as Watch
+    const { watch } = await runAndRecord(before, '2026-10-22T00:00:00Z')
+    expect(mekor.run).toHaveBeenCalledWith('philly', mekorList.url, expect.objectContaining({ closedBefore: closedSeen }))
+    expect(watch.lastCheck).toMatchObject({ closedOnGoogle: closedSeen })
   })
 
   it('keeps what it read on the watch, for the Kosher page, but hands back the watch without it', async () => {

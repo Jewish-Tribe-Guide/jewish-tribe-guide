@@ -1,9 +1,8 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
-import { adminApi } from '@/lib/adminApi'
 import { ChangedTag } from '@/components/resources/editorParts'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
 import { withSave } from './findingEdits'
@@ -13,6 +12,7 @@ import { kindsOf } from './WatchKinds'
 import { waitingAnswers, type WaitAnswer } from './waitingAnswers'
 import { groupEdit, ownGroups, waitingGroups, type WaitBox, type WaitGroup, type WaitRow } from './waitingGroups'
 import type { Jobs } from './useWatchJobs'
+import { useAdminApiFor } from './useAdminApi'
 
 // What a job read that's decided on the place itself (a closure, a check
 // against Google, a menu's reading, a place the guide has archived), on To
@@ -85,7 +85,7 @@ export default function TodoReading({
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<{ item: DirectoryResource; category: CategoryConfig; edit: BoxEdit } | null>(null)
   const [changing, setChanging] = useState<string | null>(null)
-  const api = useMemo(() => adminApi(token, community), [token, community])
+  const api = useAdminApiFor(token, community)
   const send = (method: 'PATCH' | 'POST', path: string, body: Record<string, unknown>) => api.send(method, path, body)
 
   const g = ownGroups(waitingGroups(placeId, jobs, now).groups)[0]

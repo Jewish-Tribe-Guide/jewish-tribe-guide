@@ -71,7 +71,28 @@ export function filterPlaces(places: AdminPlace[], { show, category, query }: { 
 
 /** The line under a place's name, only when there's something to say:
  *  "No address", "Archived Oct 3". */
-export function placeLine(p: AdminPlace): string {
-  if (p.status === 'archived') return `Archived ${shortDay(p.changedAt)}`
-  return p.hasAddress ? '' : 'No address'
+export function placeLine(p: AdminPlace, sameName = false): string {
+  // A place another has the name of says its street, so the two aren't
+  // the same row twice (ACME ×2, GIANT ×3; Nov 18 review).
+  const street = sameName && p.hasAddress ? streetOf(p.listing.address) : ''
+  if (p.status === 'archived') return [street, `Archived ${shortDay(p.changedAt)}`].filter(Boolean).join(' · ')
+  return p.hasAddress ? street : 'No address'
 }
+
+/** A name as two places share it: case and spacing aside. */
+export const nameKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase()
+
+/** The names more than one place has (nameKey). */
+export function sharedNames(places: readonly AdminPlace[]): Set<string> {
+  const seen = new Set<string>()
+  const twice = new Set<string>()
+  for (const p of places) {
+    const k = nameKey(p.name)
+    if (seen.has(k)) twice.add(k)
+    seen.add(k)
+  }
+  return twice
+}
+
+/** An address's street: up to its first comma. */
+export const streetOf = (address: string | null | undefined) => (address ?? '').split(',')[0].trim()

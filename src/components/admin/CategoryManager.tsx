@@ -164,7 +164,7 @@ export default function CategoryManager({
   const openedId = editingId?.startsWith(CAT_PREFIX) && !editingId.startsWith(NEW_PREFIX) && editingId !== `${CAT_PREFIX}new` ? editingId.slice(CAT_PREFIX.length) : null
   const listKept = categories !== null
   useEffect(() => {
-    if (openedId && !listKept) prefetchCategoryListings(openedId)
+    if (openedId && !listKept) prefetchCategoryListings(community, openedId)
     // Only as the page opens: once the list is here, the editor has asked.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openedId])

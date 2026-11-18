@@ -323,11 +323,11 @@ test('a left-out submission shows up in History, with its reason', async ({ page
   await expect(review).not.toBeVisible({ timeout: 15_000 }) // a save, not a redraw: as the approve test above
 
   // The click-through this test actually exists to prove: Reports' History
-  // row, then Left, and the submission just left out is on it — the
+  // row, then Rejected, and the submission just rejected is on it — the
   // real-world case is "did I actually leave that out?".
   await page.goto('/philly/admin/metrics')
   await page.getByRole('link', { name: /History/ }).click()
-  await page.getByRole('link', { name: 'Left', exact: true }).click()
+  await page.getByRole('link', { name: 'Rejected', exact: true }).click()
   await expect(page).toHaveURL(/\/admin\/history\/rejected/)
   const card = page.locator('div.rounded-lg.shadow-sm', { hasText: name })
   await expect(card).toBeVisible()

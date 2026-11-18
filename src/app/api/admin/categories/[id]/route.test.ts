@@ -9,7 +9,6 @@ const m = vi.hoisted(() => ({
   deleteCategory: vi.fn(),
   categoryDeleteCounts: vi.fn(),
   revalidatePublicContent: vi.fn(),
-  renameCategoryId: vi.fn(),
   clearCategoryFieldData: vi.fn(),
 }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
@@ -17,7 +16,7 @@ vi.mock('@/lib/communityStore', () => ({
   communitySlugFromRequest: (r: Request) => new URL(r.url).searchParams.get('community'),
   resolveCommunity: m.resolveCommunity,
 }))
-vi.mock('@/lib/categoryStore', () => ({ updateCategory: m.updateCategory, deleteCategory: m.deleteCategory, categoryDeleteCounts: m.categoryDeleteCounts, renameCategoryId: m.renameCategoryId }))
+vi.mock('@/lib/categoryStore', () => ({ updateCategory: m.updateCategory, deleteCategory: m.deleteCategory, categoryDeleteCounts: m.categoryDeleteCounts }))
 vi.mock('@/lib/resourceStore', () => ({ clearCategoryFieldData: m.clearCategoryFieldData, applyFieldOptionRenames: vi.fn() }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: m.revalidatePublicContent }))
 
@@ -142,6 +141,19 @@ describe('PATCH /api/admin/categories/:id — what each listing adds', () => {
 })
 
 // The Eruv's confirm says how many eruvim and watches go with it (Nov 4).
+// A category's id is its address, and every other row that names it
+// (banners, home sections, Right now, tabs, subscribers, pending
+// suggestions) points at it. No screen has offered to change it since Nov 5,
+// and a rename moved only the listings, so the route no longer takes one.
+describe('PATCH /api/admin/categories/:id — its id', () => {
+  it('leaves the id as it is when a body names a new one', async () => {
+    const res = await patch({ label: 'Shuls', newId: 'shuls' })
+    expect(res.status).toBe(200)
+    expect(m.updateCategory).toHaveBeenCalledWith('philly', 'synagogue', expect.anything())
+    expect(m.updateCategory).not.toHaveBeenCalledWith('philly', 'shuls', expect.anything())
+  })
+})
+
 describe('DELETE /api/admin/categories/:id', () => {
   const del = (q = '') =>
     DELETE(
@@ -169,11 +181,9 @@ describe('DELETE /api/admin/categories/:id', () => {
 // database held the new one (the admin review, Nov 18). adminWrite now
 // invalidates after anything but a refusal.
 describe('PATCH /api/admin/categories/:id — a save that fails partway', () => {
-  it('still drops the cached site when the rename went through and the update failed', async () => {
-    m.renameCategoryId.mockResolvedValue({ listings: 3 })
+  it('still drops the cached site when the update failed (it may have written)', async () => {
     m.updateCategory.mockRejectedValue(new Error('connection reset'))
-    expect((await patch({ newId: 'shuls', label: 'Shuls' })).status).toBe(502)
-    expect(m.renameCategoryId).toHaveBeenCalled()
+    expect((await patch({ label: 'Shuls' })).status).toBe(502)
     expect(m.revalidatePublicContent).toHaveBeenCalled()
   })
 
@@ -184,9 +194,9 @@ describe('PATCH /api/admin/categories/:id — a save that fails partway', () => 
     expect(m.revalidatePublicContent).toHaveBeenCalled()
   })
 
-  it('refuses a bad pin colour before renaming anything, and leaves the cache', async () => {
-    expect((await patch({ newId: 'shuls', pinColor: 'blue' })).status).toBe(400)
-    expect(m.renameCategoryId).not.toHaveBeenCalled()
+  it('refuses a bad pin colour before writing anything, and leaves the cache', async () => {
+    expect((await patch({ label: 'Shuls', pinColor: 'blue' })).status).toBe(400)
+    expect(m.updateCategory).not.toHaveBeenCalled()
     expect(m.revalidatePublicContent).not.toHaveBeenCalled()
   })
 })

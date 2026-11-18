@@ -537,6 +537,40 @@ describe('submissionStore (integration)', () => {
     expect(after!.details.confirmedAt).toBe(longAgo)
   })
 
+  // Two tabs, two admins, or a retry after a slow save (Nov 18 review):
+  // the second approval found the row still to be approved and inserted
+  // the place again. Only one of them may go through.
+  it('approving one new place twice, at once or one after the other, puts it live once', async () => {
+    const category = await makeTestCategory()
+    const name = `Integration Listing ${randomUUID()}`
+    const submission = await submitListingCreate('philly', listingPayload(category.id, name))
+    pendingSubmissionIds.push(submission.id)
+
+    const both = await Promise.allSettled([approveSubmission(submission.id), approveSubmission(submission.id)])
+    expect(both.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+    const refused = both.find((r) => r.status === 'rejected') as PromiseRejectedResult
+    expect(refused.reason).toBeInstanceOf(ReviewEditError)
+    await expect(approveSubmission(submission.id)).rejects.toBeInstanceOf(ReviewEditError)
+
+    const { data: rows } = await getAdminClient().from('resource').select('id').eq('category', category.id).eq('name', name)
+    expect(rows).toHaveLength(1)
+  })
+
+  it('rejecting a change already approved leaves it approved and live', async () => {
+    const category = await makeTestCategory()
+    const name = `Integration Listing ${randomUUID()}`
+    const submission = await submitListingCreate('philly', listingPayload(category.id, name))
+    pendingSubmissionIds.push(submission.id)
+
+    await approveSubmission(submission.id)
+    await expect(rejectSubmission(submission.id)).rejects.toBeInstanceOf(ReviewEditError)
+
+    const { data: row } = await getAdminClient().from('submission').select('status').eq('id', submission.id).single()
+    expect(row?.status).toBe('approved')
+    const { data: live } = await getAdminClient().from('resource').select('status').eq('category', category.id).eq('name', name).single()
+    expect(live?.status).toBe('approved')
+  })
+
   it('rejecting a create submission never creates a live resource', async () => {
     const category = await makeTestCategory()
     const name = `Integration Listing ${randomUUID()}`

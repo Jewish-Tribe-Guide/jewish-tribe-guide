@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 16, 2026.
+Last updated: Nov 18, 2026.
 
 ## The branch
 
@@ -434,6 +434,28 @@ Kept up card stays a card above the search, chevron and all (decided Nov
 14: it's how people find out they can trust the site, and opening it shows
 how everything is checked).
 
+**Drawn Nov 18, parked by the user the same day** ("maybe it's fine the
+way it is now idk" → "Park it for now"; today's home stays). If it comes
+back, my recommendation was Flip C plain (the weekday board with small
+square pictures); the full-pictures board got an "uch". (Canvas
+https://claude.ai/artifact/AR8hb7s66iPhAdqsqhbQsU, "Phone home: boxes and
+rows"): the user asked whether Right now should be a box and the
+categories rows ("these bunched up boxes and pictures"). Three boards:
+Today as built; Flip A, Right now as one white box of lines (the same
+words as Q1, no photo, chevrons) and the categories as one white box of
+rows with a 40px picture each; Flip B, the same rows with Right now as
+one box split in two halves. Would undo Q1, R3 and Oct 17's tiles. Rows
+come out about 70px longer than tiles. Then Flip C, the user's own
+("truly reversing the way it is today"), a weekday and a Friday: Right
+now as two separate boxes side by side, each category its own row 8px
+apart, pictures held as small squares for a later round. On Friday the
+two boxes are Shabbos (candles) and Shabbos shopping, white; the eruv
+line becomes its own row under them; the cards' Minyanim/Zmanim and item
+buttons are dropped (each box one tap). The user OK'd Flip C's layout
+("Yes, no coding yet"), then asked for pictures: "Flip C: full
+pictures" draws the weekday with every Right now box and category row a
+full photo, white words over a dark fade. Not built until the user picks.
+
 Boards U1 + U3f/U3g (Nov 14, canvas
 https://claude.ai/artifact/1L9Ep2cBxk84xQ2BePNbzL, built Nov 15): the
 computer home has Right now under Explore by Category, the same answers as
@@ -829,6 +851,115 @@ Nov 14, later, the user's yes to both:
   category pages, Browse, What changed, Feedback and You. The Add button
   sits beside Feedback · About · Privacy at the bottom now, in Safari as
   it already did in the home-screen app.
+
+## The admin review (Nov 18, on `redesign/suite-rows`)
+
+The user asked for a look over the whole admin: what to fix, what to
+refactor, which watches don't work right. Fixed the same day, each with a
+test that failed against the old code:
+
+- Approve and reject act only on a change still waiting. Two approvals of
+  one new place at once (two tabs, a double tap) put it live twice, and
+  rejecting a change already approved marked it rejected while it stayed
+  live. The approval now claims the row first and hands it back if the
+  apply fails.
+- Category banner upload: that community's admins, not superadmins only.
+  Philly's 3 non-superadmin admins and Washington's 1 couldn't upload a
+  banner (as hero and logo before them).
+- Category page preview: its own community's places and zmanim, not
+  Philly's (it read `community.config`).
+- Watches: one watch's failed save no longer ends the night's run; it
+  counts as not working and the rest run.
+- Menu watch: a reading an admin skipped stays skipped on the nightly run,
+  not only on Read now.
+- Mekor watch: one place on Google is filed once. The Brodsky Center was
+  filed twice on Nov 4 (two names on Mekor's list, one Google place).
+  **Live queue still holds both** (the user's to reject one; 7 Mekor new
+  places waiting, 14–30 days old).
+
+Then, the rest of the list (the user, Nov 18: "keep going through the
+whole list"), each with a test that failed against the old code unless
+it says otherwise:
+
+- Sign-in links (admin and inbox) go back to the guide, never to an
+  Origin header a request claims (d27471f5).
+- Home page and Feedback keep what was typed when the sign-in token
+  refreshes (431a5f89).
+- Add a place names a save that failed after the listing was made ("Not
+  saved: …"), and stays until Done (f4c61656).
+- A sign-in check that couldn't be made (no signal, a 5xx) says "Couldn't
+  check your access" with Try again, instead of "not an admin" and a
+  sign-out (7acbbd51).
+- Watches run and nightly email (0e9036b9): a failed step of the watches
+  run is named in its warning; a run cut off past its time limit is
+  emailed (live: read-menus Oct 27, watches Nov 6 were never told of); a
+  job that didn't run at all is emailed the first night it's late.
+- A page with part of a change waiting isn't AI-read again every night
+  (87411c2c), which was using up the night's reads.
+- Keystone-K and Mekor: a place Google said is closed isn't asked about
+  again for 30 days (c9717ddc); Keystone skips a new place already waiting
+  in the queue, by name or Google place (63896a05).
+- Google sync takes the longest-unasked listings first past its 500 cap,
+  and every Google request gives up after 10s (937e0802).
+- read-menus and look-again: a late answer always lands after its "took
+  too long" save (it raced it before); walk-routes' request times out
+  (f864d927). A late look-again try counted as failed has no test.
+- Back, Forward and reload (each checked in a real browser):
+  - `replaceState` calls in To do, Places and the sign-in gate drop Next's
+    mark (`replaceAddress`, 42da8b3e); a unit test fails on any new one.
+  - Home page's full-size preview (`?preview=open`), a form's question
+    (`?question=N`) and its preview (b220a7b4).
+  - Add a place's form after Find (`?step=finish`) and a source over it
+    (`?over=…`); a reload on the form is Find again, the address fixed in
+    place (58bed9f1).
+  - New community on the superadmin console (`?step=new`, 736d1797).
+- Gone: `People.tsx`, ChangeReview's unused `inPlace` (b0b75bd0), and the
+  unused `/api/admin/subscribers` routes (no test: nothing called them).
+- Settled with the user later on Nov 18 (they agreed to all three):
+  - A category's id can't be renamed: no screen offered it since Nov 5,
+    and a rename moved only the listings, so `renameCategoryId`, the
+    id-usage route and the editor's rename gate are gone (9181c66a).
+  - A form's tile has no emoji to pick: the site always drew its line
+    icon. The picker, the unused `PinColorField` and Support's and
+    Volunteer's emoji fallbacks are gone (1b4d2641).
+  - About and Privacy and Communities live only in the superadmin
+    console (`/admin/pages`, `/admin`); the community's menu links there
+    and its two copies are gone.
+- The three screen nits, fixed Nov 18: Places says the street of a place
+  another place has the name of (68d03fd5); Reports and History say
+  Approved and Rejected, as To do's buttons do, not Taken and Left
+  (8d549ac4, a change to the Oct 29 Reports board's wording); a shul's
+  usual times on its admin listing read by tefillah then time, Shabbos's
+  Friday first (d17d456c).
+
+Still open:
+
+- **KCL says "agrees" for a listing that names KCL but isn't on KCL's
+  list.** A design call: proposed, file a suggestion ("KCL’s list doesn’t
+  have it by this name") for such a listing, or show it on the Kosher
+  page instead. Not built.
+- **To do's own open/close is a raw `history.pushState`** (`goTo` in
+  ModerationQueue). Checked in the browser, Back from another page after
+  a reload lands on the open place, so it works today; it's still the
+  pattern AGENTS.md warns against.
+- Public site: `FindResourcesConnected` and `ResourceMapView` still call
+  `replaceState` carrying Next's mark (allowlisted in
+  `replaceStateMark.test.ts`); not seen to break.
+- Watches: a dated shul week is still compared with the usual times
+  (`shulWeekReading.ts`, `dropListed`), against the rule (for the
+  synagogue logic review); the watches run's time budget is thin (no new
+  watch after 250s of 300, the syncs' time included); the hours/menu/
+  Refuah syncs ignore "job off" and fetch a site's pages all at once; some
+  watch code reads Philly's timezone and map centre for every community;
+  walk-routes retries a failed chunk first every night; cron auth's
+  compare isn't constant-time.
+- **The Brodsky Center is in the live queue twice** (filed Nov 4): the
+  user's to reject one.
+- Refactors worth doing, moved to their own session on Nov 18 (the
+  admin-refactors session): one `useAdminApi` hook for the token/fetch/error
+  pattern, one admin route wrapper for auth + community + invalidation,
+  one change-review component (ChangeReview and TodoChange), and one
+  kosher-list runner for Keystone and Mekor.
 
 ## Open from the boxes and fields work (Nov 10)
 

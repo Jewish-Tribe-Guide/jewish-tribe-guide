@@ -36,3 +36,18 @@ describe('tryLook, an eruv', () => {
     expect(saveTry).toHaveBeenCalledWith('philly', 'eruv', 'elkins-park', expect.any(String), null)
   })
 })
+
+// Nov 18 review: the night's run saves a try that took too long as found
+// nothing, and the try ran on and saved what it found too; whichever landed
+// last stood. A try waits for that save before its own.
+describe('tryLook, after the night gave up on it', () => {
+  it('waits for the night’s "nothing" to be saved before saving what it found', async () => {
+    vi.mocked(listEruvimForAdmin).mockResolvedValue({ eruvim: [{ id: 'elkins-park', website: 'https://www.yiep.org/' }] } as never)
+    vi.mocked(findEruvStatusPages).mockResolvedValue({ found: [] })
+    const order: string[] = []
+    vi.mocked(saveTry).mockImplementation(async () => void order.push('try saved'))
+    const ready = () => new Promise<void>((ok) => setTimeout(() => (order.push('night saved'), ok()), 20))
+    await tryLook('philly', ELKINS, undefined, Date.now(), { ready })
+    expect(order).toEqual(['night saved', 'try saved'])
+  })
+})

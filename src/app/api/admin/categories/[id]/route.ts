@@ -1,7 +1,7 @@
 import { adminWrite, unchanged } from '@/lib/adminRoute'
 import { isPlaceKind, type PlaceKind } from '@/lib/placeKinds'
 import type { NextRequest } from 'next/server'
-import { updateCategory, deleteCategory, categoryDeleteCounts, renameCategoryId } from '@/lib/categoryStore'
+import { updateCategory, deleteCategory, categoryDeleteCounts } from '@/lib/categoryStore'
 import { clearCategoryFieldData, applyFieldOptionRenames } from '@/lib/resourceStore'
 import { isHttpUrl } from '@/lib/validation'
 import type { CategoryCapabilities, CategoryField, CategoryFormSection } from '@/lib/categories'
@@ -59,17 +59,12 @@ type PatchBody = {
    *  value to the new one on every listing that had it selected, right after
    *  the category itself is saved. */
   applyOptionRenames?: { fieldKey: string; oldValue: string; newValue: string }[]
-  /** Rename this category's own URL slug — the editor confirms against a
-   *  listing count first (see id-usage) since it cascades to every listing's
-   *  stored `category` value, not just this row. Applied before the rest of
-   *  the patch, which then targets the NEW id. */
-  newId?: string
 }
 
 // PATCH /api/admin/categories/:id — edit a category's presentation, fields,
-// and capabilities. Only the provided keys change. `newId` renames the
-// category's own slug (see renameCategoryId) — everything else in this same
-// request then targets that new id. Admin only.
+// and capabilities. Only the provided keys change. Its id (its address)
+// never does: banners, home sections, Right now, tabs, subscribers and
+// pending suggestions all name it. Admin only.
 export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx: RouteContext<'/api/admin/categories/[id]'>) => {
   const { id } = await ctx.params
 
@@ -119,36 +114,20 @@ export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx:
   if (body.walkList != null) body.walkList = parseWalkLists(body.walkList)
   if (body.listingParts != null) body.listingParts = parseListingParts(body.listingParts)
 
-  // Before the rename below: a refusal comes before anything is written
-  // (a 4xx isn't invalidated, adminRoute.ts), and a rename followed by this
-  // 400 left the category renamed behind an error.
+  // A refusal comes before anything is written (a 4xx isn't invalidated,
+  // adminRoute.ts).
   if (body.pinColor && !isValidPinColor(body.pinColor)) {
     return Response.json({ ok: false, errors: ['The pin colour must be a hex value like #2657bf.'] }, { status: 400 })
   }
 
-  // Applied before everything else, and using its own error path (400, not
-  // the catch-all 502 below) — an invalid/taken slug is a plain validation
-  // problem the admin needs to fix and retry, same tier as the pinColor
-  // check above, not an unexpected server failure.
-  let effectiveId = id
-  let idRenamed: number | undefined
-  if (body.newId && body.newId !== id) {
-    try {
-      ;({ listings: idRenamed } = await renameCategoryId(community.slug, id, body.newId))
-      effectiveId = body.newId
-    } catch (err) {
-      return Response.json({ ok: false, errors: [err instanceof Error ? err.message : 'Could not rename category.'] }, { status: 400 })
-    }
-  }
-
   try {
-    const category = await updateCategory(community.slug, effectiveId, body)
+    const category = await updateCategory(community.slug, id, body)
     if (!category) {
       return Response.json({ ok: false, errors: ['Category not found.'] }, { status: 404 })
     }
     let cleared: number | undefined
     if (body.clearFields && (body.clearFields.address || body.clearFields.phone || body.clearFields.keys?.length)) {
-      ;({ updated: cleared } = await clearCategoryFieldData(community.slug, effectiveId, {
+      ;({ updated: cleared } = await clearCategoryFieldData(community.slug, id, {
         address: body.clearFields.address,
         phone: body.clearFields.phone,
         fieldKeys: body.clearFields.keys,
@@ -156,9 +135,9 @@ export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx:
     }
     let renamed: number | undefined
     if (body.applyOptionRenames?.length) {
-      ;({ updated: renamed } = await applyFieldOptionRenames(community.slug, effectiveId, body.applyOptionRenames))
+      ;({ updated: renamed } = await applyFieldOptionRenames(community.slug, id, body.applyOptionRenames))
     }
-    return Response.json({ ok: true, category, cleared, renamed, idRenamed })
+    return Response.json({ ok: true, category, cleared, renamed })
   } catch (err) {
     console.error('[admin/categories/:id] PATCH failed:', err)
     // The columns a save can reach before the database has them.

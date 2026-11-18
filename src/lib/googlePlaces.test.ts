@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   fetchPlaceSync,
   findPlaceId,
+  findPlaceStatus,
   googleHoursToStructured,
   namesOverlap,
   nextGoogleFields,
@@ -419,5 +420,21 @@ describe('searchPlaces', () => {
     vi.stubGlobal('fetch', fetchSpy)
     expect(await searchPlaces('  ')).toBeNull()
     expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
+
+// The nightly sync asks Google about every listing one after another inside
+// a 300s limit, and nothing stopped a call that never answered: one hang
+// ran the whole job into Vercel's cutoff (Nov 18 review).
+describe('every Google call gives up', () => {
+  it('passes a timeout signal on each of the four requests', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'ZERO_RESULTS' }) })
+    vi.stubGlobal('fetch', fetchSpy)
+    await findPlaceId('Some Shul', '123 Main St')
+    await findPlaceStatus('Some Shul', '123 Main St')
+    await searchPlaces('Some Shul')
+    await fetchPlaceSync('abc')
+    expect(fetchSpy).toHaveBeenCalledTimes(4)
+    for (const [, init] of fetchSpy.mock.calls) expect(init?.signal).toBeInstanceOf(AbortSignal)
   })
 })

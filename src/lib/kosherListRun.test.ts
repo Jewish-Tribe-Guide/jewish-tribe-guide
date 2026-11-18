@@ -32,6 +32,7 @@ function list(findings: F[], filed: (f: F) => Promise<void> = async () => {}): K
   return {
     watchName: 'Test list watch',
     sourceName: 'Test list',
+    categories: ['restaurant'],
     read: async () => ({ updated: '2026-11-01', entries: ['a', 'b', 'c'] }),
     compare: async () => ({ findings, agree: ['agreeing-1', 'agreeing-2'] }),
     findingKey: (f) => `${f.kind}:${f.name}`,

@@ -24,8 +24,8 @@ const OP_META: Record<EnrichedSubmission['operation'], { label: string; cls: str
 }
 
 const STATUS_META: Record<'approved' | 'rejected', { label: string; cls: string }> = {
-  approved: { label: 'Taken', cls: 'bg-green-50 text-green-700 border border-green-200' },
-  rejected: { label: 'Left', cls: 'bg-red-50 text-red-700 border border-red-200' },
+  approved: { label: 'Approved', cls: 'bg-green-50 text-green-700 border border-green-200' },
+  rejected: { label: 'Rejected', cls: 'bg-red-50 text-red-700 border border-red-200' },
 }
 
 

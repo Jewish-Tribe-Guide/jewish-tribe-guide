@@ -1,4 +1,5 @@
 import { getAdminClient } from '@/lib/supabase/admin'
+import { withinOrLate } from './lateWork'
 import { listCategoriesUncached } from '@/lib/categoryStore'
 import { jobsOff } from '@/lib/jobOff'
 import { listWatches } from '@/lib/watchStore'
@@ -129,14 +130,6 @@ export const FIRST_READ_MS = 90_000
  *  five minutes and records what it did. */
 export const FIRST_READS_END_MS = 270_000
 
-const TOO_LONG = Symbol('too long')
-/** `work`, or TOO_LONG once `ms` pass; the read is left behind. */
-function within<T>(ms: number, work: Promise<T>): Promise<T | typeof TOO_LONG> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const late = new Promise<typeof TOO_LONG>((resolve) => (timer = setTimeout(() => resolve(TOO_LONG), Math.max(0, ms))))
-  return Promise.race([work, late]).finally(() => clearTimeout(timer))
-}
-
 /** A community's food places never read (needsFirstRead), by name. */
 async function unreadMenus(slug: string): Promise<{ l: DirectoryResource; kind: DishKind }[]> {
   const kinds = dishKinds(await listCategoriesUncached(slug))
@@ -217,22 +210,29 @@ export async function readUnreadMenus(
     for (const { l, kind } of unread) {
       if (budget <= 0 || now() > until) break
       budget--
-      const read = await within(
+      // One that takes too long is kept as not read, saying why, so it's on
+      // the Main dishes page with Read now rather than first in line again
+      // tomorrow. If it finishes after all, its reading is kept after that
+      // (lateWork.ts).
+      const read = await withinOrLate(
         Math.min(readMs, end - now()),
-        readPlaceMenu(slug, l, kind, apiKey).catch((err) => {
-          console.error(`[read-menus] ${l.name} failed:`, err)
-          return null
-        }),
-      )
-      // Kept as not read, saying why, so it's on the Main dishes page with
-      // Read now rather than first in line again tomorrow.
-      const kept =
-        read === TOO_LONG
-          ? await saveMenuReading(slug, l.id, { status: 'failed', sourceUrl: menuLinkOf(l) ?? menuWebsite(l, kind.category), dishes: [], note: 'Its menu took too long to read.', model: null }).catch((err) => {
-              console.error(`[read-menus] ${l.name} took too long, and couldn’t be kept:`, err)
-              return null
+        (ready) =>
+          readPlaceMenuPages(l, kind, apiKey)
+            .then(async (pages) => {
+              await ready()
+              return saveMenuReading(slug, l.id, pages)
             })
-          : read
+            .catch((err) => {
+              console.error(`[read-menus] ${l.name} failed:`, err)
+              return null
+            }),
+        () =>
+          saveMenuReading(slug, l.id, { status: 'failed', sourceUrl: menuLinkOf(l) ?? menuWebsite(l, kind.category), dishes: [], note: 'Its menu took too long to read.', model: null }).catch((err) => {
+            console.error(`[read-menus] ${l.name} took too long, and couldn’t be kept:`, err)
+            return null
+          }),
+      )
+      const kept = 'late' in read ? ((await read.late) as Awaited<ReturnType<typeof saveMenuReading>> | null) : read.value
       // One that couldn't be read is kept, saying why, but isn't a read.
       if (kept?.status === 'failed') failed++
       else if (kept) done++

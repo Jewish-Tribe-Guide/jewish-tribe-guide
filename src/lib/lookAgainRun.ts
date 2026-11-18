@@ -1,4 +1,5 @@
 import { getAdminClient } from './supabase/admin'
+import { withinOrLate } from './lateWork'
 import { listCategoriesUncached } from './categoryStore'
 import { isCategorySyncEligible } from './categories'
 import { listEruvimForAdmin } from './eruvStore'
@@ -53,7 +54,15 @@ export async function loadLookAgain(community: string, now = Date.now()): Promis
 /** One try, saved: what it found, if anything. A menu read again is kept
  *  as its reading (proposed or failed again), so it finds nothing here;
  *  `read` says whether it could be read this time. */
-export async function tryLook(community: string, item: Pick<LookItem, 'kind' | 'id' | 'name'>, apiKey: string | undefined, now = Date.now()): Promise<{ found: boolean; read?: boolean }> {
+export async function tryLook(
+  community: string,
+  item: Pick<LookItem, 'kind' | 'id' | 'name'>,
+  apiKey: string | undefined,
+  now = Date.now(),
+  /** Awaited before the try is saved: the night's own save of it, once
+   *  the night gave up waiting (lateWork.ts). */
+  { ready }: { ready?: () => Promise<void> } = {},
+): Promise<{ found: boolean; read?: boolean }> {
   const at = new Date(now).toISOString()
   let found: FoundPage | FoundPlace | null = null
   let read: boolean | undefined
@@ -75,6 +84,7 @@ export async function tryLook(community: string, item: Pick<LookItem, 'kind' | '
     if (!apiKey) throw new Error('The AI reader isn’t set up here (no OPENAI_API_KEY).')
     read = (await readMenuAgain(community, item.id, apiKey))?.status === 'proposed'
   }
+  await ready?.()
   await saveTry(community, item.kind, item.id, at, found)
   return { found: !!found, ...(read === undefined ? {} : { read }) }
 }
@@ -105,18 +115,26 @@ export async function lookAgainNight(
     for (const item of queue.slice(0, perNight)) {
       if (now() > until) break
       tried++
-      let timer: ReturnType<typeof setTimeout> | undefined
-      const late = new Promise<'late'>((resolve) => (timer = setTimeout(() => resolve('late'), tryMs)))
-      const result = await Promise.race([tryLook(slug, item, apiKey, now()), late])
-        .catch((err) => {
-          console.error(`[look-again] ${item.name} failed:`, err)
-          return 'failed' as const
-        })
-        .finally(() => clearTimeout(timer))
-      if (result === 'late' || result === 'failed') {
-        if (result === 'failed') failed++
-        await saveTry(slug, item.kind, item.id, new Date(now()).toISOString(), null).catch((err) => console.error(`[look-again] couldn’t save ${item.name}’s try:`, err))
-      } else if (result.found) found++
+      const nothing = () => saveTry(slug, item.kind, item.id, new Date(now()).toISOString(), null).catch((err) => console.error(`[look-again] couldn’t save ${item.name}’s try:`, err))
+      // One that takes too long is saved as found nothing at once; if it
+      // finishes after all, what it found is saved after that (lateWork.ts).
+      const result = await withinOrLate(
+        tryMs,
+        (ready) =>
+          tryLook(slug, item, apiKey, now(), { ready }).catch((err) => {
+            console.error(`[look-again] ${item.name} failed:`, err)
+            return 'failed' as const
+          }),
+        nothing,
+      )
+      // Too long counts as failed, as one that threw does.
+      if ('late' in result) {
+        failed++
+        await result.late
+      } else if (result.value === 'failed') {
+        failed++
+        await nothing()
+      } else if (result.value.found) found++
     }
     out.push({ community: slug, tried, found, failed, left: queue.length - tried })
   }

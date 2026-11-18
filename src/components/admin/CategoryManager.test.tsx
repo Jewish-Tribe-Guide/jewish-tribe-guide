@@ -106,7 +106,8 @@ describe('CategoryManager — opening a page quickly', () => {
     renderWithProviders(<CategoryManager token="t" editingId="cat:restaurant" onOpenEditor={vi.fn()} onCloseEditor={vi.fn()} />)
     const asked = vi.mocked(fetch).mock.calls.map(([url]) => String(url))
     expect(asked.some((u) => u.includes('/api/admin/categories?counts=1'))).toBe(true)
-    expect(asked).toContain('/api/resources?category=restaurant')
+    // Its own community's places (Nov 18).
+    expect(asked).toContain('/api/resources?category=restaurant&community=test-community')
   })
 
   // Each page's address is rendered on the server the first time it's

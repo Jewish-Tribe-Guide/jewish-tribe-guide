@@ -7,7 +7,8 @@ import type { DirectoryResource, MapFilters } from '@/types'
 import { takeCategoryListings } from '@/lib/categoryListings'
 import type { Coords } from '@/lib/useStoredLocation'
 import { withMilesFromAddress } from '@/lib/listingTravel'
-import { community } from '@/community.config'
+import { useActiveCommunity } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 import GenericDirectory from '@/components/resources/GenericDirectory'
 import EruvInfo from '@/components/resources/EruvInfo'
 import ZmanimCard from '@/components/ZmanimCard'
@@ -78,6 +79,8 @@ export default function CategoryPreview({
   /** Adding opens on this field's row: the field an admin is looking at. */
   focusField?: string
 }) {
+  // Its own community's places, centre and region, not the default one's.
+  const { community } = useActiveCommunity()
   const [realListings, setRealListings] = useState<DirectoryResource[] | null>(null)
   // Listings added/edited during this preview session — client-only, never
   // sent to the server. An edited real listing is "shadowed" here by id (see
@@ -108,7 +111,7 @@ export default function CategoryPreview({
   useEffect(() => {
     if (action?.mode !== 'map' || mapListings !== null) return
     let cancelled = false
-    fetch('/api/resources')
+    fetch(withCommunity('/api/resources', community.slug))
       .then(async (res) => {
         const body = await res.json()
         if (!cancelled) setMapListings(res.ok && body.ok ? (body.resources as DirectoryResource[]) : [])
@@ -119,14 +122,14 @@ export default function CategoryPreview({
     return () => {
       cancelled = true
     }
-  }, [action?.mode, mapListings])
+  }, [action?.mode, mapListings, community.slug])
 
   useEffect(() => {
     let cancelled = false
     // A brand-new, unsaved category's id has no matching rows — this just
     // resolves to an empty list, same as any other empty category.
     // Already on its way when the manager asked as the page opened.
-    takeCategoryListings(category.id)
+    takeCategoryListings(community.slug, category.id)
       .then(({ resources: listings }) => {
         if (!cancelled) {
           setRealListings(listings)
@@ -141,7 +144,7 @@ export default function CategoryPreview({
     return () => {
       cancelled = true
     }
-  }, [category.id, category.kind])
+  }, [category.id, category.kind, community.slug])
 
   function goToDirectory() {
     setAction(null)
