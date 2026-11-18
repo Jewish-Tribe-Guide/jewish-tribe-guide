@@ -1,5 +1,5 @@
 import { revalidateTag } from 'next/cache'
-import { getAdminUser } from '@/lib/adminAuth'
+import { siteAdminRead } from '@/lib/adminRoute'
 import { TAGS } from '@/lib/cacheTags'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 
@@ -33,10 +33,10 @@ import { revalidatePublicContent } from '@/lib/revalidateContent'
 // TAGS.pages is invalidated separately because it is global rather than
 // per-community, so revalidatePublicContent (which iterates communities) does
 // not cover it — the same split the pages admin route already has to make.
-export async function POST(request: Request) {
-  const admin = await getAdminUser(request)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+//
+// siteAdminRead, not siteAdminWrite: invalidating is the whole route, done
+// below, and the wrapper's pass would do it a second time.
+export const POST = siteAdminRead(async () => {
   try {
     await revalidatePublicContent()
     revalidateTag(TAGS.pages, 'max')
@@ -45,4 +45,4 @@ export async function POST(request: Request) {
     console.error('[admin/revalidate] failed:', err)
     return Response.json({ ok: false, errors: ['Could not revalidate.'] }, { status: 502 })
   }
-}
+})

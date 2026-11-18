@@ -13,7 +13,7 @@ vi.mock('@/lib/communityStore', () => ({
 }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: m.revalidatePublicContent }))
 
-const { adminRead, adminWrite, siteAdminWrite, unchanged } = await import('./adminRoute')
+const { adminRead, adminWrite, siteAdminRead, siteAdminWrite, unchanged } = await import('./adminRoute')
 
 const req = (q = '?community=ues') => new Request(`http://x/api/admin/thing${q}`, { method: 'POST' })
 const json = (status: number) => Response.json({ ok: status < 400 }, { status })
@@ -92,5 +92,23 @@ describe('siteAdminWrite', () => {
   it('refuses a community admin who isn’t a site owner', async () => {
     m.getAdminUser.mockResolvedValue(null)
     expect((await siteAdminWrite(async () => json(200))(req(''))).status).toBe(401)
+  })
+})
+
+describe('siteAdminRead', () => {
+  it('signs in as a site owner, names no community, and never invalidates', async () => {
+    const handler = vi.fn(async () => json(200))
+    await siteAdminRead(handler)(req(''))
+    expect(m.getAdminUser).toHaveBeenCalled()
+    expect(m.resolveCommunity).not.toHaveBeenCalled()
+    expect(handler).toHaveBeenCalledWith(expect.any(Request), { admin: { email: 'owner@x.co' } }, undefined)
+    expect(m.revalidatePublicContent).not.toHaveBeenCalled()
+  })
+
+  it('refuses someone not a site owner', async () => {
+    m.getAdminUser.mockResolvedValue(null)
+    const handler = vi.fn(async () => json(200))
+    expect((await siteAdminRead(handler)(req(''))).status).toBe(401)
+    expect(handler).not.toHaveBeenCalled()
   })
 })

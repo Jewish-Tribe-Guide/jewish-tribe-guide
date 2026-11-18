@@ -59,7 +59,9 @@ async function afterWrite(run: () => Promise<Response>, label: string): Promise<
 
 const labelOf = (request: Request) => `admin ${request.method} ${new URL(request.url).pathname}`
 
-/** A community admin's read: signed in for the community the request names. */
+/** A community admin's read: signed in for the community the request names.
+ *  Also the wrapper for a write the public site never shows (a watch's
+ *  settings, the team, a run started): no invalidation, as before. */
 export function adminRead<R extends Request, P>(handler: (request: R, admin: AdminRequestContext, ctx: P) => Promise<Response>) {
   return async (request: R, ctx?: P): Promise<Response> => {
     const community = await resolveCommunity(communitySlugFromRequest(request))
@@ -77,6 +79,16 @@ export function adminWrite<R extends Request, P>(handler: (request: R, admin: Ad
     const admin = await getAdminUserForCommunity(request, community.slug)
     if (!admin) return NOT_AUTHORIZED()
     return afterWrite(() => handler(request, { community, admin }, ctx as P), labelOf(request))
+  }
+}
+
+/** A site owner's read (SUPERADMIN_EMAILS), or a write the public site
+ *  never shows: signed in, no community, no invalidation. */
+export function siteAdminRead<R extends Request, P>(handler: (request: R, admin: SiteAdminRequestContext, ctx: P) => Promise<Response>) {
+  return async (request: R, ctx?: P): Promise<Response> => {
+    const admin = await getAdminUser(request)
+    if (!admin) return NOT_AUTHORIZED()
+    return handler(request, { admin }, ctx as P)
   }
 }
 

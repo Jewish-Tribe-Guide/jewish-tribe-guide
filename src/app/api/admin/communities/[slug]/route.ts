@@ -1,6 +1,5 @@
 import type { NextRequest } from 'next/server'
-import { revalidatePublicContent } from '@/lib/revalidateContent'
-import { getAdminUser } from '@/lib/adminAuth'
+import { siteAdminWrite } from '@/lib/adminRoute'
 import {
   addCommunityAdminEmail,
   deleteCommunity,
@@ -25,10 +24,12 @@ function asEmailList(value: unknown): string[] | undefined {
 // superadmin console's per-community admin roster actually uses;
 // adminEmails' full replace stays for anything else that wants it).
 // Superadmin only, same as everything else in this file.
-export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/communities/[slug]'>) {
-  const admin = await getAdminUser(request)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+//
+// Publishing/unpublishing changes the public switcher and sitemap
+// immediately, so siteAdminWrite throws the public cache away after it. The
+// email lists aren't public content, but invalidating on every save is cheap
+// and keeps one code path instead of two.
+export const PATCH = siteAdminWrite(async (request: NextRequest, _admin, ctx: RouteContext<'/api/admin/communities/[slug]'>) => {
   const { slug } = await ctx.params
 
   let body: {
@@ -74,12 +75,6 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     if (hasAddAdmin) await addCommunityAdminEmail(slug, body.addAdminEmail as string)
     if (hasRemoveAdmin) await removeCommunityAdminEmail(slug, body.removeAdminEmail as string)
 
-    // Publishing/unpublishing changes the public switcher and sitemap
-    // immediately, same as any other public-content admin save. The email
-    // lists aren't public content, but revalidating unconditionally is
-    // cheap and keeps this one code path instead of two.
-    await revalidatePublicContent()
-
     // adminEmails/notifyMutedEmails/notifyReviewEmails/previewToken ride
     // along here (superadmin-only route) so the client can sync its state
     // right away regardless of which fields this call actually touched —
@@ -105,7 +100,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     const message = err instanceof Error ? err.message : 'Could not update the community.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }
-}
+})
 
 // DELETE /api/admin/communities/:slug  body: { confirmSlug: string }
 // Permanently deletes a community and everything in it. Superadmin only —
@@ -121,10 +116,10 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
 // This works on the live site too (Oct 29, the user asked for it). It used
 // to be refused there outright; the retyped slug and superadmin-only are
 // what stand in for that now.
-export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin/communities/[slug]'>) {
-  const admin = await getAdminUser(request)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+//
+// The community's own directory (and, for everyone else, the communities
+// list) is public content, so siteAdminWrite drops the cache after it.
+export const DELETE = siteAdminWrite(async (request: NextRequest, _admin, ctx: RouteContext<'/api/admin/communities/[slug]'>) => {
   const { slug } = await ctx.params
 
   let body: { confirmSlug?: string }
@@ -139,14 +134,10 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin
 
   try {
     await deleteCommunity(slug)
-    // The community's own directory (and, for everyone else, the updated
-    // communities list) is public content — drop the cache so its removal
-    // shows up immediately instead of waiting out cacheLife('days').
-    await revalidatePublicContent()
     return Response.json({ ok: true })
   } catch (err) {
     console.error('[admin/communities/:slug] DELETE failed:', err)
     const message = err instanceof Error ? err.message : 'Could not delete community.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }
-}
+})

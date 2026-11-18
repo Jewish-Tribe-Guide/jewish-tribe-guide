@@ -1,5 +1,6 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
-import { getAdminUser, getAllowedAdminEmails } from '@/lib/adminAuth'
+import { getAllowedAdminEmails } from '@/lib/adminAuth'
+import { siteAdminRead } from '@/lib/adminRoute'
 import {
   createCommunity,
   listCommunities,
@@ -19,10 +20,7 @@ import { addMissingSiteScreens, cloneCommunityContent } from '@/lib/communityClo
 // the actual point: creating and browsing every community is a superadmin
 // action, not something scoped to whichever one community an admin
 // administers.
-export async function GET(request: Request) {
-  const admin = await getAdminUser(request)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = siteAdminRead(async () => {
   try {
     const [communities, adminEmails, notifyPreferenceLists, previewTokens] = await Promise.all([
       listCommunities(),
@@ -46,7 +44,7 @@ export async function GET(request: Request) {
     console.error('[admin/communities] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load communities.'] }, { status: 502 })
   }
-}
+})
 
 type CreateBody = {
   slug?: string
@@ -66,10 +64,11 @@ type CreateBody = {
 // POST /api/admin/communities — the "New Community" flow: creates the
 // community row, then optionally clones another community's categories and
 // home sections into it. Superadmin only (see GET above).
-export async function POST(request: Request) {
-  const admin = await getAdminUser(request)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+//
+// siteAdminRead, not siteAdminWrite: it invalidates itself, with
+// `newCommunity` (the list expired outright, and read until it has the new
+// slug). The wrapper's plain pass after it would mark the list stale again.
+export const POST = siteAdminRead(async (request: Request) => {
   let body: CreateBody
   try {
     body = (await request.json()) as CreateBody
@@ -133,4 +132,4 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : 'Could not create community.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }
-}
+})
