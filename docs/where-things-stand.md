@@ -434,6 +434,17 @@ Kept up card stays a card above the search, chevron and all (decided Nov
 14: it's how people find out they can trust the site, and opening it shows
 how everything is checked).
 
+**Drawn Nov 18, waiting on the user** (canvas
+https://claude.ai/artifact/AR8hb7s66iPhAdqsqhbQsU, "Phone home: boxes and
+rows"): the user asked whether Right now should be a box and the
+categories rows ("these bunched up boxes and pictures"). Three boards:
+Today as built; Flip A, Right now as one white box of lines (the same
+words as Q1, no photo, chevrons) and the categories as one white box of
+rows with a 40px picture each; Flip B, the same rows with Right now as
+one box split in two halves. Would undo Q1, R3 and Oct 17's tiles. Rows
+come out about 70px longer than tiles. Friday's Right now not drawn.
+Not built until the user picks.
+
 Boards U1 + U3f/U3g (Nov 14, canvas
 https://claude.ai/artifact/1L9Ep2cBxk84xQ2BePNbzL, built Nov 15): the
 computer home has Right now under Explore by Category, the same answers as
