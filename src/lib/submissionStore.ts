@@ -372,6 +372,8 @@ export async function submitGoogleClosure(community: string, targetId: string): 
  *  leaving the listing invalid. The message is for the admin. */
 export class ReviewEditError extends Error {}
 
+const ALREADY_DECIDED = 'This change has already been decided.'
+
 // `edited`, when given: the admin's copy of the listing, fixed in the opened
 // card before approving (reviewEdits.ts). It's what goes live, and it's
 // saved on the submission with a record of what the admin changed.
@@ -411,6 +413,7 @@ export async function approveSubmission(
   if (community && submission.community_id !== community) {
     throw new Error(`Submission not found: ${id}`)
   }
+  if (submission.status !== 'pending') throw new ReviewEditError(ALREADY_DECIDED)
 
   // An edit goes on the listing as it is now, changing only its own fields
   // (editedFields.ts): another edit approved since stays approved. The
@@ -514,20 +517,40 @@ export async function approveSubmission(
     } as unknown as Record<string, unknown>
   }
 
+  // Claimed before anything goes on the site: of two approvals at once (two
+  // tabs, two admins, a retry after a slow save), only the one whose claim
+  // finds it still waiting goes on; the other is told it was decided
+  // (Nov 18). Put back to waiting if applying it fails, so it can be tried
+  // again.
+  const { data: claimed, error: claimErr } = await supabase
+    .from('submission')
+    .update({ status: 'approved', reviewed_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'pending')
+    .select('id')
+    .maybeSingle()
+  if (claimErr) throw new Error(`Failed to mark submission approved: ${claimErr.message}`)
+  if (!claimed) throw new ReviewEditError(ALREADY_DECIDED)
+
   let affectedResourceId: string | null = null
   let newItems: { fieldKey: string; item: string }[] = []
   let changes: ChangePart[] | undefined
-  if (submission.target_type === 'listing') {
-    ;({ id: affectedResourceId, newItems, changes } = await applyListing(submission))
-  } else if (submission.target_type === 'category') {
-    await applyCategory(submission)
-  } else if (submission.target_type === 'eruv' && submission.operation === 'update') {
-    await applyEruv(submission)
-  } else if (submission.target_type === 'eruv' && submission.operation === 'create') {
-    await applyNewEruv(submission)
-  } else {
-    // tag handled in a later phase.
-    throw new Error(`Unsupported submission target_type: ${submission.target_type}`)
+  try {
+    if (submission.target_type === 'listing') {
+      ;({ id: affectedResourceId, newItems, changes } = await applyListing(submission))
+    } else if (submission.target_type === 'category') {
+      await applyCategory(submission)
+    } else if (submission.target_type === 'eruv' && submission.operation === 'update') {
+      await applyEruv(submission)
+    } else if (submission.target_type === 'eruv' && submission.operation === 'create') {
+      await applyNewEruv(submission)
+    } else {
+      // tag handled in a later phase.
+      throw new Error(`Unsupported submission target_type: ${submission.target_type}`)
+    }
+  } catch (err) {
+    await supabase.from('submission').update({ status: 'pending', reviewed_at: null }).eq('id', id)
+    throw err
   }
 
   const { data, error } = await supabase
@@ -573,7 +596,7 @@ export async function decidePart(
   const supabase = getAdminClient()
   const { data: sub } = await supabase.from('submission').select('*').eq('id', id).eq('community_id', community).maybeSingle()
   const submission = sub as SubmissionRow | null
-  if (!submission || submission.status !== 'pending') throw new ReviewEditError('This change has already been decided.')
+  if (!submission || submission.status !== 'pending') throw new ReviewEditError(ALREADY_DECIDED)
   if (submission.target_type !== 'listing' || submission.operation !== 'update' || !submission.target_id) throw new ReviewEditError('Only an edit is decided a part at a time.')
   const { data: row } = await supabase.from('resource').select('*').eq('community_id', community).eq('id', submission.target_id).maybeSingle()
   if (!row) throw new ReviewEditError('The listing this changes couldn’t be found.')
@@ -710,12 +733,16 @@ export async function rejectSubmission(id: string, community?: string, reviewedB
         ...(withReason ? { review_reason: reason } : {}),
       })
       .eq('id', id)
+      // Only one still waiting: rejecting one approved meanwhile would say
+      // "rejected" while the change stays live (Nov 18).
+      .eq('status', 'pending')
     if (community) query = query.eq('community_id', community)
-    return query.select('*').single()
+    return query.select('*').maybeSingle()
   }
   let { data, error } = await reject(Boolean(reason))
   if (error && reason && /review_reason/.test(error.message)) ({ data, error } = await reject(false))
   if (error) throw new Error(`Failed to reject submission: ${error.message}`)
+  if (!data) throw new ReviewEditError(ALREADY_DECIDED)
   await keepReportedItems(data as SubmissionRow)
   return data as SubmissionRow
 }
