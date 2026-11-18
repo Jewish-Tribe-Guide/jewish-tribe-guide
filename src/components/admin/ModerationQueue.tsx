@@ -1,5 +1,6 @@
 'use client'
 
+import { replaceAddress } from '@/lib/replaceAddress'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { fetchJson } from '@/lib/fetchJson'
@@ -105,7 +106,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the address isn't the new page's until after the first render (see viewFromAddress)
     setView(viewFromAddress())
     url.searchParams.delete('show')
-    window.history.replaceState(window.history.state, '', url)
+    replaceAddress(url)
   }, [])
   // Same categories the public site and the category admin editor read —
   // loaded fresh per admin page request (see /admin/layout.tsx's

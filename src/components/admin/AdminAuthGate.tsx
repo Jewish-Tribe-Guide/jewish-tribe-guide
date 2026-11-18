@@ -1,5 +1,6 @@
 'use client'
 
+import { replaceAddress } from '@/lib/replaceAddress'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { getBrowserClient } from '@/lib/supabase/client'
@@ -190,7 +191,7 @@ export default function AdminAuthGate({
     const params = new URLSearchParams(window.location.search)
     const description = params.get('error_description')
     if (!description) return
-    history.replaceState(history.state, '', window.location.pathname)
+    replaceAddress(window.location.pathname)
     // Reading state Supabase's redirect set on the URL (external to React),
     // once on mount — the exact case the lint rule's own guidance carves out.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -216,7 +217,7 @@ export default function AdminAuthGate({
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
     const description = hash.get('error_description')
     if (!description) return
-    history.replaceState(history.state, '', window.location.pathname + window.location.search)
+    replaceAddress(window.location.pathname + window.location.search)
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSignInError(description.replace(/\+/g, ' '))
   }, [])
@@ -241,7 +242,7 @@ export default function AdminAuthGate({
   useEffect(() => {
     if (!ready) return
     if (!window.location.href.includes('#')) return
-    history.replaceState(history.state, '', window.location.pathname + window.location.search)
+    replaceAddress(window.location.pathname + window.location.search)
   }, [ready])
 
   // Local-dev-only shortcut: /admin?devToken=<DEV_ADMIN_BYPASS_SECRET> signs in
@@ -255,7 +256,7 @@ export default function AdminAuthGate({
     const devToken = params.get('devToken')
     if (!devToken) return
 
-    history.replaceState(history.state, '', window.location.pathname)
+    replaceAddress(window.location.pathname)
 
     fetch('/api/admin/dev-login', {
       method: 'POST',

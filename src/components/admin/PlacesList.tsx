@@ -1,5 +1,6 @@
 'use client'
 
+import { replaceAddress } from '@/lib/replaceAddress'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -81,7 +82,7 @@ function setAddressParam(name: string, value: string, fallback: string) {
   const url = new URL(window.location.href)
   if (value === fallback) url.searchParams.delete(name)
   else url.searchParams.set(name, value)
-  window.history.replaceState(window.history.state, '', url)
+  replaceAddress(url)
 }
 
 /** "142 pages · read last night", for Watches at the top of the list. */
