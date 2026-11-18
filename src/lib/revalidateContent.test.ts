@@ -96,12 +96,49 @@ describe('revalidatePublicContent', () => {
   it('expires the community list outright when a community was just added', async () => {
     listCommunities.mockResolvedValue([community('philly')])
 
-    await revalidatePublicContent({ newCommunity: true })
+    await revalidatePublicContent({ newCommunity: 'fresh' })
 
     expect(revalidateTag).toHaveBeenCalledWith(TAGS.communities, { expire: 0 })
     for (const [tag, profile] of revalidateTag.mock.calls) {
       if (tag !== TAGS.communities) expect(profile).toBe('max')
     }
+  })
+
+  // Expiring wasn't enough (Nov 18, community-editor.spec.ts:61, 1 run in 4
+  // on two workers): Next hands a read the result of a fill another request
+  // already started, without checking whether it began before the
+  // invalidation (use-cache-wrapper's cross-request join). A fill begun
+  // before the insert still answered after the expiry, without the new
+  // community, and its address 404'd. The next read after that fill is a
+  // fresh one, so asking again until the list has it settles it before the
+  // admin is sent there.
+  it('waits until the community list holds the new community', async () => {
+    let expired = false
+    revalidateTag.mockImplementation((tag) => {
+      if (tag === TAGS.communities) expired = true
+    })
+    const reads: boolean[] = []
+    let afterExpiry = 0
+    listCommunities.mockImplementation(async () => {
+      reads.push(expired)
+      if (!expired) return [community('philly')]
+      // The first read after the expiry joins the fill already running.
+      afterExpiry += 1
+      return afterExpiry === 1 ? [community('philly')] : [community('philly'), community('fresh')]
+    })
+
+    await revalidatePublicContent({ newCommunity: 'fresh' })
+    revalidateTag.mockReset()
+
+    expect(reads.filter(Boolean)).toHaveLength(2)
+  })
+
+  it('gives up waiting for a new community after a few reads rather than hanging the save', async () => {
+    listCommunities.mockResolvedValue([community('philly')])
+
+    await revalidatePublicContent({ newCommunity: 'fresh' })
+
+    expect(listCommunities.mock.calls.length).toBeLessThanOrEqual(6)
   })
 
   it('invalidates the community list itself, not just the content inside it', async () => {
@@ -206,6 +243,6 @@ describe('creating a community', () => {
   // page reads the stale list and 404s for the first visitor.
   it('expires the community list outright, so the new address works at once', () => {
     const src = readFileSync('src/app/api/admin/communities/route.ts', 'utf-8')
-    expect(src).toContain('revalidatePublicContent({ newCommunity: true })')
+    expect(src).toContain('revalidatePublicContent({ newCommunity: community.slug })')
   })
 })

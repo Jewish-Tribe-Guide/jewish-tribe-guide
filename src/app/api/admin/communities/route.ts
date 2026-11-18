@@ -125,7 +125,7 @@ export async function POST(request: Request) {
     // communities list) is public content — drop the cache so it shows up
     // immediately instead of waiting out cacheLife('days'). Its own address
     // must work on the first load, so the list isn't served stale.
-    await revalidatePublicContent({ newCommunity: true })
+    await revalidatePublicContent({ newCommunity: community.slug })
 
     return Response.json({ ok: true, community })
   } catch (err) {

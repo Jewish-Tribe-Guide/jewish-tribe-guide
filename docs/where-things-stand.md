@@ -191,6 +191,29 @@ are unbalanced; about 6–7 min looks reachable.
     old test 5 of 5 red, new 5 of 5 green. Also: the site's CSP refuses
     `waitForFunction`'s string eval, so it can never see a page flag; poll
     `page.evaluate` instead.
+  - Closed Nov 18: `community-editor.spec.ts:61` (a new community's page
+    404'd straight after Create), 1 run in 4 with two workers. Expiring the
+    community list wasn't enough: Next hands a `use cache` read the result
+    of a fill another request already started, without checking whether it
+    began before the invalidation (`use-cache-wrapper.js`, "joining pending
+    cross-request invocation"; 468 joins in one local run). A fill begun
+    before the insert answered after the expiry. The create route now reads
+    the list until it holds the new slug (two reads at most, five allowed)
+    before answering. A real bug for an admin too, not just the test. Unit
+    test red against the old code; the race itself didn't reproduce on
+    demand (25/25 before and after locally).
+  - Nov 17, not reproduced: `places.spec.ts:77` and
+    `read-questions.spec.ts:80` failed together in run 43994304148. The
+    runner's own direct Supabase calls in the test hooks took 2–3.8s in
+    that 40s window, against 100–450ms elsewhere in the same run. So the
+    test database was slow, not the app. The test project is also dev's
+    and every preview's database; separating them is the user's call.
+  - Open, not reproduced: `category-editor.spec.ts:116`, the Delete
+    question vanished 6s after it was asked (run 43937547841), with the
+    editor still open. 0 of 18 locally (4× CPU slowdown, and beside the
+    community tests on two workers). Ruled out: the clone writing to the
+    source, cached reads, sort-order renumbering, triggers. The trace from
+    the next failure (retained since cc591c7a) should name what remounted.
   - Moderation's 15s waits (from Nov 3) are the approve request itself,
     about ten database round trips in a row; left as they are.
   - The combined jobs read made 105 database requests, about 65 of them
