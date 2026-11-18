@@ -165,7 +165,7 @@ function CategoryEditorScreen({
   useEffect(() => {
     if (!countId) return
     let cancelled = false
-    takeCategoryListings(countId)
+    takeCategoryListings(community, countId)
       .then(({ ok, resources }) => {
         if (!cancelled && ok) {
           setPlaceCount(resources.length)
@@ -176,7 +176,7 @@ function CategoryEditorScreen({
     return () => {
       cancelled = true
     }
-  }, [countId])
+  }, [countId, community])
   // What the positional rule would give this category, previewed under
   // "Automatic". For a category being created there is no id in the list yet,
   // so it lands on the neutral fallback — accurate enough, since its real

@@ -1,4 +1,5 @@
 import type { DirectoryResource } from '@/types'
+import { withCommunity } from '@/lib/useCommunityData'
 
 // A category page's places, for its admin preview and count. The user, Nov 9:
 // "Most noticable is clicking on a category page in admin." Opened from its
@@ -15,30 +16,35 @@ export type CategoryListings = { ok: boolean; resources: DirectoryResource[] }
 
 export const FRESH_MS = 10_000
 
+// Keyed by community too: a category id is only a community's own (Nov 18,
+// Washington's Grocery page showed Philly's groceries).
 const waiting = new Map<string, { at: number; answer: Promise<CategoryListings> }>()
+const keyOf = (community: string, id: string) => `${community}\u0000${id}`
 
-function ask(id: string): Promise<CategoryListings> {
-  return fetch(`/api/resources?category=${encodeURIComponent(id)}`).then(async (res) => {
+function ask(community: string, id: string): Promise<CategoryListings> {
+  return fetch(withCommunity(`/api/resources?category=${encodeURIComponent(id)}`, community)).then(async (res) => {
     const body = await res.json()
     return res.ok && body.ok ? { ok: true, resources: body.resources as DirectoryResource[] } : { ok: false, resources: [] }
   })
 }
 
 /** Starts asking for a page's places, before anything needs them. */
-export function prefetchCategoryListings(id: string): void {
-  const w = waiting.get(id)
+export function prefetchCategoryListings(community: string, id: string): void {
+  const key = keyOf(community, id)
+  const w = waiting.get(key)
   if (w && Date.now() - w.at < FRESH_MS) return
-  const answer = ask(id)
+  const answer = ask(community, id)
   // Nobody may take it; a failure is the taker's to see.
   answer.catch(() => {})
-  waiting.set(id, { at: Date.now(), answer })
+  waiting.set(key, { at: Date.now(), answer })
 }
 
 /** A page's places: the answer already on its way, or a new ask. */
-export function takeCategoryListings(id: string): Promise<CategoryListings> {
-  const w = waiting.get(id)
-  waiting.delete(id)
-  return w && Date.now() - w.at < FRESH_MS ? w.answer : ask(id)
+export function takeCategoryListings(community: string, id: string): Promise<CategoryListings> {
+  const key = keyOf(community, id)
+  const w = waiting.get(key)
+  waiting.delete(key)
+  return w && Date.now() - w.at < FRESH_MS ? w.answer : ask(community, id)
 }
 
 /** Tests: nothing left waiting from the one before. */
