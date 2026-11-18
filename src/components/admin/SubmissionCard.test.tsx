@@ -236,12 +236,12 @@ describe('read-only history card — who reviewed it', () => {
     expect(screen.getByText(/by jane@example\.com/)).toBeInTheDocument()
   })
 
-  it('says Taken or Left, the words Reports counts them in', () => {
+  it('says Approved or Rejected, the words Reports counts them in', () => {
     renderHistoryCard({ status: 'approved' })
-    expect(screen.getByText('Taken')).toBeInTheDocument()
+    expect(screen.getByText('Approved')).toBeInTheDocument()
     cleanup()
     renderHistoryCard({ status: 'rejected' })
-    expect(screen.getByText('Left')).toBeInTheDocument()
+    expect(screen.getByText('Rejected')).toBeInTheDocument()
   })
 
   it('shows why one was left out, when a reason was given', () => {

@@ -12,10 +12,10 @@ import { withCommunity } from '@/lib/useCommunityData'
 import { SubmissionCard } from './SubmissionCard'
 import { AdminBack, AdminEmpty } from './AdminUI'
 
-// Taken and Left, the words Reports counts them in.
+// Approved and Rejected, the words on To do's buttons and in Reports.
 const COPY: Record<'approved' | 'rejected', { title: string; empty: string }> = {
-  approved: { title: 'Taken', empty: 'Nothing taken yet.' },
-  rejected: { title: 'Left', empty: 'Nothing left out yet.' },
+  approved: { title: 'Approved', empty: 'Nothing approved yet.' },
+  rejected: { title: 'Rejected', empty: 'Nothing rejected yet.' },
 }
 
 // Read-only, most-recently-decided-first view of what happened to
