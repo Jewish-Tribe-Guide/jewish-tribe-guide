@@ -1,7 +1,8 @@
 // One run of the KCL list watch: find the list on KCL's home page, read the
 // PDF's names, and date the hechsher of every listing that says KCL and is
-// on it (kclWatch.ts). Files nothing: a list of names alone can't say what
-// the guide should change.
+// on it (kclWatch.ts). A listing that says KCL and isn't on it gets a card
+// in To do, to take KCL off or keep it; nothing else is filed, since a list
+// of names alone can't say what else the guide should change.
 //
 // Run daily by /api/cron/watches for a website watch on KCL's home page,
 // and on demand from the admin Watches tab.
@@ -9,11 +10,12 @@
 import { extractText, getDocumentProxy } from 'unpdf'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
+import { submitListingUpdate } from '@/lib/submissionStore'
 import { confirmFromSource } from '@/lib/sourceConfirm'
 import { KOSHER_SECTION } from '@/lib/boxDates'
 import { CATEGORIES } from '@/lib/mekorRun'
-import type { ListRead } from '@/lib/watches'
-import { KCL_NAME, kclListLink, kclMatches, parseKclList, type KclEntry } from '@/lib/kclWatch'
+import { listDifference, type ListRead } from '@/lib/watches'
+import { KCL_NAME, KCL_WATCH_NAME, kclListLink, kclMatches, kclMissing, kclMissingKey, kclMissingNote, kclSubmissionKey, parseKclList, type KclEntry } from '@/lib/kclWatch'
 
 /** Fewer names than this means the PDF changed shape, not that KCL dropped
  *  most of its places. The December 2025 list had 205. */
@@ -25,10 +27,14 @@ export type KclRun =
       ok: true
       entries: number
       listRead: ListRead
-      findings: 0
-      filed: 0
+      /** Listings that say KCL and aren't on its list. */
+      findings: number
+      /** Cards filed for them this run: the ones not filed before. */
+      filed: number
       /** Listings that say KCL and are on its list. */
       matching: number
+      /** Every listing it lacks, a line each (listDifference). */
+      differences: string[]
       confirmed?: number
     }
 
@@ -61,19 +67,50 @@ export async function readKclList(homeUrl: string): Promise<{ updated: string | 
   return list
 }
 
+type Row = { id: string; category: string; name: string; address: string | null; phone: string | null; anchor_id: string; distance: number | null; status: string; details: Record<string, unknown> }
+
 export async function runKclWatch(community: string, homeUrl: string): Promise<KclRun> {
   const list = await readKclList(homeUrl)
   if ('error' in list) return { ok: false, error: list.error }
 
-  const { data: rows, error } = await getAdminClient()
+  const supabase = getAdminClient()
+  const { data: rows, error } = await supabase
     .from('resource')
-    .select('id,name,status,details')
+    .select('id,category,name,address,phone,anchor_id,distance,status,details')
     .eq('community_id', community)
     .eq('status', 'approved')
     .in('category', CATEGORIES)
   if (error) return { ok: false, error: `Couldn’t read the guide's listings: ${error.message}` }
 
-  const matched = kclMatches(list.entries, (rows ?? []) as { id: string; name: string; status: string; details: Record<string, unknown> }[])
+  const listings = (rows ?? []) as Row[]
+  const matched = kclMatches(list.entries, listings)
+  const missing = kclMissing(list.entries, listings)
+
+  // Every card this watch has filed, whatever became of it: one an admin
+  // rejected isn't filed again until the listing's hechshers change.
+  const { data: earlier, error: earlierError } = await supabase
+    .from('submission')
+    .select('operation,target_id,payload')
+    .eq('community_id', community)
+    .eq('submitted_by->>name', KCL_WATCH_NAME)
+  if (earlierError) return { ok: false, error: `Couldn’t read earlier suggestions: ${earlierError.message}` }
+  const before = new Set((earlier ?? []).map(kclSubmissionKey).filter(Boolean))
+
+  let filed = 0
+  for (const f of missing) {
+    if (before.has(kclMissingKey(f))) continue
+    const l = f.listing
+    await submitListingUpdate(
+      community,
+      l.id,
+      { category: l.category, name: l.name, anchorId: l.anchor_id, distance: l.distance, address: l.address ?? '', phone: l.phone ?? '', details: f.details },
+      kclMissingNote(f, list.updated),
+      { name: KCL_WATCH_NAME },
+    )
+    filed++
+  }
+  const differences = missing.map((f) => listDifference(f.listing.name, 'Says KCL, not on KCL’s list', before.has(kclMissingKey(f)) ? 'before' : 'now'))
+
   const confirmed = await confirmFromSource(community, [...matched.keys()], KCL_NAME, [KOSHER_SECTION])
-  return { ok: true, entries: list.entries.length, listRead: list, findings: 0, filed: 0, matching: matched.size, confirmed }
+  return { ok: true, entries: list.entries.length, listRead: list, findings: missing.length, filed, matching: matched.size, differences, confirmed }
 }

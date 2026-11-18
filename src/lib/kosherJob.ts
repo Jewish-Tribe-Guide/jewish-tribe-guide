@@ -9,7 +9,7 @@ import {
   type KeystoneEntry,
   type WatchFinding,
 } from './keystoneWatch'
-import { KCL_HOME_URL, kclMatches, type KclEntry } from './kclWatch'
+import { KCL_HOME_URL, kclMatches, kclMissing, kclMissingKey, type KclEntry } from './kclWatch'
 import { compareMekor, findingKey as mekorKey, matchEntries, type GuideListing, type MekorEntry, type MekorFinding } from './mekorWatch'
 import type { JobCounts } from './watchJobs'
 
@@ -127,7 +127,8 @@ export type KosherInput = {
    *  it didn't load). */
   keystone: KeystoneEntry[] | null
   mekor: MekorEntry[] | null
-  /** KCL's names (kclWatch.ts): it only confirms, so it has no differences. */
+  /** KCL's names (kclWatch.ts): it confirms, and its one difference is a
+   *  place that says KCL and isn't on it. */
   kcl?: KclEntry[] | null
   filed?: Partial<Record<KosherList, Filed>>
 }
@@ -168,6 +169,10 @@ export function kosherPlaces({ listings, keystone, mekor, kcl = null, filed = {}
 
   if (kcl) {
     for (const [id, name] of kclMatches(kcl, live)) on.get(id)?.push({ list: 'kcl', name, url: KCL_HOME_URL, says: 'KCL' })
+    const k = filed.kcl ?? NOTHING_FILED
+    for (const f of kclMissing(kcl, live)) {
+      differences.get(f.listing.id)?.push({ list: 'kcl', line: 'The listing says KCL; KCL’s list doesn’t have it by this name', filed: filedState(kclMissingKey(f), k) })
+    }
   }
 
   // A place new on both lists is one place.

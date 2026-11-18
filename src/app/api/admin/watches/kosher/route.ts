@@ -9,7 +9,7 @@ import { jobFindings } from '@/lib/watchFindingStore'
 import type { Finding } from '@/lib/watchFindings'
 import { MEKOR_LIST_URL, MEKOR_WATCH_NAME, isMekorList, submissionKey as mekorSubmissionKey, type GuideListing, type MekorEntry } from '@/lib/mekorWatch'
 import { readKeystoneList } from '@/lib/keystoneRun'
-import { KCL_HOME_URL, isKclList, type KclEntry } from '@/lib/kclWatch'
+import { KCL_HOME_URL, KCL_WATCH_NAME, isKclList, kclSubmissionKey, type KclEntry } from '@/lib/kclWatch'
 import { readKclList } from '@/lib/kclRun'
 import { CATEGORIES, readMekorList } from '@/lib/mekorRun'
 import { KOSHER_JOB_CATEGORIES, kosherCounts, kosherPlaces, type Filed, type KosherList } from '@/lib/kosherJob'
@@ -108,7 +108,7 @@ export async function GET(request: Request) {
       if (error) throw new Error(error.message)
       return (data ?? []) as Submission[]
     }
-    const [{ watches, available }, listReads, listingRows, keystoneFiled, mekorFiled, [categories, { findings, decided }]] = await Promise.all([
+    const [{ watches, available }, listReads, listingRows, keystoneFiled, mekorFiled, kclFiled, [categories, { findings, decided }]] = await Promise.all([
       listWatches(slug),
       getListReads(slug),
       supabase
@@ -119,6 +119,7 @@ export async function GET(request: Request) {
         .in('category', CATEGORIES),
       filedBy(KEYSTONE_WATCH_NAME),
       filedBy(MEKOR_WATCH_NAME),
+      filedBy(KCL_WATCH_NAME),
       // What they filed, waiting here to compare (watchFindings.ts).
       listCategories(slug).then(async (categories) => [categories, await jobFindings(slug, 'kosher', categories)] as const),
     ])
@@ -149,6 +150,7 @@ export async function GET(request: Request) {
       filed: {
         keystone: filedFrom(keystoneFiled, keystoneSubmissionKey),
         mekor: filedFrom(mekorFiled, mekorSubmissionKey),
+        kcl: filedFrom(kclFiled, kclSubmissionKey),
       },
     })
 
@@ -181,7 +183,7 @@ export async function GET(request: Request) {
     const food = categories.filter((c) => KOSHER_JOB_CATEGORIES.includes(c.id))
     const boxKeys = new Map(food.map((c) => [c.id, kosherBoxKeys(c)]))
     const details = new Map((listingRows.data ?? []).map((l) => [l.id as string, (l.details ?? {}) as Record<string, unknown>]))
-    const sent = new Map([...keystoneFiled, ...mekorFiled].flatMap((s) => (s.id ? [[s.id, s.payload] as const] : [])))
+    const sent = new Map([...keystoneFiled, ...mekorFiled, ...kclFiled].flatMap((s) => (s.id ? [[s.id, s.payload] as const] : [])))
     const withValues = (f: Finding): Finding & { address?: string; category?: string } => {
       const payload = sent.get(f.id)
       if (!payload || f.operation === 'delete') return f

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isKclList, kclListLink, kclMatches, parseKclList } from './kclWatch'
+import { isKclList, kclListLink, kclMatches, kclMissing, kclMissingKey, kclMissingNote, kclSubmissionKey, parseKclList } from './kclWatch'
 
 // KCL's list of the places it certifies (the user, Nov 4: "Can we add [it]
 // to our kashrut checks for the ones that are KCL?"): a PDF of names, no
@@ -67,5 +67,39 @@ describe('kclMatches', () => {
 
   it('its own name over a longer one it starts', () => {
     expect(Object.fromEntries(kclMatches(entries, [listing('fc', 'Four Corners')]))).toEqual({ fc: 'Four Corners' })
+  })
+})
+
+// A place that says KCL and isn't on the list was simply never dated, and
+// nothing said why (Nov 18 review). It now gets a card in To do, as
+// Mekor's watch files one for IKC (the user, Nov 18: "File a To do card").
+describe('kclMissing', () => {
+  const entries = ['South Side Smokehouse', 'Bagel King', 'Sprinkles North', 'Sprinkles South', 'Authentic Kosher Chinese'].map((name) => ({ name }))
+
+  it('a live place that says KCL and that no name on the list could be, with KCL taken off', () => {
+    const missing = kclMissing(entries, [listing('z', 'Zayde’s Deli', ['OU', 'KCL']), listing('ss', 'Southside')])
+    expect(missing.map((f) => [f.listing.id, f.details.kosherCert])).toEqual([['z', ['OU']]])
+  })
+
+  it('never one that may be there: two names it could be, or a name too short to match on', () => {
+    expect(kclMissing(entries, [listing('sp', 'Sprinkles'), listing('b', 'Bagel')])).toEqual([])
+  })
+
+  it('only places the guide says are KCL, and live', () => {
+    expect(kclMissing(entries, [listing('o', 'Zayde’s Deli', ['OU']), listing('old', 'Zayde’s Deli', ['KCL'], 'archived')])).toEqual([])
+  })
+
+  it('its note says what each button does, and which edition it read', () => {
+    const [onlyKcl] = kclMissing(entries, [listing('z', 'Zayde’s Deli')])
+    expect(kclMissingNote(onlyKcl, 'December 2025')).toContain('leaves it with no hechsher named')
+    expect(kclMissingNote(onlyKcl, 'December 2025')).toContain('December 2025')
+    const [withOu] = kclMissing(entries, [listing('z', 'Zayde’s Deli', ['OU', 'KCL'])])
+    expect(kclMissingNote(withOu, null)).toContain('Approving takes KCL off; OU stays. Rejecting keeps KCL.')
+  })
+
+  it('the card it filed reads back as the same card, so it isn’t filed twice', () => {
+    const [f] = kclMissing(entries, [listing('z', 'Zayde’s Deli', ['OU', 'KCL'])])
+    expect(kclSubmissionKey({ operation: 'update', target_id: 'z', payload: { details: f.details } })).toBe(kclMissingKey(f))
+    expect(kclSubmissionKey({ operation: 'create', target_id: null, payload: {} })).toBeNull()
   })
 })

@@ -7,6 +7,7 @@ import { LISTING_PAGE_WATCH_NAME } from './listingPageWatch'
 import { NEWSLETTER_WATCH_NAME } from './newsletter'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
 import { MEKOR_WATCH_NAME } from './mekorWatch'
+import { KCL_WATCH_NAME } from './kclWatch'
 import { REFUAH_WATCH_NAME } from './refuahWatch'
 import { GOOGLE_SUBMITTER_NAME } from './activity'
 import { ERUV_WEBSITE_WATCH_NAME } from './eruvWebsite'
@@ -53,6 +54,7 @@ const FROM: Record<string, string> = {
   [NEWSLETTER_WATCH_NAME]: 'From their newsletter',
   [KEYSTONE_WATCH_NAME]: 'From Keystone-K’s list',
   [MEKOR_WATCH_NAME]: 'From Mekor Habracha’s list',
+  [KCL_WATCH_NAME]: 'From KCL’s list',
   [REFUAH_WATCH_NAME]: 'From Refuah',
   [GOOGLE_SUBMITTER_NAME]: 'From Google',
   [ERUV_WEBSITE_WATCH_NAME]: 'From its website',
