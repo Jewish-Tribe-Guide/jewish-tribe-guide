@@ -12,7 +12,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import type { WatchDigestItem } from '@/lib/email'
 import { submitListingCreate, submitListingUpdate } from '@/lib/submissionStore'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
-import { askGoogleIfOpen, withPlaceId } from '@/lib/keystoneRun'
+import { askGoogleIfOpen, knownClosed, withPlaceId, type ClosedSeen } from '@/lib/keystoneRun'
 import { confirmFromSource } from '@/lib/sourceConfirm'
 import { KOSHER_SECTION } from '@/lib/boxDates'
 import { listDifference, type ListRead } from '@/lib/watches'
@@ -63,6 +63,8 @@ export type MekorRun =
       /** Listings the list names that agree with it. */
       matching: number
       closedOnGoogle: string[]
+      /** Those, with when Google said so (keystoneRun.ts's ClosedSeen). */
+      closedSeen: ClosedSeen[]
       /** Every place it differs on, a line each (listDifference). */
       differences: string[]
       /** Listings the list agreed with, dated today. */
@@ -88,7 +90,7 @@ export async function readMekorList(url: string): Promise<{ updated: string | nu
   return { updated, entries }
 }
 
-export async function runMekorWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<MekorRun> {
+export async function runMekorWatch(community: string, url: string, { dry = false, closedBefore, now = Date.now() }: { dry?: boolean; closedBefore?: readonly ClosedSeen[]; now?: number } = {}): Promise<MekorRun> {
   const list = await readMekorList(url)
   if ('error' in list) return { ok: false, error: list.error }
   const { updated, entries } = list
@@ -145,6 +147,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
   const notes = new Map<MekorFinding, string>()
   const placeIds = new Map<MekorFinding, string>()
   const closed: string[] = []
+  const closedSeen: ClosedSeen[] = []
   const closedNow = new Set<MekorFinding>()
   const fresh: MekorFinding[] = []
   // Google's place for each new place already waiting or suggested in this
@@ -154,9 +157,11 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
   for (const f of unfiled) {
     let note = findingNote(f, updated)
     if (f.kind === 'new') {
-      const g = await askGoogleIfOpen(f.entry.name, f.entry.address)
+      const known = knownClosed(closedBefore, f.entry.name, now)
+      const g = known ? { closed: true as const, line: '' } : await askGoogleIfOpen(f.entry.name, f.entry.address)
       if (g.closed) {
         closed.push(f.entry.name)
+        closedSeen.push(known ?? { name: f.entry.name, at: new Date(now).toISOString() })
         closedNow.add(f)
         continue
       }
@@ -185,6 +190,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
       filed: 0,
       matching: agree.length,
       closedOnGoogle: closed,
+      closedSeen,
       differences,
       wouldFile: fresh.map((f) => ({ kind: f.kind, ...describe(f), note: notes.get(f)! })),
     }
@@ -236,5 +242,5 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
   // What a kosher list says is the certification: that's what it dates.
   const confirmed = await confirmFromSource(community, agree, MEKOR_NAME, [KOSHER_SECTION])
 
-  return { ok: true, entries: entries.length, listRead: { updated, entries }, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }
+  return { ok: true, entries: entries.length, listRead: { updated, entries }, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, closedSeen, differences, confirmed }
 }

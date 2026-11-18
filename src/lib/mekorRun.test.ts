@@ -157,6 +157,15 @@ describe('runMekorWatch', () => {
     expect(mockCreate.mock.calls.length).toBeGreaterThan(0)
   })
 
+  it('a place Google said is closed isn’t asked about again for 30 days', async () => {
+    mockGoogle.mockResolvedValue({ placeId: 'p', name: null, businessStatus: 'OPERATIONAL' })
+    setDb([], [], [])
+    const now = Date.parse('2026-11-18T07:00:00Z')
+    const body = await runMekorWatch('philly', LIST, { closedBefore: [{ name: 'Z Candy Bar', at: new Date(now - 10 * 86_400_000).toISOString() }], now })
+    expect(mockGoogle.mock.calls.map(([name]) => name)).not.toContain('Z Candy Bar')
+    expect(body.ok && body.closedOnGoogle).toContain('Z Candy Bar')
+  })
+
   it('does not file again what it filed before, whatever the admin decided', async () => {
     setDb([magical, zevis, shtetl], [], [])
     await run()

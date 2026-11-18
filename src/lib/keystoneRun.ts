@@ -57,6 +57,21 @@ async function googleSays(f: Extract<WatchFinding, { kind: 'new' }>): Promise<Go
  *  approving it fills the listing from Google at once (the user, Nov 2). */
 type GoogleSays = { closed: boolean; line: string; placeId?: string }
 
+/** A place Google said was permanently closed, and when. A closed place
+ *  is never filed, so without this nothing remembered the answer and it
+ *  was asked again, a paid call, every night (Nov 18 review). Kept on the
+ *  list watch's check (WatchCheck.closedOnGoogle). */
+export type ClosedSeen = { name: string; at: string }
+
+/** Asked again after this long, in case it reopened. */
+export const ASK_CLOSED_AGAIN_DAYS = 30
+
+/** Google's answer for a place it said was closed lately, or null to ask. */
+export function knownClosed(before: readonly ClosedSeen[] | undefined, name: string, now: number): ClosedSeen | null {
+  const seen = before?.find((c) => c.name === name)
+  return seen && now - Date.parse(seen.at) < ASK_CLOSED_AGAIN_DAYS * 86_400_000 ? seen : null
+}
+
 /** Whether Google says a place a list names is still open, as a line for
  *  its card. Shared with Mekor Habracha's watch (mekorRun.ts). */
 export async function askGoogleIfOpen(name: string, address: string): Promise<GoogleSays> {
@@ -94,6 +109,8 @@ export type KeystoneRun =
       /** Listings the list names that agree with it. */
       matching: number
       closedOnGoogle: string[]
+      /** Those, with when Google said so (ClosedSeen). */
+      closedSeen: ClosedSeen[]
       /** Every place it differs on, a line each (listDifference). */
       differences: string[]
       /** Listings the list agreed with, dated today. */
@@ -123,7 +140,7 @@ export async function readKeystoneList(url: string): Promise<{ entries: Keystone
   return { entries }
 }
 
-export async function runKeystoneWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<KeystoneRun> {
+export async function runKeystoneWatch(community: string, url: string, { dry = false, closedBefore, now = Date.now() }: { dry?: boolean; closedBefore?: readonly ClosedSeen[]; now?: number } = {}): Promise<KeystoneRun> {
   const list = await readKeystoneList(url)
   if ('error' in list) return { ok: false, error: list.error }
   const { entries } = list
@@ -154,14 +171,17 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
   const notes = new Map<WatchFinding, string>()
   const placeIds = new Map<WatchFinding, string>()
   const closed: string[] = []
+  const closedSeen: ClosedSeen[] = []
   const closedNow = new Set<WatchFinding>()
   const fresh: WatchFinding[] = []
   for (const f of unfiled) {
     let note = findingNote(f)
     if (f.kind === 'new') {
-      const g = await googleSays(f)
+      const known = knownClosed(closedBefore, f.entry.name, now)
+      const g = known ? { closed: true, line: '' } : await googleSays(f)
       if (g.closed) {
         closed.push(f.entry.name)
+        closedSeen.push(known ?? { name: f.entry.name, at: new Date(now).toISOString() })
         closedNow.add(f)
         continue
       }
@@ -186,6 +206,7 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
       filed: 0,
       matching: agree.length,
       closedOnGoogle: closed,
+      closedSeen,
       differences,
       wouldFile: fresh.map((f) => ({ kind: f.kind, ...describe(f), note: notes.get(f)! })),
     }
@@ -236,5 +257,5 @@ export async function runKeystoneWatch(community: string, url: string, { dry = f
   // What a kosher list says is the certification: that's what it dates.
   const confirmed = await confirmFromSource(community, agree, KEYSTONE_NAME, [KOSHER_SECTION])
 
-  return { ok: true, entries: entries.length, listRead: { updated: null, entries }, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }
+  return { ok: true, entries: entries.length, listRead: { updated: null, entries }, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, closedSeen, differences, confirmed }
 }

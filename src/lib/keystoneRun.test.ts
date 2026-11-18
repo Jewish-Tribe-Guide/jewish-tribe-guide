@@ -181,6 +181,24 @@ describe('runKeystoneWatch', () => {
     expect(lines).toContain(`${names[0]}: On the list, not in the guide`)
   })
 
+  // A closed place is never filed, so nothing remembered Google's answer:
+  // it was asked again, a paid call, every night (Nov 18 review). Asked
+  // again after 30 days, in case it reopened.
+  it('a place Google said is closed isn’t asked about again for 30 days', async () => {
+    mockGoogle.mockResolvedValue({ placeId: 'p2', name: null, businessStatus: 'OPERATIONAL' })
+    setDb([], [])
+    const now = Date.parse('2026-11-18T07:00:00Z')
+    const tenDays = new Date(now - 10 * 86_400_000).toISOString()
+    const body = await runKeystoneWatch('philly', LIST, { closedBefore: [{ name: 'Sababa Falafel', at: tenDays }], now })
+    expect(mockGoogle.mock.calls.map(([name]) => name)).not.toContain('Sababa Falafel')
+    expect(body.ok && body.closedOnGoogle).toContain('Sababa Falafel')
+    expect(body.ok && body.closedSeen).toContainEqual({ name: 'Sababa Falafel', at: tenDays })
+    expect(mockCreate.mock.calls.map(([, p]) => p.name)).not.toContain('Sababa Falafel')
+    mockGoogle.mockClear()
+    await runKeystoneWatch('philly', LIST, { closedBefore: [{ name: 'Sababa Falafel', at: new Date(now - 31 * 86_400_000).toISOString() }], now })
+    expect(mockGoogle.mock.calls.map(([name]) => name)).toContain('Sababa Falafel')
+  })
+
   // The user, Nov 2: a new place keeps the place Google found for it, so
   // approving it fills the listing from Google at once; not when Google's
   // name for it is another place's.
