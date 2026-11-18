@@ -133,6 +133,24 @@ describe('syncHoursWatches', () => {
     expect(m.addWatch).not.toHaveBeenCalled()
   })
 
+  // And it could take most of the morning run: every place, every night.
+  it('starts no place’s search after its stop time, and takes the places in turn each night', async () => {
+    m.rows = [row('lmc', 'Lower Merion Community Mikvah', 'http://lmcmikvah.org/'), row('mei', 'Mikvah Mei Shalva', 'https://philamikvah.org/')]
+    expect(await syncHoursWatches(reach, undefined, Date.now() - 1)).toEqual([{ community: 'philly', added: 0, removed: 0 }])
+    expect(reach.fetchHome).not.toHaveBeenCalled()
+    // Not reached isn't "searched and found nothing": no reason kept.
+    expect(m.updateWatch).not.toHaveBeenCalled()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const firstOn = async (iso: string) => {
+      vi.setSystemTime(Date.parse(iso))
+      reach.fetchHome.mockClear()
+      await syncHoursWatches(reach)
+      return reach.fetchHome.mock.calls[0][0]
+    }
+    expect(await firstOn('2026-11-17T08:00:00Z')).not.toBe(await firstOn('2026-11-18T08:00:00Z'))
+    vi.useRealTimers()
+  })
+
   // And a website's candidate pages were read all in one moment.
   it('reads a website’s pages a few at a time', async () => {
     const links = Array.from({ length: 10 }, (_, i) => `<a href="/hours-${i}/">Hours ${i}</a>`).join('')

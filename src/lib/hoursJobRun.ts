@@ -1,4 +1,5 @@
 import { getAdminClient } from '@/lib/supabase/admin'
+import { dayNumber, inTurn } from './inTurn'
 import { fewAtATime } from './fewAtATime'
 import { jobsOff } from './jobOff'
 import { listCategoriesUncached } from '@/lib/categoryStore'
@@ -148,8 +149,14 @@ export async function recordSearch(
  *  it no longer finds (hoursWatchChanges). All places of both jobs at
  *  once, each given SEARCH_DEADLINE_MS; one that takes longer, or whose
  *  website doesn't open, is left as it is. A place left with no page
- *  keeps why (recordSearch). Returns what it did, for the run's log. */
-export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADLINE_MS): Promise<{ community: string; added: number; removed: number }[]> {
+ *  keeps why (recordSearch). Returns what it did, for the run's log.
+ *
+ *  `stopBy`: no place's search starts after it (Nov 18 review: every
+ *  place, every night, could take the watches' own time in the morning
+ *  run). One not reached is left as it is, as one that took too long is,
+ *  and the places are taken in turn (inTurn), so it isn't the same ones
+ *  left out each night. */
+export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADLINE_MS, stopBy = Infinity): Promise<{ community: string; added: number; removed: number }[]> {
   const { data, error } = await getAdminClient().from('community').select('slug, timezone')
   if (error) throw new Error(`Couldn’t list the communities: ${error.message}`)
   const out = []
@@ -160,17 +167,20 @@ export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADL
     // means nothing is read, the search for its pages included.
     const off = jobsOff(watches)
     const jobs = await Promise.all(PAGE_JOBS.filter((job) => !off.includes(job)).map(async (job) => (await hoursJobPlaces(slug, job)).places.map((place) => ({ place, job }))))
-    const places = jobs.flat()
+    const places = inTurn(jobs.flat(), dayNumber())
     const own = await ownSitePlaces(slug)
     if (!places.length && !own.places.length) continue
     const searches = await fewAtATime(places, SITES_AT_ONCE, async ({ place: p, job }) => {
+      if (Date.now() > stopBy) return null
       const website = websiteOf(p)
       return { website, got: website ? await deadline(searchHoursPages(website, timezone, reach, job).catch(() => null), ms) : null }
     })
     let added = 0
     let removed = 0
     for (const [i, { place, job }] of places.entries()) {
-      const { website, got } = searches[i]
+      const searched = searches[i]
+      if (!searched) continue
+      const { website, got } = searched
       const { add, remove } = hoursWatchChanges(place, got && !('error' in got) ? got : null, watches)
       let pages = watches.filter((w) => w.resourceId === place.id && isListingPageWatch(w) && !remove.includes(w.id)).length
       for (const w of add) {

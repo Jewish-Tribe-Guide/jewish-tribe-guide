@@ -1,7 +1,8 @@
 import { listCommunities } from './communityStore'
 import { listCategoriesUncached } from './categoryStore'
 import { approvedListingsNow, saveWalkRoutes, walkRoutesOf } from './walkRouteStore'
-import { askOpenRouteService, dayNumber, inTurn, workOutWalks, type WalkRouteResult } from './walkRouteRun'
+import { dayNumber, inTurn } from './inTurn'
+import { askOpenRouteService, workOutWalks, type WalkRouteResult } from './walkRouteRun'
 
 // ── Working out the walks: nightly, and as soon as a listing changes ───────
 // The nightly job (cron/walk-routes) and an admin's approval, new listing

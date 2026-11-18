@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { DirectoryResource } from '@/types'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
-import { ORS_SPACING_MS, askOpenRouteService, inTurn, workOutWalks, type WalkRouteDeps } from './walkRouteRun'
+import { ORS_SPACING_MS, askOpenRouteService, workOutWalks, type WalkRouteDeps } from './walkRouteRun'
 import type { WalkRoute } from './walkRoutes'
 
 const at = { lat: 39.95, lng: -75.16 }
@@ -100,14 +100,5 @@ describe('askOpenRouteService', () => {
     } finally {
       vi.unstubAllGlobals()
     }
-  })
-})
-
-describe('inTurn', () => {
-  it('starts at the turn’s place and goes round, whatever the turn', () => {
-    expect(inTurn(['a', 'b', 'c'], 0)).toEqual(['a', 'b', 'c'])
-    expect(inTurn(['a', 'b', 'c'], 4)).toEqual(['b', 'c', 'a'])
-    expect(inTurn(['a', 'b', 'c'], -1)).toEqual(['c', 'a', 'b'])
-    expect(inTurn([], 3)).toEqual([])
   })
 })

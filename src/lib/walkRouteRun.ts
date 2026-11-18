@@ -1,6 +1,7 @@
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from './categories'
 import type { LatLng } from './geo'
+import { inTurn } from './inTurn'
 import { parseWalkLists } from './walkList'
 import { ORS_MATRIX_MAX, orsMatrixBody, readOrsMatrix, routesToWorkOut, type WalkRoute } from './walkRoutes'
 
@@ -36,18 +37,6 @@ export type WalkRouteDeps = {
   turn?: number
 }
 
-/** The list from position `turn` round to the start: a different first
- *  piece each night, so ones that fail every night (a place
- *  OpenRouteService can't route to) can't take the whole budget night
- *  after night and leave the rest never worked out (Nov 18 review). */
-export function inTurn<T>(items: readonly T[], turn = 0): T[] {
-  if (!items.length) return []
-  const at = ((Math.trunc(turn) % items.length) + items.length) % items.length
-  return [...items.slice(at), ...items.slice(0, at)]
-}
-
-/** The day's number, for `turn`: one more each day. */
-export const dayNumber = (now = Date.now()) => Math.floor(now / 86_400_000)
 
 export type WalkRouteResult = { listings: number; asked: number; walks: number; failed: number; leftForTomorrow: number }
 
