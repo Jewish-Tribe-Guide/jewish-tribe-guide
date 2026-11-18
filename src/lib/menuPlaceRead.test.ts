@@ -128,6 +128,29 @@ describe('readUnreadMenus', () => {
     }
   })
 
+  // Nov 18 review: a read that finished after it was kept as "took too
+  // long" saved too, and whichever save landed last stood, so a slow
+  // "took too long" save could overwrite the dishes it found.
+  it('a read that finishes late is kept after its "took too long", never under it', async () => {
+    vi.useFakeTimers()
+    try {
+      const landed: string[] = []
+      m.saveMenuReading.mockImplementation(async (_slug: string, id: string, r: { status: string }) => {
+        if (r.status === 'failed') await new Promise((ok) => setTimeout(ok, 1000))
+        landed.push(`${id}:${r.status}`)
+        return { status: r.status }
+      })
+      m.findMenus.mockImplementationOnce(() => new Promise((ok) => setTimeout(() => ok([source]), 1500)))
+      m.readMenus.mockResolvedValue({ status: 'proposed', dishes: ['Falafel'], sourceUrl: source.url, note: null, model: 'm' })
+      const run = readUnreadMenus('key', { perRun: 1, readMs: 1000 })
+      await vi.advanceTimersByTimeAsync(3000)
+      await run
+      expect(landed.filter((x) => x.startsWith('a:'))).toEqual(['a:failed', 'a:proposed'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('gives a read only the time the run has left', async () => {
     vi.useFakeTimers()
     try {
