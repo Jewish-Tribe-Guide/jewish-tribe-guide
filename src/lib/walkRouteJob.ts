@@ -1,7 +1,7 @@
 import { listCommunities } from './communityStore'
 import { listCategoriesUncached } from './categoryStore'
 import { approvedListingsNow, saveWalkRoutes, walkRoutesOf } from './walkRouteStore'
-import { askOpenRouteService, workOutWalks, type WalkRouteResult } from './walkRouteRun'
+import { askOpenRouteService, dayNumber, inTurn, workOutWalks, type WalkRouteResult } from './walkRouteRun'
 
 // ── Working out the walks: nightly, and as soon as a listing changes ───────
 // The nightly job (cron/walk-routes) and an admin's approval, new listing
@@ -24,7 +24,10 @@ export async function runWalkRoutes({ communities, budget }: { communities?: rea
   const key = process.env.OPENROUTESERVICE_API_KEY
   if (!key) return { ok: true, skipped: 'OPENROUTESERVICE_API_KEY is not set' }
 
-  const slugs = communities ?? (await listCommunities()).map((c) => c.slug)
+  // Communities in turn too: one whose walks fail can't hold the budget
+  // from the others every night.
+  const turn = dayNumber()
+  const slugs = inTurn(communities ?? (await listCommunities()).map((c) => c.slug), turn)
   let left = budget
   const results: Record<string, WalkRouteResult> = {}
   for (const slug of slugs) {
@@ -38,6 +41,7 @@ export async function runWalkRoutes({ communities, budget }: { communities?: rea
       ask: (body) => askOpenRouteService(key, body),
       wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
       budget: left,
+      turn,
     })
     left -= result.asked
     results[slug] = result

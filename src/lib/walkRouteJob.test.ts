@@ -15,7 +15,7 @@ const m = vi.hoisted(() => ({
 vi.mock('./communityStore', () => ({ listCommunities: m.listCommunities }))
 vi.mock('./categoryStore', () => ({ listCategoriesUncached: m.listCategoriesUncached }))
 vi.mock('./walkRouteStore', () => ({ walkRoutesOf: m.walkRoutesOf, saveWalkRoutes: m.saveWalkRoutes, approvedListingsNow: m.approvedListingsNow }))
-vi.mock('./walkRouteRun', () => ({ workOutWalks: m.workOutWalks, askOpenRouteService: vi.fn() }))
+vi.mock('./walkRouteRun', async (orig) => ({ ...(await orig<typeof import('./walkRouteRun')>()), workOutWalks: m.workOutWalks, askOpenRouteService: vi.fn() }))
 
 const { runWalkRoutes, runWalkRoutesAfterChange } = await import('./walkRouteJob')
 
@@ -35,6 +35,22 @@ describe('runWalkRoutes', () => {
   it('works out each community’s walks, sharing one budget between them', async () => {
     expect(await runWalkRoutes({ budget: 20 })).toMatchObject({ ok: true, results: { philly: { walks: 30 }, ues: { walks: 30 } } })
     expect(m.workOutWalks.mock.calls.map(([d]) => d.budget)).toEqual([20, 17])
+  })
+
+  // Nov 18 review: the same community, and the same requests in it, went
+  // first every night, so ones that failed every night held the budget.
+  it('starts each night somewhere else: the communities, and the work in each, in turn', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const firstOn = async (iso: string) => {
+      vi.setSystemTime(Date.parse(iso))
+      m.workOutWalks.mockClear()
+      await runWalkRoutes({ budget: 20 })
+      return { first: m.walkRoutesOf.mock.calls.at(-2)![0], turn: m.workOutWalks.mock.calls[0][0].turn }
+    }
+    const [mon, tue] = [await firstOn('2026-11-16T08:00:00Z'), await firstOn('2026-11-17T08:00:00Z')]
+    expect(mon.first).not.toBe(tue.first)
+    expect(tue.turn).toBe(mon.turn + 1)
+    vi.useRealTimers()
   })
 
   it('reads listings as the table has them now, not the cached read an approval just made stale', async () => {

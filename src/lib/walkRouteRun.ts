@@ -30,7 +30,24 @@ export type WalkRouteDeps = {
   wait: (ms: number) => Promise<void>
   /** Requests this run may still make. */
   budget: number
+  /** Where in the work this run starts (the day's number, nightly): what
+   *  ran out of budget or failed tonight isn't first in line again
+   *  tomorrow (inTurn). */
+  turn?: number
 }
+
+/** The list from position `turn` round to the start: a different first
+ *  piece each night, so ones that fail every night (a place
+ *  OpenRouteService can't route to) can't take the whole budget night
+ *  after night and leave the rest never worked out (Nov 18 review). */
+export function inTurn<T>(items: readonly T[], turn = 0): T[] {
+  if (!items.length) return []
+  const at = ((Math.trunc(turn) % items.length) + items.length) % items.length
+  return [...items.slice(at), ...items.slice(0, at)]
+}
+
+/** The day's number, for `turn`: one more each day. */
+export const dayNumber = (now = Date.now()) => Math.floor(now / 86_400_000)
 
 export type WalkRouteResult = { listings: number; asked: number; walks: number; failed: number; leftForTomorrow: number }
 
@@ -42,6 +59,9 @@ export async function workOutWalks(deps: WalkRouteDeps): Promise<WalkRouteResult
     return placesOf.get(id)!
   }
 
+  // Every request the run could make, first: then asked from tonight's
+  // place in the list (inTurn).
+  const work: { origin: DirectoryResource; from: LatLng; chunk: [string, LatLng][] }[] = []
   for (const category of deps.categories) {
     const lists = parseWalkLists(category.walkList).filter((w) => deps.categories.some((c) => c.id === w.categoryId))
     if (lists.length === 0) continue
@@ -55,30 +75,31 @@ export async function workOutWalks(deps: WalkRouteDeps): Promise<WalkRouteResult
         const targets = (await places(list.categoryId)).filter((p) => p.id !== origin.id)
         for (const t of routesToWorkOut(from, targets, list.maxMinutes, deps.stored.get(origin.id))) wanted.set(t.id, t.geo)
       }
-      if (wanted.size === 0) continue
       const all = [...wanted.entries()]
-      for (let start = 0; start < all.length; start += ORS_MATRIX_MAX - 1) {
-        const chunk = all.slice(start, start + ORS_MATRIX_MAX - 1)
-        if (result.asked >= deps.budget) {
-          result.leftForTomorrow += chunk.length
-          continue
-        }
-        if (result.asked > 0) await deps.wait(ORS_SPACING_MS)
-        result.asked++
-        try {
-          const walks = readOrsMatrix(await deps.ask(orsMatrixBody(from, chunk.map(([, geo]) => geo))), chunk.length)
-          if (!walks) throw new Error('Not a matrix reply')
-          await deps.save(
-            origin.id,
-            chunk.map(([toId, to], i) => ({ toId, from, to, ...walks[i] })),
-          )
-          result.walks += chunk.length
-        } catch (err) {
-          // Tried again tomorrow: nothing was kept for these.
-          console.error(`[walk-routes] ${origin.name} failed:`, err)
-          result.failed += chunk.length
-        }
-      }
+      for (let start = 0; start < all.length; start += ORS_MATRIX_MAX - 1) work.push({ origin, from, chunk: all.slice(start, start + ORS_MATRIX_MAX - 1) })
+    }
+  }
+
+  for (const { origin, from, chunk } of inTurn(work, deps.turn)) {
+    if (result.asked >= deps.budget) {
+      result.leftForTomorrow += chunk.length
+      continue
+    }
+    if (result.asked > 0) await deps.wait(ORS_SPACING_MS)
+    result.asked++
+    try {
+      const walks = readOrsMatrix(await deps.ask(orsMatrixBody(from, chunk.map(([, geo]) => geo))), chunk.length)
+      if (!walks) throw new Error('Not a matrix reply')
+      await deps.save(
+        origin.id,
+        chunk.map(([toId, to], i) => ({ toId, from, to, ...walks[i] })),
+      )
+      result.walks += chunk.length
+    } catch (err) {
+      // Tried again another night, from elsewhere in the line: nothing was
+      // kept for these.
+      console.error(`[walk-routes] ${origin.name} failed:`, err)
+      result.failed += chunk.length
     }
   }
   return result
