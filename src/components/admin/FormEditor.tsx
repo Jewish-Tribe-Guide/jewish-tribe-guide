@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { DEFAULT_CONTACT_STEPS, type FormConfig, type FormContent, type FormStep, type StepCondition } from '@/lib/forms'
 import Wizard from '@/components/wizard/Wizard'
 import FormStepEditor from './FormStepEditor'
+import { useStepsInAddress } from './useStepsInAddress'
 import FormPreview, { resolvePreviewSteps } from './FormPreview'
 import { IconField } from './CategoryFormFields'
 import { fetchJson } from '@/lib/fetchJson'
@@ -178,25 +179,18 @@ export default function FormEditor({
   }, [wanted, kept, publishing])
 
   // The preview and a question's screen each get their own history entry,
-  // so Back lands on this screen rather than the list.
-  useEffect(() => {
-    function onPopState(e: PopStateEvent) {
-      const state = e.state as { editorPreview?: boolean; formStep?: number } | null
-      setPreviewing(!!state?.editorPreview)
-      setOpenStep(state?.formStep ?? null)
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [])
+  // so Back lands on this screen rather than the list, with an address
+  // (?preview=open, ?question=2) so a reload stays on it (Nov 18: both were
+  // entries pushed behind Next's router, with nothing in the address).
+  useStepsInAddress('question', openStep !== null ? [String(openStep)] : [], ([i]) => setOpenStep(i !== undefined && /^\d+$/.test(i) ? Number(i) : null))
+  useStepsInAddress('preview', previewing ? ['open'] : [], ([to]) => setPreviewing(to === 'open'))
 
   function openPreview() {
     setPreviewing(true)
-    history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
   }
 
   function showStep(i: number) {
     setOpenStep(i)
-    history.pushState({ ...(window.history.state ?? {}), formStep: i }, '')
     window.scrollTo?.(0, 0)
   }
 
@@ -218,7 +212,7 @@ export default function FormEditor({
 
   function removeStep(i: number) {
     setDraft((d) => ({ ...d, steps: d.steps.filter((_, idx) => idx !== i) }))
-    history.back()
+    setOpenStep(null)
   }
 
   function moveStep(i: number, dir: -1 | 1) {
@@ -230,7 +224,6 @@ export default function FormEditor({
       return { ...d, steps: next }
     })
     setOpenStep(j)
-    history.replaceState({ ...(window.history.state ?? {}), formStep: j }, '')
   }
 
   function validate(): string[] {
@@ -314,7 +307,7 @@ export default function FormEditor({
     onBack()
   }
 
-  if (previewing) return <FormPreview content={draft} onClose={() => history.back()} />
+  if (previewing) return <FormPreview content={draft} onClose={() => setPreviewing(false)} />
 
   const name = draft.title.trim() || (isNew ? 'New form' : live.title)
   const step = openStep !== null ? draft.steps[openStep] : undefined
@@ -324,7 +317,7 @@ export default function FormEditor({
     const i = openStep
     screen = (
       <>
-        <AdminBack back={{ label: name, onClick: () => history.back() }} title={step.question.trim() || 'New question'} />
+        <AdminBack back={{ label: name, onClick: () => setOpenStep(null) }} title={step.question.trim() || 'New question'} />
         <FormStepEditor
           step={step}
           index={i}

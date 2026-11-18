@@ -333,7 +333,7 @@ describe('SiteSettingsEditor — Home page', () => {
     const user = userEvent.setup()
     await renderEditor()
     await user.click(screen.getByRole('button', { name: 'Preview' }))
-    expect(history.state?.editorPreview).toBe(true)
+    await waitFor(() => expect(window.location.search).toBe('?preview=open'))
 
     act(() => history.back())
     await waitFor(() => expect(screen.queryByTitle('Site preview')).toBeNull())
@@ -348,6 +348,20 @@ describe('SiteSettingsEditor — Home page', () => {
     await waitFor(() => expect(screen.queryByTitle('Site preview')).toBeNull())
     act(() => history.forward())
     await waitFor(() => expect(screen.getByTitle('Site preview')).toBeInTheDocument())
+  })
+
+  // Nov 18: the preview was an entry pushed behind Next's router with
+  // nothing in the address, so a reload lost it.
+  it('a reload on the preview’s address opens it again, with what the boxes hold', async () => {
+    window.history.replaceState({}, '', '/philly/admin/home?preview=open')
+    try {
+      mockLoad(SITE_SETTINGS_DEFAULTS, [])
+      renderWithProviders(<SiteSettingsEditor token="tok" />, { content: { categories: [] }, community: makeCommunity({ slug: 'philly' }) })
+      expect(await screen.findByTitle('Site preview')).toBeInTheDocument()
+      await waitFor(() => expect(writePreviewDraft).toHaveBeenCalled())
+    } finally {
+      window.history.replaceState({}, '', '/philly/admin/home')
+    }
   })
 
   // Like a screenshot here: the small one opens big (the user, Nov 4).
