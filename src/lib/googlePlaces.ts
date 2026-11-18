@@ -187,6 +187,11 @@ export function namesOverlap(a: string, b: string): boolean {
 
 // ── Find Place id ───────────────────────────────────────────────────────────
 
+/** How long a Google request may take before it counts as failed. The
+ *  nightly sync asks about every listing one after another inside a 300s
+ *  limit, so one call that never answered used to end the whole run. */
+const GOOGLE_TIMEOUT_MS = 10_000
+
 /**
  * Resolves a Google place id from a name + address. Used once, by the place-id
  * backfill. Returns null if Google can't confidently match the query (callers
@@ -201,7 +206,7 @@ export async function findPlaceId(name: string, address: string): Promise<string
     const url =
       `https://maps.googleapis.com/maps/api/place/findplacefromtext/json` +
       `?input=${encodeURIComponent(input)}&inputtype=textquery&fields=place_id&key=${key}`
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS) })
     if (!res.ok) return null
     const data = (await res.json()) as { status: string; candidates?: { place_id?: string }[] }
     if (data.status !== 'OK' || !data.candidates?.[0]?.place_id) return null
@@ -227,7 +232,7 @@ export async function findPlaceStatus(
     const url =
       `https://maps.googleapis.com/maps/api/place/findplacefromtext/json` +
       `?input=${encodeURIComponent(input)}&inputtype=textquery&fields=place_id,name,business_status&key=${key}`
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS) })
     if (!res.ok) return null
     const data = (await res.json()) as {
       status: string
@@ -251,7 +256,7 @@ export async function searchPlaces(query: string): Promise<{ placeId: string; na
   if (!key || !q) return null
   try {
     const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(q)}&key=${key}`
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS) })
     if (!res.ok) return null
     const data = (await res.json()) as { status: string; results?: { place_id?: string; name?: string; formatted_address?: string }[] }
     if (data.status === 'ZERO_RESULTS') return []
@@ -301,7 +306,7 @@ export async function fetchPlaceSync(placeId: string, { statusOnly = false }: { 
     const url =
       `https://maps.googleapis.com/maps/api/place/details/json` +
       `?place_id=${encodeURIComponent(placeId)}&fields=${fields}&key=${key}`
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS) })
     if (!res.ok) return null
     const data = (await res.json()) as { status: string; result?: GooglePlaceResult }
     if (data.status !== 'OK' || !data.result) return null

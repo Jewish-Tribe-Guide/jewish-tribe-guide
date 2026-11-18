@@ -80,6 +80,9 @@ describe('syncOneListing', () => {
           details: expect.objectContaining({
             businessStatus: 'CLOSED_TEMPORARILY',
             googleSyncedAt: expect.any(String),
+            // A full sync asks whether it's open too: the nightly run
+            // takes the longest-unasked first by this (sync-hours).
+            googleStatusCheckedAt: expect.any(String),
             // No prior value, so the transition is recorded from UNKNOWN
             // rather than pretending nothing changed.
             businessStatusBefore: 'UNKNOWN',

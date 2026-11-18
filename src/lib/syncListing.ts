@@ -113,10 +113,13 @@ export async function syncOneListing(row: SyncedRow, { statusOnly = false }: { s
 
   // Only asked whether it's still open (the nightly run, most nights): its
   // hours and the rest weren't refreshed, so "Synced from Google · updated"
-  // keeps the date they were.
+  // keeps the date they were. A full sync asks whether it's open too, so
+  // both stamp googleStatusCheckedAt: the nightly run takes the
+  // longest-unasked listings first by it (sync-hours).
+  const at = new Date().toISOString()
   const details: Record<string, unknown> = {
     ...row.details,
-    ...(statusOnly ? { googleStatusCheckedAt: new Date().toISOString() } : { googleSyncedAt: new Date().toISOString() }),
+    ...(statusOnly ? { googleStatusCheckedAt: at } : { googleSyncedAt: at, googleStatusCheckedAt: at }),
   }
   delete details.lastSyncError
   delete details.lastSyncFailedAt
