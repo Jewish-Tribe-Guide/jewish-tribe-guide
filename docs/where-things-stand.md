@@ -360,6 +360,9 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   alike, a group's Join included), 40px tall and as wide as their words
   on every width: the solid ones felt "aggressive" and a full row closed
   the listing off. **Changes** a group's green Join (Oct 6) to blue.
+  Then Edit listing is the filled blue pill on these listings too, as on
+  every other (the user: "bring back the regular edit listing color"); it
+  was outlined from Oct 6, beside the big filled Join. **Changes** that.
 - Found Nov 17, not fixed: `e2e/listing-detail.spec.ts:375` (mobile) —
   a Cemetery listing's own page, header Back: the list shows but the
   address stays on the listing, about 1 run in 13 (3 of 40 on the code

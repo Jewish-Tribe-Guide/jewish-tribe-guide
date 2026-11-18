@@ -391,8 +391,6 @@ export default function ListingDetailModal({
             <ListingEditBar
               onEdit={canEdit ? () => openForm('edit') : undefined}
               onRequestRemoval={canEdit && canReport ? openRemoval : undefined}
-              item={item}
-              category={category}
               className="pointer-events-auto"
             />
           </div>

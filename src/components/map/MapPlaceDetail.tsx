@@ -236,8 +236,6 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
           <ListingEditBar
             onEdit={canEdit ? () => openForm('edit') : undefined}
             onRequestRemoval={canEdit && canReport ? openRemoval : undefined}
-            item={item}
-            category={category}
           />
         }
       />
