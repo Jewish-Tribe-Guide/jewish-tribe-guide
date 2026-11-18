@@ -356,6 +356,10 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   own Edit when it is the listing's only box and Edit listing is under it.
   **Changes** Oct 6's one box (Join was inside it, after the description)
   and Oct 10's Edit under every box, on these listings only.
+  Same day, board B6: the pills are light (pale blue, Join and Share
+  alike, a group's Join included), 40px tall and as wide as their words
+  on every width: the solid ones felt "aggressive" and a full row closed
+  the listing off. **Changes** a group's green Join (Oct 6) to blue.
 - Found Nov 17, not fixed: `e2e/listing-detail.spec.ts:375` (mobile) —
   a Cemetery listing's own page, header Back: the list shows but the
   address stays on the listing, about 1 run in 13 (3 of 40 on the code

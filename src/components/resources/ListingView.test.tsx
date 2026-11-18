@@ -344,15 +344,18 @@ describe('ListingView — Join and Share, then the box (Nov 17)', () => {
     expect(share.className).not.toMatch(/\bw-12\b/)
   })
 
-  it('two thirds and one on a phone; from 640 wide each pill is as wide as its words', () => {
+  // Board B6 (the user, Nov 17): solid green or blue felt "aggressive" and a
+  // full row closed the listing off. Light, 40px, as wide as their words,
+  // a group's Join included; the same look for both.
+  it('Join and Share are light pills of one look, as wide as their words, a group’s Join too', () => {
     view({ item: group, category: groups })
     const row = screen.getByTestId('listing-join-row')
     const join = within(row).getByRole('link', { name: 'Join the group' })
     const share = within(row).getByRole('button', { name: /Share/ })
-    expect(join.className).toMatch(/flex-\[2_1_0%\]/)
-    expect(share.className).toMatch(/flex-\[1_1_0%\]/)
-    for (const pill of [join, share]) expect(pill.className).toMatch(/sm:flex-none/)
-    expect(join.className).not.toMatch(/max-w/)
+    expect(join.className).toBe(share.className)
+    expect(join.className).toMatch(/\bh-10\b/)
+    expect(join.className).toMatch(/bg-primary\/10/)
+    expect(join.className).not.toMatch(/emerald|text-white|flex-\[|flex-1\b/)
   })
 
   it('no Edit on the box when it is the listing’s only box: Edit listing is right under it', () => {
