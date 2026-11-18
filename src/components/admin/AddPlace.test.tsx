@@ -205,6 +205,42 @@ describe('Add a place', () => {
       await waitFor(() => expect(onClose).toHaveBeenCalled())
     })
 
+    // Once the listing was made, every save after it was allSettled or
+    // caught to null and never looked at: "is added" read as done while
+    // its Stop never saved (Nov 18 review).
+    it('a save after the listing that fails is said, and the screen stays', async () => {
+      const user = userEvent.setup()
+      site()
+      vi.mocked(fetchJson).mockImplementation(async (url, init) => {
+        const body = init?.body ? JSON.parse(String(init.body)) : {}
+        if (String(url).includes('/watches/google') && body.action === 'stop_field') throw new Error('Could not do that.')
+        return String(url).includes('/found') && init?.method !== 'POST' ? { found: [] } : {}
+      })
+      const onClose = renderAdd()
+      await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await user.click(screen.getByTestId('editor-row-contact:phone'))
+      await user.click(screen.getByRole('button', { name: 'Stop' }))
+      await addIt(user)
+      expect(await screen.findByRole('alert')).toHaveTextContent('Not saved: Google’s Stops')
+      expect(onClose).not.toHaveBeenCalled()
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      expect(onClose).toHaveBeenCalled()
+    })
+
+    it('Add to the listing that fails says so and stays', async () => {
+      const user = userEvent.setup()
+      site({ found: [{ id: 's1', payload: { details: { minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '07:00' }] } } }] })
+      const onClose = renderAdd()
+      await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await addIt(user)
+      await screen.findByText('Found on its website')
+      vi.mocked(fetchJson).mockRejectedValue(new Error('Could not do that.'))
+      await user.click(screen.getByRole('button', { name: 'Add to the listing' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t add it.')
+      expect(onClose).not.toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: 'Add to the listing' })).toBeEnabled()
+    })
+
     it('a page given is saved and read; if it can’t be, it’s said there (AddFailed8)', async () => {
       const user = userEvent.setup()
       site({ lastError: 'It wouldn’t open' })
