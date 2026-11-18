@@ -86,7 +86,7 @@ export async function POST(request: Request) {
       const category = await getCategoryById(row!.community_id, listing.category)
       const minyanimField = category?.detailFields.find((f) => f.type === 'minyanim')
       if (!minyanimField) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
-      result = await readShulWeek(listing, minyanimField.key, source, apiKey)
+      result = await readShulWeek(listing, minyanimField.key, source, apiKey, { where: community })
     } else {
       const festivals = await fetchFestivals(community.timezone)
       const festival = festivals.find((f) => f.name === field('festival')) ?? festivals.find((f) => f.festival === field('festival'))

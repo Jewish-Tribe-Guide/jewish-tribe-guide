@@ -230,7 +230,7 @@ export async function POST(request: Request) {
           const first = images[0]
           const source = first && !text ? (first.mime === 'application/pdf' ? { pdf: first.b64 } : { image: first.b64, mime: first.mime }) : { text: text || '(see photo)' }
           try {
-            const { update } = await readShulWeek(l, key, source, apiKey)
+            const { update } = await readShulWeek(l, key, source, apiKey, { where: community })
             return { ...p, listing: brief(p.listingId), item: l, minyanimKey: key, update }
           } catch (err) {
             console.error('[message/read] times not read:', err instanceof Error ? err.message : err)

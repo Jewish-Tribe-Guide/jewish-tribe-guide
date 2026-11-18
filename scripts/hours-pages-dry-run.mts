@@ -45,8 +45,9 @@ import type { ResourceRow } from '../src/types'
 
 const LOOKS_LIKE_HOURS = /\b\d{1,2}(:\d\d)?\s*(am|pm|a\.m\.|p\.m\.)|\b(hours|open|closed|candle|sunset|appointment only|by appointment)\b/i
 
-const { data: communities } = await getAdminClient().from('community').select('slug, name')
-for (const { slug, name: communityName } of (communities ?? []) as { slug: string; name: string }[]) {
+const { data: communities } = await getAdminClient().from('community').select('slug, name, timezone, map_center')
+for (const { slug, name: communityName, timezone, map_center } of (communities ?? []) as { slug: string; name: string; timezone: string; map_center: { lat: number; lng: number } }[]) {
+  const where = { timezone, mapCenter: map_center }
   for (const category of await listCategoriesUncached(slug)) {
     const reads = pageReadsFor(category)
     // Places with named weekly hours (a mikvah's), not every place with "Hours".
@@ -65,7 +66,7 @@ for (const { slug, name: communityName } of (communities ?? []) as { slug: strin
       }
       for (const { url: page } of hoursPages(home.url, home.body)) {
         console.log(`\n   ── ${page}`)
-        const source = await readListingPage(page).catch(() => null)
+        const source = await readListingPage(page, { timezone: where.timezone }).catch(() => null)
         if (!source) {
           console.log('      Can’t be read (blocked, moved, or nearly empty).')
           continue
@@ -74,7 +75,7 @@ for (const { slug, name: communityName } of (communities ?? []) as { slug: strin
         console.log(`      The page says:${lines.length ? '' : ' nothing like hours.'}`)
         for (const l of lines.slice(0, 12)) console.log(`        | ${l}`)
         try {
-          const reading = await readPageFor(listing, category, reads, source, { apiKey: process.env.OPENAI_API_KEY!, communityName })
+          const reading = await readPageFor(listing, category, reads, source, { apiKey: process.env.OPENAI_API_KEY!, communityName, where })
           console.log(`      The AI read: ${reading.read.length ? '' : 'no hours.'}`)
           for (const l of reading.read) console.log(`        · ${l}`)
           if (reading.unread?.length) console.log(`      Couldn’t compare: ${reading.unread.join('; ')}`)

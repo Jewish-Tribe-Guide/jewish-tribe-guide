@@ -81,7 +81,7 @@ describe('searchHoursPages', () => {
   // Its appointments page has no clock time, but says how Shabbos works:
   // a section's note, read since Oct 22.
   it('keeps the pages with a clock time or appointments on them, from its home page and its links', async () => {
-    expect(await searchHoursPages('http://lmcmikvah.org/', reach)).toEqual({
+    expect(await searchHoursPages('http://lmcmikvah.org/', 'America/New_York', reach)).toEqual({
       found: [
         { url: 'https://lmcmikvah.org/', link: null },
         { url: 'https://lmcmikvah.org/appointments-and-membership/', link: 'Appointments and Membership' },
@@ -92,9 +92,9 @@ describe('searchHoursPages', () => {
   })
 
   it('says why when its website doesn’t open, and which pages didn’t load', async () => {
-    expect(await searchHoursPages('https://philamikvah.org/', reach)).toEqual({ error: 'it couldn’t be reached' })
+    expect(await searchHoursPages('https://philamikvah.org/', 'America/New_York', reach)).toEqual({ error: 'it couldn’t be reached' })
     const slow = { ...reach, readPage: vi.fn(async (url: string) => (url.endsWith('mens-mikvah/') ? null : { url, text: PAGES[url], pdf: null })) }
-    expect(await searchHoursPages('http://lmcmikvah.org/', slow)).toMatchObject({ unloaded: ['https://lmcmikvah.org/mens-mikvah/'] })
+    expect(await searchHoursPages('http://lmcmikvah.org/', 'America/New_York', slow)).toMatchObject({ unloaded: ['https://lmcmikvah.org/mens-mikvah/'] })
   })
   // Beth Zion-Beth Israel as Oct 21's check of every shul page found it:
   // five pages read, all showing its calendar's week, two of them its High
@@ -118,8 +118,8 @@ describe('searchHoursPages', () => {
           ? { url, text: [...week, '', bzbi[url]].join('\n'), pdf: null, weeks: [{ sunday: '2026-10-18', from: '2026-10-21', to: '2026-10-24', lines: week }] }
           : { url, text: 'Thursday: 10:30am — 6:00pm\nSunday: 10:30am — 4:30pm', pdf: null },
     }
-    expect(await searchHoursPages('http://www.bzbi.org/', shulReach, 'times')).toEqual({ found: [{ url: 'https://bzbi.org/worship/', link: 'Worship' }], unloaded: [] })
-    expect(await searchHoursPages('http://rosenbach.org/', shulReach, 'times')).toEqual({ found: [], unloaded: [] })
+    expect(await searchHoursPages('http://www.bzbi.org/', 'America/New_York', shulReach, 'times')).toEqual({ found: [{ url: 'https://bzbi.org/worship/', link: 'Worship' }], unloaded: [] })
+    expect(await searchHoursPages('http://rosenbach.org/', 'America/New_York', shulReach, 'times')).toEqual({ found: [], unloaded: [] })
   })
 })
 
@@ -147,7 +147,7 @@ describe('syncHoursWatches', () => {
         return { url, text: 'Sunday 9 AM – 5 PM', pdf: null }
       },
     }
-    await searchHoursPages('http://lmcmikvah.org/', busy)
+    await searchHoursPages('http://lmcmikvah.org/', 'America/New_York', busy)
     expect(most).toBeGreaterThan(1)
     expect(most).toBeLessThanOrEqual(3)
   })

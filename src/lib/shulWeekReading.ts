@@ -1,4 +1,4 @@
-import { community } from '@/community.config'
+import type { Community } from '@/lib/communityStore'
 import type { DirectoryResource } from '@/types'
 import { fetchDatesInfo } from './dateZmanim'
 import { leaveOutHeldElsewhere } from './heldElsewhere'
@@ -12,6 +12,11 @@ import { currentSeason } from './season'
 function datesFrom(today: string, n: number): string[] {
   return Array.from({ length: n }, (_, i) => new Date(Date.parse(`${today}T12:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10))
 }
+
+/** Where a community counts its days, and works out zmanim for a listing
+ *  with no pin: its own timezone and map centre, not the one static
+ *  config's for every community. */
+export type CommunityPlace = Pick<Community, 'timezone' | 'mapCenter'>
 
 /** "Update their times" (agreed Oct 1), the reading half: a shul's times
  *  read from what was sent, then compared with what the listing has, day by
@@ -31,10 +36,11 @@ export async function readShulWeek(
   minyanimKey: string,
   source: ScheduleSource,
   apiKey: string,
-  { sentAt, week, others }: { sentAt?: number; week?: { from: string; to: string }; others?: () => Promise<readonly DirectoryResource[]> } = {},
+  { where, sentAt, week, others }: { where: CommunityPlace; sentAt?: number; week?: { from: string; to: string }; others?: () => Promise<readonly DirectoryResource[]> },
 ) {
+  const { timezone } = where
   const now = Date.now()
-  const dayOf = (ms: number) => new Intl.DateTimeFormat('en-CA', { timeZone: community.timezone }).format(new Date(ms))
+  const dayOf = (ms: number) => new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date(ms))
   const today = dayOf(now)
   // A message sent days ago (a newsletter): its days start when it was sent,
   // at most two weeks back, so its "this Shabbos" lands where it meant.
@@ -43,17 +49,17 @@ export async function readShulWeek(
   const dates = week
     ? datesFrom(week.from, 1 + Math.round((Date.parse(`${week.to}T12:00:00Z`) - Date.parse(`${week.from}T12:00:00Z`)) / 86_400_000))
     : datesFrom(first, 21 + Math.round((Date.parse(`${today}T12:00:00Z`) - Date.parse(`${first}T12:00:00Z`)) / 86_400_000))
-  const coords = listing.geo ?? community.mapCenter
-  const ahead = await fetchDatesInfo({ latitude: coords.lat, longitude: coords.lng, timezone: community.timezone }, dates[0], dates.at(-1)!)
+  const coords = listing.geo ?? where.mapCenter
+  const ahead = await fetchDatesInfo({ latitude: coords.lat, longitude: coords.lng, timezone }, dates[0], dates.at(-1)!)
   const days = { today, ...(!week && first < today ? { sentOn: first } : {}), days: dates.map((date) => ({ date, names: ahead.names[date] ?? [] })) }
   const raw = await readRegular(source, days, listing.name, { apiKey })
   const { times, left } = await leaveOutHeldElsewhere(raw.times, { shulId: listing.id, key: minyanimKey, zmanim: ahead.zmanim, others })
   const read = { ...raw, times }
   // "This week", given by weekday: the guide's week, Sunday to Shabbos,
   // the next once Shabbos is over, as Edit listing's (thisWeekEdit.ts).
-  const shabbosOver = first === today && weekdayOf(today) === 'sat' && localMinutes(now) >= (ahead.zmanim[today]?.havdalah ?? Infinity)
+  const shabbosOver = first === today && weekdayOf(today) === 'sat' && localMinutes(now, timezone) >= (ahead.zmanim[today]?.havdalah ?? Infinity)
   const reading = week ? asCalendarWeek(read, week) : weekdaysOnGuideWeek(read, editWeek(first, shabbosOver), 'text' in source ? source.text : undefined)
-  const compare = (r: RegularReading) => compareTimes(regularMinyanim(listing[minyanimKey]), r, { season: currentSeason(now, community.timezone), zmanim: ahead.zmanim })
+  const compare = (r: RegularReading) => compareTimes(regularMinyanim(listing[minyanimKey]), r, { season: currentSeason(now, timezone), zmanim: ahead.zmanim })
   const update = compare(reading)
   // A website page's: its usual times, then each week it gives dates for,
   // as that week's schedule (datedAsWeeks).
@@ -89,8 +95,8 @@ export function datedAsWeeks(reading: RegularReading): { usual: RegularReading |
 }
 
 // Minutes past midnight in the community's timezone.
-function localMinutes(ms: number): number {
-  const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: community.timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(ms)).split(':').map(Number)
+function localMinutes(ms: number, timezone: string): number {
+  const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(ms)).split(':').map(Number)
   return h * 60 + m
 }
 

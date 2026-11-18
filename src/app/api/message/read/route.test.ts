@@ -27,7 +27,7 @@ vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
 vi.mock('@/lib/uiConfig', () => ({ ui: m.ui }))
 vi.mock('@/lib/communityStore', () => ({
   communitySlugFromRequest: () => 'philly',
-  resolveCommunity: async () => ({ slug: 'philly', name: 'Philadelphia' }),
+  resolveCommunity: async () => ({ slug: 'philly', name: 'Philadelphia', timezone: 'America/New_York', mapCenter: { lat: 39.95, lng: -75.16 } }),
 }))
 vi.mock('@/lib/resourceStore', () => ({ listApprovedResources: m.listApprovedResources }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
@@ -236,7 +236,7 @@ describe('POST /api/message/read — the reading', () => {
     reads({ proposals: [{ kind: 'times', listingId: MEKOR, quote: 'Mincha 6:15', checked: true }] })
     m.readShulWeek.mockResolvedValue({ update: { kind: 'week', days: [] }, model: 'm' })
     const body = await (await POST(req({ text: 'Mekor this week: Mincha 6:15' }))).json()
-    expect(m.readShulWeek).toHaveBeenCalledWith(expect.objectContaining({ id: MEKOR }), 'minyanim', { text: 'Mekor this week: Mincha 6:15' }, 'test-key')
+    expect(m.readShulWeek).toHaveBeenCalledWith(expect.objectContaining({ id: MEKOR }), 'minyanim', { text: 'Mekor this week: Mincha 6:15' }, 'test-key', { where: expect.objectContaining({ timezone: 'America/New_York' }) })
     expect(body.proposals[0]).toMatchObject({ kind: 'times', listing: { name: 'Mekor Habracha' }, update: { kind: 'week' } })
   })
 

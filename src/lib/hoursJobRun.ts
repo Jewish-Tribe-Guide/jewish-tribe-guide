@@ -41,11 +41,11 @@ export async function fetchHome(url: string): Promise<{ url: string; body: strin
  *  (looksLikeHours), a shul's if it has a davening time and isn't another
  *  copy of a calendar (timesPagesToRead). One that doesn't load is
  *  `unloaded`. */
-export async function searchHoursPages(website: string, reach: HoursReach = {}, job: PageJob = 'hours'): Promise<{ found: HoursPage[]; unloaded: string[] } | { error: string }> {
+export async function searchHoursPages(website: string, timezone: string, reach: HoursReach = {}, job: PageJob = 'hours'): Promise<{ found: HoursPage[]; unloaded: string[] } | { error: string }> {
   const home = await (reach.fetchHome ?? fetchHome)(website)
   if ('error' in home) return home
   // A shul's calendar may be posted as pictures (calendarPictures.ts).
-  const read = reach.readPage ?? ((u: string) => readListingPage(u, { pictures: job === 'times' }))
+  const read = reach.readPage ?? ((u: string) => readListingPage(u, { timezone, pictures: job === 'times' }))
   const pages = (job === 'times' ? timesPages : hoursPages)(home.url, home.body)
   const sources = await fewAtATime(pages, PAGES_AT_ONCE, (p) => read(p.url).catch(() => null))
   const keep = job === 'times' ? timesPagesToRead(sources) : sources.map((s) => !!s && looksLikeHours(s))
@@ -150,10 +150,10 @@ export async function recordSearch(
  *  website doesn't open, is left as it is. A place left with no page
  *  keeps why (recordSearch). Returns what it did, for the run's log. */
 export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADLINE_MS): Promise<{ community: string; added: number; removed: number }[]> {
-  const { data, error } = await getAdminClient().from('community').select('slug')
+  const { data, error } = await getAdminClient().from('community').select('slug, timezone')
   if (error) throw new Error(`Couldn’t list the communities: ${error.message}`)
   const out = []
-  for (const { slug } of (data ?? []) as { slug: string }[]) {
+  for (const { slug, timezone } of (data ?? []) as { slug: string; timezone: string }[]) {
     const { watches, available } = await listWatches(slug)
     if (!available) continue
     // A job the community turned off isn't searched for (jobOff.ts): off
@@ -165,7 +165,7 @@ export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADL
     if (!places.length && !own.places.length) continue
     const searches = await fewAtATime(places, SITES_AT_ONCE, async ({ place: p, job }) => {
       const website = websiteOf(p)
-      return { website, got: website ? await deadline(searchHoursPages(website, reach, job).catch(() => null), ms) : null }
+      return { website, got: website ? await deadline(searchHoursPages(website, timezone, reach, job).catch(() => null), ms) : null }
     })
     let added = 0
     let removed = 0

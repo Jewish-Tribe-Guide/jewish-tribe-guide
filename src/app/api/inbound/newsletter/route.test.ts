@@ -71,7 +71,7 @@ describe('POST /api/inbound/newsletter', () => {
     expect(m.receiveNewsletter).toHaveBeenCalledWith(
       'philly',
       { messageId: 'g1', from: email.from, list: null, subject: 'Shabbos', date: '2026-10-16T14:00:00.000Z', text: 'Mincha 6pm', attachment: { mime: 'application/pdf', b64: 'JVBERg==' } },
-      { apiKey: 'k', communityName: 'Philadelphia' },
+      { apiKey: 'k', communityName: 'Philadelphia', where: expect.objectContaining({ slug: 'philly' }) },
     )
   })
 

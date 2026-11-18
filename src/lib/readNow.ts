@@ -7,6 +7,7 @@ import { compareKeystone, entryFor, type KeystoneEntry } from './keystoneWatch'
 import { KOSHER_LIST_NAMES } from './kosherJob'
 import { readListingPage, readPageFor } from './listingPageRun'
 import { pageReadsFor } from './listingPageWatch'
+import type { CommunityPlace } from './shulWeekReading'
 import { compareMekor, matchEntries, type GuideListing, type MekorEntry } from './mekorWatch'
 import { MENU_LINK_KEY } from './menuLink'
 import { dishKinds, readPlaceMenuPages } from './menuPlaceRead'
@@ -57,14 +58,14 @@ function answer(draft: ReadNowDraft, phone: string, details: Record<string, unkn
 }
 
 /** A shul's or a mikvah's page, or the pages its website has for them. */
-export async function readPageNow(category: CategoryConfig, draft: ReadNowDraft, url: string | null, { apiKey, communityName }: { apiKey: string; communityName: string }): Promise<ReadNowAnswer> {
+export async function readPageNow(category: CategoryConfig, draft: ReadNowDraft, url: string | null, { apiKey, communityName, where }: { apiKey: string; communityName: string; where: CommunityPlace }): Promise<ReadNowAnswer> {
   const reads = pageReadsFor(category)
   if (!reads) return { state: 'none' }
   const website = websiteOf(category, draft)
   let urls = url ? [url] : []
   if (!url) {
     if (!website) return { state: 'none' }
-    const search = await searchHoursPages(website, {}, reads.kind)
+    const search = await searchHoursPages(website, where.timezone, {}, reads.kind)
     if (!search || 'error' in search) return { state: 'failed' }
     urls = search.found.slice(0, MAX_PAGES).map((p) => p.url)
     if (!urls.length) return { state: 'none' }
@@ -74,11 +75,11 @@ export async function readPageNow(category: CategoryConfig, draft: ReadNowDraft,
   let phone = draft.phone
   let opened = 0
   for (const u of urls) {
-    const source = await readListingPage(u, { pictures: reads.kind === 'times' }).catch(() => null)
+    const source = await readListingPage(u, { timezone: where.timezone, pictures: reads.kind === 'times' }).catch(() => null)
     if (!source) continue
     opened++
     const listing = blank(category, { ...draft, phone, details })
-    const reading = await readPageFor(listing, category, reads, source, { apiKey, communityName })
+    const reading = await readPageFor(listing, category, reads, source, { apiKey, communityName, where })
     const got = reading.proposal?.submission as { phone?: unknown; details?: Record<string, unknown> } | undefined
     if (got?.details) details = { ...details, ...got.details }
     if (typeof got?.phone === 'string') phone = got.phone
@@ -94,7 +95,7 @@ export async function readPageNow(category: CategoryConfig, draft: ReadNowDraft,
 }
 
 /** The latest email from that address, read for the shul's times. */
-export async function readEmailNow(community: string, category: CategoryConfig, draft: ReadNowDraft, address: string, { apiKey, communityName }: { apiKey: string; communityName: string }): Promise<EmailNowAnswer> {
+export async function readEmailNow(community: string, category: CategoryConfig, draft: ReadNowDraft, address: string, { apiKey, communityName, where }: { apiKey: string; communityName: string; where: CommunityPlace }): Promise<EmailNowAnswer> {
   const look = await latestEmailFrom(community, address)
   if (look.state !== 'found') return look
   const reads = pageReadsFor(category)
@@ -103,7 +104,7 @@ export async function readEmailNow(community: string, category: CategoryConfig, 
   const file = attachmentSource(email.attachment)
   if (!reads || reads.kind !== 'times' || (text.length < 10 && !file)) return { state: 'no-times', on, account }
   const source = text.length >= 10 ? { url: '', text } : { url: '', text: null, ...file }
-  const reading = await readPageFor(blank(category, draft), category, reads, source as never, { apiKey, communityName, now: email.date ? Date.parse(email.date) : undefined })
+  const reading = await readPageFor(blank(category, draft), category, reads, source as never, { apiKey, communityName, where, now: email.date ? Date.parse(email.date) : undefined })
   const got = reading.proposal?.submission as { details?: Record<string, unknown> } | undefined
   const filled = answer(draft, draft.phone, { ...draft.details, ...got?.details })
   return filled.state === 'done' ? { state: 'found', on, account, details: filled.details } : { state: 'no-times', on, account }
@@ -119,10 +120,10 @@ export async function readEruvEmailNow(community: string, address: string, timez
 }
 
 /** A place's own website, for its phone and email. */
-export async function readSiteNow(category: CategoryConfig, draft: ReadNowDraft): Promise<ReadNowAnswer> {
+export async function readSiteNow(category: CategoryConfig, draft: ReadNowDraft, timezone: string): Promise<ReadNowAnswer> {
   const website = websiteOf(category, draft)
   if (!website) return { state: 'none' }
-  const source = await readListingPage(website).catch(() => null)
+  const source = await readListingPage(website, { timezone }).catch(() => null)
   if (!source) return { state: 'failed' }
   if (!source.contacts) return { state: 'none' }
   const { changes } = readPageContacts(contactFields(category, {}), blank(category, draft), source.contacts)
