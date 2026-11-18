@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
+import { useLatestRef } from '@/lib/useLatestRef'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import type { SiteSettings } from '@/lib/siteSettings'
 import type { HomeSection, DraftHomeSection } from '@/lib/homeSections'
@@ -132,12 +133,16 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   const rightNowLoaded = useRightNowData(community.slug)
   const rightNowData = rightNowLoaded && sectionsDraft ? inHomeOrder(rightNowLoaded, sectionsDraft) : null
 
+  // The token is read, not depended on: a new one (hourly) would load the
+  // draft again over what's being typed.
+  const tokenRef = useLatestRef(token)
   const load = useCallback(async () => {
     setError(null)
+    const headers = { Authorization: `Bearer ${tokenRef.current}` }
     try {
       const [settingsRes, sectionsRes] = await Promise.all([
-        fetch(withCommunity('/api/admin/site-settings', community.slug), { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(withCommunity('/api/admin/home-sections', community.slug), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(withCommunity('/api/admin/site-settings', community.slug), { headers }),
+        fetch(withCommunity('/api/admin/home-sections', community.slug), { headers }),
       ])
       const settingsBody = await parseOkJson<{ settings: SiteSettings }>(settingsRes, 'Failed to load.')
       const sectionsBody = await parseOkJson<{ sections: HomeSection[] }>(sectionsRes, 'Failed to load.')
@@ -148,7 +153,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community.slug])
+  }, [tokenRef, community.slug])
 
   useLoadOnMount(load)
 

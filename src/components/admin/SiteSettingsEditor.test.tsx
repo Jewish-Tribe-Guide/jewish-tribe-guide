@@ -222,6 +222,22 @@ describe('SiteSettingsEditor — Home page', () => {
     expect(within(saveBar()!).getByText('2 changes')).toBeInTheDocument()
   })
 
+  // Supabase hands the page a new token about once an hour, and on coming
+  // back to an old tab. Loading again on it put the saved settings back over
+  // what was typed, with nothing to say so (Nov 18 review).
+  it('keeps what was typed when the sign-in token changes', async () => {
+    const user = userEvent.setup()
+    mockLoad(SITE_SETTINGS_DEFAULTS)
+    const community = makeCommunity({ slug: 'philly' })
+    const view = renderWithProviders(<SiteSettingsEditor token="tok" />, { community })
+    await screen.findByRole('complementary', { name: 'Preview' })
+    await user.type(screen.getByLabelText('Words in the search box'), '!')
+    vi.mocked(parseOkJson).mockClear()
+    view.rerenderWithProviders(<SiteSettingsEditor token="tok-2" />)
+    await act(async () => {})
+    expect(within(saveBar()!).getByText('1 change')).toBeInTheDocument()
+  })
+
   it('Undo puts every field back and takes the bar away', async () => {
     const user = userEvent.setup()
     await renderEditor({ ...SITE_SETTINGS_DEFAULTS, desktopHeroHeadline: 'Original' })

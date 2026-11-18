@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
+import { useLatestRef } from '@/lib/useLatestRef'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import type { SiteSettings } from '@/lib/siteSettings'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -29,16 +30,19 @@ export default function FeedbackEditor({ token, onBack }: { token: string; onBac
   const [justSaved, setJustSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Read, not depended on: a new token (hourly) would load the draft again
+  // over what's being typed.
+  const tokenRef = useLatestRef(token)
   const load = useCallback(async () => {
     try {
-      const res = await fetch(withCommunity('/api/admin/site-settings', community), { headers: { Authorization: `Bearer ${token}` } })
+      const res = await fetch(withCommunity('/api/admin/site-settings', community), { headers: { Authorization: `Bearer ${tokenRef.current}` } })
       const body = await parseOkJson<{ settings: SiteSettings }>(res, 'Failed to load.')
       setSaved(pick(body.settings))
       setDraft(pick(body.settings))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community])
+  }, [tokenRef, community])
   useLoadOnMount(load)
 
   const changes = saved && draft ? KEYS.filter((k) => saved[k] !== draft[k]).length : 0
