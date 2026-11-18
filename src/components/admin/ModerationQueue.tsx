@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { replaceAddress } from '@/lib/replaceAddress'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { Session } from '@supabase/supabase-js'
@@ -11,6 +12,7 @@ import { shownPlaces, todoPlaces, type TodoFilter } from '@/lib/todoPlaces'
 import { loadTodo, reloadTodo, updateTodo, useTodo } from '@/lib/useTodo'
 import { useTodoSplit } from './useTodoSplit'
 import { useAdminApi } from './useAdminApi'
+import { moveTo } from './useScreenHistory'
 import { STEP_PARAMS } from '@/lib/stepAddress'
 import { useFullPane } from './AdminUI'
 import TodoList, { TODO_START, type TodoView } from './TodoList'
@@ -28,9 +30,9 @@ const OPENED = 'moderation-open'
 
 // Which card is open: what the queue last opened itself, or, after Back and
 // Forward (or a shared link), what the address says. Not read from the
-// address after our own push: Next.js and the analytics script both wrap
-// history.pushState, and the address changes a moment after the call, so
-// reading it straight away still saw the list.
+// address after our own move: the router writes it only once its
+// navigation lands (useScreenHistory), so reading it straight away still
+// saw the list.
 let openedHere: string | null | undefined
 // The place that just left the list, said where it went (the user, Nov 4:
 // menus read again "disappeared. Where'd they go"). Until the next opens.
@@ -76,22 +78,32 @@ function viewFromAddress(): TodoView {
   return { ...TODO_START, filters: SHOWS.filter((f) => shows.includes(f)) }
 }
 
-/** `replace`: moving on by itself, so Back doesn't return to a place that's done. */
-function goTo(openId: string | null, replace = false) {
-  const url = new URL(window.location.href)
-  if (openId) url.searchParams.set('open', openId)
-  else url.searchParams.delete('open')
-  // What was open at the place before goes with it (stepAddress.ts).
-  for (const p of STEP_PARAMS) url.searchParams.delete(p)
+type Router = ReturnType<typeof useRouter>
+
+/** `replace`: moving on by itself, so Back doesn't return to a place that's
+ *  done. Through Next's router, never history.pushState: an entry written
+ *  behind its back carries its copy of the page before, and after a reload,
+ *  Back to it from another page changed the address and drew nothing
+ *  (AGENTS.md; e2e-admin-write/todo-history.spec.ts). What shows changes at
+ *  once; the address follows. */
+function goTo(router: Router, openId: string | null, replace = false) {
   openedHere = openId
-  window.history[replace ? 'replaceState' : 'pushState'](null, '', url)
   window.dispatchEvent(new Event(OPENED))
+  void moveTo(router, replace ? 'replace' : 'push', () => {
+    const url = new URL(window.location.href)
+    if (openId) url.searchParams.set('open', openId)
+    else url.searchParams.delete('open')
+    // What was open at the place before goes with it (stepAddress.ts).
+    for (const p of STEP_PARAMS) url.searchParams.delete(p)
+    return url.pathname + url.search
+  })
 }
 
 export default function ModerationQueue({ session }: { session: Session }) {
   const community = useCommunitySlug()
   const token = session.access_token
   const api = useAdminApi(token)
+  const router = useRouter()
   // Loaded afresh each time To do opens; the nav's count reads the same copy.
   const { data, error: loadError } = useTodo(token, community, session.user.email, true)
   const [error, setError] = useState<string | null>(null)
@@ -179,7 +191,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
     setOpenError(null)
     doneHere = null
     if (!openPlace) spot.current = { key, y: window.scrollY, top: rowOf(key)?.getBoundingClientRect().top ?? 0 }
-    goTo(key)
+    goTo(router, key)
     if (!wide()) window.scrollTo?.(0, 0)
   }
 
@@ -220,7 +232,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
   function backToList() {
     if (!leave()) return
     remember()
-    goTo(null)
+    goTo(router, null)
   }
 
   // Esc closes the open place, as its X does (the user, Nov 2), on a
@@ -240,7 +252,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
 
   useEffect(() => {
     if (openPlace) {
-      if (openPlace.key !== openId) goTo(openPlace.key, true)
+      if (openPlace.key !== openId) goTo(router, openPlace.key, true)
       wasOpen.current = { key: openPlace.key, name: openPlace.name }
       listWhenOpen.current = list.map((p) => p.key)
       return
@@ -253,7 +265,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
     editing.current.clear()
     const keys = listWhenOpen.current
     const next = keys.slice(keys.indexOf(openId) + 1).find((k) => places.some((p) => p.key === k))
-    goTo(next && window.matchMedia?.('(min-width: 768px)').matches ? next : null, true)
+    goTo(router, next && window.matchMedia?.('(min-width: 768px)').matches ? next : null, true)
   })
 
   // Up and down step through the places, on a computer.

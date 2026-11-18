@@ -941,10 +941,6 @@ it says otherwise:
 
 Still open:
 
-- **To do's own open/close is a raw `history.pushState`** (`goTo` in
-  ModerationQueue). Checked in the browser, Back from another page after
-  a reload lands on the open place, so it works today; it's still the
-  pattern AGENTS.md warns against.
 - Public site: `FindResourcesConnected` and `ResourceMapView` still call
   `replaceState` carrying Next's mark (allowlisted in
   `replaceStateMark.test.ts`); not seen to break.
@@ -965,11 +961,19 @@ Still open:
     across the hourly new token, so no screen reloads a draft over what's
     typed (the Home page and Feedback fix, now for every screen).
   - One route wrapper (`src/lib/adminRoute.ts`: `adminRead`,
-    `adminWrite`, `siteAdminWrite`): sign-in, the community, and the
-    public site's cache thrown away after a write, now even when the save
-    failed partway. On categories, home sections, forms, campaign
-    banners and site settings. Still by hand, to move over a few at a
-    time: pages, communities, and the other admin routes.
+    `adminWrite`, `siteAdminRead`, `siteAdminWrite`): sign-in, the
+    community, and the public site's cache thrown away after a write, now
+    even when the save failed partway. Every admin route is on it
+    (`adminRoutesWrapped.test.ts` fails on one that isn't) but dev-login,
+    request-link and whoami, which sign in themselves. So a 502 from an
+    approval, a listing save, a kosher restore, Google or Look again now
+    refreshes the site, where it didn't. Pages and a new community keep
+    their own invalidation (`siteAdminRead`), and a save that changes
+    nothing public is marked `unchanged()`.
+  - To do's open and close go through Next's router (`moveTo`), not a raw
+    `history.pushState`. It worked before too (Next's patched pushState
+    copied the same page's state), so `todo-history.spec.ts` passed
+    against the old code as well; it guards the move.
   - One change screen: Read now's finding on a saved place opens To do's
     (TodoChange), with its answers; ChangeReview is gone.
   - One kosher-list runner (`src/lib/kosherListRun.ts`) for Keystone-K
