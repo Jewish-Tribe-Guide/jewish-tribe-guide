@@ -1,7 +1,6 @@
 import type { NextRequest } from 'next/server'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
+import { adminRead } from '@/lib/adminRoute'
 import { countCategoryFieldUsage } from '@/lib/resourceStore'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 type Body = {
   address?: boolean
@@ -14,11 +13,7 @@ type Body = {
 // calls this before removing a field (or turning off address/phone) on an
 // existing category, so it can warn the admin how much data would be
 // orphaned before they save. Read-only; admin only.
-export async function POST(request: NextRequest, ctx: RouteContext<'/api/admin/categories/[id]/field-usage'>) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const POST = adminRead(async (request: NextRequest, { community }, ctx: RouteContext<'/api/admin/categories/[id]/field-usage'>) => {
   const { id } = await ctx.params
 
   let body: Body
@@ -35,4 +30,4 @@ export async function POST(request: NextRequest, ctx: RouteContext<'/api/admin/c
     console.error('[admin/categories/:id/field-usage] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not check existing listings.'] }, { status: 502 })
   }
-}
+})

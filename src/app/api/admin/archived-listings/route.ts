@@ -1,17 +1,12 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
+import { adminRead } from '@/lib/adminRoute'
 import { listArchivedResources } from '@/lib/resourceStore'
 import { listCategoriesUncached } from '@/lib/categoryStore'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // GET /api/admin/archived-listings — every soft-deleted listing (an approved
 // removal report leaves the row as status='archived' rather than dropping
 // it — see submissionStore.ts), enriched with its category's label so the
 // admin cleanup view doesn't have to show bare category ids. Admin only.
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (_request: Request, { community }) => {
   try {
     const [listings, categories] = await Promise.all([
       listArchivedResources(community.slug),
@@ -24,4 +19,4 @@ export async function GET(request: Request) {
     console.error('[admin/archived-listings] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load archived listings.'] }, { status: 502 })
   }
-}
+})

@@ -1,5 +1,4 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead } from '@/lib/adminRoute'
 import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { resolveCapabilities } from '@/lib/categories'
@@ -22,11 +21,7 @@ import { listSearchMissCounts, listSearchMissDismissals, setSearchMissDismissed 
  *  every listing; this keeps a long tail from slowing the tab down. */
 const MAX_CLASSIFIED = 300
 
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (_request: Request, { community }) => {
   try {
     const [counts, { dismissed, available }, categories, listings] = await Promise.all([
       listSearchMissCounts(community.slug),
@@ -45,13 +40,9 @@ export async function GET(request: Request) {
     console.error('[admin/missed-searches] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load missed searches.'] }, { status: 502 })
   }
-}
+})
 
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const POST = adminRead(async (request: Request, { community }) => {
   let body: { term?: unknown; dismissed?: unknown }
   try {
     body = await request.json()
@@ -74,4 +65,4 @@ export async function POST(request: Request) {
       { status: 502 },
     )
   }
-}
+})

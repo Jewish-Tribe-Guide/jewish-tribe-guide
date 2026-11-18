@@ -1,8 +1,7 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
+import { adminRead } from '@/lib/adminRoute'
 import { listFormResponses, listNewAdminResponses } from '@/lib/formResponseStore'
 import { listFormsForAdmin } from '@/lib/formStore'
 import { responseSummary } from '@/lib/todo'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // GET /api/admin/responses?formId=X — a custom form's responses, or
 // GET /api/admin/responses?feedback=1 — Feedback submissions. Backs the
@@ -12,11 +11,7 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 // domain, not admin's (see /api/inbox's explicit requestTypes allowlist).
 // GET /api/admin/responses?new=1 — those not yet handled, as To do lists
 // them: the form's title, their first words, and when.
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (request: Request, { community }) => {
   const { searchParams } = new URL(request.url)
   const formId = searchParams.get('formId')
   const feedback = searchParams.get('feedback')
@@ -46,4 +41,4 @@ export async function GET(request: Request) {
     console.error('[admin/responses] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load responses.'] }, { status: 502 })
   }
-}
+})

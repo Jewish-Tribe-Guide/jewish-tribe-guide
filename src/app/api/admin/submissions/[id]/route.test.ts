@@ -193,11 +193,13 @@ describe('PATCH /api/admin/submissions/:id — the decision', () => {
     expect(m.approveSubmission).not.toHaveBeenCalled()
   })
 
-  it('502s, with no emails and no cache refresh, when the store fails', async () => {
+  // The cache is dropped all the same: an approval that failed partway may
+  // have written part of the change (adminRoute.ts, a 5xx is invalidated).
+  it('502s, with no emails, when the store fails, and still drops the cache', async () => {
     m.approveSubmission.mockRejectedValue(new Error('db down'))
     expect((await patch({ status: 'approved' })).status).toBe(502)
     expect(m.afterCallbacks).toHaveLength(0)
-    expect(m.revalidatePublicContent).not.toHaveBeenCalled()
+    expect(m.revalidatePublicContent).toHaveBeenCalledTimes(1)
   })
 
   it('emails the submitter (with the trimmed reason) and notifies the other admins, after the response', async () => {

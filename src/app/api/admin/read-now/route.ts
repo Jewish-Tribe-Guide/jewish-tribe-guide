@@ -1,6 +1,5 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
+import { adminRead } from '@/lib/adminRoute'
 import { getCategoryById } from '@/lib/categoryStore'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { readEruvPage } from '@/lib/eruvReader'
 import { isMekorList } from '@/lib/mekorWatch'
 import { kosherLookup, readEmailNow, readEruvEmailNow, readMenuNow, readPageNow, readRefuahNow, readSiteNow, type ReadNowDraft } from '@/lib/readNow'
@@ -32,10 +31,7 @@ function readDraft(raw: unknown): ReadNowDraft | null {
   }
 }
 
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
+export const POST = adminRead(async (request: Request, { community }) => {
   const body = (await request.json().catch(() => null)) as { category?: unknown; slot?: unknown; url?: unknown; draft?: unknown } | null
   if (body?.slot === 'eruv') {
     // An eruv's status page: it has no category or listing to fill in.
@@ -84,4 +80,4 @@ export async function POST(request: Request) {
     console.error('[admin/read-now] failed:', err)
     return Response.json({ ok: true, state: 'failed' })
   }
-}
+})

@@ -532,6 +532,38 @@ describe('/api/admin/main-dishes', () => {
       expect(waiting).toMatchObject({ reading: { status: 'proposed' } })
     })
 
+    // The public site's cache is dropped when the listing changes, and only
+    // then (adminRoute.ts): a read that dates its dishes, but not one waiting
+    // for an admin, nor a page stopped, a reading skipped or no menu.
+    it('drops the public site’s cache only when the listing changes', async () => {
+      m.findMenu.mockResolvedValue({ url: 'https://judah.example/menu', text: 'menu', pdf: null })
+      await POST(req('POST', { action: 'read', resourceId: ID }))
+      expect(m.setMenuDishes).toHaveBeenCalled()
+      expect(m.revalidatePublicContent).toHaveBeenCalledTimes(1)
+
+      for (const action of ['skip', 'no_menu', 'cant_read', 'undo_no_menu']) {
+        m.revalidatePublicContent.mockClear()
+        expect((await POST(req('POST', { action, resourceId: ID }))).status).toBe(200)
+        expect(m.revalidatePublicContent, action).not.toHaveBeenCalled()
+      }
+
+      // One with something new waits for an admin.
+      m.revalidatePublicContent.mockClear()
+      m.readMenu.mockResolvedValue({ ...read, dishes: [...read.dishes, { name: 'Shawarma', quote: 'Shawarma', checked: true }] })
+      await POST(req('POST', { action: 'read', resourceId: ID }))
+      expect(m.revalidatePublicContent).not.toHaveBeenCalled()
+    })
+
+    it('in the background, a read that dates its dishes drops the cache again after the reply', async () => {
+      m.readMenuPage.mockResolvedValue({ url: 'https://judah.example/menu', text: 'menu', pdf: null })
+      await POST(req('POST', { action: 'link', resourceId: ID, url: 'https://judah.example/menu', background: true }))
+      // The link itself is on the listing.
+      expect(m.revalidatePublicContent).toHaveBeenCalledTimes(1)
+      await Promise.all(m.afterCallbacks.map((f) => f()))
+      expect(m.setMenuDishes).toHaveBeenCalled()
+      expect(m.revalidatePublicContent).toHaveBeenCalledTimes(2)
+    })
+
     it('lists which of them are "not always", and which a reader found on its menu before', async () => {
       m.listApprovedResources.mockResolvedValue([{ ...listingOf, itemMenu: { dishes: { Falafel: '2026-10-01T12:00:00Z' } } }])
       const place = (await (await GET(req('GET'))).json()).places[0]

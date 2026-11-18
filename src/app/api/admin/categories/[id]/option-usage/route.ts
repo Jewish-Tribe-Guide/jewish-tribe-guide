@@ -1,7 +1,6 @@
 import type { NextRequest } from 'next/server'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
+import { adminRead } from '@/lib/adminRoute'
 import { countFieldOptionUsage } from '@/lib/resourceStore'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 type Body = {
   renames: { fieldKey: string; oldValue: string; newValue: string }[]
@@ -13,11 +12,7 @@ type Body = {
 // looks like an option rename (one value removed, one added, same field), so
 // it can offer to cascade the rename into existing listings' data instead of
 // silently orphaning them. Read-only; admin only.
-export async function POST(request: NextRequest, ctx: RouteContext<'/api/admin/categories/[id]/option-usage'>) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const POST = adminRead(async (request: NextRequest, { community }, ctx: RouteContext<'/api/admin/categories/[id]/option-usage'>) => {
   const { id } = await ctx.params
 
   let body: Body
@@ -37,4 +32,4 @@ export async function POST(request: NextRequest, ctx: RouteContext<'/api/admin/c
     console.error('[admin/categories/:id/option-usage] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not check existing listings.'] }, { status: 502 })
   }
-}
+})

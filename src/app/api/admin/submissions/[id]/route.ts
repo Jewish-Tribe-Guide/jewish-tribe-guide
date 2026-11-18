@@ -1,13 +1,11 @@
-import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { readEruvNowById } from '@/lib/eruvReadNow'
 import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { after, type NextRequest } from 'next/server'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
+import { adminWrite, unchanged } from '@/lib/adminRoute'
 import { approveSubmission, decidePart, rejectSubmission, ReviewEditError } from '@/lib/submissionStore'
 import { sendDecisionEmail } from '@/lib/confirmationEmail'
 import { sendReviewActionNotification, sendStatusChangeDigest } from '@/lib/email'
 import { loadSyncableListing, syncOneListing } from '@/lib/syncListing'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { getResourceRowById } from '@/lib/resourceStore'
 import { getCategoryById } from '@/lib/categoryStore'
 import { listSubscribersForCategory } from '@/lib/subscriberStore'
@@ -26,13 +24,9 @@ import { routes } from '@/lib/routes'
 // left waiting, with `payload` when the admin fixed it in Edit; its last
 // part decides the edit as before.
 // A best-effort decision email is sent to the submitter if they provided one.
-export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/submissions/[id]'>) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) {
-    return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-  }
-
+// The wrapper drops the public site's cached copy after a decision, so the
+// edit shows up; a part rejected on its own changes nothing yet (unchanged).
+export const PATCH = adminWrite(async (request: NextRequest, { community, admin }, ctx: RouteContext<'/api/admin/submissions/[id]'>) => {
   const { id } = await ctx.params
 
   let body: { status?: string; reason?: string; payload?: unknown; only?: unknown; part?: unknown }
@@ -68,8 +62,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
       const decided = await decidePart(id, community.slug, body.part, decision, admin.email, body.payload)
       if (!decided.whole) {
         // Nobody is told yet: the change isn't decided until its last part is.
-        if (decision === 'approved') await revalidatePublicContent()
-        return Response.json({ ok: true, submission: decided.submission, partial: true })
+        const partial = Response.json({ ok: true, submission: decided.submission, partial: true })
+        return decision === 'approved' ? partial : unchanged(partial)
       }
     } catch (err) {
       if (err instanceof ReviewEditError) return Response.json({ ok: false, errors: [err.message] }, { status: 400 })
@@ -166,7 +160,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   // straight back in the queue. loadSyncableListing filters on `approved` as
   // well, so this holds even if another caller forgets.
   //
-  // Awaited rather than fired off, so the revalidate below publishes the
+  // Awaited rather than fired off, so the wrapper's revalidate publishes the
   // synced values too — but never allowed to fail the approval, which has
   // already happened by this point and must not be reported as failed because
   // Google was unreachable. It's just late instead: tonight's run picks it up.
@@ -190,10 +184,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     }
   }
 
-  // The public site caches this content; drop it so the edit shows up.
-  await revalidatePublicContent()
   // A new or moved listing's walks along the streets, now rather than
   // tonight (walkRouteJob.ts); after the response, so the admin isn't kept.
   if (decision === 'approved' && submission.target_type !== 'eruv') after(() => runWalkRoutesAfterChange(community.slug))
   return Response.json({ ok: true, submission })
-}
+})

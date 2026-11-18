@@ -55,6 +55,17 @@ describe('/api/admin/listings/:id/found', () => {
     expect(m.revalidate).toHaveBeenCalledOnce()
   })
 
+  // Only what reaches the listing drops the public site's cache: the email
+  // and website reads file findings for To do.
+  it('the email and website reads, and a Google read with nothing to read, leave the cache alone', async () => {
+    m.site.mockResolvedValue(true)
+    expect((await post('site')).status).toBe(200)
+    expect((await post('email')).status).toBe(200)
+    m.load.mockResolvedValueOnce(null)
+    expect((await post('google')).status).toBe(200)
+    expect(m.revalidate).not.toHaveBeenCalled()
+  })
+
   it('anything else is refused', async () => {
     expect((await post('nope')).status).toBe(400)
   })
