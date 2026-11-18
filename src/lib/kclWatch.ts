@@ -9,9 +9,15 @@
 //
 // The list has no addresses, no towns and no kinds, so it can only confirm:
 // a listing the guide says is KCL, whose name is on the list, has its
-// hechsher checked. Nothing is filed and nothing is added from it. A name
-// on the list is never taken for a place that doesn't already say KCL
-// ("Authentic Kosher Chinese" is on it; ours isn't KCL). Pure.
+// hechsher checked. Nothing is added from it. A name on the list is never
+// taken for a place that doesn't already say KCL ("Authentic Kosher
+// Chinese" is on it; ours isn't KCL).
+//
+// A listing that says KCL and that no name on the list could be gets a
+// card in To do, to take KCL off or keep it (the user, Nov 18), as Mekor's
+// watch does for IKC. Before, it was simply never dated, and nothing said
+// why. One that two names could be is left alone: it may well be there.
+// Pure.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { selectValues } from './categories'
@@ -80,8 +86,16 @@ type KclListing = { id: string; name: string; status: string; details: Record<st
 /** Each live listing that says KCL, by id, to the name it has on the list:
  *  the same name, or one starting the other. Only a single match counts. */
 export function kclMatches(entries: KclEntry[], listings: KclListing[]): Map<string, string> {
-  const names = entries.map((e) => ({ name: e.name, key: compact(e.name) })).filter((e) => e.key)
   const out = new Map<string, string>()
+  for (const [l, found] of candidates(entries, listings)) if (found.length === 1) out.set(l.id, found[0])
+  return out
+}
+
+/** Each live listing that says KCL, with the names on the list it could
+ *  be: the same name, or else one starting the other. */
+function candidates<L extends KclListing>(entries: KclEntry[], listings: readonly L[]): [L, string[]][] {
+  const names = entries.map((e) => ({ name: e.name, key: compact(e.name) })).filter((e) => e.key)
+  const out: [L, string[]][] = []
   for (const l of listings) {
     if (l.status !== 'approved' || !selectValues(l.details.kosherCert).includes(KCL_CERT)) continue
     const key = compact(l.name)
@@ -90,7 +104,60 @@ export function kclMatches(entries: KclEntry[], listings: KclListing[]): Map<str
     const found = same.length
       ? same
       : names.filter((e) => Math.min(e.key.length, key.length) >= MIN_PREFIX && (e.key.startsWith(key) || key.startsWith(e.key)))
-    if (found.length === 1) out.set(l.id, found[0].name)
+    out.push([l, found.map((e) => e.name)])
   }
   return out
+}
+
+// ── Listings the list doesn't have ───────────────────────────────────────────
+
+/** submitted_by.name on every card the watch files. */
+export const KCL_WATCH_NAME = 'KCL list (automated)'
+
+/** A listing that says KCL and that no name on the list could be, with
+ *  what approving its card leaves: the listing without KCL. */
+export type KclMissing<L extends KclListing = KclListing> = { listing: L; details: Record<string, unknown> }
+
+export function kclMissing<L extends KclListing>(entries: KclEntry[], listings: readonly L[]): KclMissing<L>[] {
+  const keys = entries.map((e) => compact(e.name)).filter(Boolean)
+  // Not even a name too short to match on ("Bagel", with "Bagel King" on
+  // the list): that may be the place, so it isn't said to be missing.
+  const anyStart = (l: L) => {
+    const key = compact(l.name)
+    return keys.some((k) => k.startsWith(key) || key.startsWith(k))
+  }
+  return candidates(entries, listings)
+    .filter(([l, found]) => found.length === 0 && !anyStart(l))
+    .map(([listing]) => ({ listing, details: { ...listing.details, kosherCert: selectValues(listing.details.kosherCert).filter((c) => c !== KCL_CERT) } }))
+}
+
+/** The card's note: what the list lacks, and what each button does. */
+export function kclMissingNote(f: KclMissing, updated: string | null): string {
+  const left = selectValues(f.details.kosherCert)
+  return [
+    `The guide says KCL, and KCL's list of the places it certifies doesn't have this place by this name: ${KCL_HOME_URL}`,
+    'The list is names only, so a place it lists under another name looks missing here: check the place’s own certificate before approving.',
+    left.length
+      ? `Approving takes KCL off; ${left.join(', ')} stays. Rejecting keeps KCL.`
+      : 'Approving takes KCL off, which leaves it with no hechsher named: edit in the right one first. Rejecting keeps KCL.',
+    updated && `KCL's list is the ${updated} edition.`,
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/** What a card proposes, so it isn't filed twice: once rejected, it stays
+ *  rejected until the listing's hechshers change. */
+export function kclMissingKey(f: KclMissing): string {
+  return `cert:${f.listing.id}:${proposal(f.details)}`
+}
+
+/** The same key, read back from a card the watch filed earlier. */
+export function kclSubmissionKey(s: { operation: string; target_id: string | null; payload: Record<string, unknown> }): string | null {
+  if (s.operation !== 'update' || !s.target_id) return null
+  return `cert:${s.target_id}:${proposal((s.payload.details ?? {}) as Record<string, unknown>)}`
+}
+
+function proposal(d: Record<string, unknown>): string {
+  return JSON.stringify([...selectValues(d.kosherCert)].sort())
 }

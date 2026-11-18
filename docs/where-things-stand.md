@@ -925,6 +925,13 @@ it says otherwise:
   - About and Privacy and Communities live only in the superadmin
     console (`/admin/pages`, `/admin`); the community's menu links there
     and its two copies are gone.
+- A listing that says KCL and that no name on KCL's list could be now
+  gets a card in To do, to take KCL off or keep it (the user chose it
+  over a line on the Kosher certification page, Nov 18). Before, it was
+  never dated and nothing said why. One that a name on the list might be
+  (two names, or a name too short to match on) is left alone. The card
+  isn't filed again once decided, until the listing's hechshers change,
+  and the Kosher certification page shows it as a difference too.
 - The three screen nits, fixed Nov 18: Places says the street of a place
   another place has the name of (68d03fd5); Reports and History say
   Approved and Rejected, as To do's buttons do, not Taken and Left
@@ -934,10 +941,6 @@ it says otherwise:
 
 Still open:
 
-- **KCL says "agrees" for a listing that names KCL but isn't on KCL's
-  list.** A design call: proposed, file a suggestion ("KCL’s list doesn’t
-  have it by this name") for such a listing, or show it on the Kosher
-  page instead. Not built.
 - **To do's own open/close is a raw `history.pushState`** (`goTo` in
   ModerationQueue). Checked in the browser, Back from another page after
   a reload lands on the open place, so it works today; it's still the

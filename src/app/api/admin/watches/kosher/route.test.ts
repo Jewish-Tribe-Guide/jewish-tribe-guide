@@ -235,7 +235,7 @@ describe('GET /api/admin/watches/kosher', () => {
 
   it('reads only this community’s listings and suggestions', async () => {
     await GET(req())
-    expect(m.filters.filter(([, col]) => col === 'community_id').map(([, , v]) => v)).toEqual(['philly', 'philly', 'philly'])
+    expect(m.filters.filter(([, col]) => col === 'community_id').map(([, , v]) => v)).toEqual(['philly', 'philly', 'philly', 'philly'])
   })
 })
 
