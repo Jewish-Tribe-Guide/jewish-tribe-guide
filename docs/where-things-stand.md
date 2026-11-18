@@ -877,29 +877,85 @@ test that failed against the old code:
   **Live queue still holds both** (the user's to reject one; 7 Mekor new
   places waiting, 14–30 days old).
 
-Found, not fixed (the user's to pick from):
+Then, the rest of the list (the user, Nov 18: "keep going through the
+whole list"), each with a test that failed against the old code unless
+it says otherwise:
 
-- Watches: the nightly email never says a run was cut off (live: read-menus
-  Oct 27 and watches Nov 6 never finished); the watches job always reports
-  ok; out of AI reads every night since Oct 27, partly from re-reading pages
-  that already have a change waiting; KCL says "agrees" for a listing not on
-  its list; Google is asked nightly about places it already said are
-  closed; Keystone doesn't check Mekor's waiting new places (and the other
-  way round); reading a shul's dated week still compares it with the usual
-  times, against the rule (`shulWeekReading.ts` decides same/changed/new
-  from `regularMinyanim`; `listingPageRun.ts`'s `dropListed` drops a dated
-  row that matches a usual time). For the synagogue logic review.
-- Admin: unsaved Home page and Feedback drafts are wiped when the sign-in
-  token refreshes; Add a place hides a follow-up save that failed; the
-  sign-in link's address comes from the request's Origin header; renaming a
-  category's id leaves old references behind; the subscriber routes are
-  dead.
-- Screens: same-name places in Places can't be told apart; Reports' "Left"
-  label; a shul's weekday times can show out of order.
+- Sign-in links (admin and inbox) go back to the guide, never to an
+  Origin header a request claims (d27471f5).
+- Home page and Feedback keep what was typed when the sign-in token
+  refreshes (431a5f89).
+- Add a place names a save that failed after the listing was made ("Not
+  saved: …"), and stays until Done (f4c61656).
+- A sign-in check that couldn't be made (no signal, a 5xx) says "Couldn't
+  check your access" with Try again, instead of "not an admin" and a
+  sign-out (7acbbd51).
+- Watches run and nightly email (0e9036b9): a failed step of the watches
+  run is named in its warning; a run cut off past its time limit is
+  emailed (live: read-menus Oct 27, watches Nov 6 were never told of); a
+  job that didn't run at all is emailed the first night it's late.
+- A page with part of a change waiting isn't AI-read again every night
+  (87411c2c), which was using up the night's reads.
+- Keystone-K and Mekor: a place Google said is closed isn't asked about
+  again for 30 days (c9717ddc); Keystone skips a new place already waiting
+  in the queue, by name or Google place (63896a05).
+- Google sync takes the longest-unasked listings first past its 500 cap,
+  and every Google request gives up after 10s (937e0802).
+- read-menus and look-again: a late answer always lands after its "took
+  too long" save (it raced it before); walk-routes' request times out
+  (f864d927). A late look-again try counted as failed has no test.
+- Back, Forward and reload (each checked in a real browser):
+  - `replaceState` calls in To do, Places and the sign-in gate drop Next's
+    mark (`replaceAddress`, 42da8b3e); a unit test fails on any new one.
+  - Home page's full-size preview (`?preview=open`), a form's question
+    (`?question=N`) and its preview (b220a7b4).
+  - Add a place's form after Find (`?step=finish`) and a source over it
+    (`?over=…`); a reload on the form is Find again, the address fixed in
+    place (58bed9f1).
+  - New community on the superadmin console (`?step=new`, 736d1797).
+- Gone: `People.tsx`, ChangeReview's unused `inPlace` (b0b75bd0), and the
+  unused `/api/admin/subscribers` routes (no test: nothing called them).
+
+Still open:
+
+- **KCL says "agrees" for a listing that names KCL but isn't on KCL's
+  list.** A design call: proposed, file a suggestion ("KCL’s list doesn’t
+  have it by this name") for such a listing, or show it on the Kosher
+  page instead. Not built.
+- **Renaming a category's id moves its listings only.** Still pointing at
+  the old id after: a campaign banner (`campaign_banner.category_id`), home
+  sections, Right now's categories (`rightNowCategories`), a phone tab or
+  computer nav link to it, subscribers' `categories`, and pending
+  suggestions' `payload.category`. Fix: cascade them in
+  `renameCategoryId`, or refuse the rename while any exists.
+- **Duplicate screens, which home to keep:** About and Privacy is at both
+  `/admin/pages` and `/{c}/admin/pages`, and Communities at `/admin` and
+  `/{c}/admin/communities` (superadmins only see the second of each).
+- **A form's icon is still an emoji picker** (`IconField`), against the
+  no-emoji rule; what a form's tile shows instead is a design call.
+- **To do's own open/close is a raw `history.pushState`** (`goTo` in
+  ModerationQueue). Checked in the browser, Back from another page after
+  a reload lands on the open place, so it works today; it's still the
+  pattern AGENTS.md warns against.
+- Public site: `FindResourcesConnected` and `ResourceMapView` still call
+  `replaceState` carrying Next's mark (allowlisted in
+  `replaceStateMark.test.ts`); not seen to break.
+- Watches: a dated shul week is still compared with the usual times
+  (`shulWeekReading.ts`, `dropListed`), against the rule (for the
+  synagogue logic review); the watches run's time budget is thin (no new
+  watch after 250s of 300, the syncs' time included); the hours/menu/
+  Refuah syncs ignore "job off" and fetch a site's pages all at once; some
+  watch code reads Philly's timezone and map centre for every community;
+  walk-routes retries a failed chunk first every night; cron auth's
+  compare isn't constant-time.
+- **The Brodsky Center is in the live queue twice** (filed Nov 4): the
+  user's to reject one.
+- Screens: same-name places in Places can't be told apart; Reports'
+  "Left" label; a shul's weekday times can show out of order.
 - Refactors worth doing: one `useAdminApi` hook for the token/fetch/error
-  pattern repeated across tabs, one admin route wrapper for auth + community,
-  one change-review component, the screens still without an address, a
-  `replaceState` that keeps `__NA`.
+  pattern, one admin route wrapper for auth + community + invalidation,
+  one change-review component (ChangeReview and TodoChange), and one
+  kosher-list runner for Keystone and Mekor.
 
 ## Open from the boxes and fields work (Nov 10)
 
