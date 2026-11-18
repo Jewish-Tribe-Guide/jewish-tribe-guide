@@ -13,6 +13,7 @@ import { dayInTimezone } from '@/lib/activity'
 import { listMinyanim, minyanimOn, type ShulMinyanim } from '@/lib/upcomingDavening'
 import type { AnswerSchedule } from '@/lib/askAnswer'
 import { useZmanim } from '@/lib/useZmanim'
+import { secularHoliday } from '@/lib/secularHolidays'
 import { useZmanAnchors, geoOrCommunityDefault } from '@/lib/useZmanAnchors'
 import type { AnchorTimes } from '@/lib/useZmanAnchors'
 import type { LatLng } from '@/lib/geo'
@@ -103,6 +104,7 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   // Today's Yom Tov answer is the converter's own (isYomTov); the days
   // ahead only fill in what it doesn't say.
   if (dates[0] && typeof zmanimData?.isYomTov === 'boolean') dates[0] = { ...dates[0], yomTov: zmanimData.isYomTov }
+  if (dates[0] && zmanimData?.isRoshChodesh) dates[0] = { ...dates[0], roshChodesh: true }
 
   const posting: Record<string, Record<string, DayPosting>> = {}
   const shuls: ShulMinyanim[] = (listings ?? [])
@@ -140,9 +142,19 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
 }
 
 /** The day keys a date's minyanim match: its weekday, its own date (a
- *  special schedule's), and Yom Tov when the calendar says so. */
+ *  special schedule's), Yom Tov when the calendar says so, a public
+ *  holiday (worked out here, so always known), and Rosh Chodesh when the
+ *  calendar has said it is (today's only: the days ahead don't carry it,
+ *  and "Next:" mustn't name a minyan that may not be running). */
 export function dayKeysFor(d: DateFacts): MinyanDayKey[] {
-  return [d.weekday, dateKey(d.date), ...(d.yomTov ? (['yom_tov'] as const) : [])]
+  const [y, m, day] = d.date.split('-').map(Number)
+  return [
+    d.weekday,
+    dateKey(d.date),
+    ...(d.yomTov ? (['yom_tov'] as const) : []),
+    ...(secularHoliday(new Date(y, m - 1, day)) ? (['holiday'] as const) : []),
+    ...(d.roshChodesh ? (['rosh_chodesh'] as const) : []),
+  ]
 }
 
 /** The schedule as a search answer needs it (see askAnswer's

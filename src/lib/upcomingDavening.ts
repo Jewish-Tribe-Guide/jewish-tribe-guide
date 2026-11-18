@@ -79,11 +79,11 @@ type Candidate = {
  *
  * `today`/`tomorrow` are the full set of day keys that apply — a plain
  * weekday plus whichever pseudo-days the caller has already resolved to be
- * true (Rosh Chodesh, Yom Tov, a secular holiday; see calendarDaysFor). A
+ * true (Rosh Chodesh, Yom Tov, a secular holiday; see dayKeysFor). A
  * minyan whose `days` don't intersect either set at all is never a
  * candidate. Resolving those pseudo-days is deliberately the caller's job,
  * not this function's — it stays pure and testable with plain arrays,
- * the same reasoning `calendarDaysFor` itself documents for keeping the
+ * the same reasoning as keeping the
  * Jewish-calendar lookup out of the low-level day math.
  *
  * A row this function can't put a number on is never a candidate: an
@@ -101,7 +101,7 @@ export function nextUpcomingDavening(
   shuls: ShulMinyanim[],
   opts: {
     /** Every day key that applies to today — the plain weekday plus any
-     *  pseudo-days already resolved true (see calendarDaysFor). */
+     *  pseudo-days already resolved true (see dayKeysFor). */
     today: MinyanDayKey[]
     tomorrow: MinyanDayKey[]
     nowMinutes: number

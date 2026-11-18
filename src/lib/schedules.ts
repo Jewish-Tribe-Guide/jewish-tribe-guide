@@ -117,6 +117,9 @@ export type DateFacts = {
   festival: string | null
   /** "Hoshana Rabbah", "Shemini Atzeres", "Chol HaMoed". */
   name: string | null
+  /** Set on today only, from the zmanim's isRoshChodesh: the calendar's
+   *  days ahead don't carry it. */
+  roshChodesh?: boolean
 }
 
 /** A date's facts from the calendar's days ahead (see jewishDays.ts).

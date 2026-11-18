@@ -975,6 +975,36 @@ Still open:
   one change-review component (ChangeReview and TodoChange), and one
   kosher-list runner for Keystone and Mekor.
 
+## The public site review (Nov 18, on `claude/public-review-46a065`)
+
+The same exercise as the admin review, for everything a visitor sees. Six
+areas reviewed (getting around, a listing, the map, contributing, public
+API and caching, speed and phones); 47 findings, the user said yes to all
+of them in seven batches on Nov 18, with item 3 (Back closes a phone's
+listing sheet) and item 4 (Forward to a search shows the search again).
+Each fix has a test that failed against the old code. The full list is in
+the session's notes; what's done is below.
+
+Left out on purpose:
+
+- Forms are hidden (Oct 31), so the intake wizard's findings wait until
+  they come back: answers to questions a branch hid are still sent, a form
+  ending on a single-choice question has no Submit, a failed Turnstile
+  says "refresh" and loses the answers, the steps are raw `pushState`, the
+  "✅" and section emoji, and Support/Volunteer as the generic wizard.
+- The parked Today home stays parked (the user, Nov 18).
+- Asking for location: being drawn (stop asking on the first load; ask
+  when the visitor reaches for something that needs it). Not built.
+
+Done:
+
+- "Next:" and the minyan lists count public holidays and Rosh Chodesh
+  (`dayKeysFor`). On Thanksgiving a shul said "Next: Shacharis 7 AM
+  tomorrow" right above "8:30 AM also on public holidays". Rosh Chodesh
+  is known for today only (the calendar's days ahead don't carry it), so
+  tomorrow's Rosh Chodesh minyan still isn't offered as Next. The unused
+  `calendarDaysFor` is gone.
+
 ## Open from the boxes and fields work (Nov 10)
 
 The user's answers on Nov 10, evening, and what was done with them:
