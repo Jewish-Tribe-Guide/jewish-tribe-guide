@@ -186,6 +186,22 @@ describe('/api/cron/watches', () => {
     expect(saved).toMatchObject({ lastError: 'boom', failingSince: expect.any(String) })
   })
 
+  // Nov 18 review: a save that failed (one Supabase blip) rejected the
+  // whole run, so every watch still in line went unread that night.
+  it('keeps going past a watch whose save fails, and counts it as not working', async () => {
+    mockList.mockResolvedValue({
+      available: true,
+      watches: [watch({ id: 'a', url: 'https://a.example/' }), watch({ id: 'b', url: 'https://b.example/' }), watch({ id: 'c', url: 'https://c.example/' })],
+    })
+    mockUpdate.mockImplementation(async (_c: string, id: string) => {
+      if (id === 'a') throw new Error('Couldn’t save the watch: connection reset')
+    })
+    const body = await (await GET(request())).json()
+    expect(mockUpdate.mock.calls.map(([, id]) => id).sort()).toEqual(['a', 'b', 'c'])
+    expect(body.results.find((r: { id: string }) => r.id === 'a')).toMatchObject({ ok: false, error: expect.stringContaining('connection reset') })
+    expect(body.run).toMatchObject({ ran: 3, notWorking: 1, left: 0 })
+  })
+
   // So it isn't in the next night's email again: that reads failingSince.
   it('keeps when a watch already broken first broke', async () => {
     mockList.mockResolvedValue({ available: true, watches: [watch({ id: 'bad', failingSince: '2026-10-05T07:00:00.000Z' })] })

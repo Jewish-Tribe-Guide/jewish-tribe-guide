@@ -124,9 +124,16 @@ async function runAll(started = Date.now()): Promise<Body> {
     run: async (watch) => {
       // A watch that breaks is told of in the nightly email (nightlyEmail.ts).
       // What it found agreeing is kept for Activity (validatedDuring.ts).
-      const { result, validated: found } = await validatedDuring(() => runAndRecord(watch, undefined, budget))
-      if (found.length) validated.set(watch.id, found)
-      return { id: watch.id, url: watch.url, ...result.outcome }
+      try {
+        const { result, validated: found } = await validatedDuring(() => runAndRecord(watch, undefined, budget))
+        if (found.length) validated.set(watch.id, found)
+        return { id: watch.id, url: watch.url, ...result.outcome }
+      } catch (err) {
+        // Its save failed (runAndRecord's own reading never throws): one
+        // watch not working, never the end of the night's run (Nov 18).
+        console.error(`[cron/watches] ${watch.id} failed:`, err)
+        return { id: watch.id, url: watch.url, ok: false as const, error: err instanceof Error ? err.message : String(err) }
+      }
     },
   })
 
