@@ -11,13 +11,13 @@ import { routes } from '@/lib/routes'
 import { markTimes, submissionSource } from '@/lib/submissionSource'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useEditWeek } from '@/lib/useEditWeek'
-import { withCommunity } from '@/lib/useCommunityData'
 import ListingEditor, { type EditorControl } from '@/components/resources/ListingEditor'
 import { itemLists } from '@/components/resources/ItemsEditor'
 import PlaceFrame, { PlaceButtons, SourceCard, placeSubline, type PlaceButton, type PlacePosition } from './PlaceFrame'
 import { TheOriginal, fieldKeyFor } from './SubmissionReview'
 import { changeEdit } from './changeEdit'
 import { changeAnswers, oneMinyanTime } from './changeView'
+import { useAdminApi } from './useAdminApi'
 import { useEditorSteps, useStepsInAddress } from './useStepsInAddress'
 
 // A change on To do, in the listing's own editor (boards E1Times, R5Link,
@@ -61,6 +61,7 @@ export default function TodoChange({
   onEditing: (editing: boolean) => void
 }) {
   const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const fields = category.detailFields
   const current = s.current!
   const parts = reviewParts(current, s.payload as never, category)
@@ -145,11 +146,7 @@ export default function TodoChange({
           adminSave={{
             label: answers.yes,
             via: async ({ payload }) => {
-              const res = await fetch(withCommunity(`/api/admin/submissions/${s.id}`, community), {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ status: 'approved', payload, ...(part ? { part: part.id } : {}) }),
-              })
+              const res = await api.fetch(`/api/admin/submissions/${s.id}`, { method: 'PATCH', body: { status: 'approved', payload, ...(part ? { part: part.id } : {}) } })
               savedPart.current = res.ok && !!((await res.clone().json().catch(() => null)) as { partial?: boolean } | null)?.partial
               return res
             },

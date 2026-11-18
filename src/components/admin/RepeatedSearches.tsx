@@ -2,13 +2,12 @@
 
 import { useCallback, useState } from 'react'
 import type { ClassifiedMiss } from '@/lib/missedSearches'
-import { fetchJson } from '@/lib/fetchJson'
 import { routes } from '@/lib/routes'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { withCommunity } from '@/lib/useCommunityData'
 import { repeatedSearches, shortDay, teachable, type TodoReading, type TodoSearch, type TodoWord } from '@/lib/todo'
 import { AdminBox, AdminRows, Chevron } from './AdminUI'
+import { useAdminApi } from './useAdminApi'
 
 // The searches worth an admin's time: asked more than once, still with no
 // answer. Nobody is expected to go through every search (the user, Oct 31),
@@ -43,6 +42,7 @@ function SearchRow({
   onDone: () => void
 }) {
   const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [category, setCategory] = useState(search.askedCategory ?? data.addable[0]?.id ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -52,11 +52,7 @@ function SearchRow({
     setBusy(true)
     setError(null)
     try {
-      await fetchJson(
-        withCommunity(path, community),
-        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
-        'Could not save.',
-      )
+      await api.post(path, body, 'Could not save.')
       // Dismissed or taught, it's off the list.
       onDone()
     } catch (err) {
@@ -150,18 +146,16 @@ function SearchRow({
 }
 
 export default function RepeatedSearches({ token, onChange }: { token: string; onChange?: () => void }) {
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [data, setData] = useState<Loaded | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const at = (path: string) => withCommunity(path, community)
-    const headers = { Authorization: `Bearer ${token}` }
     try {
       const [misses, readings] = await Promise.all([
-        fetchJson<{ searches: ClassifiedMiss[]; addable: Loaded['addable']; dismissalsAvailable: boolean }>(at('/api/admin/missed-searches'), { headers }, 'Failed to load the searches.'),
-        fetchJson<{ readings: TodoReading[]; wordsAvailable: boolean }>(at('/api/admin/read-questions'), { headers }, 'Failed to load the searches.').catch(() => null),
+        api.get<{ searches: ClassifiedMiss[]; addable: Loaded['addable']; dismissalsAvailable: boolean }>('/api/admin/missed-searches', 'Failed to load the searches.'),
+        api.get<{ readings: TodoReading[]; wordsAvailable: boolean }>('/api/admin/read-questions', 'Failed to load the searches.').catch(() => null),
       ])
       setData({
         searches: repeatedSearches(misses.searches, readings?.readings ?? []),
@@ -172,7 +166,7 @@ export default function RepeatedSearches({ token, onChange }: { token: string; o
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community])
+  }, [api])
   useLoadOnMount(load)
 
   if (error) return <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>

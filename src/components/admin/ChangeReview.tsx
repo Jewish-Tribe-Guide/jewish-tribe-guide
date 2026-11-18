@@ -13,10 +13,9 @@ import { useEditorSteps, useStepsInAddress } from './useStepsInAddress'
 import { reviewParts } from '@/lib/reviewParts'
 import { markTimes, submissionSource } from '@/lib/submissionSource'
 import { normalizeRow } from '@/lib/resourceShape'
-import { useCommunitySlug } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
 import ListingEditor from '@/components/resources/ListingEditor'
 import { AdminBack } from './AdminUI'
+import { useAdminApi } from './useAdminApi'
 import { TheOriginal, fieldKeyFor } from './SubmissionReview'
 import ThingSwitches from './ThingSwitches'
 import { changeEdit } from './changeEdit'
@@ -67,7 +66,7 @@ export default function ChangeReview({
    *  (none: the change whole), and whether its Edit is open. */
   inPlace?: { part?: string; switches: ReactNode; onEditing: (editing: boolean) => void }
 }) {
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const fields = category.detailFields
   const whole = s.payload as unknown as ResourceSubmission
   // Its parts, in the order first shown; answered ones stay, ticked.
@@ -162,11 +161,7 @@ export default function ChangeReview({
           adminSave={{
             label: 'Update the listing',
             via: async ({ payload }) => {
-              const res = await fetch(withCommunity(`/api/admin/submissions/${s.id}`, community), {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ status: 'approved', payload, ...(part ? { part: part.id } : {}) }),
-              })
+              const res = await api.fetch(`/api/admin/submissions/${s.id}`, { method: 'PATCH', body: { status: 'approved', payload, ...(part ? { part: part.id } : {}) } })
               savedPart.current = res.ok && !!((await res.clone().json().catch(() => null)) as { partial?: boolean } | null)?.partial
               return res
             },

@@ -3,7 +3,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import type { EnrichedSubmission } from '@/types'
 import { parseOkJson } from './fetchJson'
-import { withCommunity } from './useCommunityData'
+import { adminApi, type AdminApi } from './adminApi'
 import { unmatchedPlaces, type TodoResponse, type TodoUnmatched } from './todo'
 import { todoPlaceCount } from './todoPlaces'
 import { setupLeft, type SetupState } from './setup'
@@ -50,8 +50,8 @@ function subscribe(l: () => void) {
   return () => listeners.delete(l)
 }
 
-async function get<T>(url: string, token: string, failure: string): Promise<T> {
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+async function get<T>(api: AdminApi, path: string, failure: string): Promise<T> {
+  const res = await api.fetch(path)
   if (res.status === 401) throw new Unauthorized()
   return parseOkJson<T>(res, failure)
 }
@@ -59,12 +59,12 @@ async function get<T>(url: string, token: string, failure: string): Promise<T> {
 class Unauthorized extends Error {}
 
 async function load(key: string, token: string, community: string, email: string | undefined) {
-  const at = (path: string) => withCommunity(path, community)
+  const api = adminApi(token, community)
   const [subs, responses, setup, google] = await Promise.allSettled([
-    get<{ submissions: EnrichedSubmission[] }>(at('/api/admin/submissions'), token, 'Failed to load.'),
-    get<{ responses: TodoResponse[] }>(at('/api/admin/responses?new=1'), token, 'Failed to load the responses.'),
-    get<{ setup: SetupState }>(at('/api/admin/setup'), token, 'Failed to load the setup.'),
-    get<{ places: Parameters<typeof unmatchedPlaces>[0] }>(at('/api/admin/watches/google'), token, 'Failed to load Google’s places.'),
+    get<{ submissions: EnrichedSubmission[] }>(api, '/api/admin/submissions', 'Failed to load.'),
+    get<{ responses: TodoResponse[] }>(api, '/api/admin/responses?new=1', 'Failed to load the responses.'),
+    get<{ setup: SetupState }>(api, '/api/admin/setup', 'Failed to load the setup.'),
+    get<{ places: Parameters<typeof unmatchedPlaces>[0] }>(api, '/api/admin/watches/google', 'Failed to load Google’s places.'),
   ])
   if (state.key !== key) return
   if (subs.status === 'rejected') {
@@ -91,7 +91,7 @@ async function load(key: string, token: string, community: string, email: string
       jobs: state.data?.jobs,
     },
   })
-  jobsLoad = loadWaiting(key, token, community)
+  jobsLoad = loadWaiting(key, api)
 }
 
 let waitingLoads = 0
@@ -99,13 +99,13 @@ let jobsLoad: Promise<void> = Promise.resolve()
 
 /** Every job's reading, after the rest so To do doesn't wait on them; what
  *  couldn't load just isn't counted. Only the latest load's answer is kept. */
-async function loadWaiting(key: string, token: string, community: string) {
+async function loadWaiting(key: string, api: AdminApi) {
   const load = ++waitingLoads
   const jobs: Jobs = {}
-  await loadJobs(token, community, (k, v) => void (jobs[k] = v), (k) => void (jobs[k] = null))
+  await loadJobs(api, (k, v) => void (jobs[k] = v), (k) => void (jobs[k] = null))
   if (state.key === key && load === waitingLoads) {
     withJobs(jobs)
-    pollMenus(key, token, community, load)
+    pollMenus(key, api, load)
   }
 }
 
@@ -116,16 +116,16 @@ function withJobs(jobs: Jobs) {
 /** A menu being read (given just now, read after the reply): the food
  *  places asked for again until it's in, so its reading turns up on To do
  *  without a reload. Stops when another load starts. */
-function pollMenus(key: string, token: string, community: string, load: number, tries = 0) {
+function pollMenus(key: string, api: AdminApi, load: number, tries = 0) {
   // A read that never finishes says so once it's older than any read can
   // run (menuReadingStore); asking stops then too, not before (Nov 4).
   if (!menusReading(state.data?.jobs?.dishes) || tries * MENU_READING_POLL_MS > READING_GIVES_UP_MS) return
   setTimeout(async () => {
     if (state.key !== key || load !== waitingLoads) return
-    const dishes = await loadDishes(token, community)
+    const dishes = await loadDishes(api)
     if (state.key !== key || load !== waitingLoads || !state.data?.jobs) return
     if (dishes) withJobs({ ...state.data.jobs, dishes })
-    pollMenus(key, token, community, load, tries + 1)
+    pollMenus(key, api, load, tries + 1)
   }, MENU_READING_POLL_MS)
 }
 

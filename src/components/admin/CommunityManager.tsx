@@ -4,10 +4,11 @@ import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import tzLookup from 'tz-lookup'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson, parseOkJson } from '@/lib/fetchJson'
+import { parseOkJson } from '@/lib/fetchJson'
 import { adminBase } from '@/lib/adminNav'
 import AddressInput from '@/components/intake/AddressInput'
 import type { Community } from '@/lib/communityStore'
+import { useSiteAdminApi } from './useAdminApi'
 
 // GET /api/admin/communities adds adminEmails/previewToken on top of the
 // plain Community shape (see that route's own comment) — never on Community
@@ -115,6 +116,7 @@ function cityShortName(cityQuery: string): string {
 }
 
 export default function CommunityManager({ token }: { token: string }) {
+  const api = useSiteAdminApi(token)
   const [communities, setCommunities] = useState<CommunityWithAdminEmail[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Managing every community (browsing the list, creating a new one) is a
@@ -173,7 +175,7 @@ export default function CommunityManager({ token }: { token: string }) {
     setError(null)
     setForbidden(false)
     try {
-      const res = await fetch('/api/admin/communities', { headers: { Authorization: `Bearer ${token}` } })
+      const res = await api.fetch('/api/admin/communities')
       if (res.status === 401) {
         setForbidden(true)
         return
@@ -183,7 +185,7 @@ export default function CommunityManager({ token }: { token: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token])
+  }, [api])
 
   useLoadOnMount(load)
 
@@ -282,27 +284,23 @@ export default function CommunityManager({ token }: { token: string }) {
 
     setSaving(true)
     try {
-      const body = await fetchJson<{ community: Community }>(
+      const body = await api.post<{ community: Community }>(
         '/api/admin/communities',
         {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            slug: draft.slug.trim(),
-            name: draft.name.trim(),
-            // Never required — see the "More details" disclosure — so a
-            // blank field (cleared by hand, or never auto-filled because no
-            // city was picked) still needs something real to submit rather
-            // than an empty string admin-visible copy would render as.
-            mission: draft.mission.trim() || `A guide to the ${draft.region.trim() || draft.name.trim()} Jewish community.`,
-            region: draft.region.trim(),
-            timezone: draft.timezone.trim(),
-            mapCenter: { lat, lng },
-            themeColor: draft.themeColor.trim(),
-            backgroundColor: draft.backgroundColor.trim(),
-            adminEmails: parseEmailList(draft.adminEmails),
-            cloneFrom: draft.cloneFrom || null,
-          }),
+          slug: draft.slug.trim(),
+          name: draft.name.trim(),
+          // Never required — see the "More details" disclosure — so a
+          // blank field (cleared by hand, or never auto-filled because no
+          // city was picked) still needs something real to submit rather
+          // than an empty string admin-visible copy would render as.
+          mission: draft.mission.trim() || `A guide to the ${draft.region.trim() || draft.name.trim()} Jewish community.`,
+          region: draft.region.trim(),
+          timezone: draft.timezone.trim(),
+          mapCenter: { lat, lng },
+          themeColor: draft.themeColor.trim(),
+          backgroundColor: draft.backgroundColor.trim(),
+          adminEmails: parseEmailList(draft.adminEmails),
+          cloneFrom: draft.cloneFrom || null,
         },
         'Could not create community.',
       )
@@ -323,13 +321,10 @@ export default function CommunityManager({ token }: { token: string }) {
     setTogglingSlug(slug)
     setToggleError(null)
     try {
-      const { community } = await fetchJson<{ community: CommunityWithAdminEmail }>(
+      const { community } = await api.send<{ community: CommunityWithAdminEmail }>(
+        'PATCH',
         `/api/admin/communities/${slug}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ visible: nextVisible }),
-        },
+        { visible: nextVisible },
         'Could not update visibility.',
       )
       // Unlike delete, this isn't destructive — patch the row in place
@@ -379,15 +374,7 @@ export default function CommunityManager({ token }: { token: string }) {
     setDeleting(true)
     setDeleteError(null)
     try {
-      await fetchJson(
-        `/api/admin/communities/${slug}`,
-        {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ confirmSlug: slug }),
-        },
-        'Could not delete community.',
-      )
+      await api.send('DELETE', `/api/admin/communities/${slug}`, { confirmSlug: slug }, 'Could not delete community.')
       // A real, full reload rather than re-fetching in place. This route
       // deletes a community, which calls revalidatePublicContent() and
       // invalidates the same content tags the surrounding admin layout's

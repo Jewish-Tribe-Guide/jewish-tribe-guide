@@ -2,15 +2,14 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { fetchJson } from '@/lib/fetchJson'
 import type { ResourceSubmission } from '@/types'
 import { useCategories } from '@/lib/useCategories'
 import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
 import { shownPlaces, todoPlaces, type TodoFilter } from '@/lib/todoPlaces'
 import { loadTodo, reloadTodo, updateTodo, useTodo } from '@/lib/useTodo'
 import { useTodoSplit } from './useTodoSplit'
+import { useAdminApi } from './useAdminApi'
 import { STEP_PARAMS } from '@/lib/stepAddress'
 import { useFullPane } from './AdminUI'
 import TodoList, { TODO_START, type TodoView } from './TodoList'
@@ -91,6 +90,7 @@ function goTo(openId: string | null, replace = false) {
 export default function ModerationQueue({ session }: { session: Session }) {
   const community = useCommunitySlug()
   const token = session.access_token
+  const api = useAdminApi(token)
   // Loaded afresh each time To do opens; the nav's count reads the same copy.
   const { data, error: loadError } = useTodo(token, community, session.user.email, true)
   const [error, setError] = useState<string | null>(null)
@@ -276,13 +276,10 @@ export default function ModerationQueue({ session }: { session: Session }) {
     setBusyId(id)
     setOpenError(null)
     try {
-      const res = await fetchJson<{ partial?: boolean }>(
-        withCommunity(`/api/admin/submissions/${id}`, community),
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ status, ...(reason ? { reason } : {}), ...(payload ? { payload } : {}), ...(part ? { part } : {}) }),
-        },
+      const res = await api.send<{ partial?: boolean }>(
+        'PATCH',
+        `/api/admin/submissions/${id}`,
+        { status, ...(reason ? { reason } : {}), ...(payload ? { payload } : {}), ...(part ? { part } : {}) },
         'Failed to update.',
       )
       if (res?.partial) {

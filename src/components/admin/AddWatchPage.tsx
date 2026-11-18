@@ -4,12 +4,11 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { fetchJson } from '@/lib/fetchJson'
 import type { NightKindId } from '@/lib/jobRuns'
-import { withCommunity } from '@/lib/useCommunityData'
 import { jobLists } from '@/lib/watchJobList'
 import { AdminBack, AdminBox, AdminEmpty, AdminRow } from './AdminUI'
 import { noteJobSwitched, useWatchJobsAndReload } from './useWatchJobs'
+import { useAdminApi } from './useAdminApi'
 
 // + Add a watch: everything not already on Watches. A job turned off comes
 // back on with a tap, and Other pages opens to add a page.
@@ -17,6 +16,7 @@ import { noteJobSwitched, useWatchJobsAndReload } from './useWatchJobs'
 export default function AddWatchPage({ token }: { token: string }) {
   const community = useCommunitySlug()
   const router = useRouter()
+  const api = useAdminApi(token)
   const base = adminBase(community)
   const { jobs } = useWatchJobsAndReload(token)
   const [error, setError] = useState<string | null>(null)
@@ -27,11 +27,7 @@ export default function AddWatchPage({ token }: { token: string }) {
   async function turnOn(kind: NightKindId) {
     setError(null)
     try {
-      await fetchJson(
-        withCommunity('/api/admin/watches', community),
-        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'job-on', kind }) },
-        'Could not turn it on.',
-      )
+      await api.post('/api/admin/watches', { action: 'job-on', kind }, 'Could not turn it on.')
       noteJobSwitched(community, kind, false)
       router.push(`${base}/watches`)
     } catch (err) {

@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import type { SiteSettings } from '@/lib/siteSettings'
 import type { HomeSection, DraftHomeSection } from '@/lib/homeSections'
 import { saveHomeSections } from '@/lib/homeSectionsDraft'
 import { useActiveCommunity } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
+import { useAdminApi } from './useAdminApi'
+import { parseOkJson } from '@/lib/fetchJson'
 import { adminBase } from '@/lib/adminNav'
 import DesktopTopicsManager, { withoutCard } from './DesktopTopicsManager'
 import RightNowScreen, { ScreenHeader, inHomeOrder, rightNowSummary, useRightNowData } from './RightNowScreen'
@@ -83,6 +83,7 @@ type CardScreen = 'rightNow' | 'map'
 
 export default function SiteSettingsEditor({ token }: { token: string }) {
   const { community } = useActiveCommunity()
+  const api = useAdminApi(token)
   // Which version of the page the boxes and the preview are of.
   const [device, setDevice] = useState<PreviewDevice>('computer')
   // The day the preview shows Right now on, picked on Right Now's screen
@@ -136,8 +137,8 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
     setError(null)
     try {
       const [settingsRes, sectionsRes] = await Promise.all([
-        fetch(withCommunity('/api/admin/site-settings', community.slug), { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(withCommunity('/api/admin/home-sections', community.slug), { headers: { Authorization: `Bearer ${token}` } }),
+        api.fetch('/api/admin/site-settings'),
+        api.fetch('/api/admin/home-sections'),
       ])
       const settingsBody = await parseOkJson<{ settings: SiteSettings }>(settingsRes, 'Failed to load.')
       const sectionsBody = await parseOkJson<{ sections: HomeSection[] }>(sectionsRes, 'Failed to load.')
@@ -148,7 +149,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community.slug])
+  }, [api])
 
   useLoadOnMount(load)
 
@@ -182,15 +183,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
       // and this draft may hold what it had before it saved.
       const changed = changedSettings(settings, draft)
       if (Object.keys(changed).length > 0) {
-        const body = await fetchJson<{ settings: SiteSettings }>(
-          withCommunity('/api/admin/site-settings', community.slug),
-          {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify(changed),
-          },
-          'Save failed.',
-        )
+        const body = await api.send<{ settings: SiteSettings }>('PATCH', '/api/admin/site-settings', changed, 'Save failed.')
         setSettings(body.settings)
         setDraft(body.settings)
       }
@@ -242,7 +235,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
             <ImageUploadField
               value={draft.logoUrl ?? ''}
               onChange={(url) => set('logoUrl', url || null)}
-              uploadUrl={withCommunity('/api/admin/site-settings/logo', community.slug)}
+              uploadUrl={api.url('/api/admin/site-settings/logo')}
               token={token}
               shape="square"
               // As a listing's photo (the user, Nov 4): no hint, the address
@@ -298,7 +291,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
         <ImageUploadField
           value={draft.desktopMapImage?.url ?? ''}
           onChange={(url) => set('desktopMapImage', url ? { url, alt: '' } : null)}
-          uploadUrl={withCommunity('/api/admin/site-settings/hero-image', community.slug)}
+          uploadUrl={api.url('/api/admin/site-settings/hero-image')}
           token={token}
           shape="square"
           aspect={26 / 15}
@@ -369,7 +362,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
                       <ImageUploadField
                         value={draft.desktopHeroImage?.url ?? ''}
                         onChange={(url) => set('desktopHeroImage', url ? { url, alt: '' } : null)}
-                        uploadUrl={withCommunity('/api/admin/site-settings/hero-image', community.slug)}
+                        uploadUrl={api.url('/api/admin/site-settings/hero-image')}
                         token={token}
                         shape="square"
                         aspect={11 / 6}

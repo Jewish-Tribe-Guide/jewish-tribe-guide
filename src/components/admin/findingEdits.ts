@@ -7,7 +7,7 @@ import { itemsField } from '@/lib/listingView'
 import { minyanWriting } from '@/lib/minyanText'
 import { schedulesKey } from '@/lib/schedules'
 import { TIMES_PART_LABELS, type TimesPart } from '@/lib/timesParts'
-import { withCommunity } from '@/lib/useCommunityData'
+import type { AdminApi } from '@/lib/adminApi'
 import type { Finding, FindingTimes } from '@/lib/watchFindings'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import type { BoxEdit } from '@/components/resources/BoxEditSheet'
@@ -175,17 +175,13 @@ export function googleEdit(place: GooglePlace, item: DirectoryResource, category
 
 /** The sheet's edit, saving where the finding's edit says. `after`, with
  *  the response once it's in, before `onSaved`. */
-export function withSave(fe: FindingEdit, { community, token, onSaved, after }: { community: string; token: string; onSaved: () => void; after?: (res: Response) => Promise<void> }): BoxEdit {
+export function withSave(fe: FindingEdit, { api, onSaved, after }: { api: AdminApi; onSaved: () => void; after?: (res: Response) => Promise<void> }): BoxEdit {
   return {
     ...fe.edit,
     save: {
       label: 'Save to the listing',
       via: async ({ payload }) => {
-        const res = await fetch(withCommunity(fe.send.path, community), {
-          method: fe.send.method,
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(fe.send.body(payload)),
-        })
+        const res = await api.fetch(fe.send.path, { method: fe.send.method, body: fe.send.body(payload) })
         if (res.ok && after) await after(res.clone())
         return res
       },

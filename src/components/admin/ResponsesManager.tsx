@@ -4,11 +4,10 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FormConfig } from '@/lib/forms'
 import type { InboxResponse } from '@/lib/inbox'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson } from '@/lib/fetchJson'
 import ResponseCard from '@/components/responses/ResponseCard'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
 import { AdminEmpty } from './AdminUI'
+import { useAdminApi } from './useAdminApi'
 
 // Responses for Feedback and any custom admin-created form (support/volunteer
 // excluded — those are hospital-facing and live in /inbox instead, see
@@ -23,6 +22,7 @@ const FEEDBACK_KEY = '__feedback__'
 
 export default function ResponsesManager({ token }: { token: string }) {
   const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [forms, setForms] = useState<FormConfig[] | null>(null)
   const [formsError, setFormsError] = useState<string | null>(null)
   // A form's own screen links here with ?form=<id>, to open on its tab.
@@ -30,7 +30,7 @@ export default function ResponsesManager({ token }: { token: string }) {
 
   useEffect(() => {
     let cancelled = false
-    fetch(withCommunity('/api/admin/forms', community), { headers: { Authorization: `Bearer ${token}` } })
+    api.fetch('/api/admin/forms')
       .then((res) => res.json())
       .then((body) => {
         if (cancelled) return
@@ -43,7 +43,7 @@ export default function ResponsesManager({ token }: { token: string }) {
     return () => {
       cancelled = true
     }
-  }, [token, community])
+  }, [api])
 
   const tabs: { key: string; label: string }[] = [
     { key: FEEDBACK_KEY, label: 'Feedback' },
@@ -92,6 +92,7 @@ function ResponsesList({
   community: string
   query: { feedback: true } | { formId: string }
 }) {
+  const api = useAdminApi(token)
   const [items, setItems] = useState<InboxResponse[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -101,11 +102,7 @@ function ResponsesList({
     setItems(null)
     try {
       const params = 'feedback' in query ? 'feedback=1' : `formId=${encodeURIComponent(query.formId)}`
-      const body = await fetchJson<{ responses: InboxResponse[] }>(
-        withCommunity(`/api/admin/responses?${params}`, community),
-        { headers: { Authorization: `Bearer ${token}` } },
-        'Failed to load.',
-      )
+      const body = await api.get<{ responses: InboxResponse[] }>(`/api/admin/responses?${params}`, 'Failed to load.')
       setItems(body.responses)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -113,7 +110,7 @@ function ResponsesList({
     // query is a fresh object each render; stringify-free re-run is driven by
     // ResponsesManager remounting this component via `key={activeKey}` instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, community])
+  }, [api])
 
   useLoadOnMount(load)
 

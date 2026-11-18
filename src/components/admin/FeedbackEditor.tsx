@@ -2,10 +2,9 @@
 
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson, parseOkJson } from '@/lib/fetchJson'
+import { parseOkJson } from '@/lib/fetchJson'
 import type { SiteSettings } from '@/lib/siteSettings'
-import { useCommunitySlug } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
+import { useAdminApi } from './useAdminApi'
 import { AdminBack, AdminBox, AdminField, AdminSwitch, adminInputClass } from './AdminUI'
 import SaveBar, { useLeaveGuard } from './SaveBar'
 
@@ -22,7 +21,7 @@ function pick(s: SiteSettings): Feedback {
 }
 
 export default function FeedbackEditor({ token, onBack }: { token: string; onBack: () => void }) {
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [saved, setSaved] = useState<Feedback | null>(null)
   const [draft, setDraft] = useState<Feedback | null>(null)
   const [saving, setSaving] = useState(false)
@@ -31,14 +30,14 @@ export default function FeedbackEditor({ token, onBack }: { token: string; onBac
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(withCommunity('/api/admin/site-settings', community), { headers: { Authorization: `Bearer ${token}` } })
+      const res = await api.fetch('/api/admin/site-settings')
       const body = await parseOkJson<{ settings: SiteSettings }>(res, 'Failed to load.')
       setSaved(pick(body.settings))
       setDraft(pick(body.settings))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community])
+  }, [api])
   useLoadOnMount(load)
 
   const changes = saved && draft ? KEYS.filter((k) => saved[k] !== draft[k]).length : 0
@@ -54,15 +53,7 @@ export default function FeedbackEditor({ token, onBack }: { token: string; onBac
     setError(null)
     setSaving(true)
     try {
-      const body = await fetchJson<{ settings: SiteSettings }>(
-        withCommunity('/api/admin/site-settings', community),
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(draft),
-        },
-        'Save failed.',
-      )
+      const body = await api.send<{ settings: SiteSettings }>('PATCH', '/api/admin/site-settings', draft, 'Save failed.')
       setSaved(pick(body.settings))
       setDraft(pick(body.settings))
       setJustSaved(true)

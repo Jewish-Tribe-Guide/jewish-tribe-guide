@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { fetchJson } from '@/lib/fetchJson'
 import { statusPill } from '@/lib/eruvJob'
 import type { AdminPlace } from '@/lib/adminPlaces'
 import type { AdminEruv } from '@/lib/eruvStore'
@@ -9,7 +8,7 @@ import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
 import { useStepsInAddress } from './useStepsInAddress'
-import { withCommunity } from '@/lib/useCommunityData'
+import { useAdminApi } from './useAdminApi'
 import type { CategoryConfig } from '@/lib/categories'
 import { sourceKind, sourceProblem, type WatchPurpose } from '@/lib/watchPurposes'
 import { EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCard, editorFieldLabel, editorInputClass } from '@/components/resources/editorParts'
@@ -72,7 +71,7 @@ export default function EruvListing({
   onSaved: () => void
   backLabel?: string
 }) {
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [draft, setDraft] = useState<Draft>(() => draftOf(eruv))
   const [details, setDetails] = useState<Record<string, unknown>>(() => ({ ...eruv.details }))
   const [leaveOut, setLeaveOut] = useState<string[]>(eruv.lineLeaveOut)
@@ -86,8 +85,7 @@ export default function EruvListing({
   // A screen asked for by the address, opened once its row is drawn.
   const [screenAsked, setScreenAsked] = useState<Which | null>(null)
 
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-  const post = <T,>(path: string, body: Record<string, unknown>) => fetchJson<T>(withCommunity(path, community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not do that.')
+  const post = <T,>(path: string, body: Record<string, unknown>) => api.post<T>(path, body)
   const save = (edit: Record<string, unknown>) => post('/api/admin/eruvim', { action: 'save', id: eruv.id, edit })
   const actions = sourceActions(eruv.id, post)
   const sources = eruvSources(eruv.id, jobs, now)
@@ -382,6 +380,7 @@ type StatusRead =
  *  (`category`), as Places has once it's added (Nov 9). */
 export function AddEruv({ token, category, onBack, onAdded }: { token: string; category?: CategoryConfig; onBack: () => void; onAdded: () => Promise<void> | void }) {
   const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [draft, setDraft] = useState({ name: '', covers: '', status: '', map: '', hotline: '', alertsUrl: '', website: '' })
   const [details, setDetails] = useState<Record<string, unknown>>({})
   /** The open row, when it was opened from the empty ones. */
@@ -409,19 +408,16 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
     setScreen(key === 'status' || key === 'map' ? screenFor(key) : null)
   })
 
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-  const post = <T,>(body: Record<string, unknown>) => fetchJson<T>(withCommunity('/api/admin/eruvim', community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not add it.')
+  const post = <T,>(body: Record<string, unknown>) => api.post<T>('/api/admin/eruvim', body, 'Could not add it.')
 
   /** Read now (EruvRead13, EruvEmailNow14): what its page or its latest email
    *  says, and nothing's saved. */
   async function readStatusNow() {
     const email = sourceKind(draft.status) === 'email'
     setStatusRead({ state: 'reading' })
-    const reply = await fetchJson<{ state?: string; status?: string; words?: string | null; on?: string; account?: string | null }>(
-      withCommunity('/api/admin/read-now', community),
-      { method: 'POST', headers, body: JSON.stringify({ slot: email ? 'eruv-email' : 'eruv', url: draft.status.trim() }) },
-      'Could not read that.',
-    ).catch(() => null)
+    const reply = await api
+      .post<{ state?: string; status?: string; words?: string | null; on?: string; account?: string | null }>('/api/admin/read-now', { slot: email ? 'eruv-email' : 'eruv', url: draft.status.trim() }, 'Could not read that.')
+      .catch(() => null)
     const says = reply?.words || (reply?.status === 'up' ? 'Up' : 'Down')
     if (reply?.state === 'done') setStatusRead({ state: 'done', words: says })
     else if (reply?.state === 'found') setStatusRead({ state: 'done', words: says, on: reply.on })

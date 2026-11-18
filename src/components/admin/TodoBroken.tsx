@@ -1,14 +1,13 @@
 'use client'
 
-import { useCallback, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { editorRows } from '@/lib/editorRows'
-import { fetchJson } from '@/lib/fetchJson'
+import { adminApi } from '@/lib/adminApi'
 import { listingSlug } from '@/lib/listingSlug'
 import { itemsField } from '@/lib/listingView'
 import { routes } from '@/lib/routes'
-import { withCommunity } from '@/lib/useCommunityData'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { CameraIcon } from '@/components/icons'
 import ListingEditor, { type EditorControl } from '@/components/resources/ListingEditor'
@@ -56,8 +55,8 @@ export default function TodoBroken({
 }) {
   const [now] = useState(() => Date.now())
   const view = brokenView(placeId, label, jobs, now)
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-  const post = <T,>(path: string, body: Record<string, unknown>) => fetchJson<T>(withCommunity(path, community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not do that.')
+  const api = useMemo(() => adminApi(token, community), [token, community])
+  const post = <T,>(path: string, body: Record<string, unknown>) => api.post<T>(path, body)
   const actions = sourceActions(placeId, post)
 
   // The listing, for its category and the field's own editor. An eruv has
@@ -66,12 +65,12 @@ export default function TodoBroken({
   const [round, setRound] = useState(0)
   const loadListing = useCallback(async () => {
     try {
-      const got = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`/api/admin/watches/google?item=${placeId}`, community), { headers: { Authorization: `Bearer ${token}` } }, 'Could not open its listing.')
+      const got = await api.get<{ item: DirectoryResource; category: CategoryConfig }>(`/api/admin/watches/google?item=${placeId}`, 'Could not open its listing.')
       setListing(got?.item && got.category ? got : 'none')
     } catch {
       setListing('none')
     }
-  }, [placeId, community, token])
+  }, [placeId, api])
   useLoadOnMount(loadListing)
 
   // The editor's own state, for the answers: an edit is saved first.
@@ -197,7 +196,7 @@ export default function TodoBroken({
       body.append('resourceId', placeId)
       for (const f of files) body.append('file', f)
       void run('give', async () => {
-        await fetchJson(withCommunity('/api/admin/main-dishes', community), { method: 'POST', headers: { Authorization: headers.Authorization }, body }, 'Could not read those photos.')
+        await api.post('/api/admin/main-dishes', body, 'Could not read those photos.')
         setGiving(null)
       })
     }
@@ -287,12 +286,11 @@ export default function TodoBroken({
           label: 'Update the listing',
           via: ({ payload }) =>
             dishesKey
-              ? fetch(withCommunity('/api/admin/main-dishes', community), {
+              ? api.fetch('/api/admin/main-dishes', {
                   method: 'POST',
-                  headers,
-                  body: JSON.stringify({ action: 'save', resourceId: placeId, always: payload.details?.[dishesKey] ?? [], sometimes: payload.details?.[`${dishesKey}_sometimes`] ?? [] }),
+                  body: { action: 'save', resourceId: placeId, always: payload.details?.[dishesKey] ?? [], sometimes: payload.details?.[`${dishesKey}_sometimes`] ?? [] },
                 })
-              : fetch(withCommunity(`/api/admin/listings/${placeId}`, community), { method: 'PATCH', headers, body: JSON.stringify({ payload }) }),
+              : api.fetch(`/api/admin/listings/${placeId}`, { method: 'PATCH', body: { payload } }),
           onSaved: () => {},
         }}
       />

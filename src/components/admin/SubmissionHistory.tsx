@@ -3,14 +3,13 @@
 import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { parseOkJson } from '@/lib/fetchJson'
 import type { EnrichedSubmission } from '@/types'
 import { useCategories } from '@/lib/useCategories'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
 import { SubmissionCard } from './SubmissionCard'
 import { AdminBack, AdminEmpty } from './AdminUI'
+import { useAdminApi } from './useAdminApi'
 
 // Taken and Left, the words Reports counts them in.
 const COPY: Record<'approved' | 'rejected', { title: string; empty: string }> = {
@@ -24,6 +23,7 @@ const COPY: Record<'approved' | 'rejected', { title: string; empty: string }> = 
 // take" or "did I actually leave that out" without going into Supabase.
 export default function SubmissionHistory({ token, status }: { token: string; status: 'approved' | 'rejected' }) {
   const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [items, setItems] = useState<EnrichedSubmission[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const categoriesById = new Map(useCategories().map((c) => [c.id, c]))
@@ -32,15 +32,12 @@ export default function SubmissionHistory({ token, status }: { token: string; st
     setError(null)
     setItems(null)
     try {
-      const res = await fetch(withCommunity(`/api/admin/submissions?status=${status}`, community), {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await parseOkJson<{ submissions: EnrichedSubmission[] }>(res, 'Failed to load.')
+      const body = await api.get<{ submissions: EnrichedSubmission[] }>(`/api/admin/submissions?status=${status}`, 'Failed to load.')
       setItems(body.submissions)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, status, community])
+  }, [api, status])
 
   useLoadOnMount(load)
 

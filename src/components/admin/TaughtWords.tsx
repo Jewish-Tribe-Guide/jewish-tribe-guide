@@ -2,11 +2,9 @@
 
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson } from '@/lib/fetchJson'
-import { withCommunity } from '@/lib/useCommunityData'
-import { useCommunitySlug } from '@/lib/communityContext'
 import { shortDay } from '@/lib/todo'
 import CollapsibleSection from './CollapsibleSection'
+import { useAdminApi } from './useAdminApi'
 
 // The words the site's own search has been taught (askWords.ts), on the
 // Searches page under the searches themselves: who taught each, from which
@@ -17,7 +15,7 @@ type TaughtWord = { word: string; label: string; fromQuestion: string | null; ta
 type Loaded = { words: TaughtWord[]; wordsAvailable: boolean }
 
 export default function TaughtWords({ token }: { token: string }) {
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [data, setData] = useState<Loaded | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -25,11 +23,11 @@ export default function TaughtWords({ token }: { token: string }) {
   const load = useCallback(async () => {
     setError(null)
     try {
-      setData(await fetchJson<Loaded>(withCommunity('/api/admin/read-questions', community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the taught words.'))
+      setData(await api.get<Loaded>('/api/admin/read-questions', 'Failed to load the taught words.'))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community])
+  }, [api])
 
   useLoadOnMount(load)
 
@@ -37,11 +35,7 @@ export default function TaughtWords({ token }: { token: string }) {
     setError(null)
     setBusy(word)
     try {
-      await fetchJson(
-        withCommunity('/api/admin/read-questions', community),
-        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'unteach', word }) },
-        'Could not save.',
-      )
+      await api.post('/api/admin/read-questions', { action: 'unteach', word }, 'Could not save.')
       setData((d) => d && { ...d, words: d.words.filter((x) => x.word !== word) })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save.')

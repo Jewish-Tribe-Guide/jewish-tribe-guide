@@ -1,7 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
-import { fetchJson } from '@/lib/fetchJson'
-import { withCommunity } from '@/lib/useCommunityData'
+import { adminApi } from '@/lib/adminApi'
 import {
   detectOptionRenames,
   fieldsWithRenamedShowIf,
@@ -43,6 +42,7 @@ export function useCategorySaveWorkflow({
   /** Given the id it was saved under (a renamed slug's new one). */
   onSaved: (id: string) => void
 }) {
+  const api = useMemo(() => adminApi(token, community), [token, community])
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   // Set once a save attempt finds existing listings with data in a field the
@@ -72,16 +72,12 @@ export function useCategorySaveWorkflow({
   // save completes.
   const [pendingIdRename, setPendingIdRename] = useState<{ oldId: string; newId: string; count: number } | null>(null)
 
-  const usageUrl = initial ? withCommunity(`/api/admin/categories/${initial.id}/field-usage`, community) : null
+  const usagePath = initial ? `/api/admin/categories/${initial.id}/field-usage` : null
 
   async function fetchUsage(ask: { address: boolean; phone: boolean; fieldKeys: string[] }) {
-    const body = await fetchJson<{ usage: { address: number; phone: number; fields: Record<string, number> } }>(
-      usageUrl!,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(ask),
-      },
+    const body = await api.post<{ usage: { address: number; phone: number; fields: Record<string, number> } }>(
+      usagePath!,
+      ask,
       'Could not check existing listings.',
     )
     return body.usage
@@ -90,7 +86,7 @@ export function useCategorySaveWorkflow({
   /** How many saved places have an answer in one field, or null when it
    *  can't be told (a new page, or the check failed). */
   async function countAnswers(target: { field: string } | 'address' | 'phone'): Promise<number | null> {
-    if (isNew || !usageUrl) return null
+    if (isNew || !usagePath) return null
     try {
       const usage = await fetchUsage({ address: target === 'address', phone: target === 'phone', fieldKeys: typeof target === 'object' ? [target.field] : [] })
       return typeof target === 'object' ? (usage.fields[target.field] ?? 0) : usage[target]
@@ -129,11 +125,7 @@ export function useCategorySaveWorkflow({
     if (!isNew && !pendingIdRename && draft.id !== initial!.id) {
       setSaving(true)
       try {
-        const body = await fetchJson<{ count: number }>(
-          withCommunity(`/api/admin/categories/${initial!.id}/id-usage`, community),
-          { headers: { Authorization: `Bearer ${token}` } },
-          'Could not check existing listings.',
-        )
+        const body = await api.get<{ count: number }>(`/api/admin/categories/${initial!.id}/id-usage`, 'Could not check existing listings.')
         setPendingIdRename({ oldId: initial!.id, newId: draft.id, count: body.count })
         return
       } catch (err) {
@@ -155,13 +147,9 @@ export function useCategorySaveWorkflow({
       if (detected.length > 0) {
         setSaving(true)
         try {
-          const body = await fetchJson<{ usage: { fieldKey: string; oldValue: string; newValue: string; count: number }[] }>(
-            withCommunity(`/api/admin/categories/${initial!.id}/option-usage`, community),
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ renames: detected }),
-            },
+          const body = await api.post<{ usage: { fieldKey: string; oldValue: string; newValue: string; count: number }[] }>(
+            `/api/admin/categories/${initial!.id}/option-usage`,
+            { renames: detected },
             'Could not check existing listings.',
           )
           const usage = body.usage
@@ -279,15 +267,7 @@ export function useCategorySaveWorkflow({
         // A new page's boxes, when it has any (a copy of Hospitals).
         ...(isNew && listingPartsToSave(draft.listingParts) && { listingParts: listingPartsToSave(draft.listingParts) }),
       }
-      await fetchJson(
-        withCommunity(isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`, community),
-        {
-          method: isNew ? 'POST' : 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(payload),
-        },
-        'Save failed.',
-      )
+      await api.send(isNew ? 'POST' : 'PATCH', isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`, payload, 'Save failed.')
       onSaved(draft.id)
     } catch (err) {
       setErrors([err instanceof Error ? err.message : 'Save failed.'])

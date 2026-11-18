@@ -2,13 +2,12 @@
 
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson } from '@/lib/fetchJson'
-import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { adminBase } from '@/lib/adminNav'
 import type { NewsletterLine } from '@/lib/nightKinds'
 import { pageFrom } from '@/lib/placeLink'
 import { AdminBack, AdminBox, AdminCount, AdminField, AdminRow, adminInputClass } from './AdminUI'
+import { useAdminApi } from './useAdminApi'
 
 // ── Watches → Newsletters (admin drawings 18 and 18b, Oct 29) ───────────────
 // Shul newsletters come in through a Google Apps Script in the guide's own
@@ -222,6 +221,7 @@ function AddNewsletter({ places, busy, onAdd, onCancel }: { places: Place[]; bus
 export default function NewslettersPage({ token }: { token: string }) {
   const community = useCommunitySlug()
   const base = adminBase(community)
+  const api = useAdminApi(token)
   const [data, setData] = useState<NewslettersLoaded | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -233,24 +233,20 @@ export default function NewslettersPage({ token }: { token: string }) {
 
   const load = useCallback(async () => {
     try {
-      setData(await fetchJson<NewslettersLoaded>(withCommunity('/api/admin/watches/newsletters', community), { headers: { Authorization: `Bearer ${token}` } }, 'Couldn’t load the newsletters.'))
+      setData(await api.get<NewslettersLoaded>('/api/admin/watches/newsletters', 'Couldn’t load the newsletters.'))
       setNow(Date.now())
       setLoadError(null)
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Couldn’t load the newsletters.')
     }
-  }, [token, community])
+  }, [api])
   useLoadOnMount(load)
 
   async function act(body: Record<string, unknown>): Promise<boolean> {
     setError(null)
     setBusy(true)
     try {
-      await fetchJson(
-        withCommunity('/api/admin/watches', community),
-        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
-        'Couldn’t do that.',
-      )
+      await api.post('/api/admin/watches', body, 'Couldn’t do that.')
       await load()
       return true
     } catch (err) {
@@ -267,11 +263,7 @@ export default function NewslettersPage({ token }: { token: string }) {
 
   async function saveLink(url: string): Promise<string | null> {
     try {
-      await fetchJson(
-        withCommunity('/api/admin/watches/newsletters', community),
-        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) },
-        'That link didn’t answer. Check access is set to Anyone.',
-      )
+      await api.post('/api/admin/watches/newsletters', { url }, 'That link didn’t answer. Check access is set to Anyone.')
       setSetUpAgain(false)
       await load()
       return null

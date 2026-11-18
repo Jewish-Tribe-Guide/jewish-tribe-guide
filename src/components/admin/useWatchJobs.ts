@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson } from '@/lib/fetchJson'
 import { fetchJobs } from './fetchJobs'
 import type { JobKey } from '@/lib/watchJobReads'
-import { withCommunity } from '@/lib/useCommunityData'
+import type { AdminApi } from '@/lib/adminApi'
+import { useAdminApi } from './useAdminApi'
 import { useCommunitySlug } from '@/lib/communityContext'
 import type { CategoryConfig } from '@/lib/categories'
 import type { GooglePlace } from '@/lib/googleJob'
@@ -136,8 +136,8 @@ export function jobsSettled(jobs: Jobs, keys: readonly (keyof Jobs)[] = ['catego
 export const MENU_READING_POLL_MS = 6000
 
 /** The food places alone, read again: null if they couldn't be. */
-export function loadDishes(token: string, community: string): Promise<Jobs['dishes'] | null> {
-  return fetchJson<{ places: Jobs['dishes'] }>(withCommunity('/api/admin/main-dishes', community), { headers: { Authorization: `Bearer ${token}` } }, '')
+export function loadDishes(api: AdminApi): Promise<Jobs['dishes'] | null> {
+  return api.get<{ places: Jobs['dishes'] }>('/api/admin/main-dishes', '')
     .then((d) => d.places ?? null)
     .catch(() => null)
 }
@@ -183,10 +183,10 @@ export function jobsChangedBy(path: string): JobKey[] {
   return ALL_JOBS
 }
 
-export async function loadJobs(token: string, community: string, fill: <K extends keyof Jobs>(key: K, value: Jobs[K]) => void, failed: (key: keyof Jobs) => void, keys: readonly JobKey[] = ALL_JOBS) {
+export async function loadJobs(api: AdminApi, fill: <K extends keyof Jobs>(key: K, value: Jobs[K]) => void, failed: (key: keyof Jobs) => void, keys: readonly JobKey[] = ALL_JOBS) {
   // One request for all of them (api/admin/watches/jobs): thirteen from the
   // browser queued on its six connections to the server.
-  const answers = await fetchJobs(token, community, keys, keys.length === ALL_JOBS.length)
+  const answers = await fetchJobs(api, keys, keys.length === ALL_JOBS.length)
   for (const key of keys) {
     const d = answers[key]
     const value = d == null ? undefined : (READS[key].take as (d: unknown) => unknown)(d)
@@ -209,6 +209,7 @@ export async function loadJobs(token: string, community: string, fill: <K extend
  *  its jobs after its own data the same way (useTodo's loadWaiting). */
 export function useWatchJobsAndReload(token: string, { ready = true }: { ready?: boolean } = {}): { jobs: Jobs; reload: (changed?: readonly JobKey[]) => Promise<void> } {
   const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [jobs, setJobs] = useState<Jobs>(() => lastSeen.get(community) ?? {})
 
   const load = useCallback(async (given?: readonly JobKey[]) => {
@@ -223,10 +224,10 @@ export function useWatchJobsAndReload(token: string, { ready = true }: { ready?:
       setJobs((j) => ({ ...j, [key]: value }))
     }
     const failed = (key: keyof Jobs) => setJobs((j) => (j[key] === undefined ? { ...j, [key]: null } : j))
-    await loadJobs(token, community, fill, failed, changed)
+    await loadJobs(api, fill, failed, changed)
     const rest = ALL_JOBS.filter((k) => !changed.includes(k))
-    if (rest.length) void loadJobs(token, community, fill, failed, rest)
-  }, [token, community])
+    if (rest.length) void loadJobs(api, fill, failed, rest)
+  }, [api])
 
   useEffect(() => {
     lastSeen.set(community, jobs)
@@ -236,9 +237,9 @@ export function useWatchJobsAndReload(token: string, { ready = true }: { ready?:
   const reading = menusReading(jobs.dishes)
   useEffect(() => {
     if (!reading) return
-    const t = setTimeout(() => void loadDishes(token, community).then((dishes) => dishes && setJobs((j) => ({ ...j, dishes }))), MENU_READING_POLL_MS)
+    const t = setTimeout(() => void loadDishes(api).then((dishes) => dishes && setJobs((j) => ({ ...j, dishes }))), MENU_READING_POLL_MS)
     return () => clearTimeout(t)
-  }, [reading, jobs.dishes, token, community])
+  }, [reading, jobs.dishes, api])
 
   useEffect(() => {
     const follow = (c: string, kind: NightKindId, off: boolean) => {

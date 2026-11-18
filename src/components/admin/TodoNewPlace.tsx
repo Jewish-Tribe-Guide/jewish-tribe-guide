@@ -3,13 +3,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { DirectoryResource, EnrichedSubmission, ResourceSubmission } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
-import { useCommunitySlug } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
 import ListingEditor, { type EditorControl } from '@/components/resources/ListingEditor'
 import { useListingDraft } from '@/components/resources/useListingDraft'
 import PlaceFrame, { PlaceButtons, placeSubline, type PlaceButton, type PlacePosition } from './PlaceFrame'
 import { SubmissionSourceCard } from './TodoChange'
 import { useEditorSteps, useStepsInAddress } from './useStepsInAddress'
+import { useAdminApi } from './useAdminApi'
 
 // A new place on To do (board L3NewPlace): the listing as it would go in,
 // in the site's own editor, a row for each thing it has and "Not on the
@@ -72,7 +71,7 @@ export default function TodoNewPlace({
   onUpdated: (id: string) => void
   onEditing: (editing: boolean) => void
 }) {
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const sent = s.payload as unknown as ResourceSubmission
   const [start] = useState(() => asListing(sent))
   const draft = useListingDraft(category, start)
@@ -126,10 +125,9 @@ export default function TodoNewPlace({
           label: 'Add to the guide',
           // As it was sent unless something was changed in it.
           via: ({ payload }) =>
-            fetch(withCommunity(`/api/admin/submissions/${s.id}`, community), {
+            api.fetch(`/api/admin/submissions/${s.id}`, {
               method: 'PATCH',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ status: 'approved', ...(edited.current ? { payload: withEdits(sent, payload) } : {}) }),
+              body: { status: 'approved', ...(edited.current ? { payload: withEdits(sent, payload) } : {}) },
             }),
           onSaved: () => onUpdated(s.id),
         }}

@@ -2,9 +2,9 @@
 
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson, parseOkJson } from '@/lib/fetchJson'
-import { withCommunity } from '@/lib/useCommunityData'
-import { useCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
+import { parseOkJson } from '@/lib/fetchJson'
+import { useCommunityTimezone } from '@/lib/communityContext'
+import { useAdminApi } from './useAdminApi'
 import { useNow } from '@/lib/useNow'
 import type { CategoryConfig } from '@/lib/categories'
 import { activeCampaignBanner, type CampaignBanner } from '@/lib/campaignBanner'
@@ -62,7 +62,7 @@ export default function CampaignBannerManager({
   onOpen: (id: string) => void
   onClose: () => void
 }) {
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const timezone = useCommunityTimezone()
   const now = useNow()
   // Deliberately NOT useCategories()/ContentProvider — that reads the
@@ -82,25 +82,15 @@ export default function CampaignBannerManager({
     setError(null)
     try {
       const [bannersBody, categoriesBody] = await Promise.all([
-        parseOkJson<{ banners: CampaignBanner[] }>(
-          await fetch(withCommunity('/api/admin/campaign-banners', community), {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          'Failed to load campaign banners.',
-        ),
-        parseOkJson<{ categories: CategoryConfig[] }>(
-          await fetch(withCommunity('/api/admin/categories', community), {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          'Failed to load categories.',
-        ),
+        parseOkJson<{ banners: CampaignBanner[] }>(await api.fetch('/api/admin/campaign-banners'), 'Failed to load campaign banners.'),
+        parseOkJson<{ categories: CategoryConfig[] }>(await api.fetch('/api/admin/categories'), 'Failed to load categories.'),
       ])
       setBanners(bannersBody.banners)
       setCategories(categoriesBody.categories)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community])
+  }, [api])
 
   useLoadOnMount(load)
 
@@ -169,7 +159,7 @@ function CampaignScreen({
   onDone: () => void
   onBack: () => void
 }) {
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const isNew = banner === null
   const start: FormState = banner
     ? { categoryId: banner.categoryId, title: banner.title, subtitle: banner.subtitle, startDate: banner.startDate, endDate: banner.endDate, destination: banner.destination }
@@ -197,15 +187,7 @@ function CampaignScreen({
 
     setSaving(true)
     try {
-      await fetchJson(
-        withCommunity(isNew ? '/api/admin/campaign-banners' : `/api/admin/campaign-banners/${banner.id}`, community),
-        {
-          method: isNew ? 'POST' : 'PATCH',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
-        },
-        'Could not save the campaign.',
-      )
+      await api.send(isNew ? 'POST' : 'PATCH', isNew ? '/api/admin/campaign-banners' : `/api/admin/campaign-banners/${banner.id}`, form, 'Could not save the campaign.')
       onDone()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the campaign.')
@@ -218,11 +200,7 @@ function CampaignScreen({
     if (!banner) return
     setSaving(true)
     try {
-      await fetchJson(
-        withCommunity(`/api/admin/campaign-banners/${banner.id}`, community),
-        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
-        'Could not delete the campaign.',
-      )
+      await api.send('DELETE', `/api/admin/campaign-banners/${banner.id}`, undefined, 'Could not delete the campaign.')
       onDone()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete the campaign.')

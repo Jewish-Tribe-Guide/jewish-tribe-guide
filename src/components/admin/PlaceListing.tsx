@@ -5,13 +5,11 @@ import type { EnrichedSubmission } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import type { AdminPlace } from '@/lib/adminPlaces'
 import type { EditorRow } from '@/lib/editorRows'
-import { fetchJson } from '@/lib/fetchJson'
 import { websiteKeyOf, type CheckedField } from '@/lib/googleJob'
 import { dishStatus } from '@/lib/watchJobs'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { shortDay } from '@/lib/todo'
-import { withCommunity } from '@/lib/useCommunityData'
 import { TrashIcon } from '@/components/icons'
 import { SUBMIT_PILL } from '@/components/resources/submitPill'
 import type { DirectoryResource } from '@/types'
@@ -25,6 +23,7 @@ import type { Stop } from './openedPlaceBoxes'
 import { jobsChangedBy, type Jobs } from './useWatchJobs'
 import { kindsOf } from './WatchKinds'
 import { useStepsInAddress } from './useStepsInAddress'
+import { useAdminApi } from './useAdminApi'
 
 // A listing as an admin sees it, wherever it's opened from: Places, or a job's
 // row with nothing waiting (boards Listing6, States6, Menu5, Change5, Stopped6,
@@ -40,7 +39,7 @@ const INPUT = 'min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 
 
 /** `send`: an eruv's own way back, which isn't a listing's route. */
 export function ArchivedPlace({ place, category, token, onDone, send: own }: { place: AdminPlace; category: CategoryConfig | undefined; token: string; onDone: () => void; send?: { restore: () => Promise<void>; remove: () => Promise<void> } }) {
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
@@ -50,7 +49,7 @@ export function ArchivedPlace({ place, category, token, onDone, send: own }: { p
     setError(null)
     try {
       if (own) await (method === 'PATCH' ? own.restore() : own.remove())
-      else await fetchJson(withCommunity(`/api/admin/archived-listings/${place.id}`, community), { method, headers: { Authorization: `Bearer ${token}` } }, fallback)
+      else await api.send(method, `/api/admin/archived-listings/${place.id}`, undefined, fallback)
       onDone()
     } catch (err) {
       setError(err instanceof Error ? err.message : fallback)
@@ -268,8 +267,8 @@ export default function PlaceListing({
     if (foundOpen) window.scrollTo?.(0, 0)
   }, [foundOpen])
 
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-  const post = <T,>(path: string, body: Record<string, unknown>) => fetchJson<T>(withCommunity(path, community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not do that.')
+  const api = useAdminApi(token)
+  const post = <T,>(path: string, body: Record<string, unknown>) => api.post<T>(path, body)
   const actions = sourceActions(place.id, post)
   // Until every job has answered, nothing can be said of a row.
   const loaded = (['google', 'times', 'hours', 'dishes', 'kosher', 'hospitals', 'links', 'runs'] as const).every((k) => jobs[k] !== undefined)
@@ -368,7 +367,7 @@ export default function PlaceListing({
     try {
       await post('/api/admin/watches/google', { action, id: place.id, field })
       if (action === 'use_field') {
-        const got = await fetchJson<{ item: DirectoryResource }>(withCommunity(`/api/admin/watches/google?item=${place.id}`, community), { headers }, 'Could not open its listing.')
+        const got = await api.get<{ item: DirectoryResource }>(`/api/admin/watches/google?item=${place.id}`, 'Could not open its listing.')
         const key = field === 'website' ? websiteKeyOf(category!)! : field
         setItem(got.item)
         setPatch({ [key]: (got.item as Record<string, unknown>)[key] ?? '' })
@@ -382,10 +381,10 @@ export default function PlaceListing({
   }
 
   type Found = { found: { id: string }[] }
-  const foundIds = async () => (await fetchJson<Found>(withCommunity(`/api/admin/listings/${place.id}/found`, community), { headers }, 'Could not see what it found.')).found.map((f) => f.id)
+  const foundIds = async () => (await api.get<Found>(`/api/admin/listings/${place.id}/found`, 'Could not see what it found.')).found.map((f) => f.id)
 
   async function openChange(id: string) {
-    const { submissions } = await fetchJson<{ submissions: EnrichedSubmission[] }>(withCommunity('/api/admin/submissions?status=pending', community), { headers }, 'Could not open that.')
+    const { submissions } = await api.get<{ submissions: EnrichedSubmission[] }>('/api/admin/submissions?status=pending', 'Could not open that.')
     const found = submissions.find((s) => s.id === id)
     if (found) setChange(found)
   }
@@ -418,7 +417,7 @@ export default function PlaceListing({
   /** Answered: Update the listing changed what the editor started from. */
   async function partAnswered(id: string, updated: boolean) {
     if (updated) {
-      const got = await fetchJson<{ item: DirectoryResource }>(withCommunity(`/api/admin/watches/google?item=${place.id}`, community), { headers }, 'Could not open its listing.')
+      const got = await api.get<{ item: DirectoryResource }>(`/api/admin/watches/google?item=${place.id}`, 'Could not open its listing.')
       setItem(got.item)
       setEditorRound((r) => r + 1)
     }
@@ -427,7 +426,7 @@ export default function PlaceListing({
 
   async function changeAnswered(updated: boolean) {
     if (updated) {
-      const got = await fetchJson<{ item: DirectoryResource }>(withCommunity(`/api/admin/watches/google?item=${place.id}`, community), { headers }, 'Could not open its listing.')
+      const got = await api.get<{ item: DirectoryResource }>(`/api/admin/watches/google?item=${place.id}`, 'Could not open its listing.')
       setItem(got.item)
       setEditorRound((r) => r + 1)
     }
@@ -440,7 +439,7 @@ export default function PlaceListing({
     setChangeBusy(true)
     setChangeError(null)
     try {
-      const res = await fetchJson<{ partial?: boolean }>(withCommunity(`/api/admin/submissions/${id}`, community), { method: 'PATCH', headers, body: JSON.stringify({ status, ...(reason ? { reason } : {}), ...(part ? { part } : {}) }) }, 'Failed to update.')
+      const res = await api.send<{ partial?: boolean }>('PATCH', `/api/admin/submissions/${id}`, { status, ...(reason ? { reason } : {}), ...(part ? { part } : {}) }, 'Failed to update.')
       if (res?.partial) {
         await partAnswered(id, status === 'approved')
         return 'partial'
@@ -507,7 +506,7 @@ export default function PlaceListing({
     setArchiving(true)
     setArchiveError(null)
     try {
-      await fetchJson(withCommunity(`/api/admin/listings/${place.id}`, community), { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }, 'Could not archive it.')
+      await api.send('DELETE', `/api/admin/listings/${place.id}`, undefined, 'Could not archive it.')
       onSaved()
     } catch (err) {
       setArchiveError(err instanceof Error ? err.message : 'Could not archive it.')
@@ -573,11 +572,7 @@ export default function PlaceListing({
         adminSave={{
           label: 'Update the listing',
           via: ({ payload }) =>
-            fetch(withCommunity(`/api/admin/listings/${place.id}`, community), {
-              method: 'PATCH',
-              headers,
-              body: JSON.stringify({ payload }),
-            }),
+            api.fetch(`/api/admin/listings/${place.id}`, { method: 'PATCH', body: { payload } }),
           onSaved,
           beside: confirming ? undefined : <ArchiveBin onClick={() => setConfirming(true)} />,
         }}

@@ -5,15 +5,14 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { fetchJson } from '@/lib/fetchJson'
 import { hoursJobCategories } from '@/lib/hoursJob'
 import type { NightKindId } from '@/lib/jobRuns'
 import { NIGHT_KINDS, type KindNight, type NightKindView, type TrackedSource } from '@/lib/nightKinds'
 import { pageFrom, placePath } from '@/lib/placeLink'
 import { HOSPITAL_CATEGORY } from '@/lib/refuahMatch'
-import { withCommunity } from '@/lib/useCommunityData'
 import { JOB_STEPS } from '@/lib/watchJobList'
 import { AdminBack, AdminBox, AdminRow, adminInputClass } from './AdminUI'
+import { useAdminApi } from './useAdminApi'
 import { noteJobSwitched, useWatchJobsAndReload } from './useWatchJobs'
 
 // A job, opened (board "a job"): how last night went and when it runs, what
@@ -53,7 +52,7 @@ const ADDS: Partial<Record<NightKindId, { label: string; purpose: string; place?
 }
 
 function AddToJob({ kind, token, onDone }: { kind: NightKindId; token: string; onDone: () => Promise<void> }) {
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const { jobs } = useWatchJobsAndReload(token)
   const add = ADDS[kind]!
   const [place, setPlace] = useState('')
@@ -68,14 +67,10 @@ function AddToJob({ kind, token, onDone }: { kind: NightKindId; token: string; o
     setBusy(true)
     setError(null)
     try {
-      await fetchJson(
-        withCommunity('/api/admin/watches', community),
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          // Only a purpose the Add a watch form offers goes by it; a Refuah page is checked by its address.
-          body: JSON.stringify({ action: 'add', url, ...(add.place ? { resourceId: place } : {}), ...(kind === 'hospitals' ? {} : { purpose: add.purpose }) }),
-        },
+      await api.post(
+        '/api/admin/watches',
+        // Only a purpose the Add a watch form offers goes by it; a Refuah page is checked by its address.
+        { action: 'add', url, ...(add.place ? { resourceId: place } : {}), ...(kind === 'hospitals' ? {} : { purpose: add.purpose }) },
         'Could not add it.',
       )
       await onDone()
@@ -118,6 +113,7 @@ function AddToJob({ kind, token, onDone }: { kind: NightKindId; token: string; o
  *  does; what the job checked then counts as Not checked. */
 export function TurnOffJob({ kind, name, count, token }: { kind: NightKindId; name: string; count: number; token: string }) {
   const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const router = useRouter()
   const [asking, setAsking] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -127,11 +123,7 @@ export function TurnOffJob({ kind, name, count, token }: { kind: NightKindId; na
     setBusy(true)
     setError(null)
     try {
-      await fetchJson(
-        withCommunity('/api/admin/watches', community),
-        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'job-off', kind }) },
-        'Could not turn it off.',
-      )
+      await api.post('/api/admin/watches', { action: 'job-off', kind }, 'Could not turn it off.')
       noteJobSwitched(community, kind, true)
       router.push(`${adminBase(community)}/watches`)
     } catch (err) {
@@ -186,6 +178,7 @@ const TRACKED_SHOWN = 2
 export default function JobPage({ token, id }: { token: string; id: string }) {
   const community = useCommunitySlug()
   const base = adminBase(community)
+  const api = useAdminApi(token)
   const { jobs, reload } = useWatchJobsAndReload(token)
   const [adding, setAdding] = useState(false)
   const [all, setAll] = useState(false)
@@ -213,11 +206,7 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
   async function list(id: string, action: 'pause' | 'resume') {
     setError(null)
     try {
-      await fetchJson(
-        withCommunity('/api/admin/watches', community),
-        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action, id }) },
-        'Could not do that.',
-      )
+      await api.post('/api/admin/watches', { action, id }, 'Could not do that.')
       await reload()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not do that.')
