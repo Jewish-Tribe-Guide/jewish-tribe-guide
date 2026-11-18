@@ -1593,8 +1593,19 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     setPagedItemId(null)
     // Closing the listing the address names: the address becomes the
     // category's, as it would have been had it been opened from the list.
+    //
+    // Written so Next's router learns it. Next patches replaceState, but
+    // treats a call whose state carries its own `__NA` mark as its own and
+    // passes it straight through, so handing it `window.history.state` left
+    // the router holding the listing's address, and its next commit (a
+    // refresh on coming back to the app, or anything just after the tap)
+    // wrote the listing's back (Nov 17). Without the mark, Next copies its
+    // state in and moves its own address to this one, with no navigation:
+    // the list stays as it is. The other keys (a `step`) are kept.
     if (id === linkedItemId && window.location.pathname !== routes.slug(activeCommunity.slug, category.id)) {
-      window.history.replaceState(window.history.state, '', routes.slug(activeCommunity.slug, category.id) + window.location.search)
+      const state: Record<string, unknown> = { ...window.history.state }
+      delete state.__NA
+      window.history.replaceState(state, '', routes.slug(activeCommunity.slug, category.id) + window.location.search)
     }
   }
   const closeColumn = (id: string) => {

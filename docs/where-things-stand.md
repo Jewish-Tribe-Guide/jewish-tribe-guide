@@ -356,11 +356,25 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   own Edit when it is the listing's only box and Edit listing is under it.
   **Changes** Oct 6's one box (Join was inside it, after the description)
   and Oct 10's Edit under every box, on these listings only.
-- Found Nov 17, not fixed: `e2e/listing-detail.spec.ts:375` (mobile) —
-  a Cemetery listing's own page, header Back: the list shows but the
-  address stays on the listing, about 1 run in 13 (3 of 40 on the code
-  before the pills, 3 of 41 after). A real Back that doesn't write its
-  address, not a slow test: the poll waits 5s.
+- Fixed Nov 17: Back from a listing's own page (`/philly/cemetery/<id>`
+  on a phone) wrote the category's address with `replaceState`, handing
+  it `window.history.state`. That state carries Next's `__NA` mark, and
+  Next's patched `replaceState` passes such a call through as its own, so
+  the router kept the listing's address and wrote it back on its next
+  commit: about 1 run in 13 in `e2e/listing-detail.spec.ts:375`, and
+  every time on coming back to the app (RefreshContentOnReturn's
+  refresh), after which a reload reopened the closed listing.
+  `closeOpenListing` now drops the mark, so Next moves its own address
+  with no navigation. New test "keeps the category's address after Back,
+  through a refresh": red 5 of 5 before, green 10 of 10 after; the old
+  test 40 of 40 after.
+- Found Nov 17, not fixed: `FindResourcesConnected`'s `replace` sync (the
+  search box, Open now, filters, `?item=`) writes the address the same
+  way, so Next never learns those either: by the same mechanism a refresh
+  (coming back to the app) should drop them from the address. Read from
+  Next's code, not yet seen in a browser. Left alone for now: telling
+  the router re-renders everything reading `useSearchParams`, the cascade
+  that sync was written to avoid.
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,
