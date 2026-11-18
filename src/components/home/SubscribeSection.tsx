@@ -7,6 +7,7 @@ import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import Honeypot from '@/components/Honeypot'
+import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWidget'
 import { HOME_CARD_OUTLINE, SIGN_OFF_BUTTON, SIGN_OFF_CARD, SIGN_OFF_EYEBROW, SIGN_OFF_HEADING, SIGN_OFF_LINE } from './AnswerCard'
 
 // ── "Stay in the loop" signup — desktop only, right after the map ──────────
@@ -55,6 +56,12 @@ export default function SubscribeSection({
   const [notifyAdd, setNotifyAdd] = useState(true)
   const [notifyClosure, setNotifyClosure] = useState(true)
   const [honeypot, setHoneypot] = useState('')
+  // The challenge mounts once someone starts on the email, not with the
+  // page: the home page loads nothing from Turnstile just to be looked at.
+  const [started, setStarted] = useState(false)
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const turnstileRef = useRef<TurnstileHandle>(null)
+  const challenge = started ? <TurnstileWidget ref={turnstileRef} onVerify={setTurnstileToken} /> : null
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
@@ -184,10 +191,13 @@ export default function SubscribeSection({
           notifyAdd,
           notifyClosure,
           company: honeypot,
+          turnstileToken,
         }),
       })
       const body = await res.json()
       if (!res.ok || !body.ok) {
+        // Tokens are single-use: a refused one needs a fresh challenge.
+        if (body.code === 'turnstile') turnstileRef.current?.reset()
         setError((body.errors ?? ['Something went wrong.']).join(' '))
         return
       }
@@ -213,6 +223,7 @@ export default function SubscribeSection({
             {done ? 'You’re subscribed. Every email has an unsubscribe link.' : 'An email when a place is added or closes.'}
           </p>
           {error && <p className="mt-2 text-sm font-semibold text-red-600">{error}</p>}
+          {!done && challenge}
         </div>
         {!done && (
           <form onSubmit={handleSubmit} className="flex w-full gap-2 @[540px]:w-auto @[540px]:shrink-0">
@@ -222,6 +233,7 @@ export default function SubscribeSection({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onFocus={() => setStarted(true)}
               placeholder="Your email"
               aria-label="Email address"
               className="h-10 min-w-0 flex-1 rounded-full border border-slate-300 bg-white px-4 text-[14.5px] text-ink placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary @[540px]:w-[200px] @[540px]:flex-none"
@@ -255,6 +267,7 @@ export default function SubscribeSection({
             </p>
             <form onSubmit={handleSubmit} className="space-y-4">
               <Honeypot value={honeypot} onChange={setHoneypot} />
+            {challenge}
 
               {/* Email + Subscribe on one row — the box is wide enough that
                   stacking them (and the checkboxes below) left most of it
@@ -266,6 +279,7 @@ export default function SubscribeSection({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+              onFocus={() => setStarted(true)}
                   placeholder="you@example.com"
                   aria-label="Email address"
                   className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary"

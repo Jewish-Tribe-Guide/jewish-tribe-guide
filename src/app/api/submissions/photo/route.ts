@@ -1,5 +1,6 @@
 import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
+import { imageTypeOf } from '@/lib/imageBytes'
 
 // Same bucket every other admin-uploaded image uses (see
 // admin/categories/icon/route.ts) — a separate path prefix, not a separate
@@ -47,15 +48,23 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, errors: ['Image is too large — please keep it under 5MB.'] }, { status: 400 })
   }
 
+  // The label is only a first filter: what is stored, and the type it is
+  // served with, come from the file's own bytes.
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const type = imageTypeOf(bytes)
+  if (!type) {
+    return Response.json({ ok: false, errors: ['Please upload a PNG, JPG, WebP, or GIF image.'] }, { status: 400 })
+  }
+
   try {
     await ensureBucket()
 
-    const ext = file.type.split('/')[1]
+    const ext = type.split('/')[1]
     const path = `listing-photo/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
 
     const { error: uploadError } = await getAdminClient()
       .storage.from(BUCKET)
-      .upload(path, await file.arrayBuffer(), { contentType: file.type, upsert: false })
+      .upload(path, bytes, { contentType: type, upsert: false })
     if (uploadError) throw uploadError
 
     const { data } = getAdminClient().storage.from(BUCKET).getPublicUrl(path)

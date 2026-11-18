@@ -6,8 +6,10 @@ const m = vi.hoisted(() => ({
   createSubscriber: vi.fn(),
   sendSubscribeConfirmation: vi.fn(),
   after: vi.fn(),
+  verifyTurnstile: vi.fn(),
 }))
-vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit }))
+vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
+vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
 vi.mock('@/lib/communityStore', () => ({
   resolveCommunity: m.resolveCommunity,
   communitySlugFromRequest: (r: Request) => new URL(r.url).searchParams.get('community'),
@@ -26,6 +28,7 @@ beforeEach(() => {
   m.resolveCommunity.mockResolvedValue({ slug: 'ues' })
   m.createSubscriber.mockResolvedValue({ id: 'sub1', email: 'a@b.co' })
   m.sendSubscribeConfirmation.mockResolvedValue(undefined)
+  m.verifyTurnstile.mockResolvedValue(true)
 })
 
 describe('POST /api/subscribers', () => {
@@ -98,5 +101,21 @@ describe('POST /api/subscribers', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect((await post({ email: 'a@b.co' })).status).toBe(502)
     expect(m.after).not.toHaveBeenCalled()
+  })
+
+  // A signup emails the address given: without a challenge, a loop could
+  // sign up anyone's address from this form (Nov 18 review, item 25).
+  it('403s with code "turnstile", and subscribes nobody, when verification fails', async () => {
+    m.verifyTurnstile.mockResolvedValue(false)
+    const res = await post({ email: 'a@b.co', turnstileToken: 't' })
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('turnstile')
+    expect(m.verifyTurnstile).toHaveBeenCalledWith('t', '1.2.3.4')
+    expect(m.createSubscriber).not.toHaveBeenCalled()
+  })
+
+  it('stores the address as the site writes it', async () => {
+    await post({ email: ' A@B.co ' })
+    expect(m.createSubscriber).toHaveBeenCalledWith('ues', expect.objectContaining({ email: 'a@b.co' }))
   })
 })

@@ -68,6 +68,7 @@ beforeEach(() => {
   m.resolveCommunity.mockResolvedValue({ slug: 'philly' })
   m.getResourceById.mockResolvedValue({ id: 'r1', category: 'synagogue' })
   m.getCategoryById.mockResolvedValue({ id: 'synagogue', detailFields: [], capabilities: undefined })
+  m.listCategories.mockResolvedValue([{ id: 'synagogue' }])
   m.validateSubmission.mockReturnValue([])
   m.hasListingChanged.mockReturnValue(true)
   m.submitListingCreate.mockResolvedValue({ id: 's1' })
@@ -165,6 +166,15 @@ describe('POST /api/submissions — refusals before anything is stored', () => {
     nothingStored()
   })
 
+  // A hidden category's page isn't on the site, so nothing a visitor can
+  // reach adds to it (Nov 18 review: a hand-made POST still could).
+  it('403s a new place in a hidden category', async () => {
+    m.listCategories.mockResolvedValue([{ id: 'grocery' }])
+    const res = await post({ operation: 'create', payload: listing })
+    expect(res.status).toBe(403)
+    expect(m.submitListingCreate).not.toHaveBeenCalled()
+  })
+
   it('403s when the target category has that action switched off', async () => {
     m.getCategoryById.mockResolvedValue({ id: 'synagogue', detailFields: [], capabilities: { add: false } })
     const res = await post({ operation: 'create', payload: listing })
@@ -193,13 +203,28 @@ describe('POST /api/submissions — accepted submissions', () => {
   it('files a create against the request’s community and returns its id', async () => {
     const res = await post({ operation: 'create', payload: listing, submittedBy: { name: 'A', email: 'a@b.co' } })
     expect(await res.json()).toEqual({ ok: true, id: 's1' })
-    expect(m.submitListingCreate).toHaveBeenCalledWith('philly', { ...listing, submittedBy: { name: 'A', email: 'a@b.co' } })
+    expect(m.submitListingCreate).toHaveBeenCalledWith('philly', { ...listing, submittedBy: { email: 'a@b.co' } })
   })
 
   it('files an update with its note and submitter', async () => {
-    const res = await post({ operation: 'update', targetId: 'r1', payload: listing, note: 'moved', submittedBy: { name: 'A' } })
+    const res = await post({ operation: 'update', targetId: 'r1', payload: listing, note: 'moved', submittedBy: { email: ' A@Example.com ' } })
     expect(await res.json()).toEqual({ ok: true, id: 's2' })
-    expect(m.submitListingUpdate).toHaveBeenCalledWith('philly', 'r1', listing, 'moved', { name: 'A' })
+    expect(m.submitListingUpdate).toHaveBeenCalledWith('philly', 'r1', listing, 'moved', { email: 'a@example.com' })
+  })
+
+  // Which watch or admin sent a change is read off submitted_by.name: the
+  // queue says "read automatically from Keystone-K's list", an approval
+  // stamps "Confirmed by Keystone-K", and What changed drops "A visitor".
+  // So a visitor never names themselves; only the email they typed is kept.
+  it('keeps only a submitter’s email, never a name they send', async () => {
+    for (const name of ['Keystone-K list (automated)', 'Google Places (automated)', 'a@example.com']) {
+      m.submitListingUpdate.mockClear()
+      await post({ operation: 'update', targetId: 'r1', payload: listing, submittedBy: { name, email: 'a@example.com' } })
+      expect(m.submitListingUpdate.mock.calls[0][4]).toEqual({ email: 'a@example.com' })
+    }
+    m.submitListingUpdate.mockClear()
+    await post({ operation: 'update', targetId: 'r1', payload: listing, submittedBy: { name: 'Keystone-K list (automated)' } })
+    expect(m.submitListingUpdate.mock.calls[0][4]).toBeNull()
   })
 
   // "Read by AI" and an admin's fixes are the site's to say. A visitor who

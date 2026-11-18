@@ -1,4 +1,4 @@
-import { toggleVote, getVotedResourceIds } from '@/lib/voteStore'
+import { canVote, toggleVote, getVotedResourceIds } from '@/lib/voteStore'
 import { enforceRateLimit } from '@/lib/rateLimit'
 
 // GET /api/votes   header: x-vote-token
@@ -28,6 +28,8 @@ export async function GET(request: Request) {
   }
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 // POST /api/votes  body: { resourceId, token }
 // Toggles the browser token's upvote on a listing. Instant (not moderated).
 export async function POST(request: Request) {
@@ -45,8 +47,21 @@ export async function POST(request: Request) {
   if (!resourceId || !token) {
     return Response.json({ ok: false, error: 'Missing resourceId or token.' }, { status: 400 })
   }
+  // Both are UUIDs from the site itself (voteToken.ts makes the token).
+  if (!UUID.test(resourceId) || !UUID.test(token)) {
+    return Response.json({ ok: false, error: 'Invalid resourceId or token.' }, { status: 400 })
+  }
+
+  // A new token is free to make, so the limit above alone let one machine add
+  // 30 votes a minute to one listing. Per listing, a person taps it a few
+  // times at most (Nov 18 review, item 32).
+  const perListing = await enforceRateLimit(request, `votes:${resourceId}`, { limit: 4, windowSec: 3600 })
+  if (perListing) return perListing
 
   try {
+    if (!(await canVote(resourceId))) {
+      return Response.json({ ok: false, error: 'This listing doesn’t take votes.' }, { status: 404 })
+    }
     const result = await toggleVote(resourceId, token)
     // Deliberately does NOT call revalidatePublicContent() — a vote IS
     // different from every other write path here, in the one way that

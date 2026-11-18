@@ -14,9 +14,7 @@ import { payloadTooLarge } from '@/lib/limits'
 import { itemWording } from '@/lib/itemMarks'
 import { itemsChange, messageSource, newPlaceSubmission, sentItems, sentPlace } from '@/lib/messageReader'
 import { fieldsEdit } from '@/lib/fieldChanges'
-import { validateSubmission } from '@/lib/resourceStore'
-import { SERVER_ONLY_PAYLOAD_KEYS } from '@/lib/submissionSource'
-import { normalizeUrl } from '@/lib/validation'
+import { prepareSubmission } from '@/lib/prepareSubmission'
 import type { ResourceSubmission, SubmissionRow } from '@/types'
 
 // POST /api/message/send   { text, photoUrls, stores: [{ listingId, items, menu? }], edits: [{ listingId, values, notes }], places: [{ category, place, items }], forms: [{ submission }], email?, turnstileToken, company }
@@ -142,16 +140,12 @@ export async function POST(request: Request) {
     for (const f of forms) {
       const submission = (f.submission && typeof f.submission === 'object' ? f.submission : null) as ResourceSubmission | null
       if (!submission) continue
-      for (const k of SERVER_ONLY_PAYLOAD_KEYS) delete (submission as Record<string, unknown>)[k]
       const category = catById.get(submission.category)
       if (!category || !ui.contributions.add || !resolveCapabilities(category.capabilities).add) {
         return Response.json({ ok: false, errors: ['This action is not available for this category.'] }, { status: 403 })
       }
-      for (const field of category.detailFields) {
-        const raw = submission.details?.[field.key]
-        if (field.type === 'url' && typeof raw === 'string' && raw.trim()) submission.details[field.key] = normalizeUrl(raw)
-      }
-      const errors = validateSubmission(submission, category)
+      // The listing form's own preparation (/api/submissions).
+      const errors = prepareSubmission(submission, category, { operation: 'create' })
       if (errors.length) return Response.json({ ok: false, errors }, { status: 400 })
       filed.push(
         await submitListingCreate(

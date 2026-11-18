@@ -80,11 +80,12 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
 
 // DELETE /api/resource/:id/confirm
 // Undoes a confirmation made by mistake, restoring whatever confirmedAt (or
-// none) was in place before it — body: { previousConfirmedAt?, confirmedAt?,
-// activityId? }. `confirmedAt` is the stamp this browser was given; when it's
-// sent, the undo only happens if the listing still carries it, so undoing
-// can't erase someone else's confirmation made in between. (A page loaded
-// before this existed doesn't send it, and gets the old behaviour.)
+// none) was in place before it — body: { previousConfirmedAt?, confirmedAt,
+// activityId? }. `confirmedAt` is the stamp this browser was given, and is
+// required: the undo only happens if the listing still carries it, so
+// undoing can't erase someone else's confirmation made in between, and no
+// one can write a date onto a listing they never confirmed. The date put
+// back is never later than the one undone.
 export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/[id]/confirm'>) {
   const limited = await enforceRateLimit(request, 'confirm', { limit: 20, windowSec: 60 })
   if (limited) return limited
@@ -108,13 +109,16 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
     return Response.json({ ok: false, error: 'Invalid previous confirmation.' }, { status: 400 })
   }
   const expected = body.confirmedAt
-  if (expected !== undefined && expected !== null && !isIso(expected)) {
+  if (!isIso(expected)) {
     return Response.json({ ok: false, error: 'Invalid confirmation.' }, { status: 400 })
+  }
+  if (typeof previous === 'string' && Date.parse(previous) > Date.parse(expected)) {
+    return Response.json({ ok: false, error: 'Invalid previous confirmation.' }, { status: 400 })
   }
 
   const { data, error } = section
-    ? await getAdminClient().rpc('unconfirm_section', { p_id: id, p_section: section, p_expected: expected ?? null, p_previous: previous ?? null })
-    : await getAdminClient().rpc('unconfirm_resource', { p_id: id, p_expected: expected ?? null, p_previous: previous ?? null })
+    ? await getAdminClient().rpc('unconfirm_section', { p_id: id, p_section: section, p_expected: expected, p_previous: previous ?? null })
+    : await getAdminClient().rpc('unconfirm_resource', { p_id: id, p_expected: expected, p_previous: previous ?? null })
   if (error) {
     console.error('[confirm] undo rpc failed:', error)
     return Response.json({ ok: false, error: 'Could not undo confirmation.' }, { status: 502 })

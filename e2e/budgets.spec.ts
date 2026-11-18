@@ -290,6 +290,9 @@ test.describe('category page weight', () => {
     const hosts: string[] = []
     page.on('request', (r) => void hosts.push(new URL(r.url()).host))
 
+    // The computer home ends on the email signup, which needs the challenge
+    // only once someone types in it (Nov 18).
+    await load(page, `/${community}`)
     await load(page, `/${community}/${category.id}`)
     expect(hosts.filter((h) => h === TURNSTILE_HOST), 'while only browsing').toHaveLength(0)
 

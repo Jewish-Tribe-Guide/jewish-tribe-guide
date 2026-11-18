@@ -56,7 +56,13 @@ export async function listPublishedForms(community: string): Promise<Omit<FormCo
     .eq('community_id', community)
     .order('id')
   if (error) throw new Error(`Failed to load forms: ${error.message}`)
-  return (data as FormRow[]).map(toConfig).filter((f) => f.active !== false)
+  // The draft comes off here, not only in the type: the result goes to every
+  // visitor's page, and an admin's unpublished edit was going with it.
+  return (data as FormRow[])
+    .map(toConfig)
+    .filter((f) => f.active !== false)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- left out, see above
+    .map(({ draft: _unpublished, ...form }) => form)
 }
 
 // Every form including drafts, for the admin Forms manager.

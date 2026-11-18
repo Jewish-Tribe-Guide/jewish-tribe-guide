@@ -1,8 +1,7 @@
-import { validateSubmission, getResourceById } from '@/lib/resourceStore'
+import { getResourceById } from '@/lib/resourceStore'
 import { getCategoryById, listCategories } from '@/lib/categoryStore'
-import { resolveCapabilities, isCategorySyncEligible } from '@/lib/categories'
-import { submitterDetails } from '@/lib/syncFields'
-import { keepsMenuLink } from '@/lib/menuLink'
+import { resolveCapabilities } from '@/lib/categories'
+import { prepareSubmission } from '@/lib/prepareSubmission'
 import {
   submitListingCreate,
   submitListingUpdate,
@@ -19,15 +18,13 @@ import { sendSubmissionNotification } from '@/lib/email'
 import { sendSubmissionConfirmation } from '@/lib/confirmationEmail'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { payloadTooLarge } from '@/lib/limits'
-import { SERVER_ONLY_PAYLOAD_KEYS } from '@/lib/submissionSource'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
-import { normalizeUrl } from '@/lib/validation'
-import { readContacts } from '@/lib/contacts'
 import { hasListingChanged } from '@/lib/listingDiff'
 import { ui } from '@/lib/uiConfig'
 import type { ResourceSubmission, SubmissionRow } from '@/types'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { normalizeEmail } from '@/lib/activity'
 
 type Body = {
   operation?: 'create' | 'update' | 'delete'
@@ -81,7 +78,11 @@ export async function POST(request: Request) {
 
   const community = await resolveCommunity(communitySlugFromRequest(request))
   const { operation, targetType = 'listing', targetId, note } = body
-  const submittedBy = body.submittedBy ?? null
+  // Only the email a visitor typed. A name is how the guide's own checks
+  // and admins sign (submissionSource, editedBy), so one sent from here
+  // would let a visitor's edit pass as Keystone-K's or Google's.
+  const email = normalizeEmail(body.submittedBy?.email)
+  const submittedBy = email ? { email } : null
 
   if (targetType === 'category') {
     return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
@@ -149,10 +150,7 @@ export async function POST(request: Request) {
 
   const payload = body.payload as ResourceSubmission | undefined
   // Where a suggestion came from ("Read by AI") and an admin's fixes are
-  // the site's own to say, never a visitor's (submissionSource.ts).
-  if (payload && typeof payload === 'object') {
-    for (const k of SERVER_ONLY_PAYLOAD_KEYS) delete (payload as Record<string, unknown>)[k]
-  }
+  // the site's own to say, never a visitor's: prepareSubmission strips them.
   if ((operation === 'create' || operation === 'update') && !payload) {
     return Response.json({ ok: false, errors: ['Missing listing details.'] }, { status: 400 })
   }
@@ -175,6 +173,12 @@ export async function POST(request: Request) {
   // category from the payload (create) or the existing listing (update/delete),
   // so a disabled per-category button can't be bypassed by posting directly.
   const categoryId = operation === 'create' ? payload?.category : existingResource?.category
+  // A new place only in a category on the site: getCategoryById reads
+  // hidden ones too, and a hidden page has no Add for a visitor to reach.
+  // listCategories counts one a campaign has revealed as on the site.
+  if (operation === 'create' && !(await listCategories(community.slug)).some((c) => c.id === categoryId)) {
+    return Response.json({ ok: false, errors: ['This action is not available for this category.'] }, { status: 403 })
+  }
   if (categoryId) {
     const cat = await getCategoryById(community.slug, categoryId)
     if (cat) {
@@ -192,35 +196,10 @@ export async function POST(request: Request) {
 
   if (payload) {
     const category = await getCategoryById(community.slug, payload.category)
-    // The app's own keys (sync state, an admin's status override, item dates)
-    // come off before anything else looks at the payload: nothing downstream
-    // would refuse them, and the moderation diff hides them.
-    if (payload.details && typeof payload.details === 'object') {
-      payload.details = submitterDetails(payload.details, {
-        operation: operation === 'create' ? 'create' : 'update',
-        fieldKeys: category?.detailFields.map((f) => f.key) ?? [],
-        syncEligible: category ? isCategorySyncEligible(category) : false,
-        storedPlaceId: existingResource?.placeId,
-        keepsMenuLink: keepsMenuLink(category),
-      })
-    }
-    // Nobody types the "https://" scheme by hand for a website field — add it
-    // before validating (so a bare "example.com" isn't rejected) and before
-    // storing (so the saved value is still a real, working link — the card
-    // renderer uses it as-is for the href). The listing form already does
-    // this client-side on blur; normalizing again here covers any submission
-    // that skips that path (e.g. a stale client, direct API use).
-    if (payload.details) {
-      for (const field of category?.detailFields ?? []) {
-        // A list of contacts as it was typed in the editor ("215-805-8668, "),
-        // stored tidied: each entry checked, the blank ones gone.
-        if (field.type === 'contacts' && field.key in payload.details) payload.details[field.key] = readContacts(payload.details[field.key])
-        if (field.type !== 'url') continue
-        const raw = payload.details[field.key]
-        if (typeof raw === 'string' && raw.trim()) payload.details[field.key] = normalizeUrl(raw)
-      }
-    }
-    const errors = validateSubmission(payload, category)
+    const errors = prepareSubmission(payload, category, {
+      operation: operation === 'create' ? 'create' : 'update',
+      storedPlaceId: existingResource?.placeId,
+    })
     // The authoritative version of the guard the editors already apply
     // client-side (ListingEditor and BoxEditor keep Send off until something
     // changed) — this one can't be bypassed by posting directly.

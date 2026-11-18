@@ -25,6 +25,8 @@ vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate, submitListingCreate: m.submitListingCreate }))
 vi.mock('@/lib/email', () => ({ sendSubmissionNotification: m.sendSubmissionNotification }))
 
+import { SYNC_INTERNAL_FIELDS } from '@/lib/syncFields'
+
 const { POST } = await import('./route')
 
 const ARCH = '0b6c4c1e-2f55-4a8e-9d57-3b7f0d6f4a21'
@@ -126,6 +128,17 @@ describe('POST /api/message/send', () => {
     expect(res.status).toBe(400)
     expect((await res.json()).errors.length).toBeGreaterThan(0)
     expect(m.submitListingCreate).toHaveBeenCalledTimes(1)
+  })
+
+  // The add form's place goes through the same preparation as the listing
+  // form's (/api/submissions): before Nov 18 this path dropped only the
+  // source keys, so a hand-made send could set the app's own keys (an
+  // admin's status override, sync dates), which the moderation diff hides.
+  it('strips the app’s own keys from a new place sent from the add form', async () => {
+    const forged = Object.fromEntries(SYNC_INTERNAL_FIELDS.map((k) => [k, 'CLOSED_PERMANENTLY']))
+    const form = { category: 'grocery', name: 'South Square Market', address: '2201 South St', phone: '', anchorId: 'all', distance: null, geo: null, details: { m: ['Challah'], ...forged } }
+    expect(await (await post({ text: 'x', forms: [{ submission: form }] })).json()).toMatchObject({ ok: true, filed: 1 })
+    expect(m.submitListingCreate.mock.calls[0][1].details).toEqual({ m: ['Challah'] })
   })
 
   it('files a new place in its category, with what it carries', async () => {

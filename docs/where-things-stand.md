@@ -1004,6 +1004,38 @@ Done:
   is known for today only (the calendar's days ahead don't carry it), so
   tomorrow's Rosh Chodesh minyan still isn't offered as Next. The unused
   `calendarDaysFor` is gone.
+- What reaches the queue and the site from a visitor, tightened:
+  - A sender is their email only. A name they typed ("Keystone-K
+    (automated)") no longer makes the queue say it was read from a watch,
+    or approval say "Confirmed by" one.
+  - A new place from "+ Add" gets the same clean-up as the listing form
+    (`prepareSubmission`: the site's own keys off, contacts tidied, bare
+    websites given their scheme).
+  - Undoing a "checked" needs the stamp it was given, so a listing's date
+    can't be set to any day.
+  - Undoing "gone" puts "Reported gone" back only while a report of it is
+    waiting in the queue.
+  - A new place can't be sent into a hidden category.
+- Email the site sends: a request's type comes from the site (one of the
+  five built-in kinds, or a published form's own title found by its id),
+  never from the sender, since it is the email's subject. Its confirmation
+  goes to one address. The email signup has the Turnstile challenge,
+  mounted once someone types in it, so the home page still loads nothing
+  from Cloudflare (`budgets.spec.ts` now checks the home page too).
+- Photo uploads are stored with the type their bytes show, and refused
+  when the bytes are not a PNG, JPG, GIF or WebP, whatever the label says.
+  **Not done:** Turnstile on uploads (a token is single-use, and the photo
+  goes up when picked, before the listing's own submit uses the form's
+  token; it needs a second challenge), and clearing photos no listing
+  uses (it deletes stored files, so it waits for a yes on what counts as
+  unused: a rejected edit's photo, an old photo in What changed).
+- Public reads: a form's unpublished draft no longer goes out with the
+  published form, and `/api/eruv` says a read failed and when, not the
+  error's text.
+- Counts: a vote needs an approved listing in a category with upvotes on,
+  real UUIDs, and one machine gets four taps a listing an hour. A
+  remembered question counts toward "most asked" once per visitor a day,
+  written after the answer.
 
 ## Open from the boxes and fields work (Nov 10)
 

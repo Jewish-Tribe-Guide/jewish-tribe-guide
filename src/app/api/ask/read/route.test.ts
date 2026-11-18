@@ -9,10 +9,14 @@ const m = vi.hoisted(() => ({
   sharedLimit: vi.fn(),
   findReading: vi.fn(),
   saveReading: vi.fn(),
+  countAsked: vi.fn(),
+  rateLimit: vi.fn(),
+  after: vi.fn(),
   fetch: vi.fn(),
 }))
-vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, sharedLimit: m.sharedLimit }))
-vi.mock('@/lib/questionReadingStore', () => ({ findReading: m.findReading, saveReading: m.saveReading }))
+vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, sharedLimit: m.sharedLimit, rateLimit: m.rateLimit }))
+vi.mock('@/lib/questionReadingStore', () => ({ findReading: m.findReading, saveReading: m.saveReading, countAsked: m.countAsked }))
+vi.mock('next/server', () => ({ after: m.after }))
 vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly' }) }))
 vi.mock('@/lib/categoryStore', () => ({
   listCategories: async () => [makeCategory({ id: 'restaurant', pluralLabel: 'Food', detailFields: [{ key: 't', label: 'Food Type', type: 'select', filterable: true }] })],
@@ -75,6 +79,20 @@ describe('POST /api/ask/read', () => {
     expect(m.findReading).toHaveBeenCalledWith('philly', 'kosher food')
     expect(m.fetch).not.toHaveBeenCalled()
     expect(m.enforceRateLimit).not.toHaveBeenCalled()
+  })
+
+  // Nov 18 review, item 32: every ask counted, so a loop could put any
+  // question at the top of the admin's "most asked".
+  it('counts a remembered question once per visitor a day, after answering', async () => {
+    m.findReading.mockResolvedValue({ reading: { categories: [] }, approved: true, hits: 7 })
+    m.rateLimit.mockResolvedValueOnce({ ok: true }).mockResolvedValueOnce({ ok: false, retryAfter: 60 })
+    await ask('Kosher food?')
+    await ask('Kosher food?')
+    expect(m.countAsked).not.toHaveBeenCalled()
+    for (const [job] of m.after.mock.calls) await job()
+    expect(m.rateLimit).toHaveBeenCalledWith(expect.any(Request), 'question-asked:philly:kosher food', { limit: 1, windowSec: 86_400 })
+    expect(m.countAsked).toHaveBeenCalledTimes(1)
+    expect(m.countAsked).toHaveBeenCalledWith('philly', 'kosher food', 7)
   })
 
   it('reads a new question, tidies it to the site’s own words, and remembers it', async () => {
