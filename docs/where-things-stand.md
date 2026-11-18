@@ -915,6 +915,16 @@ it says otherwise:
   - New community on the superadmin console (`?step=new`, 736d1797).
 - Gone: `People.tsx`, ChangeReview's unused `inPlace` (b0b75bd0), and the
   unused `/api/admin/subscribers` routes (no test: nothing called them).
+- Settled with the user later on Nov 18 (they agreed to all three):
+  - A category's id can't be renamed: no screen offered it since Nov 5,
+    and a rename moved only the listings, so `renameCategoryId`, the
+    id-usage route and the editor's rename gate are gone (9181c66a).
+  - A form's tile has no emoji to pick: the site always drew its line
+    icon. The picker, the unused `PinColorField` and Support's and
+    Volunteer's emoji fallbacks are gone (1b4d2641).
+  - About and Privacy and Communities live only in the superadmin
+    console (`/admin/pages`, `/admin`); the community's menu links there
+    and its two copies are gone.
 
 Still open:
 
@@ -922,17 +932,6 @@ Still open:
   list.** A design call: proposed, file a suggestion ("KCL’s list doesn’t
   have it by this name") for such a listing, or show it on the Kosher
   page instead. Not built.
-- **Renaming a category's id moves its listings only.** Still pointing at
-  the old id after: a campaign banner (`campaign_banner.category_id`), home
-  sections, Right now's categories (`rightNowCategories`), a phone tab or
-  computer nav link to it, subscribers' `categories`, and pending
-  suggestions' `payload.category`. Fix: cascade them in
-  `renameCategoryId`, or refuse the rename while any exists.
-- **Duplicate screens, which home to keep:** About and Privacy is at both
-  `/admin/pages` and `/{c}/admin/pages`, and Communities at `/admin` and
-  `/{c}/admin/communities` (superadmins only see the second of each).
-- **A form's icon is still an emoji picker** (`IconField`), against the
-  no-emoji rule; what a form's tile shows instead is a design call.
 - **To do's own open/close is a raw `history.pushState`** (`goTo` in
   ModerationQueue). Checked in the browser, Back from another page after
   a reload lands on the open place, so it works today; it's still the
