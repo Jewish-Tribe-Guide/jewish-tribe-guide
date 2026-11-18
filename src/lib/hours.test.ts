@@ -255,11 +255,11 @@ describe('placesApiHoursToStructured', () => {
     expect(result?.tue).toBeNull()
   })
 
-  it('closes at 23:59 when the period runs past midnight into the next day', () => {
+  it('keeps a close past midnight as its time', () => {
     const result = placesApiHoursToStructured([
       { open: { day: 5, hour: 20, minute: 0 }, close: { day: 6, hour: 2, minute: 0 } },
     ])
-    expect(result?.fri).toEqual({ open: '20:00', close: '23:59' })
+    expect(result?.fri).toEqual({ open: '20:00', close: '02:00' })
   })
 
   it('ignores an out-of-range day index', () => {
@@ -274,17 +274,15 @@ describe('placesApiHoursToStructured', () => {
     })
   })
 
-  // Google returns split periods for a place that shuts for lunch. The mapper
-  // widens to the outer bounds rather than storing both windows, so the break
-  // is not represented and the place reads as open through it. Locking in the
-  // current behavior — StructuredHours has no way to express two windows in a
-  // day, so changing this would mean changing the stored shape.
-  it('merges split periods in one day into a single outer window', () => {
+  // Google returns split periods for a place that shuts for lunch. Until
+  // Nov 18 they were widened to one window and the place read Open through
+  // the break; the day now keeps each period.
+  it('keeps split periods in one day, spanning the day', () => {
     const result = placesApiHoursToStructured([
       { open: { day: 2, hour: 9, minute: 0 }, close: { day: 2, hour: 12, minute: 0 } },
       { open: { day: 2, hour: 14, minute: 0 }, close: { day: 2, hour: 18, minute: 0 } },
     ])
-    expect(result?.tue).toEqual({ open: '09:00', close: '18:00' })
+    expect(result?.tue).toEqual({ open: '09:00', close: '18:00', periods: [{ open: '09:00', close: '12:00' }, { open: '14:00', close: '18:00' }] })
   })
 })
 

@@ -50,4 +50,14 @@ describe('GET /api/zmanim', () => {
     expect(res.status).toBe(502)
     expect(res.headers.get('Cache-Control')).toBeNull()
   })
+
+  // Nov 18 review, item 14.
+  it('caches today’s date only; another day’s address is answered but never kept; a non-date is refused', async () => {
+    mockEnforce.mockResolvedValue(null)
+    mockGetZmanimData.mockResolvedValue({ hebrewDate: 'x' })
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+    expect((await get(`lat=1&lng=2&date=${today}`)).headers.get('Cache-Control')).toContain('s-maxage=')
+    expect((await get('lat=1&lng=2&date=2001-01-01')).headers.get('Cache-Control')).toBe('no-store')
+    expect((await get('lat=1&lng=2&date=tomorrow')).status).toBe(400)
+  })
 })

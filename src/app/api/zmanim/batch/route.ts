@@ -1,6 +1,6 @@
 import { community } from '@/community.config'
 import { getZmanimData } from '@/lib/zmanim'
-import { parseZmanimBatchRequest } from '@/lib/zmanimRequest'
+import { parseZmanimBatchRequest, zmanimDateCheck } from '@/lib/zmanimRequest'
 import { enforceRateLimit } from '@/lib/rateLimit'
 
 // Same cache policy as the single-location route: the answer depends only on
@@ -14,10 +14,14 @@ export async function GET(request: Request) {
   const limited = await enforceRateLimit(request, 'zmanim-batch', { limit: 30, windowSec: 60 })
   if (limited) return limited
 
-  const parsed = parseZmanimBatchRequest(new URL(request.url).searchParams, community.timezone)
+  const params = new URL(request.url).searchParams
+  const parsed = parseZmanimBatchRequest(params, community.timezone)
   if (!parsed.ok) {
     return Response.json({ ok: false, error: parsed.error }, { status: 400 })
   }
+  const dated = zmanimDateCheck(params, parsed.timezone)
+  if (dated === 'invalid') return Response.json({ ok: false, error: 'Invalid date.' }, { status: 400 })
+  const cacheControl = dated === 'cache' ? CACHE_CONTROL : 'no-store'
 
   // One failing spot must not sink the rest, so each result carries its own ok.
   const settled = await Promise.allSettled(
@@ -34,5 +38,5 @@ export async function GET(request: Request) {
   if (results.every((r) => !r.ok)) {
     return Response.json({ ok: false, error: 'Could not load zmanim right now.' }, { status: 502 })
   }
-  return Response.json({ ok: true, results }, { headers: { 'Cache-Control': CACHE_CONTROL } })
+  return Response.json({ ok: true, results }, { headers: { 'Cache-Control': cacheControl } })
 }

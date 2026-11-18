@@ -5,7 +5,7 @@ import { useToday } from '@/lib/useNow'
 import { community } from '@/community.config'
 import type { ZmanimData } from '@/types'
 import { applyOffsetMinutes } from '@/lib/zmanim'
-import { roundZmanimCoord, zmanimBatchPath, zmanimPath } from '@/lib/zmanimRequest'
+import { roundZmanimCoord, zmanimBatchPath, zmanimDate, zmanimPath } from '@/lib/zmanimRequest'
 import { clampTimeText, type MinyanBounds, type ZmanAnchor } from '@/lib/davening'
 
 export type AnchorTimes = {
@@ -71,12 +71,12 @@ async function loadPending(pending: Pending[]): Promise<void> {
   try {
     const spots = [...bySpot.values()]
     if (spots.length === 1) {
-      const res = await fetch(zmanimPath(spots[0].geo.lat, spots[0].geo.lng))
+      const res = await fetch(zmanimPath(spots[0].geo.lat, spots[0].geo.lng, undefined, zmanimDate(Date.now(), community.timezone)))
       const json = (await res.json()) as { ok: boolean; data?: ZmanimData }
       if (json.ok && json.data) store(spots[0].cacheKeys, json.data)
       return
     }
-    const res = await fetch(zmanimBatchPath(spots.map((s) => s.geo)))
+    const res = await fetch(zmanimBatchPath(spots.map((s) => s.geo), zmanimDate(Date.now(), community.timezone)))
     const json = (await res.json()) as {
       ok: boolean
       results?: Array<{ lat: number; lng: number; ok: boolean; data?: ZmanimData }>

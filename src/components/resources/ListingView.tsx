@@ -768,13 +768,18 @@ export default function ListingView({ item, category, color, place = null, upvot
   // (migration 078). Edit beside either.
   const editAbout = editRows('About', ['about'])
   const aboutKey = aboutFields.find((f) => !isBasicField(f))?.key
+  // Google's description on a place Google keeps, fetched before the sync
+  // recorded owning it: not marked as Google's, and not put to visitors as
+  // "Still right?" either, since it's Google's text, not the community's
+  // (Nov 18 review, item 13).
+  const googleText = !fromGoogle && aboutKey === 'googleDescription' && !!item.placeId
   const aboutFoot = fromGoogle ? (
     <span data-testid="about-google">{item.googleSyncedAt ? `Checked with Google, ${shortDate(item.googleSyncedAt, clock)}.` : 'Checked with Google.'}</span>
-  ) : aboutKey ? (
+  ) : aboutKey && !googleText ? (
     <FreshnessFooter resourceId={item.id} {...boxDate(item, aboutKey)} section={aboutKey} onEdit={editAbout} />
   ) : undefined
   const about = (aboutFields.length > 0 || aboutBig.length > 0) && (
-    <Card testId="listing-about" footer={aboutFoot} onEdit={fromGoogle ? editAbout : undefined}>
+    <Card testId="listing-about" footer={aboutFoot} onEdit={fromGoogle || googleText ? editAbout : undefined}>
       <div className="space-y-3 pt-2.5">
         {aboutFields.map((f) =>
           f.type === 'textarea' ? (

@@ -1036,6 +1036,22 @@ Done:
   real UUIDs, and one machine gets four taps a listing an hour. A
   remembered question counts toward "most asked" once per visitor a day,
   written after the answer.
+- A listing's hours read the place's clock (the community's timezone),
+  not the visitor's. A place open past midnight keeps its real close
+  ("Open until 2 AM", still open at 1 AM) instead of "11:59 PM" and
+  Closed, and a lunch or dinner break shows Closed (Google's split hours
+  are kept as `periods`; the old shape stays as it was for everything
+  else). Search's "open now" reads them the same way. The Shabbos card's
+  order and candle lighting still use the device clock; they agree with
+  each other, so they were left.
+- A shul's weekday box no longer says "10 min before sunset: 4:32 PM
+  today" on Friday or Shabbos (`ruleLinesToday` checks the rule's days).
+- The footer says "Tap Edit listing", the button's name.
+- Google's own description no longer asks "Still right?" on older
+  listings.
+- Zmanim are fetched with the date, in the community's time, so a CDN
+  can't hand back yesterday's just after midnight. A date more than a
+  day off is refused; today's is cached, any other isn't.
 
 ## Open from the boxes and fields work (Nov 10)
 

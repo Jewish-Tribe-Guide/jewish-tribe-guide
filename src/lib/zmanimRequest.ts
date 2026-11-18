@@ -18,10 +18,31 @@ export function roundZmanimCoord(n: number): number {
   return Math.round(n * f) / f + 0
 }
 
+/** Today's date (YYYY-MM-DD) in `timezone`. Sent with every zmanim request
+ *  so the address differs each day: the CDN keeps an answer ten minutes,
+ *  and without it, just after midnight, it could hand back yesterday's
+ *  times for "today" (Nov 18 review, item 14). */
+export function zmanimDate(now: number, timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now))
+}
+
 /** The path + query a client should request for a location. */
-export function zmanimPath(lat: number, lng: number, tzid?: string): string {
+export function zmanimPath(lat: number, lng: number, tzid?: string, date?: string): string {
   const q = `lat=${roundZmanimCoord(lat)}&lng=${roundZmanimCoord(lng)}`
-  return tzid ? `/api/zmanim?${q}&tzid=${encodeURIComponent(tzid)}` : `/api/zmanim?${q}`
+  const day = date ? `&date=${date}` : ''
+  return tzid ? `/api/zmanim?${q}&tzid=${encodeURIComponent(tzid)}${day}` : `/api/zmanim?${q}${day}`
+}
+
+/** Whether the server may let the CDN keep this answer: only when the date
+ *  the client asked for is the server's own today there. A date that isn't
+ *  (a clock a little off, either side of midnight) is answered for the
+ *  server's today, uncached, so no day's address ever holds another day's
+ *  times. A date that isn't a date is refused. */
+export function zmanimDateCheck(params: URLSearchParams, timezone: string, now: number = Date.now()): 'cache' | 'no-store' | 'invalid' {
+  const date = params.get('date')
+  if (date === null) return 'cache'
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return 'invalid'
+  return date === zmanimDate(now, timezone) ? 'cache' : 'no-store'
 }
 
 function isValidTimezone(tz: string): boolean {
@@ -92,8 +113,8 @@ export function canonicalZmanimPoints(points: ZmanimPoint[]): ZmanimPoint[] {
   return [...seen.values()].sort((a, b) => a.lat - b.lat || a.lng - b.lng)
 }
 
-export function zmanimBatchPath(points: ZmanimPoint[]): string {
-  return `/api/zmanim/batch?${canonicalZmanimPoints(points).map((p) => `p=${p.lat},${p.lng}`).join('&')}`
+export function zmanimBatchPath(points: ZmanimPoint[], date?: string): string {
+  return `/api/zmanim/batch?${canonicalZmanimPoints(points).map((p) => `p=${p.lat},${p.lng}`).join('&')}${date ? `&date=${date}` : ''}`
 }
 
 export type ParsedZmanimBatch =

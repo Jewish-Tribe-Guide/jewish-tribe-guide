@@ -1,5 +1,5 @@
 import type { CategoryConfig, CategoryField } from './categories'
-import { DAY_KEYS, fmt12, isStructuredHours, type DayHours, type DayKey, type StructuredHours } from './hours'
+import { DAY_KEYS, fmt12, isStructuredHours, type DayKey, type StructuredHours } from './hours'
 
 // ── A mikvah's hours, as its listing's own sections (Oct 22) ────────────────
 // Drawn on artifact 7MUNppcA4S4yvXKupEKJPR, agreed Oct 21: Mikvah hours
@@ -128,7 +128,12 @@ export function openClose(d: { open: string; close: string }): string {
   return om === cm ? `${o.slice(0, -3)}–${c}` : `${o}–${c}`
 }
 
-const dayText = (h: StructuredHours, d: DayKey): string | null => (!(d in h) ? null : h[d] ? openClose(h[d] as NonNullable<DayHours>) : 'Closed')
+const dayText = (h: StructuredHours, d: DayKey): string | null => {
+  if (!(d in h)) return null
+  const day = h[d]
+  if (!day) return 'Closed'
+  return day.periods && day.periods.length > 0 ? day.periods.map(openClose).join(', ') : openClose(day)
+}
 
 /** A section's hours as rows, days with the same hours (and the same old
  *  ones) together: "Monday to Thursday 7:30–9:30 PM was 8:30–10:30 PM".

@@ -1,6 +1,6 @@
 import { community } from '@/community.config'
 import { getZmanimData } from '@/lib/zmanim'
-import { parseZmanimRequest } from '@/lib/zmanimRequest'
+import { parseZmanimRequest, zmanimDateCheck } from '@/lib/zmanimRequest'
 import { enforceRateLimit } from '@/lib/rateLimit'
 
 // Cacheable at the CDN: the answer depends only on the (rounded) location, the
@@ -15,14 +15,18 @@ export async function GET(request: Request) {
   const limited = await enforceRateLimit(request, 'zmanim', { limit: 120, windowSec: 60 })
   if (limited) return limited
 
-  const parsed = parseZmanimRequest(new URL(request.url).searchParams, community.timezone)
+  const params = new URL(request.url).searchParams
+  const parsed = parseZmanimRequest(params, community.timezone)
   if (!parsed.ok) {
     return Response.json({ ok: false, error: parsed.error }, { status: 400 })
   }
+  const dated = zmanimDateCheck(params, parsed.timezone)
+  if (dated === 'invalid') return Response.json({ ok: false, error: 'Invalid date.' }, { status: 400 })
+  const cacheControl = dated === 'cache' ? CACHE_CONTROL : 'no-store'
 
   try {
     const data = await getZmanimData({ latitude: parsed.latitude, longitude: parsed.longitude, timezone: parsed.timezone })
-    return Response.json({ ok: true, data }, { headers: { 'Cache-Control': CACHE_CONTROL } })
+    return Response.json({ ok: true, data }, { headers: { 'Cache-Control': cacheControl } })
   } catch (err) {
     console.error('[zmanim] fetch failed:', err)
     return Response.json({ ok: false, error: 'Could not load zmanim right now.' }, { status: 502 })

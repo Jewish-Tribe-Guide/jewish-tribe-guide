@@ -1,6 +1,6 @@
 import { fieldIsVisible, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from './categories'
 import { ui } from './uiConfig'
-import { fmt12, getOpenStatus, hasAnyHours, isStructuredHours, DAY_KEYS, dayLabel, type DayKey, type DayHours } from './hours'
+import { dayRangesText, placeClock, fmt12, getOpenStatus, hasAnyHours, isStructuredHours, DAY_KEYS, dayLabel, type DayKey, type DayHours } from './hours'
 
 const short = (k: DayKey) => dayLabel(k).slice(0, 3)
 import { haversineMiles, milesText, roundMiles } from './geo'
@@ -265,11 +265,11 @@ export type WeekLine = { label: string; text: string; isToday: boolean }
 export function compactWeek(v: unknown, now: Date, { keepRuns = false }: { keepRuns?: boolean } = {}): WeekLine[] | null {
   if (!isStructuredHours(v)) return null
   const hours = v as Partial<Record<DayKey, DayHours>>
-  const today = DAY_KEYS[now.getDay()]
+  const today = placeClock(now).day
   const text = (k: DayKey) => {
     if (!(k in hours)) return 'No hours listed'
     const d = hours[k]
-    return d ? `${shortTime(fmt12(d.open))} – ${shortTime(fmt12(d.close))}` : 'Closed'
+    return d ? dayRangesText(d, (t) => shortTime(fmt12(t))) : 'Closed'
   }
   const lines: { days: DayKey[]; text: string }[] = []
   for (const k of DAY_KEYS) {

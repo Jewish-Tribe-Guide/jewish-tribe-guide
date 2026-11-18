@@ -231,6 +231,21 @@ describe('searchAsk — "open today", and hours nobody has entered', () => {
     ])
   })
 
+  // Nov 18 review, item 10: a day's second period, and last night's hours
+  // still running past midnight.
+  it('says a break’s second period is still to come, and a late night is still open', () => {
+    const split = listing('mikvah', 'Split Mikvah', 39.95, -75.17, {
+      women_s_hours: Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '09:00', close: '22:00', periods: [{ open: '09:00', close: '11:00' }, { open: '20:00', close: '22:00' }] }])),
+    })
+    expect(searchAsk([split], [mikvah], 'mikvah open today', { now: at(12) }).hits[0].today).toEqual([
+      { label: 'Women’s', opens: '8:00 PM', closes: '10:00 PM', openNow: false },
+    ])
+    const late = listing('mikvah', 'Late Mikvah', 39.95, -75.17, { women_s_hours: allWeek('20:00', '02:00') })
+    expect(searchAsk([late], [mikvah], 'mikvah open today', { now: at(1) }).hits[0].today[0]).toEqual(
+      { label: 'Women’s', opens: '8:00 PM', closes: '2:00 AM', openNow: true },
+    )
+  })
+
   it('drops hours already over for the day', () => {
     const [hit] = searchAsk([both], [mikvah], 'mikvah open today', { now: at(12) }).hits
     expect(hit.today.map((w) => w.label)).toEqual(['Women’s'])

@@ -7,7 +7,7 @@ import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from '@/lib/useZmanAnchors'
 import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, shabbosComesFirst, thisWeeksDays, weekByDates, type DayPosting, type SpecialSchedule, type WeekDayTimes } from '@/lib/schedules'
 import { isShabbosRow } from '@/lib/minyanText'
-import { clockMinutes, noteText, SHABBOS_PART_LABELS, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
+import { clockMinutes, noteText, SHABBOS_PART_LABELS, ruleLinesToday, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
 import { DAY_KEYS, type DayKey } from '@/lib/hours'
 import { boxDate, isMinyanOnly } from '@/lib/listingView'
 import { THIS_WEEK_SECTION } from '@/lib/boxDates'
@@ -280,10 +280,7 @@ export default function DaveningCard({
           <WeekTable table={week} today={today} marks={!week.everySignUp} />
           <Notes
             lines={[
-              ...week.rules.map((r) => {
-                const at = resolveAnchorTime(r.row, anchors)
-                return at ? `${capital(r.text)}: ${at} today.` : null
-              }),
+              ...ruleLinesToday(week.rules, today, anchors),
               ...week.notes,
               week.otherSeason,
             ]}
@@ -532,8 +529,6 @@ function datesText(fromDate: string, toDate: string): string {
 const weekdayOf = (date: string): DayKey => DAY_KEYS[new Date(`${date}T12:00:00Z`).getUTCDay()]
 
 const daysFrom = (date: string, days: number) => new Date(Date.parse(`${date}T12:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)
-
-const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 function Notes({ lines }: { lines: (string | null | undefined)[] }) {
   const shown = lines.filter((l): l is string => !!l)

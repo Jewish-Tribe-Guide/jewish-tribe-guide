@@ -1,5 +1,6 @@
 'use client'
 
+import { EDIT_LISTING_LABEL } from './resources/editListingLabel'
 import Link from 'next/link'
 import FeedbackButton from './FeedbackButton'
 import { SkylineIcon } from '@/components/icons'
@@ -65,7 +66,7 @@ export default function SiteFooter({
                 the guide is likely wrong (a tester, Nov 17). And the links
                 it named, Edit and Report, are long gone. */}
             <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-muted sm:ml-auto">
-              Tap <span className="font-medium text-slate-600">Suggest an edit</span> on any listing, or{' '}
+              Tap <span className="font-medium text-slate-600">{EDIT_LISTING_LABEL}</span> on any listing, or{' '}
               <span className="font-medium text-slate-600">+ Add</span> for a new place. A person checks each one.
             </p>
           </div>
