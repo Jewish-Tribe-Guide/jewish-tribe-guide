@@ -1,9 +1,6 @@
 'use client'
 
-import type { DirectoryResource } from '@/types'
-import type { CategoryConfig } from '@/lib/categories'
 import { PencilIcon, TrashIcon } from '@/components/icons'
-import { mainThing } from '@/lib/listingView'
 import { EDIT_LISTING_LABEL } from './editListingLabel'
 
 // ── The one visible way to edit an open listing ──────────────────────────
@@ -44,10 +41,10 @@ import { EDIT_LISTING_LABEL } from './editListingLabel'
 // to open the "+ Add" box about the listing on a category page, with "Edit
 // the details myself" a second step to the editor.
 //
-// On a listing that is one link (a WhatsApp group's Join, a network's
-// website), the pill is outlined rather than filled (Oct 6): the listing's
-// own big button is already right above it, and two filled pills stacked
-// read as two equal choices.
+// Filled on every listing (the user, Nov 17). A listing that is one link
+// (a WhatsApp group's Join, a network's website) had it outlined from
+// Oct 6, while its Join was a big filled button right above; Join is a
+// light pill now (board B6), so it's the same Edit listing as everywhere.
 //
 // The label is "Edit listing" (Oct 15): every box above it has its own
 // plain "Edit" for that box alone, so this one says it's the whole
@@ -63,8 +60,6 @@ import { EDIT_LISTING_LABEL } from './editListingLabel'
 export default function ListingEditBar({
   onEdit,
   onRequestRemoval,
-  item,
-  category,
   className = '',
 }: {
   /** Omitted when the listing can't be edited — then nothing renders. */
@@ -72,13 +67,10 @@ export default function ListingEditBar({
   /** Opens the editor's Request removal screen. Omitted where the category
    *  takes no removal requests. */
   onRequestRemoval?: () => void
-  item: DirectoryResource
-  category: CategoryConfig
   /** Surface-specific spacing. The shape itself never varies. */
   className?: string
 }) {
   if (!onEdit) return null
-  const quiet = mainThing(item, category) === 'join'
   return (
     <div className={`flex w-full items-stretch gap-2 ${className}`}>
       <button
@@ -87,10 +79,7 @@ export default function ListingEditBar({
           e.stopPropagation()
           onEdit()
         }}
-        className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition-transform active:scale-[0.98] ${
-          quiet ? 'border border-slate-300 bg-white text-slate-900' : 'bg-primary text-white shadow-lg'
-        }`}
-        data-quiet={quiet || undefined}
+        className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg transition-transform active:scale-[0.98]"
       >
         <PencilIcon className="h-4 w-4 shrink-0" />
         {EDIT_LISTING_LABEL}

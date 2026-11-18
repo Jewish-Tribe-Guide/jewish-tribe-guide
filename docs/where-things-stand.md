@@ -179,10 +179,18 @@ are unbalanced; about 6–7 min looks reachable.
   - main-dishes' `openPlace` reloaded every 3s, so a load over 3s on a busy
     runner was thrown away and restarted until the test gave up. Each try
     now waits for the screen to finish loading (expect's 5s), then looks.
-  - Open: `category-open.spec.ts` failed 2 of 8 full admin-write runs on
-    Nov 16, never alone (9/9). A page whose address was loaded behind the
-    list (Cemetery) is asked for again on the click. Seen before this
-    work too; cause not found yet.
+  - Closed Nov 17: `category-open.spec.ts` failed 2 of 8 full admin-write
+    runs on Nov 16, then on main's CI and PR 392's (Cemetery each time).
+    A test bug, not the site's: it clicked once the prefetch's *headers*
+    arrived, but Next uses a prefetched route only once it has read and
+    stored the whole thing (`EntryStatus.Fulfilled`,
+    `segment-cache/navigation.js`); one still arriving counts as none. On a
+    cold CI server the route rendered in 132ms and the click landed 64ms
+    in. The test now marks in the page when the router has read the body
+    and clicks a task after. Holding the body back 1.5s after the headers:
+    old test 5 of 5 red, new 5 of 5 green. Also: the site's CSP refuses
+    `waitForFunction`'s string eval, so it can never see a page flag; poll
+    `page.evaluate` instead.
   - Moderation's 15s waits (from Nov 3) are the approve request itself,
     about ten database round trips in a row; left as they are.
   - The combined jobs read made 105 database requests, about 65 of them
@@ -347,6 +355,27 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   instead of 14, and Map's wider padding starts at 390 instead of 375.
   **Changes** the row's text size on small phones; 390 and up and the
   computer are unchanged.
+- Built Nov 17, boards A4/B4/D5 (canvas HDnTE69LPCKmyMHvUHjpGr): a listing
+  whose main thing is its one link (WhatsApp groups, Networking, a
+  cemetery with only a website; `mainThing` = `join`) opens with Join or
+  Visit and Share as two pills under the name, then the box with who it's
+  for and the link's date. On a phone the pills split the row two thirds
+  and one; from 640 wide each is as wide as its words. The box loses its
+  own Edit when it is the listing's only box and Edit listing is under it.
+  **Changes** Oct 6's one box (Join was inside it, after the description)
+  and Oct 10's Edit under every box, on these listings only.
+  Same day, board B6: the pills are light (pale blue, Join and Share
+  alike, a group's Join included), 40px tall and as wide as their words
+  on every width: the solid ones felt "aggressive" and a full row closed
+  the listing off. **Changes** a group's green Join (Oct 6) to blue.
+  Then Edit listing is the filled blue pill on these listings too, as on
+  every other (the user: "bring back the regular edit listing color"); it
+  was outlined from Oct 6, beside the big filled Join. **Changes** that.
+- Found Nov 17, not fixed: `e2e/listing-detail.spec.ts:375` (mobile) —
+  a Cemetery listing's own page, header Back: the list shows but the
+  address stays on the listing, about 1 run in 13 (3 of 40 on the code
+  before the pills, 3 of 41 after). A real Back that doesn't write its
+  address, not a slow test: the poll waits 5s.
 
 **Nov 14, on this branch (appearance, held for its own PR):** the header
 Categories menu and the Add a listing picker list categories by name only,
@@ -745,6 +774,12 @@ With no choice made it's the first two categories with hours, as before
     bar (16-40 now; they sit ~25px over it).
 
 Nov 14, later, the user's yes to both:
+- Fixed Nov 17 (the user: WhatsApp Groups on a computer, narrowed to a
+  phone and widened again, "the search bar gets weird"): the category
+  page's search bar stayed in its docked look (white box, border, shadow)
+  on an unscrolled page. Crossing the phone/computer line remounts its
+  scroll marker and the docked check kept watching the old one.
+  `e2e/category-controls-resize.spec.ts`, red 3/3 before.
 - **The Kept up card is one line**, as tall as the search box (48px; it
   was 59px on two lines, the bigger box on the page): "Kept up by the
   community · 149 places", still a card with its chevron. A longer trust

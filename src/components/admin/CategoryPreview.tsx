@@ -239,7 +239,7 @@ export default function CategoryPreview({
         category={category}
         color={getCategoryColor([category], category.id)}
         path=""
-        foot={<ListingEditBar onEdit={canEdit ? () => setAction({ mode: 'edit', listing: fullest }) : undefined} item={fullest} category={category} />}
+        foot={<ListingEditBar onEdit={canEdit ? () => setAction({ mode: 'edit', listing: fullest }) : undefined} />}
       />
     ) : (
       <p className="text-sm text-muted p-4">No places on this page yet.</p>
