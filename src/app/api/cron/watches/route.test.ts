@@ -184,7 +184,7 @@ describe('/api/cron/watches', () => {
       ],
     })
     const body = await (await GET(request())).json()
-    expect(mockKeystone).toHaveBeenCalledWith('philly', 'https://keystone-k.org/establishments/')
+    expect(mockKeystone).toHaveBeenCalledWith('philly', 'https://keystone-k.org/establishments/', expect.objectContaining({ now: expect.any(Number) }))
     expect(mockWebsite).toHaveBeenCalledWith('https://bzbi.org/worship/')
     expect(body.results.map((r: { id: string }) => r.id)).toEqual(['k', 'site'])
     expect(mockUpdate.mock.calls.map(([, id]) => id)).toEqual(['k', 'site'])
@@ -238,7 +238,7 @@ describe('/api/cron/watches', () => {
     mockList.mockResolvedValue({ available: false, watches: [] })
     const body = await (await GET(request())).json()
     expect(body.recorded).toBe(false)
-    expect(mockKeystone).toHaveBeenCalledWith('philly', 'https://keystone-k.org/establishments/')
+    expect(mockKeystone).toHaveBeenCalledWith('philly', 'https://keystone-k.org/establishments/', expect.objectContaining({ now: expect.any(Number) }))
     expect(mockUpdate).not.toHaveBeenCalled()
   })
 
