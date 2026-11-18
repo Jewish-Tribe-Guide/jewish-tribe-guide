@@ -179,10 +179,18 @@ are unbalanced; about 6–7 min looks reachable.
   - main-dishes' `openPlace` reloaded every 3s, so a load over 3s on a busy
     runner was thrown away and restarted until the test gave up. Each try
     now waits for the screen to finish loading (expect's 5s), then looks.
-  - Open: `category-open.spec.ts` failed 2 of 8 full admin-write runs on
-    Nov 16, never alone (9/9). A page whose address was loaded behind the
-    list (Cemetery) is asked for again on the click. Seen before this
-    work too; cause not found yet.
+  - Closed Nov 17: `category-open.spec.ts` failed 2 of 8 full admin-write
+    runs on Nov 16, then on main's CI and PR 392's (Cemetery each time).
+    A test bug, not the site's: it clicked once the prefetch's *headers*
+    arrived, but Next uses a prefetched route only once it has read and
+    stored the whole thing (`EntryStatus.Fulfilled`,
+    `segment-cache/navigation.js`); one still arriving counts as none. On a
+    cold CI server the route rendered in 132ms and the click landed 64ms
+    in. The test now marks in the page when the router has read the body
+    and clicks a task after. Holding the body back 1.5s after the headers:
+    old test 5 of 5 red, new 5 of 5 green. Also: the site's CSP refuses
+    `waitForFunction`'s string eval, so it can never see a page flag; poll
+    `page.evaluate` instead.
   - Moderation's 15s waits (from Nov 3) are the approve request itself,
     about ten database round trips in a row; left as they are.
   - The combined jobs read made 105 database requests, about 65 of them
