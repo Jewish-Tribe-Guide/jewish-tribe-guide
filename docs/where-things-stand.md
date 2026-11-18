@@ -925,6 +925,12 @@ it says otherwise:
   - About and Privacy and Communities live only in the superadmin
     console (`/admin/pages`, `/admin`); the community's menu links there
     and its two copies are gone.
+- The three screen nits, fixed Nov 18: Places says the street of a place
+  another place has the name of (68d03fd5); Reports and History say
+  Approved and Rejected, as To do's buttons do, not Taken and Left
+  (8d549ac4, a change to the Oct 29 Reports board's wording); a shul's
+  usual times on its admin listing read by tefillah then time, Shabbos's
+  Friday first (d17d456c).
 
 Still open:
 
@@ -949,9 +955,8 @@ Still open:
   compare isn't constant-time.
 - **The Brodsky Center is in the live queue twice** (filed Nov 4): the
   user's to reject one.
-- Screens: same-name places in Places can't be told apart; Reports'
-  "Left" label; a shul's weekday times can show out of order.
-- Refactors worth doing: one `useAdminApi` hook for the token/fetch/error
+- Refactors worth doing, moved to their own session on Nov 18 (the
+  admin-refactors session): one `useAdminApi` hook for the token/fetch/error
   pattern, one admin route wrapper for auth + community + invalidation,
   one change-review component (ChangeReview and TodoChange), and one
   kosher-list runner for Keystone and Mekor.
