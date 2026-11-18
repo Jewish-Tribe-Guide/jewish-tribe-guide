@@ -1,4 +1,5 @@
 import { getAdminClient } from '@/lib/supabase/admin'
+import { jobsOff } from '@/lib/jobOff'
 import { listCategoriesUncached } from '@/lib/categoryStore'
 import { getResourceRowById, normalizeRow } from '@/lib/resourceStore'
 import { keepsMenuLink, menuWebsite, readElsewhere } from '@/lib/menuLink'
@@ -107,6 +108,8 @@ export async function syncMenuWatches(): Promise<{ community: string; added: num
     if (listError) throw new Error(`Couldn’t list the food places: ${listError.message}`)
     const { watches, available } = await listWatches(slug)
     if (!available) continue
+    // Menus turned off (jobOff.ts): no menu watch is added or taken away.
+    if (jobsOff(watches).includes('menus')) continue
     // Before the menu_reading table exists, only menu links are watched.
     const { readings } = await listMenuReadings(slug)
     const wanted = wantedMenuWatches(categories, ((rows ?? []) as ResourceRow[]).map(normalizeRow), readings)

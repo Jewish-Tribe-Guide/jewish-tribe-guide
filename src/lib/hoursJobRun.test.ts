@@ -124,6 +124,34 @@ describe('searchHoursPages', () => {
 })
 
 describe('syncHoursWatches', () => {
+  // Nov 18 review: a job a community turned off wasn't read, but its
+  // places' websites were still searched for its pages every night.
+  it('searches no website for a job the community turned off', async () => {
+    m.listWatches.mockResolvedValue({ watches: [{ id: 'off', url: 'https://guide.invalid/job-off/hours', resourceId: null, createdBy: 'job off', active: false }], available: true })
+    await syncHoursWatches(reach)
+    expect(reach.fetchHome).not.toHaveBeenCalled()
+    expect(m.addWatch).not.toHaveBeenCalled()
+  })
+
+  // And a website's candidate pages were read all in one moment.
+  it('reads a website’s pages a few at a time', async () => {
+    const links = Array.from({ length: 10 }, (_, i) => `<a href="/hours-${i}/">Hours ${i}</a>`).join('')
+    let now = 0
+    let most = 0
+    const busy = {
+      fetchHome: async () => ({ url: 'https://lmcmikvah.org/', body: links }),
+      readPage: async (url: string) => {
+        most = Math.max(most, ++now)
+        await new Promise((r) => setTimeout(r, 5))
+        now--
+        return { url, text: 'Sunday 9 AM – 5 PM', pdf: null }
+      },
+    }
+    await searchHoursPages('http://lmcmikvah.org/', busy)
+    expect(most).toBeGreaterThan(1)
+    expect(most).toBeLessThanOrEqual(3)
+  })
+
   it('watches each place’s hours pages, marked as found', async () => {
     expect(await syncHoursWatches(reach)).toEqual([{ community: 'philly', added: 3, removed: 0 }])
     expect(m.addWatch).toHaveBeenCalledWith('philly', {

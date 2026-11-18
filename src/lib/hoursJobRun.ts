@@ -1,4 +1,6 @@
 import { getAdminClient } from '@/lib/supabase/admin'
+import { fewAtATime } from './fewAtATime'
+import { jobsOff } from './jobOff'
 import { listCategoriesUncached } from '@/lib/categoryStore'
 import { normalizeRow } from '@/lib/resourceStore'
 import { addWatch, listWatches, removeWatch, updateWatch } from '@/lib/watchStore'
@@ -45,7 +47,7 @@ export async function searchHoursPages(website: string, reach: HoursReach = {}, 
   // A shul's calendar may be posted as pictures (calendarPictures.ts).
   const read = reach.readPage ?? ((u: string) => readListingPage(u, { pictures: job === 'times' }))
   const pages = (job === 'times' ? timesPages : hoursPages)(home.url, home.body)
-  const sources = await Promise.all(pages.map((p) => read(p.url).catch(() => null)))
+  const sources = await fewAtATime(pages, PAGES_AT_ONCE, (p) => read(p.url).catch(() => null))
   const keep = job === 'times' ? timesPagesToRead(sources) : sources.map((s) => !!s && looksLikeHours(s))
   return {
     found: pages.filter((_, i) => keep[i]),
@@ -56,6 +58,11 @@ export async function searchHoursPages(website: string, reach: HoursReach = {}, 
 /** Long enough for a slow website, short enough to leave the morning's
  *  run its time for the reads (its 60s, /api/cron/watches). */
 export const SEARCH_DEADLINE_MS = 20_000
+
+/** Websites searched at once, and pages of one website read at once: a
+ *  site isn't sent all its links in one moment (fewAtATime.ts). */
+const SITES_AT_ONCE = 6
+const PAGES_AT_ONCE = 3
 
 /** A job page's "Read them now" searches a place's website first, given
  *  at most this long, so the request stays well inside its route's 60s
@@ -147,18 +154,19 @@ export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADL
   if (error) throw new Error(`Couldn’t list the communities: ${error.message}`)
   const out = []
   for (const { slug } of (data ?? []) as { slug: string }[]) {
-    const jobs = await Promise.all(PAGE_JOBS.map(async (job) => (await hoursJobPlaces(slug, job)).places.map((place) => ({ place, job }))))
+    const { watches, available } = await listWatches(slug)
+    if (!available) continue
+    // A job the community turned off isn't searched for (jobOff.ts): off
+    // means nothing is read, the search for its pages included.
+    const off = jobsOff(watches)
+    const jobs = await Promise.all(PAGE_JOBS.filter((job) => !off.includes(job)).map(async (job) => (await hoursJobPlaces(slug, job)).places.map((place) => ({ place, job }))))
     const places = jobs.flat()
     const own = await ownSitePlaces(slug)
     if (!places.length && !own.places.length) continue
-    const { watches, available } = await listWatches(slug)
-    if (!available) continue
-    const searches = await Promise.all(
-      places.map(async ({ place: p, job }) => {
-        const website = websiteOf(p)
-        return { website, got: website ? await deadline(searchHoursPages(website, reach, job).catch(() => null), ms) : null }
-      }),
-    )
+    const searches = await fewAtATime(places, SITES_AT_ONCE, async ({ place: p, job }) => {
+      const website = websiteOf(p)
+      return { website, got: website ? await deadline(searchHoursPages(website, reach, job).catch(() => null), ms) : null }
+    })
     let added = 0
     let removed = 0
     for (const [i, { place, job }] of places.entries()) {

@@ -1,4 +1,5 @@
 import { getAdminClient } from '@/lib/supabase/admin'
+import { jobsOff } from '@/lib/jobOff'
 import { normalizeRow } from '@/lib/resourceStore'
 import { addWatch, listWatches, removeWatch } from '@/lib/watchStore'
 import { readRefuahNear } from '@/lib/refuahRun'
@@ -24,6 +25,8 @@ export async function syncRefuahWatches(fetcher: typeof fetch = fetch): Promise<
   for (const [community, communityRows] of byCommunity) {
     const { watches, available } = await listWatches(community)
     if (!available) continue
+    // Hospitals turned off (jobOff.ts): Refuah isn't asked.
+    if (jobsOff(watches).includes('hospitals')) continue
     const hospitals = communityRows.map(normalizeRow)
     const list = await readRefuahNear(hospitals.flatMap((h) => (h.geo ? [h.geo] : [])), fetcher)
     // Refuah down: leave every watch as it is, rather than take them all away.
