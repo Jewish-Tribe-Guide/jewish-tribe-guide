@@ -1,10 +1,8 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead, adminWrite, unchanged } from '@/lib/adminRoute'
 import { UUID } from '@/lib/itemMarkRoutes'
 import { listCategories } from '@/lib/categoryStore'
 import { getResourceById } from '@/lib/resourceStore'
 import { enforceRateLimit } from '@/lib/rateLimit'
-import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { googleCounts } from '@/lib/googleJob'
 import {
   GoogleJobError,
@@ -54,10 +52,7 @@ export const maxDuration = 60
 /** Check, Find and a pick each make a paid call to Google. */
 const PAID_LIMIT = { limit: 30, windowSec: 600 }
 
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
+export const GET = adminRead(async (request: Request, { community }) => {
   try {
     const params = new URL(request.url).searchParams
     const itemId = params.get('item')
@@ -75,16 +70,12 @@ export async function GET(request: Request) {
     console.error('[admin/watches/google] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the listings.'] }, { status: 502 })
   }
-}
+})
 
 const ACTIONS = ['check', 'find', 'pick', 'use', 'keep', 'edit', 'not_on_google', 'wrong_place', 'open', 'stop_field', 'use_field'] as const
 type Action = (typeof ACTIONS)[number]
 
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const POST = adminWrite(async (request: Request, { community, admin }) => {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   const action = body?.action as Action
   const id = typeof body?.id === 'string' ? body.id : ''
@@ -98,7 +89,7 @@ export async function POST(request: Request) {
   try {
     if (action === 'find') {
       const query = typeof body?.query === 'string' ? body.query.slice(0, 200) : undefined
-      return Response.json({ ok: true, found: await findOnGoogle(slug, id, query) })
+      return unchanged(Response.json({ ok: true, found: await findOnGoogle(slug, id, query) }))
     }
     let place
     if (action === 'check') place = await checkAgainstGoogle(slug, id)
@@ -121,11 +112,11 @@ export async function POST(request: Request) {
       place = await editFromGoogle(slug, id, values as Record<string, unknown>, admin.email)
     }
     // A check or a Stop changes only what the sync reads, never what the site shows.
-    if (action !== 'check' && action !== 'stop_field') await revalidatePublicContent()
-    return Response.json({ ok: true, place })
+    const saved = Response.json({ ok: true, place })
+    return action === 'check' || action === 'stop_field' ? unchanged(saved) : saved
   } catch (err) {
     if (err instanceof GoogleJobError) return Response.json({ ok: false, errors: [err.message] }, { status: err.status })
     console.error('[admin/watches/google] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })
   }
-}
+})

@@ -1,5 +1,4 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead } from '@/lib/adminRoute'
 import { shareReads } from '@/lib/supabase/sharedReads'
 import { JOB_READS, type JobKey } from '@/lib/watchJobReads'
 import { GET as categories } from '../../categories/route'
@@ -52,11 +51,7 @@ const HANDLERS: Record<JobKey, Handler> = {
   lookAgain,
 }
 
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (request: Request, { community }) => {
   const only = new URL(request.url).searchParams.get('only')
   const keys = (only ? only.split(',') : Object.keys(JOB_READS)).filter((k): k is JobKey => k in JOB_READS)
 
@@ -77,4 +72,4 @@ export async function GET(request: Request) {
     ),
   )
   return Response.json({ ok: true, jobs: Object.fromEntries(answers) })
-}
+})

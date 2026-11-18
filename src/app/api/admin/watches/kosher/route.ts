@@ -1,5 +1,4 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead, adminWrite } from '@/lib/adminRoute'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { getListReads, listWatches } from '@/lib/watchStore'
 import type { Watch } from '@/lib/watches'
@@ -20,7 +19,6 @@ import { listApprovedResources, restoreResource } from '@/lib/resourceStore'
 import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { after } from 'next/server'
 import { approveSubmission, rejectSubmission, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
-import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { kosherBoxKeys, renamedTo } from '@/lib/kosherBox'
 import type { ResourceSubmission } from '@/types'
 
@@ -82,11 +80,7 @@ const LISTS: { list: KosherList; url: string; is: (w: Watch) => boolean }[] = [
   { list: 'kcl', url: KCL_HOME_URL, is: (w) => isKclList(w.url) },
 ]
 
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (request: Request, { community }) => {
   try {
     const slug = community.slug
     const itemId = new URL(request.url).searchParams.get('item')
@@ -222,7 +216,7 @@ export async function GET(request: Request) {
     console.error('[admin/watches/kosher] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the kosher lists.'] }, { status: 502 })
   }
-}
+})
 
 const LIST_NAMES = new Set([KEYSTONE_WATCH_NAME, MEKOR_WATCH_NAME])
 
@@ -255,7 +249,6 @@ async function restore(slug: string, body: Record<string, unknown> | null, admin
       if (keys.length) await saveAsTheList(slug, row, found.by, { details: { ...row.details, ...pick(listed, keys) } }, 'Brought back from the archive, its hechsher as the list has it.', admin)
       await rejectSubmission(found.id, slug, admin)
     }
-    await revalidatePublicContent()
     // Its walks along the streets now, not tonight (walkRouteJob.ts).
     after(() => runWalkRoutesAfterChange(slug))
     return Response.json({ ok: true })
@@ -283,11 +276,7 @@ async function saveAsTheList(slug: string, row: Row, by: string, change: { name?
   await approveSubmission(filed.id, slug, admin)
 }
 
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const POST = adminWrite(async (request: Request, { community, admin }) => {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   const action = String(body?.action ?? '')
   const id = typeof body?.id === 'string' ? body.id : typeof body?.resourceId === 'string' ? body.resourceId : ''
@@ -311,7 +300,6 @@ export async function POST(request: Request) {
       if (!row) return Response.json({ ok: false, errors: ['That place isn’t in this guide.'] }, { status: 404 })
       const k = `https://keystone-k.org/kosher/${page}/`
       await saveAsTheList(slug, row, KEYSTONE_WATCH_NAME, { details: { ...row.details, k } }, `Its page on Keystone-K's list, given by an admin: ${k}`, admin.email)
-      await revalidatePublicContent()
       return Response.json({ ok: true })
     }
 
@@ -348,10 +336,9 @@ export async function POST(request: Request) {
       }
     }
     if (!(action === 'archive' && found.operation === 'delete')) await rejectSubmission(found.id, slug, admin.email)
-    await revalidatePublicContent()
     return Response.json({ ok: true })
   } catch (err) {
     console.error('[admin/watches/kosher] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })
   }
-}
+})

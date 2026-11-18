@@ -1,5 +1,4 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead } from '@/lib/adminRoute'
 import { listJobRuns } from '@/lib/jobRunStore'
 import { listWatches } from '@/lib/watchStore'
 import { loadGoogleJob } from '@/lib/googleJobRun'
@@ -18,10 +17,7 @@ import { jobsOff } from '@/lib/jobOff'
 //     site; the counts and misses are this community's. `available` is
 //     false before migration 086. `off`: the jobs this community turned off.
 
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
+export const GET = adminRead(async (request: Request, { community }) => {
   try {
     const now = Date.now()
     const [{ available, runs }, { watches }, google, unread, listings, links] = await Promise.all([
@@ -37,4 +33,4 @@ export async function GET(request: Request) {
     console.error('[admin/watches/runs] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the nightly runs.'] }, { status: 502 })
   }
-}
+})

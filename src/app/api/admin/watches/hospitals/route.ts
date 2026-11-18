@@ -1,5 +1,4 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead } from '@/lib/adminRoute'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { jobFindings } from '@/lib/watchFindingStore'
 import { listCategories } from '@/lib/categoryStore'
@@ -112,11 +111,7 @@ async function hospitalsIn(community: string): Promise<DirectoryResource[]> {
   return (await listApprovedResources(community)).filter((l) => l.category === HOSPITAL_CATEGORY)
 }
 
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (request: Request, { community }) => {
   try {
     const itemId = new URL(request.url).searchParams.get('item')
     if (itemId !== null) {
@@ -172,13 +167,9 @@ export async function GET(request: Request) {
     console.error('[admin/watches/hospitals] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the hospitals.'] }, { status: 502 })
   }
-}
+})
 
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const POST = adminRead(async (request: Request, { community, admin }) => {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   const action = body?.action
   const resourceId = typeof body?.resourceId === 'string' ? body.resourceId : ''
@@ -258,4 +249,4 @@ export async function POST(request: Request) {
     console.error('[admin/watches/hospitals] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })
   }
-}
+})
