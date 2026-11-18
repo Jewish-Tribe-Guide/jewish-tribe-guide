@@ -939,27 +939,38 @@ it says otherwise:
   usual times on its admin listing read by tefillah then time, Shabbos's
   Friday first (d17d456c).
 
+- The watch fixes, later on Nov 18:
+  - A job turned off isn't searched for its pages (hours, menus, Refuah,
+    eruv websites), and a site's candidate pages are read three at a time
+    (84ccccd9).
+  - Each community's pages, calendars, newsletters and pasted times are
+    read on its own timezone and map centre, not community.config's
+    (cceefa9c). The fetch user-agent still says PhillyJewishGuide: the
+    site's name, and shul sites already let it through.
+  - Cron routes compare their secret in constant time (567c5ec8).
+  - Walk routes start somewhere else in the line each night, communities
+    too, so requests that fail every night can't hold the budget
+    (35440032).
+  - The morning run: the page search gets the first 60s and takes places
+    in turn; no watch starts after 220s, room for a calendar's two-week
+    read (40782d43).
+- The public site's `replaceState` calls (`FindResourcesConnected`,
+  `ResourceMapView`) carry Next's mark, and were checked in a real
+  browser on Nov 18: the address survives a focus refresh, a navigation
+  away and Back. Left as they are (still allowlisted in
+  `replaceStateMark.test.ts`).
+- The Brodsky Center's second copy in the live queue: the user rejected
+  it on Nov 18.
+
 Still open:
 
-- **To do's own open/close is a raw `history.pushState`** (`goTo` in
-  ModerationQueue). Checked in the browser, Back from another page after
-  a reload lands on the open place, so it works today; it's still the
-  pattern AGENTS.md warns against.
-- Public site: `FindResourcesConnected` and `ResourceMapView` still call
-  `replaceState` carrying Next's mark (allowlisted in
-  `replaceStateMark.test.ts`); not seen to break.
-- Watches: a dated shul week is still compared with the usual times
-  (`shulWeekReading.ts`, `dropListed`), against the rule (for the
-  synagogue logic review); the watches run's time budget is thin (no new
-  watch after 250s of 300, the syncs' time included); the hours/menu/
-  Refuah syncs ignore "job off" and fetch a site's pages all at once; some
-  watch code reads Philly's timezone and map centre for every community;
-  walk-routes retries a failed chunk first every night; cron auth's
-  compare isn't constant-time.
-- **The Brodsky Center is in the live queue twice** (filed Nov 4): the
-  user's to reject one.
-- Refactors worth doing, moved to their own session on Nov 18 (the
-  admin-refactors session): one `useAdminApi` hook for the token/fetch/error
+- **A dated shul week is still compared with the usual times**
+  (`shulWeekReading.ts`, `dropListed`), against the rule. The user, Nov
+  18: talk about it after the rest.
+- With the admin-refactors session (PR 395): To do's own open/close is a
+  raw `history.pushState` (`goTo` in ModerationQueue; it works today,
+  checked in the browser after a reload, but it's the pattern AGENTS.md
+  warns against), one `useAdminApi` hook for the token/fetch/error
   pattern, one admin route wrapper for auth + community + invalidation,
   one change-review component (ChangeReview and TodoChange), and one
   kosher-list runner for Keystone and Mekor.
