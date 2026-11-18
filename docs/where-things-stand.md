@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 16, 2026.
+Last updated: Nov 18, 2026.
 
 ## The branch
 
@@ -851,6 +851,55 @@ Nov 14, later, the user's yes to both:
   category pages, Browse, What changed, Feedback and You. The Add button
   sits beside Feedback · About · Privacy at the bottom now, in Safari as
   it already did in the home-screen app.
+
+## The admin review (Nov 18, on `redesign/suite-rows`)
+
+The user asked for a look over the whole admin: what to fix, what to
+refactor, which watches don't work right. Fixed the same day, each with a
+test that failed against the old code:
+
+- Approve and reject act only on a change still waiting. Two approvals of
+  one new place at once (two tabs, a double tap) put it live twice, and
+  rejecting a change already approved marked it rejected while it stayed
+  live. The approval now claims the row first and hands it back if the
+  apply fails.
+- Category banner upload: that community's admins, not superadmins only.
+  Philly's 3 non-superadmin admins and Washington's 1 couldn't upload a
+  banner (as hero and logo before them).
+- Category page preview: its own community's places and zmanim, not
+  Philly's (it read `community.config`).
+- Watches: one watch's failed save no longer ends the night's run; it
+  counts as not working and the rest run.
+- Menu watch: a reading an admin skipped stays skipped on the nightly run,
+  not only on Read now.
+- Mekor watch: one place on Google is filed once. The Brodsky Center was
+  filed twice on Nov 4 (two names on Mekor's list, one Google place).
+  **Live queue still holds both** (the user's to reject one; 7 Mekor new
+  places waiting, 14–30 days old).
+
+Found, not fixed (the user's to pick from):
+
+- Watches: the nightly email never says a run was cut off (live: read-menus
+  Oct 27 and watches Nov 6 never finished); the watches job always reports
+  ok; out of AI reads every night since Oct 27, partly from re-reading pages
+  that already have a change waiting; KCL says "agrees" for a listing not on
+  its list; Google is asked nightly about places it already said are
+  closed; Keystone doesn't check Mekor's waiting new places (and the other
+  way round); reading a shul's dated week still compares it with the usual
+  times, against the rule (`shulWeekReading.ts` decides same/changed/new
+  from `regularMinyanim`; `listingPageRun.ts`'s `dropListed` drops a dated
+  row that matches a usual time). For the synagogue logic review.
+- Admin: unsaved Home page and Feedback drafts are wiped when the sign-in
+  token refreshes; Add a place hides a follow-up save that failed; the
+  sign-in link's address comes from the request's Origin header; renaming a
+  category's id leaves old references behind; the subscriber routes are
+  dead.
+- Screens: same-name places in Places can't be told apart; Reports' "Left"
+  label; a shul's weekday times can show out of order.
+- Refactors worth doing: one `useAdminApi` hook for the token/fetch/error
+  pattern repeated across tabs, one admin route wrapper for auth + community,
+  one change-review component, the screens still without an address, a
+  `replaceState` that keeps `__NA`.
 
 ## Open from the boxes and fields work (Nov 10)
 
