@@ -171,12 +171,19 @@ export function syncHoursOutcome(run: SyncHoursRun): JobOutcome {
 
 /** `ran`: checked, not counting `skipped`, those the night's AI reads ran
  *  out for (watches.ts). */
-export type WatchesRun = { active: number; ran: number; notWorking: number; left: number; skipped?: number; kinds?: RunKinds }
+/** `failedSteps`: the run's own steps that failed (giving the menus and
+ *  hospitals their watches, the eruv lines…), which went only to the log
+ *  before Nov 18. */
+export type WatchesRun = { active: number; ran: number; notWorking: number; left: number; skipped?: number; kinds?: RunKinds; failedSteps?: string[] }
 
 export function watchesOutcome(run: WatchesRun): JobOutcome {
   const parts = [`Checked ${run.ran} of ${plural(run.active, 'watch', 'watches')}`]
   if (run.notWorking) parts.push(`${run.notWorking} not working`)
-  const warnings = [run.left && `Ran out of time: ${run.left} left for the next night`, run.skipped && `Ran out of reads: ${run.skipped} not read, for the next night`].filter(Boolean)
+  const warnings = [
+    run.failedSteps?.length && `Didn’t work: ${run.failedSteps.join(', ')}`,
+    run.left && `Ran out of time: ${run.left} left for the next night`,
+    run.skipped && `Ran out of reads: ${run.skipped} not read, for the next night`,
+  ].filter(Boolean)
   return { ok: true, summary: parts.join(' · '), warning: warnings.length ? warnings.join(' · ') : null, kinds: run.kinds ?? null }
 }
 
@@ -245,14 +252,15 @@ export function nightlyEmailOutcome(run: NightlyEmailRun): JobOutcome {
 // A job that stops working is in the next nightly email (Nov 12,
 // nightlyEmailRun.ts); before it, one email when a job stopped working
 // and one when it worked again. Worked out from the job's last three
-// runs. A run cut off is told of by the run after it. A job that stops
-// running altogether is in no email: only the tab shows that.
+// runs. A run cut off is told of once it's past its time limit (or by the
+// run after it), and a job that stops running altogether the first night
+// it's late (nightlyEmailRun.ts's stoppedJobs, Nov 18).
 
-/** What was wrong with a run, or null. The latest run has just finished,
- *  so only an older one can be cut off. */
-function problemOf(run: JobRun | undefined, latest: boolean): string | null {
+/** What was wrong with a run, or null. The latest run unfinished is still
+ *  going, unless `cutOff`: it's past its time limit, so Vercel stopped it. */
+function problemOf(run: JobRun | undefined, latest: boolean, cutOff = false): string | null {
   if (!run) return null
-  if (!run.finishedAt) return latest ? null : 'stopped before it finished'
+  if (!run.finishedAt) return latest && !cutOff ? null : 'stopped before it finished'
   if (run.ok === false) return run.error || 'stopped with an error'
   return run.warning || null
 }
@@ -262,14 +270,18 @@ export type JobAlert = { job: JobId; name: string; broke: boolean; lines: string
 
 const runDay = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
 
-/** `runs`: the job's latest first, the first just finished. */
-export function jobAlert(job: Pick<NightlyJob, 'id' | 'name'>, runs: readonly JobRun[]): JobAlert | null {
+/** `runs`: the job's latest first. `at`, when given, is the time now: the
+ *  latest run unfinished past its time limit was cut off. Without it the
+ *  latest is taken as just finished, or still going (live, read-menus on
+ *  Oct 27 and watches on Nov 6 were never told of; Nov 18 review). */
+export function jobAlert(job: Pick<NightlyJob, 'id' | 'name'> & Partial<Pick<NightlyJob, 'limitSeconds'>>, runs: readonly JobRun[], at?: number): JobAlert | null {
   const [now, before, earlier] = runs
   if (!now) return null
   const lines: string[] = []
   // The run before was cut off, and nobody was told: the one before it was fine.
   if (before && !before.finishedAt && !problemOf(earlier, false)) lines.push(`${runDay(before.startedAt)}: stopped before it finished`)
-  const problem = problemOf(now, true)
+  const cutOff = at !== undefined && job.limitSeconds !== undefined && at - Date.parse(now.startedAt) > (job.limitSeconds + 60) * 1000
+  const problem = problemOf(now, true, cutOff)
   const was = problemOf(before, false)
   if (problem && !was) lines.push(`${runDay(now.startedAt)}: ${problem}`)
   else if (!problem && was) lines.push(`${runDay(now.startedAt)}: working again${now.summary ? ` (${now.summary})` : ''}`)

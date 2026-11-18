@@ -6,7 +6,7 @@ import { listWatches } from './watchStore'
 import { isNewsletterWatch } from './newsletter'
 import { findingFrom, watchNameOf } from './watchFindings'
 import { placePath } from './placeLink'
-import { NIGHTLY_JOBS, jobAlert, type JobRun } from './jobRuns'
+import { NIGHTLY_JOBS, jobAlert, jobHealth, lateAfterMs, type JobRun } from './jobRuns'
 import { statusChangesSince } from './nightNoteStore'
 import { recentJobRuns } from './jobRunStore'
 import { adminAppUrl, sendNightlyEmail } from './email'
@@ -52,20 +52,26 @@ export function stoppedWatch(w: Watch, names: ReadonlyMap<string, string>, slug:
 
 /** The jobs that stopped working last night: their latest run, since
  *  `since`, broke them (jobAlert). The jobs run for the whole site. */
-export function stoppedJobs(runs: ReadonlyMap<string, readonly JobRun[]>, since: string, slug: string): StoppedRow[] {
+export function stoppedJobs(runs: ReadonlyMap<string, readonly JobRun[]>, since: string, slug: string, now = Date.parse(since) + NIGHT_MS): StoppedRow[] {
   return NIGHTLY_JOBS.flatMap((job) => {
+    const row = (why: string) => [{ name: `${job.name} (nightly job)`, why: why.charAt(0).toUpperCase() + why.slice(1), kind: 'job' as const, path: `/${encodeURIComponent(slug)}/admin/watches` }]
     // This email's own run is the one going now: the night before's is
     // the one to tell of, a day late, since it couldn't tell of itself.
     const own = job.id === 'nightly-email'
     const list = (runs.get(job.id) ?? []).slice(own ? 1 : 0)
+    // A job that didn't run at all (a wrong secret, a cron gone): told of
+    // the first night it's late, not every night after.
+    const health = own ? null : jobHealth(job, list, now)
+    if (health?.state === 'late' && now - Date.parse(health.since) <= lateAfterMs(job) + NIGHT_MS) return row(`hasn’t run since ${runDayOf(health.since)}`)
     const from = own ? new Date(Date.parse(since) - NIGHT_MS / 4).toISOString() : since
     if (!list[0] || list[0].startedAt < from) return []
-    const alert = jobAlert(job, list)
+    const alert = jobAlert(job, list, own ? undefined : now)
     if (!alert?.broke) return []
-    const last = alert.lines[alert.lines.length - 1].replace(/^[A-Z][a-z]{2} \d{1,2}: /, '')
-    return [{ name: `${job.name} (nightly job)`, why: last.charAt(0).toUpperCase() + last.slice(1), kind: 'job' as const, path: `/${encodeURIComponent(slug)}/admin/watches` }]
+    return row(alert.lines[alert.lines.length - 1].replace(/^[A-Z][a-z]{2} \d{1,2}: /, ''))
   })
 }
+
+const runDayOf = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
 
 /** What waits on To do from tonight, a row a place, and how many more. */
 async function queue(slug: string, since: string, today: string): Promise<{ waiting: WaitingRow[]; earlier: number; people: number }> {
@@ -152,7 +158,7 @@ async function gatherNight(community: Night['community'] & { timezone: string },
     waiting,
     earlier,
     people,
-    stopped: [...broke.map((w) => stoppedWatch(w, names, community.slug)), ...stoppedJobs(runs, since, community.slug)],
+    stopped: [...broke.map((w) => stoppedWatch(w, names, community.slug)), ...stoppedJobs(runs, since, community.slug, now.getTime())],
     google,
     appUrl: adminAppUrl(),
   }
