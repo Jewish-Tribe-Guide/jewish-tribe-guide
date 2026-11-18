@@ -13,7 +13,7 @@ import { fieldKeyFor } from './SubmissionReview'
 // A change as the site's own editor opens it: what it would make the
 // listing (one part of it, when it's answered a part at a time), what that
 // differs in, the editor's rows it touches, and what goes in them. Shared
-// by a change on To do (TodoChange.tsx) and Read now's (ChangeReview.tsx).
+// by a change, on To do or opened from Read now (TodoChange.tsx).
 
 export type ChangeEdit = {
   /** The change as the open part alone would make it. */

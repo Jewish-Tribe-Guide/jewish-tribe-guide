@@ -33,6 +33,7 @@ const eruvId = `e2e-screens-${run}`
 const eruvName = `E2E Screens Eruv ${run}`
 const minyanim = [{ id: 'm1', tefillah: 'shacharis', days: ['mon', 'tue'], time: '7:00am' }]
 const submissions: string[] = []
+let placeId = ''
 
 test.beforeAll(async () => {
   const s = db()
@@ -52,6 +53,7 @@ test.beforeAll(async () => {
     .select('id')
     .single()
   if (place.error) throw new Error(`Could not seed the listing: ${place.error.message}`)
+  placeId = place.data.id
   const eruv = await s.from('eruv').insert({ community_id: 'philly', id: eruvId, name: eruvName, active: true })
   if (eruv.error) throw new Error(`Could not seed the eruv: ${eruv.error.message}`)
   const pending = { community_id: 'philly', target_type: 'listing', note: null, status: 'pending', submitted_by: { name: 'e2e-admin-write suite' } }
@@ -182,4 +184,29 @@ test('a change in To do: a minyan in the box it changes', async ({ page }) => {
     { shows: page.getByRole('button', { name: 'Remove this minyan' }), open: () => page.getByRole('button', { name: /^7:15 AM/ }).click(), close: () => page.getByRole('button', { name: 'Done', exact: true }).click() },
   ])
   await expect(page).toHaveURL(/\/philly\/admin\?open=[^&]+$/)
+})
+
+// One change screen (the admin review, Nov 18): what Read now finds on a
+// saved place opens To do's change screen, with To do's answers, not a
+// screen of its own ("Edit, then update", "Leave it") answering the same
+// change another way. Opened here by its address, as a reload of it would:
+// a Read now needs a watched source the test project hasn't got.
+test('a change found on a place in Places: To do’s screen, a minyan in it', async ({ page }) => {
+  await page.goto(`/philly/admin/places?place=${placeId}&found=${submissions[1]}`)
+  const decide = page.getByRole('group', { name: 'Decide' })
+  await expect(decide.getByRole('button', { name: 'Change to 7:15 AM' })).toBeVisible({ timeout: 20_000 })
+  await expect(decide.getByRole('button')).toHaveCount(2)
+  await expect(page.getByRole('button', { name: 'Edit, then update' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Leave it' })).toHaveCount(0)
+  await expect(page.getByText('1 of 1')).toHaveCount(0)
+  await walk(page, [
+    { shows: page.getByRole('button', { name: 'Change to 7:15 AM' }) },
+    { shows: page.getByRole('button', { name: 'Remove this minyan' }), open: () => page.getByRole('button', { name: /^7:15 AM/ }).click(), close: () => page.getByRole('button', { name: 'Done', exact: true }).click() },
+  ])
+  // Closed: back on the place, the change still waiting (nothing answered).
+  await visible(page, page.getByRole('button', { name: 'Close' })).first().click()
+  await expect(page.getByRole('button', { name: /^Usual weekday times.*7 AM/ })).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`\\?place=${placeId}$`))
+  const { data } = await db().from('submission').select('status').eq('id', submissions[1]).single()
+  expect(data?.status).toBe('pending')
 })

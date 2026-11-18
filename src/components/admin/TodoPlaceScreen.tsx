@@ -13,7 +13,6 @@ import { firstThing, shownThing } from '@/lib/todoPlaces'
 import { updateTodo } from '@/lib/useTodo'
 import { AdminBack, AdminBox } from './AdminUI'
 import { useAdminApi } from './useAdminApi'
-import type { QueuePosition } from './ChangeReview'
 import { SubmissionCard } from './SubmissionCard'
 import { SubmissionReview } from './SubmissionReview'
 import ThingSwitches from './ThingSwitches'
@@ -21,7 +20,7 @@ import TodoBroken from './TodoBroken'
 import TodoChange from './TodoChange'
 import TodoNewPlace from './TodoNewPlace'
 import TodoReading from './TodoReading'
-import PlaceFrame, { CloseButton, PlaceButtons, PlaceCard, type PlaceButton } from './PlaceFrame'
+import PlaceFrame, { CloseButton, PlaceButtons, PlaceCard, type PlaceButton, type PlacePosition } from './PlaceFrame'
 import type { Jobs } from './useWatchJobs'
 
 // A place opened from To do (the "one tap per place" boards, approved
@@ -53,7 +52,7 @@ export default function TodoPlaceScreen({
   place: TodoPlace
   /** The list's filter, which picks the thing it opens on. */
   filters: TodoFilter[]
-  position: QueuePosition
+  position: PlacePosition
   categoriesById: Map<string, CategoryConfig>
   token: string
   busyId: string | null
@@ -190,7 +189,7 @@ export default function TodoPlaceScreen({
   )
 }
 
-function Header({ place, position }: { place: TodoPlace; position: QueuePosition }) {
+function Header({ place, position }: { place: TodoPlace; position: PlacePosition }) {
   return (
     <AdminBack
       back={{ label: 'To do', onClick: position.back }}
@@ -228,7 +227,7 @@ function Feedback({
 }: {
   thing: Extract<TodoThing, { kind: 'feedback' }>
   name: string
-  position: QueuePosition
+  position: PlacePosition
   switches: ReactNode
   token: string
 }) {

@@ -14,7 +14,7 @@ import { TrashIcon } from '@/components/icons'
 import { SUBMIT_PILL } from '@/components/resources/submitPill'
 import type { DirectoryResource } from '@/types'
 import { AdminBack, AdminBox, AdminEmpty } from './AdminUI'
-import ChangeReview from './ChangeReview'
+import { ChangeOnItsOwn } from './TodoChange'
 import ListingEditorScreen from './ListingEditorScreen'
 import { listingSources, rowFinding, type GiveSource, type ReadNow, type RowSource, type SourceLine } from './listingSource'
 import OpenedPlace from './OpenedPlace'
@@ -322,7 +322,7 @@ export default function PlaceListing({
       if (!to || to === 'menu') return setChange(null)
       if (change?.id !== to) void openChange(to).catch(() => {})
     },
-    { inner: ['edit'] },
+    { inner: ['step'] },
   )
   // The rows the editor has shown, for a screen over one to open again.
   const rowsSeen = useRef(new Map<string, EditorRow>())
@@ -518,15 +518,15 @@ export default function PlaceListing({
   return (
     <div>
       {change && (
-        <ChangeReview
+        <ChangeOnItsOwn
           key={change.id}
           submission={change}
           category={category}
-          position={{ from: 'Back', at: 0, total: 1, back: () => setChange(null) }}
+          back={() => setChange(null)}
           busy={changeBusy}
           error={changeError}
           token={token}
-          onModerate={answer}
+          onModerate={(id, status, part) => void answer(id, status, undefined, part)}
           onUpdated={(id, partial) => void (partial ? partAnswered(id, true) : changeAnswered(true))}
         />
       )}
