@@ -35,6 +35,11 @@ happening in other contexts").
   `history.pushState`. An entry written behind the router's back carries
   the router's copy of the page before it, and after a reload, Back to it
   from another page changes the address and draws nothing.
+- A `replaceState` that must change the address without a navigation
+  passes state *without* Next's `__NA` key. Next's patched
+  `replaceState` treats a call carrying it (as `window.history.state`
+  does) as its own and leaves its router on the old address, which its
+  next commit writes back (Nov 17, Back from a listing's own page).
 - `router.push` writes the entry only once its navigation lands, and
   drops one a quicker click overtakes. Queue the moves
   (`src/components/admin/useScreenHistory.ts`).
