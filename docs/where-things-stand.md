@@ -442,8 +442,13 @@ Today as built; Flip A, Right now as one white box of lines (the same
 words as Q1, no photo, chevrons) and the categories as one white box of
 rows with a 40px picture each; Flip B, the same rows with Right now as
 one box split in two halves. Would undo Q1, R3 and Oct 17's tiles. Rows
-come out about 70px longer than tiles. Friday's Right now not drawn.
-Not built until the user picks.
+come out about 70px longer than tiles. Then Flip C, the user's own
+("truly reversing the way it is today"), a weekday and a Friday: Right
+now as two separate boxes side by side, each category its own row 8px
+apart, pictures held as small squares for a later round. On Friday the
+two boxes are Shabbos (candles) and Shabbos shopping, white; the eruv
+line becomes its own row under them; the cards' Minyanim/Zmanim and item
+buttons are dropped (each box one tap). Not built until the user picks.
 
 Boards U1 + U3f/U3g (Nov 14, canvas
 https://claude.ai/artifact/1L9Ep2cBxk84xQ2BePNbzL, built Nov 15): the
