@@ -955,11 +955,22 @@ Still open:
   compare isn't constant-time.
 - **The Brodsky Center is in the live queue twice** (filed Nov 4): the
   user's to reject one.
-- Refactors worth doing, moved to their own session on Nov 18 (the
-  admin-refactors session): one `useAdminApi` hook for the token/fetch/error
-  pattern, one admin route wrapper for auth + community + invalidation,
-  one change-review component (ChangeReview and TodoChange), and one
-  kosher-list runner for Keystone and Mekor.
+- The four refactors, done Nov 18 (branch `claude/admin-refactors-85cd73`):
+  - One admin api (`src/lib/adminApi.ts`, `useAdminApi`): every screen's
+    `/api/admin` request gets the token and the community from it, and
+    `adminApiCalls.test.ts` fails on one built by hand. It keeps one api
+    across the hourly new token, so no screen reloads a draft over what's
+    typed (the Home page and Feedback fix, now for every screen).
+  - One route wrapper (`src/lib/adminRoute.ts`: `adminRead`,
+    `adminWrite`, `siteAdminWrite`): sign-in, the community, and the
+    public site's cache thrown away after a write, now even when the save
+    failed partway. On categories, home sections, forms, campaign
+    banners and site settings. Still by hand, to move over a few at a
+    time: pages, communities, and the other admin routes.
+  - One change screen: Read now's finding on a saved place opens To do's
+    (TodoChange), with its answers; ChangeReview is gone.
+  - One kosher-list runner (`src/lib/kosherListRun.ts`) for Keystone-K
+    and Mekor, with the closed-on-Google memory and queue checks in it.
 
 ## Open from the boxes and fields work (Nov 10)
 
