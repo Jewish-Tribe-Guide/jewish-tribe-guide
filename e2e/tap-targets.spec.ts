@@ -76,3 +76,39 @@ test('the map’s chips take a fingertip', async ({ page }) => {
   const all = page.getByRole('button', { name: 'All', exact: true }).locator('visible=true').first()
   await expectFingerSized(all, 'the All chip')
 })
+
+// Nov 19 (board A): a contact's phones sat side by side 4px apart, its
+// email small under them, too close for a 44px tap each without one
+// reaching the next number. Each is now a row of its own.
+test('a contact’s phones and email each take a fingertip', async ({ page, request }) => {
+  const community = await defaultCommunity(page)
+  type Entry = { phones?: string[]; email?: string }
+  let found: { category: string; id: string } | null = null
+  for (const category of await categories(request, community)) {
+    const keys = ((category as unknown as { detailFields?: { key: string; type: string }[] }).detailFields ?? []).filter((f) => f.type === 'contacts').map((f) => f.key)
+    if (!keys.length) continue
+    const body = (await (await request.get(`/api/resources?category=${category.id}&community=${community}`)).json()) as { resources?: Record<string, unknown>[] }
+    // One contact with two ways to reach it: the case where they crowded.
+    const item = body.resources?.find((r) =>
+      keys.some((k) => Array.isArray(r[k]) && (r[k] as Entry[]).some((e) => (e.phones?.length ?? 0) + (e.email ? 1 : 0) >= 2)),
+    )
+    if (item) {
+      found = { category: category.id, id: String(item.id) }
+      break
+    }
+  }
+  test.skip(!found, 'no contact here has two ways to reach it')
+
+  await page.goto(`/${community}/${found!.category}/${found!.id}`)
+  await ready(page)
+  const contacts = page.getByTestId('contact')
+  await expect(contacts.first()).toBeVisible()
+  const reach = 'a[href^="tel:"], a[href^="mailto:"]'
+  let links = contacts.first().locator(reach)
+  for (let i = 0; i < (await contacts.count()); i++) {
+    links = contacts.nth(i).locator(reach)
+    if ((await links.count()) >= 2) break
+  }
+  expect(await links.count(), 'two ways to reach one contact').toBeGreaterThanOrEqual(2)
+  for (let i = 0; i < (await links.count()); i++) await expectFingerSized(links.nth(i), `the contact’s link ${i + 1}`)
+})

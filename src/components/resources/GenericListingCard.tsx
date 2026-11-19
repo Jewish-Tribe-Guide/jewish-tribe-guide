@@ -6,14 +6,13 @@ import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { useNow } from '@/lib/useNow'
 import { itemDateFor, itemDateText } from '@/lib/itemMarks'
-import { isMinyanOnly, isStale } from '@/lib/listingView'
+import { isStale } from '@/lib/listingView'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
-import { ClockIcon } from '@/components/icons'
 import SavedBadge from '@/components/SavedBadge'
 import UpvoteButton from './UpvoteButton'
 import MobileSheet from './MobileSheet'
@@ -405,9 +404,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               categoryId={category.id}
               iconImageUrl={ownPhoto}
               initials={initialsOf(item.name)}
-              // A minyan that isn't a shul: a clock, which says so, in
-              // place of initials (the user, Oct 16).
-              glyph={isMinyanOnly(item, category) ? <ClockIcon className="h-full w-full" /> : undefined}
               shape="square"
               color={color}
               // A step bigger on a computer (board H4, Nov 11), to sit with

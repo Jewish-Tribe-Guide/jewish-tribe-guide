@@ -60,7 +60,7 @@ export const NIGHTLY_JOBS: readonly NightlyJob[] = [
   {
     id: 'check-links',
     name: 'Links',
-    about: 'Opens every link a listing shows that nothing else reads, every Sunday morning, to see it’s still there.',
+    about: 'Opens every link a listing shows that nothing else reads, every Sunday morning, to see it’s still there, and clears away uploaded photos nothing uses.',
     limitSeconds: 300,
     everyDays: 7,
     cron: '0 9 * * 0',
@@ -219,14 +219,27 @@ export function walkRoutesOutcome(run: WalkRouteRun): JobOutcome {
 /** checkAllLinks's, per community (linkCheckRun.ts). */
 export type CheckLinksRun = readonly { community: string; links: number; checked: number; dontOpen: number; left: number }[]
 
-export function checkLinksOutcome(run: CheckLinksRun): JobOutcome {
+/** sweepUnusedFiles's, run first (storedFiles.ts). */
+export type FilesSwept = { cleared: number; bytes: number } | { error: string }
+
+function megabytes(bytes: number): string {
+  const mb = bytes / 1_000_000
+  return mb >= 10 ? `${Math.round(mb)} MB` : `${Math.max(0.1, Math.round(mb * 10) / 10)} MB`
+}
+
+export function checkLinksOutcome(run: CheckLinksRun, files?: FilesSwept): JobOutcome {
   const checked = sum(run, (r) => r.checked)
   const dontOpen = sum(run, (r) => r.dontOpen)
   const left = sum(run, (r) => r.left)
   const kinds: RunKinds = Object.fromEntries(run.map((r) => [r.community, { links: { of: r.links, read: r.checked - r.dontOpen } }]))
   const parts = [checked ? `Checked ${plural(checked, 'link')}` : 'No links to check']
   if (dontOpen) parts.push(`${dontOpen} didn’t open`)
-  return { ok: true, summary: parts.join(' · '), warning: left ? `Ran out of time: ${left} left for next week` : null, kinds }
+  if (files && 'cleared' in files && files.cleared) parts.push(`cleared ${plural(files.cleared, 'unused file')} (${megabytes(files.bytes)})`)
+  const warnings = [
+    left ? `Ran out of time: ${left} left for next week` : null,
+    files && 'error' in files ? `Couldn’t clear unused files: ${files.error}` : null,
+  ].filter(Boolean)
+  return { ok: true, summary: parts.join(' · '), warning: warnings.length ? warnings.join(' · ') : null, kinds }
 }
 
 export function lookAgainOutcome(run: LookAgainRun): JobOutcome {

@@ -6,7 +6,10 @@ const m = vi.hoisted(() => ({
   resolveCommunity: vi.fn(),
   updateSiteSettings: vi.fn(),
   revalidatePath: vi.fn(),
+  filesInRow: vi.fn(),
+  removeLaterIfUnused: vi.fn(),
 }))
+vi.mock('@/lib/storedFiles', () => ({ filesInRow: m.filesInRow, removeLaterIfUnused: m.removeLaterIfUnused }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({
   communitySlugFromRequest: (r: Request) => new URL(r.url).searchParams.get('community'),
@@ -29,6 +32,7 @@ beforeEach(() => {
   m.resolveCommunity.mockResolvedValue({ slug: 'philly' })
   m.getAdminUserForCommunity.mockResolvedValue({ email: 'me@x.co' })
   m.updateSiteSettings.mockImplementation(async (_c: string, body: object) => ({ ...SITE_SETTINGS_DEFAULTS, ...body }))
+  m.filesInRow.mockResolvedValue(['logo/0-old.png'])
 })
 
 describe('PATCH /api/admin/site-settings', () => {
@@ -114,5 +118,25 @@ describe('PATCH /api/admin/site-settings', () => {
   it('refuses a phone bar where no tab opens anything', async () => {
     expect((await patch({ mobileTabs: [phone(''), phone('', 'b')] })).status).toBe(400)
     expect(m.updateSiteSettings).not.toHaveBeenCalled()
+  })
+})
+
+// Nov 19: a replaced logo, hero or map card used to stay in storage for good.
+describe('PATCH /api/admin/site-settings — the files a save stops using', () => {
+  it('reads the row’s files before the save, and clears the unused ones after it', async () => {
+    m.updateSiteSettings.mockImplementation(async (_c: string, body: object) => {
+      expect(m.filesInRow).toHaveBeenCalledWith('site_settings', { community_id: 'philly' })
+      return { ...SITE_SETTINGS_DEFAULTS, ...body }
+    })
+    expect((await patch({ logoUrl: 'https://example.com/new.png' })).status).toBe(200)
+    expect(m.removeLaterIfUnused).toHaveBeenCalledWith(['logo/0-old.png'], 'site settings')
+  })
+
+  it('clears nothing when the save didn’t happen', async () => {
+    await patch({ desktopHeroHeadline: ' ' })
+    m.updateSiteSettings.mockRejectedValue(new Error('down'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await patch({ logoUrl: 'https://example.com/new.png' })
+    expect(m.removeLaterIfUnused).not.toHaveBeenCalled()
   })
 })

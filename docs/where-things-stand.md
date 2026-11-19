@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 18, 2026.
+Last updated: Nov 19, 2026.
 
 ## The branch
 
@@ -1055,9 +1055,31 @@ Done:
   when a picture is picked, shown only if Cloudflare wants a click, a
   fresh token per upload; after 20s without one it sends anyway and the
   route decides. The admin's own editors use the same field and pass it
-  too. **Your call:** clearing photos no listing uses (it deletes stored
-  files, so it waits for a yes on what counts as unused: a rejected
-  edit's photo, an old photo in What changed).
+  too. Unused photos on live, cleared Nov 19 (the user's yes): the 23
+  files no row mentioned (18 listing photos, mostly re-cropped on Aug
+  10–11, 3 old logos, 2 old category banners; 1.5 MB), backed up first to
+  `backups/prod-site-assets-unused-2026-11-19/` on the user's machine.
+  Every file a row mentions was checked to still load after. Kept on
+  purpose: the 36 only an edit in History mentions (old photos, two
+  rejected edits' photos, three screenshots the reader read), since
+  History shows them. Since Nov 19 it stays that way by itself
+  (`storedFiles.ts`): a save that replaces or takes off the logo, a hero,
+  the map card or a category's banner, or deletes a category, deletes the
+  old file once nothing else mentions it; and the Sunday link check first
+  clears every file over 30 days old that no row of any table mentions
+  (an upload never saved, a replaced listing photo, a reader's source
+  nobody kept), with the count in its line on the Watches tab. One table
+  that can't be read stops the pass. Uploads still land where they're
+  saved rather than in a holding folder (a move would mean rewriting the
+  address everywhere a save puts one). Its dry run on live found nothing
+  to clear; on the test project it cleared 30 old test uploads.
+  **Dev links to live's files** (130 of them, copied over by syncs), and
+  live's clean-up checks only live's rows. So the Nov 19 one took the old
+  logo dev's Philly still used, and the icon e2e tests failed on the test
+  project (CI's too). Fixed on dev the same day: the file, from the
+  backup, now in dev's own storage and dev's logo pointed at it. Live's
+  weekly sweep can do it again to any other of those 130 once live stops
+  using it; the lasting fix is a sync that copies files instead of links.
 - Public reads: a form's unpublished draft no longer goes out with the
   published form, and `/api/eruv` says a read failed and when, not the
   error's text.
@@ -1152,11 +1174,12 @@ Done:
   - The header's Set location, a listing's phone number, website, email
     and links, and the map's chips each take a 44px tap without changing
     how they look (`tap-44` in `globals.css`). A listing's details rows
-    are 4px taller to fit them. Not done: a hospital contact's phones and
-    email, which sit 4px apart, so 44px targets would overlap and a tap
-    could dial the wrong number. It needs each on a row of its own about
-    44px tall, a contact visibly taller: **your call**, a drawing first
-    (checked Nov 19). Cards/List left out.
+    are 4px taller to fit them. A contact's phones, email and website
+    (a hospital's Who to call, Rides…) each sit on a row of their own, 44px
+    tall, a faint line between them and a stronger one between contacts
+    (board A, picked Nov 19, canvas PMkcvVX1wzuqcbcryH2JqC; built the same
+    day). Side by side 4px apart, a tap could dial the next number. A
+    website row gets the globe icon, which the board didn't show. Cards/List left out.
   - Sentry loads after the page instead of in its first download
     (`deferredSentry.ts`). Errors thrown before it arrives are kept and
     sent; the page-load trace now starts when it arrives.
@@ -1688,7 +1711,8 @@ The user's answers on Nov 10, evening, and what was done with them:
   change says Changed with the old note crossed out under the new one, the
   way a changed time shows what it was. Two admin-write flakes seen while
   running it, each green alone: todo-scroll's resize line and
-  category-open's no-request check.
+  category-open's no-request check. todo-scroll's "keeps the row you
+  clicked" failed once more on Nov 19 (562px off), green 3 of 3 alone.
 - **A shul's week read again with its notes only reworded files nothing**
   (fixed Nov 11, South Philadelphia Shtiebel). Its calendar is read twice
   a week, and the AI wrote "until 8:00 AM" one time and "until 8:00 AM;
@@ -1716,10 +1740,8 @@ The user's answers on Nov 10, evening, and what was done with them:
   the status email after an admin's own Google refresh. Not in the email,
   on purpose: the times themselves, and "working again". With nothing
   waiting but something broken, the subject says "1 stopped working".
-  Phone, computer and quiet renders checked against N7-N9. **Migration
-  096 is on dev (Nov 12), not live** (see "Waiting for a yes"); until it is,
-  Google's changes are emailed at once as before and the nightly email
-  just has no Changed on its own. Not seen in a real inbox yet: the
+  Phone, computer and quiet renders checked against N7-N9. Migration
+  096 is on live too (checked Nov 19). Not seen in a real inbox yet: the
   first one goes out the night after this reaches the live site.
 - **A line turned down in a shul's week isn't filed again** (fixed Nov 12,
   prod queue). A read week is filed whole, so a line the admin rejected
@@ -2063,17 +2085,14 @@ Still different, each needing the user:
 The rule (AGENTS.md): nothing is written to the live database without a yes
 for that exact change, in the same conversation. Show the dry run first.
 
-0. **Migration 096 (`night_note`, Nov 12):** a new table for the
-   nightly email's Google line. On dev since Nov 12; live needs a yes.
-   The email itself is live (PR 384), so until 096 runs there, Google's
-   changes go out at once as before. The site works without it.
-0. **Migration 095 (map card photo, Nov 11):** one `add column if not
-   exists`. Run it on live before or with the deploy that ships the map
-   card; the card works without it, only its photo can't be saved. Then
-   the photo is set in the admin (City Hall, by the user's call). Needs a
-   yes.
-1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
-   category "Shuls & minyanim".
+0. ~~Migrations 095 and 096~~ Both on live (checked Nov 19: the map card's
+   photo column holds City Hall, and `night_note` exists).
+1. ~~Philly Synagogues' "Minyan" field and rename~~ Dropped (Nov 19, the
+   user: "that just feels like an extra question"). No listing asks for
+   missing weekday or Shabbos times any more, shul or not, so nothing has
+   to say which places are shuls; the `minyanOnly` field setting is gone.
+   Later, if a minyan that isn't a shul ever comes in: where it shows (the
+   user could hear it not being on the Synagogues tab at all).
 1a. **Watches on shuls' and mikvahs' own pages** are on the live site
    (checked Oct 23): Mekor, B'nai Abraham, Society Hill, Kol Tzedek,
    Rodeph Shalom, Leyv Ha-Ir, the Little Shul, Mikveh Israel, Sons of
@@ -2081,12 +2100,15 @@ for that exact change, in the same conversation. Show the dry run first.
    Shtiebel and the mikvahs, among others.
 
 1b. **Eruv status by email (6c):** migration 084 is run on both databases
-   (the user, Oct 19). Northeast's address on live is still to set: a yes,
-   once the branch is deployed. Elkins Park's sender is still unknown.
+   (the user, Oct 19). Northeast's address is set on live and its emails
+   arrive (checked Nov 19: one kept that morning). Elkins Park's sender is still unknown.
 1c. **"Candle Lighting & Zmanim"** (decided Oct 20): the user renamed it
-   on live Oct 20 (label and plural). Its description there is still
-   empty; dev has "Candle lighting, Havdalah and daily zmanim", which
-   category search reads ("havdalah" finds it). Until the three-line tiles are
+   on live Oct 20 (label and plural). Its description there is empty,
+   and nothing waits on it (Nov 19): search finds the page by its built-in
+   words ("havdalah" included), the admin has no description field, and
+   the only thing it fills is a shared link's preview line. Idea for later,
+   not now (the user): the site writes that line itself from what the page
+   is, and stops storing a description. Until the three-line tiles are
    live, the phone home cuts the name to "Candle Lighting &…".
 
 1d. **Migration 085 (`watch.last_check`)** is run on both databases
@@ -2279,8 +2301,8 @@ for that exact change, in the same conversation. Show the dry run first.
    **Northeast:** `jcor-ne-philadelphia@groups.io`, set on dev Oct 19.
    **For the user:** subscribe phillyjewishguide@gmail.com to the list;
    after this branch is deployed, paste the new Gmail script over the old
-   one (the secret and trigger stay); then set Northeast's address on live
-   (a yes). The script talks to the live site, so the preview can't receive
+   one (the secret and trigger stay); Northeast's address on live is set
+   (checked Nov 19). The script talks to the live site, so the preview can't receive
    a real email.
    **Open: Elkins Park.** No sender yet: how YIEP announces its status
    isn't known (ask 267-415-6760, yiep.org, whether there's an email
