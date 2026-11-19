@@ -967,7 +967,8 @@ it says otherwise:
 Still open:
 
 - **Shul watches, to be rewritten rather than patched** (the user, Nov
-  19: "I don't want patches anymore"). A dated week is still compared
+  19: "I don't want patches anymore"). The plan, waiting on the user:
+  `docs/shul-watch-rebuild.md`. A dated week is still compared
   with and filled from the usual times (`keepUncovered`, `dropListed`,
   `compareTimes` on weeks), because a week replaces its day and the
   reader takes one highlighted time as a week. Decided Nov 19: we post
