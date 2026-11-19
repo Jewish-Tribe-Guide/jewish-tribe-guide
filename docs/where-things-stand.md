@@ -969,6 +969,11 @@ Still open:
 - **A dated shul week is still compared with the usual times**
   (`shulWeekReading.ts`, `dropListed`), against the rule. The user, Nov
   18: talk about it after the rest.
+- A listing list's scroll-to-a-row wait gives up after about 3 seconds
+  and stops when the list goes away (`whenSettled`, Nov 19). It used to
+  poll every 32ms forever for a row that never appeared, and one timer
+  firing after a test's page was gone failed PR 395's unit job ("window is
+  not defined") with every test passing.
 - The four refactors, done Nov 18 (branch `claude/admin-refactors-85cd73`):
   - One admin api (`src/lib/adminApi.ts`, `useAdminApi`): every screen's
     `/api/admin` request gets the token and the community from it, and
