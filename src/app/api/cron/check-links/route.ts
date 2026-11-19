@@ -6,6 +6,9 @@
 // week (vercel.json); one that doesn't open shows as Not checked on its
 // place's row on the Watches tab.
 //
+// First it clears away uploaded files nothing uses (storedFiles.ts): a
+// second or two, and a failure there never stops the links.
+//
 // Each run is recorded for the Watches tab (jobRunStore.ts).
 //
 // Auth: as sync-hours (cronAuth.ts).
@@ -14,13 +17,19 @@ import { cronAuthorized } from '@/lib/cronAuth'
 import { checkAllLinks } from '@/lib/linkCheckRun'
 import { recordJobRun } from '@/lib/jobRunStore'
 import { checkLinksOutcome } from '@/lib/jobRuns'
+import { sweepUnusedFiles } from '@/lib/storedFiles'
 
 export const maxDuration = 300
 
 async function run(): Promise<NextResponse> {
   try {
-    const links = await recordJobRun('check-links', () => checkAllLinks(), checkLinksOutcome)
-    return NextResponse.json({ ok: true, links })
+    const stopAt = Date.now() + 240_000
+    const { links, files } = await recordJobRun(
+      'check-links',
+      async () => ({ files: await sweepUnusedFiles(), links: await checkAllLinks({ stopAt }) }),
+      (r) => checkLinksOutcome(r.links, r.files),
+    )
+    return NextResponse.json({ ok: true, links, files })
   } catch (err) {
     console.error('[cron/check-links] failed:', err)
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 })

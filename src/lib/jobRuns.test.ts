@@ -154,6 +154,16 @@ describe('the link check’s run, in a line', () => {
     expect(checkLinksOutcome([{ community: 'philly', links: 92, checked: 80, dontOpen: 0, left: 12 }])).toMatchObject({ summary: 'Checked 80 links', warning: 'Ran out of time: 12 left for next week' })
     expect(checkLinksOutcome([])).toMatchObject({ summary: 'No links to check', warning: null })
   })
+
+  // Nov 19: the same run clears uploaded files nothing uses (storedFiles.ts).
+  it('the files it cleared, and a clear that failed as a warning', () => {
+    const run = [{ community: 'philly', links: 92, checked: 92, dontOpen: 0, left: 0 }]
+    expect(checkLinksOutcome(run, { cleared: 3, bytes: 2_400_000 })).toMatchObject({ summary: 'Checked 92 links · cleared 3 unused files (2.4 MB)', warning: null })
+    expect(checkLinksOutcome(run, { cleared: 0, bytes: 0 })).toMatchObject({ summary: 'Checked 92 links', warning: null })
+    expect(checkLinksOutcome([{ ...run[0], checked: 80, left: 12 }], { error: 'Couldn’t read submission: timeout' })).toMatchObject({
+      warning: 'Ran out of time: 12 left for next week · Couldn’t clear unused files: Couldn’t read submission: timeout',
+    })
+  })
 })
 
 describe('jobAlert: emailing once when a job breaks, once when it works again', () => {

@@ -1,6 +1,7 @@
 import { adminRead, adminWrite } from '@/lib/adminRoute'
 import { revalidatePath } from 'next/cache'
 import { routes } from '@/lib/routes'
+import { filesInRow, removeLaterIfUnused } from '@/lib/storedFiles'
 import { MissingMapPhotoColumnError, MissingRightNowColumnError, MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems, toRightNowCategories, updateSiteSettings } from '@/lib/siteSettingsStore'
 import { MAX_BEFORE_CANDLE_ITEMS, MAX_RIGHT_NOW, MAX_MOBILE_TABS, isHomeStyle, isTodayBlockId, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
 
@@ -153,7 +154,11 @@ export const PATCH = adminWrite(async (request: Request, { community }) => {
   }
 
   try {
+    const before = await filesInRow('site_settings', { community_id: community.slug })
     const settings = await updateSiteSettings(community.slug, body)
+    // A logo, hero or map card replaced or taken off: its old file goes,
+    // if nothing else uses it (storedFiles.ts).
+    removeLaterIfUnused(before, 'site settings')
     // What changed answers only while a tab or link has it (changesLinked),
     // so adding or taking off that tab flips its page between the page and
     // a 404. The content tags (invalidated after this, by adminWrite) are

@@ -2,6 +2,7 @@ import { adminWrite, unchanged } from '@/lib/adminRoute'
 import { isPlaceKind, type PlaceKind } from '@/lib/placeKinds'
 import type { NextRequest } from 'next/server'
 import { updateCategory, deleteCategory, categoryDeleteCounts } from '@/lib/categoryStore'
+import { filesInRow, removeLaterIfUnused } from '@/lib/storedFiles'
 import { clearCategoryFieldData, applyFieldOptionRenames } from '@/lib/resourceStore'
 import { isHttpUrl } from '@/lib/validation'
 import type { CategoryCapabilities, CategoryField, CategoryFormSection } from '@/lib/categories'
@@ -121,10 +122,14 @@ export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx:
   }
 
   try {
+    const before = await filesInRow('category', { community_id: community.slug, id })
     const category = await updateCategory(community.slug, id, body)
     if (!category) {
       return Response.json({ ok: false, errors: ['Category not found.'] }, { status: 404 })
     }
+    // A banner or card picture replaced: the old file goes, if nothing else
+    // uses it (storedFiles.ts).
+    removeLaterIfUnused(before, 'category')
     let cleared: number | undefined
     if (body.clearFields && (body.clearFields.address || body.clearFields.phone || body.clearFields.keys?.length)) {
       ;({ updated: cleared } = await clearCategoryFieldData(community.slug, id, {
@@ -184,7 +189,11 @@ export const DELETE = adminWrite(async (request: NextRequest, { community }, ctx
     if (new URL(request.url).searchParams.get('dry') === '1') {
       return unchanged(Response.json({ ok: true, ...(await categoryDeleteCounts(community.slug, id)) }))
     }
+    const before = await filesInRow('category', { community_id: community.slug, id })
     const counts = await deleteCategory(community.slug, id)
+    // Its pictures go with it. Its listings' photos are the weekly sweep's,
+    // once nothing (History included) mentions them.
+    removeLaterIfUnused(before, 'category')
     return Response.json({ ok: true, ...counts })
   } catch (err) {
     console.error('[admin/categories/:id] DELETE failed:', err)

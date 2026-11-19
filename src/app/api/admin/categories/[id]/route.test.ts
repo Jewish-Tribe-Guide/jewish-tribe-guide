@@ -10,7 +10,10 @@ const m = vi.hoisted(() => ({
   categoryDeleteCounts: vi.fn(),
   revalidatePublicContent: vi.fn(),
   clearCategoryFieldData: vi.fn(),
+  filesInRow: vi.fn(),
+  removeLaterIfUnused: vi.fn(),
 }))
+vi.mock('@/lib/storedFiles', () => ({ filesInRow: m.filesInRow, removeLaterIfUnused: m.removeLaterIfUnused }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({
   communitySlugFromRequest: (r: Request) => new URL(r.url).searchParams.get('community'),
@@ -33,6 +36,7 @@ beforeEach(() => {
   m.resolveCommunity.mockResolvedValue({ slug: 'philly' })
   m.getAdminUserForCommunity.mockResolvedValue({ email: 'me@x.co' })
   m.updateCategory.mockResolvedValue(makeCategory({ id: 'synagogue' }))
+  m.filesInRow.mockResolvedValue(['category-band/0-old.jpeg'])
 })
 
 // How a category page groups its list (listGroups.ts).
@@ -198,5 +202,40 @@ describe('PATCH /api/admin/categories/:id — a save that fails partway', () => 
     expect((await patch({ label: 'Shuls', pinColor: 'blue' })).status).toBe(400)
     expect(m.updateCategory).not.toHaveBeenCalled()
     expect(m.revalidatePublicContent).not.toHaveBeenCalled()
+  })
+})
+
+// Nov 19: a replaced banner, or a deleted category's pictures, used to stay
+// in storage for good.
+describe('/api/admin/categories/:id — the files a save stops using', () => {
+  const del = (dry = false) =>
+    DELETE(
+      new Request(`http://x/api/admin/categories/synagogue?community=philly${dry ? '&dry=1' : ''}`, { method: 'DELETE' }) as unknown as NextRequest,
+      { params: Promise.resolve({ id: 'synagogue' }) },
+    )
+
+  it('a save reads the row’s files first and clears the unused ones after', async () => {
+    m.updateCategory.mockImplementation(async () => {
+      expect(m.filesInRow).toHaveBeenCalledWith('category', { community_id: 'philly', id: 'synagogue' })
+      return makeCategory({ id: 'synagogue' })
+    })
+    expect((await patch({ cardBandImageUrl: 'https://example.com/b.jpg' })).status).toBe(200)
+    expect(m.removeLaterIfUnused).toHaveBeenCalledWith(['category-band/0-old.jpeg'], 'category')
+  })
+
+  it('nothing when the category isn’t there, or the save is refused', async () => {
+    m.updateCategory.mockResolvedValue(null)
+    expect((await patch({ label: 'Shuls' })).status).toBe(404)
+    expect((await patch({ label: ' ' })).status).toBe(400)
+    expect(m.removeLaterIfUnused).not.toHaveBeenCalled()
+  })
+
+  it('deleting it clears its pictures; counting what would go clears nothing', async () => {
+    m.categoryDeleteCounts.mockResolvedValue({ listings: 0 })
+    await del(true)
+    expect(m.removeLaterIfUnused).not.toHaveBeenCalled()
+    m.deleteCategory.mockResolvedValue({ listings: 0 })
+    expect((await del()).status).toBe(200)
+    expect(m.removeLaterIfUnused).toHaveBeenCalledWith(['category-band/0-old.jpeg'], 'category')
   })
 })

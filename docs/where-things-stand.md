@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 18, 2026.
+Last updated: Nov 19, 2026.
 
 ## The branch
 
@@ -1062,8 +1062,17 @@ Done:
   Every file a row mentions was checked to still load after. Kept on
   purpose: the 36 only an edit in History mentions (old photos, two
   rejected edits' photos, three screenshots the reader read), since
-  History shows them. Nothing deletes stored files yet; live holds about
-  12 MB of Supabase's 1 GB, so not worth automating until it grows.
+  History shows them. Since Nov 19 it stays that way by itself
+  (`storedFiles.ts`): a save that replaces or takes off the logo, a hero,
+  the map card or a category's banner, or deletes a category, deletes the
+  old file once nothing else mentions it; and the Sunday link check first
+  clears every file over 30 days old that no row of any table mentions
+  (an upload never saved, a replaced listing photo, a reader's source
+  nobody kept), with the count in its line on the Watches tab. One table
+  that can't be read stops the pass. Uploads still land where they're
+  saved rather than in a holding folder (a move would mean rewriting the
+  address everywhere a save puts one). Its dry run on live found nothing
+  to clear; on the test project it cleared 30 old test uploads.
 - Public reads: a form's unpublished draft no longer goes out with the
   published form, and `/api/eruv` says a read failed and when, not the
   error's text.
@@ -1694,7 +1703,8 @@ The user's answers on Nov 10, evening, and what was done with them:
   change says Changed with the old note crossed out under the new one, the
   way a changed time shows what it was. Two admin-write flakes seen while
   running it, each green alone: todo-scroll's resize line and
-  category-open's no-request check.
+  category-open's no-request check. todo-scroll's "keeps the row you
+  clicked" failed once more on Nov 19 (562px off), green 3 of 3 alone.
 - **A shul's week read again with its notes only reworded files nothing**
   (fixed Nov 11, South Philadelphia Shtiebel). Its calendar is read twice
   a week, and the AI wrote "until 8:00 AM" one time and "until 8:00 AM;
