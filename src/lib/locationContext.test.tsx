@@ -25,7 +25,6 @@ vi.mock('./useLiveLocation', () => ({
     tracking: mockState.tracking,
     geoError: null,
     geoErrorSilent: false,
-    resumingSilently: false,
     start: vi.fn(),
     stop: vi.fn(),
   }),

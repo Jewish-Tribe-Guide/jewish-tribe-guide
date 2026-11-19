@@ -13,6 +13,25 @@
  * implements the same rule for JS-driven layout decisions. */
 @custom-variant desktop (@media (min-width: 640px) and (min-height: 640px));
 
+/* A control drawn smaller than a fingertip (a 32px chip, an 18px phone
+ * number, the header's 30px Set location) still takes a 44px tap, the
+ * size Apple and Google both ask for, without changing how it looks: an
+ * empty box centred on it catches the touch (Nov 18, review item 39). It
+ * needs room around it: a parent that clips (overflow) clips the box too,
+ * and a neighbour's box closer than 44px overlaps it. */
+@utility tap-44 {
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+
 /* Nothing in this app is meant to scroll sideways — every horizontal-scroll
  * region (the admin tab bar, a category filter row, the map's chip strip)
  * owns its own `overflow-x-auto` container specifically so the scroll stays

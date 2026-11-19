@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categories, dismissLocationPrompt, ready } from './helpers'
+import { categories, ready } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The phone header's title is big, and never cut off (Nov 16, the user: too
@@ -22,7 +22,6 @@ for (const width of [320, 375]) {
     await page.setViewportSize({ width, height: 800 })
     await page.goto(`/philly/${longest.id}`)
     await ready(page)
-    await dismissLocationPrompt(page)
     await expect(title(page)).toHaveText(longest.pluralLabel)
     // Fitting is measured after the header draws, so wait for it to settle.
     // On one line, or on two when it can't fit even at 15px.

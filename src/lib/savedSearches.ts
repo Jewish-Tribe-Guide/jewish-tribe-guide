@@ -9,6 +9,8 @@
 // without a DOM. See savedSearchesContext.tsx for the state around it.
 
 /** What kind of page a search opens, as the home's lines name them. */
+import { storageGet } from './safeStorage'
+
 export type SavedSearchKind = 'category' | 'minyanim' | 'times'
 
 export type SavedSearch = {
@@ -88,7 +90,7 @@ export function parseSavedSearches(raw: string | null): SavedSearch[] {
 }
 
 export function loadSavedSearches(): SavedSearch[] {
-  return parseSavedSearches(localStorage.getItem(STORAGE_KEY))
+  return parseSavedSearches(storageGet(STORAGE_KEY))
 }
 
 export function storeSavedSearches(searches: SavedSearch[]): void {

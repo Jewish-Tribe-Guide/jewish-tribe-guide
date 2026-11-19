@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithListings, defaultCommunitySlug, dismissLocationPrompt, ready } from './helpers'
+import { categoryWithListings, defaultCommunitySlug, ready } from './helpers'
 
 // The first tap on a place on a phone (speed targets, docs/speed-targets.md:
 // something visible at once, the answer within a second). The sheet slid up
@@ -17,7 +17,6 @@ test('the first tap on a place shows the place with its sheet, never an empty sh
 
   await page.goto(`/${community}/${category.id}`)
   await ready(page)
-  await dismissLocationPrompt(page)
   const row = page.getByRole('button', { name: /^Show details for / }).first()
   await expect(row).toBeVisible()
   const name = (await row.getAttribute('aria-label'))!.replace(/^Show details for /, '')

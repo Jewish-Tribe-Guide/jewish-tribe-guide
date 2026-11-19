@@ -117,6 +117,7 @@ export function DetailFieldInput({
             value={(value as string) ?? ''}
             onChange={onChange}
             uploadUrl="/api/submissions/photo"
+            challenge
             // Wherever this photo actually renders (CategoryIcon's callers —
             // map pins, listing cards, place detail) it's always circular, so
             // the crop step's own guide has to match that, not show a square

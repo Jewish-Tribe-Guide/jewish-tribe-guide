@@ -3,6 +3,7 @@ import { CONFIG_COMMUNITY_SLUG } from './configCommunity'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { community as configCommunity } from '@/community.config'
+import tzLookup from 'tz-lookup'
 import { assertUsableSlug } from './routes'
 import { isValidPinColor } from './categoryColor'
 
@@ -29,6 +30,10 @@ export type Community = {
   region: string
   timezone: string
   mapCenter: { lat: number; lng: number }
+  /** What the community's admin picked as its default location
+   *  ("Squirrel Hill, Pittsburgh, PA"), or absent while it's still the
+   *  city picked when the community was made. */
+  mapCenterLabel?: string
   themeColor: string
   backgroundColor: string
   /** Optional-module + UI capability overrides; same shapes as community.config.ts.
@@ -53,7 +58,10 @@ type Row = {
   manifest_description: string
   region: string
   timezone: string
-  map_center: { lat: number; lng: number } | null
+  /** Its `label` is the place as the admin picked it (Settings, Default
+   *  location); kept beside the point so the two can't drift apart, and
+   *  so it needed no new column. */
+  map_center: { lat: number; lng: number; label?: string } | null
   theme_color: string
   background_color: string
   features: Record<string, unknown> | null
@@ -72,7 +80,8 @@ function toCommunity(row: Row): Community {
     manifestDescription: row.manifest_description,
     region: row.region,
     timezone: row.timezone,
-    mapCenter: row.map_center ?? configCommunity.mapCenter,
+    mapCenter: row.map_center ? { lat: row.map_center.lat, lng: row.map_center.lng } : configCommunity.mapCenter,
+    ...(row.map_center?.label ? { mapCenterLabel: row.map_center.label } : {}),
     themeColor: row.theme_color,
     backgroundColor: row.background_color,
     features: row.features ?? {},
@@ -551,6 +560,50 @@ export async function createCommunity(input: {
  *  gated by the same GET/POST /api/admin/communities check, not any one
  *  community's own admin, since publishing a community isn't scoped to
  *  itself any more than creating one is. */
+/** The community's default location as stored now, uncached: the place a
+ *  visitor is taken to be until they set their own, and what it's called.
+ *  For the admin's Default location screen, which must show what it just
+ *  saved, not the cached copy. */
+export async function getCommunityDefaultLocation(
+  slug: string,
+): Promise<{ center: { lat: number; lng: number }; label: string | null; region: string; timezone: string } | null> {
+  const { data, error } = await getAdminClient().from('community').select('map_center, region, timezone').eq('slug', slug).maybeSingle()
+  if (error) throw new Error(`Failed to read "${slug}"'s default location: ${error.message}`)
+  if (!data) return null
+  const row = data as Pick<Row, 'map_center' | 'region' | 'timezone'>
+  return {
+    center: row.map_center ? { lat: row.map_center.lat, lng: row.map_center.lng } : configCommunity.mapCenter,
+    label: row.map_center?.label ?? null,
+    region: row.region,
+    timezone: row.timezone,
+  }
+}
+
+/** Moves the community's default location (Settings, Default location):
+ *  where distances, the home's zmanim and the map start until a visitor
+ *  sets their own. The time zone follows the place (tz-lookup); the
+ *  community's name and region don't change. */
+export async function setCommunityDefaultLocation(
+  slug: string,
+  place: { lat: number; lng: number; label: string },
+): Promise<{ center: { lat: number; lng: number }; label: string; timezone: string }> {
+  const { lat, lng } = place
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) {
+    throw new RangeError('That place has no usable location.')
+  }
+  const label = place.label.trim().slice(0, 200)
+  if (!label) throw new RangeError('Pick a place from the list.')
+  const timezone = tzLookup(lat, lng)
+  const { data, error } = await getAdminClient()
+    .from('community')
+    .update({ map_center: { lat, lng, label }, timezone })
+    .eq('slug', slug)
+    .select('slug')
+  if (error) throw new Error(`Failed to save "${slug}"'s default location: ${error.message}`)
+  if (!data?.length) throw new Error(`No community "${slug}".`)
+  return { center: { lat, lng }, label, timezone }
+}
+
 export async function setCommunityVisibility(
   slug: string,
   visible: boolean,

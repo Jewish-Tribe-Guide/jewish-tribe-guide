@@ -56,9 +56,9 @@ export default function ListingColumn({ item, category, color, place, found, upv
     if (phone) return
     const onKey = (e: KeyboardEvent) => {
       // While editing, Escape steps back one level (out of Request removal
-      // into the edit, out of the edit to the listing), as Back does.
-      const state = window.history.state as { mapSheetForm?: string } | null
-      if (state?.mapSheetForm) {
+      // into the edit, out of the edit to the listing), as Back does: the
+      // editor's levels are entries (useEditorInAddress).
+      if (editing) {
         if (e.key === 'Escape') window.history.back()
         return
       }
@@ -70,7 +70,7 @@ export default function ListingColumn({ item, category, color, place, found, upv
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onBack, onStep, hasPrev, hasNext, phone])
+  }, [onBack, onStep, hasPrev, hasNext, phone, editing])
 
   const bar = <ListingBar backLabel={backLabel} onBack={onBack} position={position} onStep={onStep} onShowMap={onShowMap} />
 

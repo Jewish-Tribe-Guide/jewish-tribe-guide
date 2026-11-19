@@ -288,31 +288,6 @@ export async function largestCategory(
   return best
 }
 
-/** Dismisses the "Share your live location?" prompt if it's showing.
- *
- *  It's a full-screen overlay that intercepts pointer events, so on mobile —
- *  where it appears on a first visit — nothing else on the page is clickable
- *  until it's dealt with. A real visitor answers it before doing anything else,
- *  so tests do too.
- *
- *  The prompt renders after a data-dependent effect, not on first paint, so
- *  a one-shot `isVisible()` check races it: it can appear moments after the
- *  check passes and intercept whatever the test clicks next. Actively wait a
- *  bit instead — harmless (and fast to resolve) when it never shows up.
- *
- *  1000ms used to be that wait. Reported live in CI: multiple unrelated
- *  tests timing out on `locator.click` with this exact prompt's own
- *  backdrop (`role="presentation"`, `z-[70]`) "intercepts pointer events",
- *  retried for the test's full 60s budget — the prompt's data-dependent
- *  effect finishing just past 1000ms under CI's real resource contention
- *  (this repo's own file-level notes document the same "suspect a budget,
- *  not the system under test" shape happening more than once elsewhere),
- *  so this returned early believing there was nothing to dismiss while the
- *  prompt was still about to open. 5000ms, matching this suite's own
- *  default `expect` timeout elsewhere — same reasoning as the doc above:
- *  still fast when the prompt never shows, since the wait resolves the
- *  instant `state: 'visible'` is met OR the timeout is reached, not a fixed
- *  delay either way. */
 /** Opens an open listing's editor: its Edit listing, which opens the
  *  editor itself everywhere (Oct 15; on a category page it used to open
  *  the "+ Add" box first). `scope`: where the listing's own Edit listing
@@ -320,17 +295,6 @@ export async function largestCategory(
 export async function openListingEditor(page: Page, scope: Page | Locator = page): Promise<void> {
   await scope.getByRole('button', { name: 'Edit listing' }).filter({ visible: true }).click()
   await page.getByRole('heading', { name: 'Edit listing' }).filter({ visible: true }).first().waitFor()
-}
-
-export async function dismissLocationPrompt(page: Page): Promise<void> {
-  const notNow = page.getByRole('button', { name: 'Not now' })
-  try {
-    await notNow.waitFor({ state: 'visible', timeout: 5000 })
-  } catch {
-    return
-  }
-  await notNow.click()
-  await notNow.waitFor({ state: 'hidden' })
 }
 
 /** The category page's own Add control — GenericDirectory's floating
@@ -369,10 +333,28 @@ export async function openAddForm(page: Page): Promise<void> {
  *  Deliberately not `networkidle`: the map, the zmanim strip and geolocation
  *  keep connections open, so it never settles on some screens and the test
  *  times out having proved nothing. Playwright discourages it for this reason.
- *  Waiting for the app's own chrome is both faster and a real signal. */
+ *  Waiting for the app's own chrome is both faster and a real signal.
+ *
+ *  The chrome alone isn't the page, though. Until React has it, the streamed
+ *  parts sit beside their placeholders (a category page has two `<main>`s
+ *  and two counts for a few hundred milliseconds), and a click on a button
+ *  that isn't hydrated yet does nothing. The location box's "Not now" used to
+ *  buy most specs that wait, as it appeared only once React had the page;
+ *  it went on Nov 18 and five tests failed in CI on the next run. So this
+ *  waits for the placeholders to go and for React to own the header, the
+ *  main and every button outside the map (Google draws its own).
+ *
+ *  The header there, not shown: a phone's Map folds it away over the map
+ *  (`invisible h-0`), and a wait for it to show never ended there. */
 export async function ready(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded')
-  await page.locator('header').first().waitFor({ state: 'visible' })
+  await page.locator('header').first().waitFor({ state: 'attached' })
+  await page.waitForFunction(() => {
+    if (document.querySelector('template[id^="B:"], div[hidden][id^="S:"]')) return false
+    const owned = (el: Element) => Object.keys(el).some((k) => k.startsWith('__reactFiber$'))
+    const ours = [...document.querySelectorAll('header, main, button')].filter((el) => !el.closest('.gm-style'))
+    return ours.some((el) => el.matches('header')) && ours.every(owned)
+  })
 }
 
 /** The server's HTML with `<script>` contents removed — i.e. the markup a

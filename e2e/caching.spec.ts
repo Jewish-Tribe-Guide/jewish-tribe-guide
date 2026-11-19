@@ -159,7 +159,7 @@ test.describe('the "/" redirect', () => {
   // resolved first, including anyone with a different one remembered.
   test('is a redirect rather than a cached page body', async ({ request }) => {
     const res = await request.get('/', { maxRedirects: 0, failOnStatusCode: false })
-    expect([307, 308]).toContain(res.status())
+    expect(res.status()).toBe(307)
     expect(res.headers()['location']).toBeTruthy()
   })
 })

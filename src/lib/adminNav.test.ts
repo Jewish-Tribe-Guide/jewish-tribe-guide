@@ -83,9 +83,9 @@ describe('adminAreas', () => {
       ['Places', ['Places', 'Watches']],
       ['Site', ['Home page', 'Category pages', 'Campaigns', 'About and Privacy']],
       ['Reports', ['Reports']],
-      ['Settings', ['Team', 'Communities']],
+      ['Settings', ['Team', 'Default location', 'Communities']],
     ])
-    expect(shape(false).at(-1)).toEqual(['Settings', ['Team']])
+    expect(shape(false).at(-1)).toEqual(['Settings', ['Team', 'Default location']])
     expect(shape(false)[2]).toEqual(['Site', ['Home page', 'Category pages', 'Campaigns']])
   })
 
@@ -136,6 +136,7 @@ describe('adminNavPosition', () => {
     ['/philly/admin/history/approved', 'reports', 'metrics'],
     ['/philly/admin/history/rejected', 'reports', 'metrics'],
     ['/philly/admin/team', 'settings', 'team'],
+    ['/philly/admin/location', 'settings', 'location'],
   ]
   it.each(cases)('%s opens %s, with %s lit', (path, area, tab) => {
     expect(adminNavPosition(path, 'philly', true)).toEqual({ area, tab })

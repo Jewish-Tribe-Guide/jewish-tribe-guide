@@ -56,7 +56,7 @@ function markContent(m: NonNullable<EruvLineFile['marks']>[number]): HTMLElement
     img.style.cssText = 'display:block;cursor:pointer'
     return img
   }
-  return new google.maps.marker.PinElement({ background: m.color ?? '#0288d1', borderColor: '#ffffff', glyphColor: '#ffffff', scale: 0.85 }).element
+  return new google.maps.marker.PinElement({ background: m.color ?? '#0288d1', borderColor: '#ffffff', glyphColor: '#ffffff', scale: 0.85 })
 }
 
 /** A marker's note, opened where it is, as on their map. Built as text,

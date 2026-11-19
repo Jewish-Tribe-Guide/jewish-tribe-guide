@@ -48,7 +48,7 @@ export const POST = adminWrite(async (request: NextRequest, { community, admin }
       const apiKey = process.env.OPENAI_API_KEY
       if (typeof body.address !== 'string' || !apiKey) return unchanged(Response.json({ ok: true, state: 'no-answer' }))
       const look = await latestEmailFrom(community.slug, body.address)
-      if (look.state === 'found') await receiveNewsletter(community.slug, look.email, { apiKey, communityName: community.name })
+      if (look.state === 'found') await receiveNewsletter(community.slug, look.email, { apiKey, communityName: community.name, where: community })
       return unchanged(Response.json({ ok: true, state: look.state, account: 'account' in look ? look.account : null }))
     }
     if (body?.action === 'site') return unchanged(Response.json({ ok: true, read: await readOwnSiteNow(community.slug, id) }))

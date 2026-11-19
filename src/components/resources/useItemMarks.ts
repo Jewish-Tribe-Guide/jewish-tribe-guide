@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { itemMarks, type ItemMark } from '@/lib/itemMarks'
-import { ui } from '@/lib/uiConfig'
+import { useContributions } from '@/lib/communityContext'
 import { useFetchOrPreview } from '@/lib/previewSend'
 import { useTurnstileActive } from './useListingSubmit'
 
@@ -79,7 +79,7 @@ export function useItemMarks(item: DirectoryResource, category: CategoryConfig, 
     () => (field ? itemMarks(item, field).map((m) => ({ ...m, ...dated[id(m)] })) : []),
     [item, field, dated],
   )
-  const canReport = ui.contributions.edit && resolveCapabilities(category.capabilities).edit
+  const canReport = useContributions().edit && resolveCapabilities(category.capabilities).edit
 
   const patch = (m: ItemMark, s: Partial<ItemState>) =>
     setStates((prev) => ({ ...prev, [id(m)]: { ...(prev[id(m)] ?? { mine: null, busy: false, error: null }), ...s } }))

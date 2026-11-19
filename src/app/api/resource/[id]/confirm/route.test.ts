@@ -121,16 +121,24 @@ describe('DELETE /api/resource/:id/confirm', () => {
     expect(m.revalidateTag).not.toHaveBeenCalled()
   })
 
-  it('treats a missing or unparseable body as "no previous confirmation" (an old page)', async () => {
-    m.rpc.mockResolvedValue(changed(null))
-    const res = await DELETE(new Request(`http://x/api/resource/${ID}/confirm`, { method: 'DELETE', body: 'not json' }), ctx())
-    expect(res.status).toBe(200)
-    expect(m.rpc).toHaveBeenCalledWith('unconfirm_resource', { p_id: ID, p_expected: null, p_previous: null })
+  // Without the stamp it was given, an undo wrote whatever date it was
+  // sent onto any listing: a listing could be made to look checked
+  // tomorrow, or have its check wiped, by anyone (Nov 18 review).
+  it('400s an undo without the stamp this browser was given, or with a body that isn’t JSON', async () => {
+    expect((await DELETE(req('DELETE', { previousConfirmedAt: '2019-05-05T00:00:00.000Z' }), ctx())).status).toBe(400)
+    expect((await DELETE(new Request(`http://x/api/resource/${ID}/confirm`, { method: 'DELETE', body: 'not json' }), ctx())).status).toBe(400)
+    expect(m.rpc).not.toHaveBeenCalled()
+  })
+
+  it('400s a previous confirmation later than the one being undone', async () => {
+    const res = await DELETE(req('DELETE', { previousConfirmedAt: '2030-01-01T00:00:00.000Z', confirmedAt: '2026-09-25T15:00:00.000Z' }), ctx())
+    expect(res.status).toBe(400)
+    expect(m.rpc).not.toHaveBeenCalled()
   })
 
   it('ignores an activity id that isn’t a whole number', async () => {
     m.rpc.mockResolvedValue(changed(null))
-    await DELETE(req('DELETE', { activityId: '42; drop table' }), ctx())
+    await DELETE(req('DELETE', { activityId: '42; drop table', confirmedAt: '2026-09-25T15:00:00.000Z' }), ctx())
     expect(m.removeVisitorConfirmation).not.toHaveBeenCalled()
   })
 
@@ -141,7 +149,7 @@ describe('DELETE /api/resource/:id/confirm', () => {
     ['a date-shaped string that is not a real date', '2026-13-45Tnope'],
   ] as const) {
     it(`400s a previousConfirmedAt that is ${label}, without writing`, async () => {
-      expect((await DELETE(req('DELETE', { previousConfirmedAt: bad }), ctx())).status).toBe(400)
+      expect((await DELETE(req('DELETE', { previousConfirmedAt: bad, confirmedAt: '2026-09-25T15:00:00.000Z' }), ctx())).status).toBe(400)
       expect(m.rpc).not.toHaveBeenCalled()
     })
     it(`400s a confirmedAt that is ${label}, without writing`, async () => {
@@ -153,7 +161,7 @@ describe('DELETE /api/resource/:id/confirm', () => {
   it('502s when the database call fails', async () => {
     m.rpc.mockResolvedValue({ data: null, error: { message: 'boom' } })
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect((await DELETE(req('DELETE', {}), ctx())).status).toBe(502)
+    expect((await DELETE(req('DELETE', { confirmedAt: '2026-09-25T15:00:00.000Z' }), ctx())).status).toBe(502)
     expect(m.revalidateTag).not.toHaveBeenCalled()
   })
 })

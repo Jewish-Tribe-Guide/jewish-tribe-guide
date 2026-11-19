@@ -54,11 +54,21 @@ import { nightKindOf } from '@/lib/nightKinds'
 export const maxDuration = 300
 
 /** No watch starts after this much of the run: one AI read can take half
- *  a minute (Oct 24: 31s; 34s the slowest seen), and the alerts still go
- *  out after the last, inside maxDuration. 200s until Oct 26, when the
+ *  a minute (Oct 24: 31s; 34s the slowest seen), and a shul's calendar is
+ *  read a week at a time, this week and next (68s), and the alerts still
+ *  go out after the last, inside maxDuration. 200s until Oct 26, when the
  *  night every shul's page is read for its new week (32 AI reads more)
- *  would have left the menus, checked last, for the next night. */
-const START_NO_WATCH_AFTER_MS = 250_000
+ *  would have left the menus, checked last, for the next night; 250s
+ *  until Nov 18, which a two-week read started at the end ran past. The
+ *  searches before the watches have their own limit now
+ *  (SEARCH_PAGES_FOR_MS), so the watches keep most of the run. */
+const START_NO_WATCH_AFTER_MS = 220_000
+
+/** The shul and mikvah page search (syncHoursWatches) starts no place's
+ *  search after this much of the run, each search given its own 20s:
+ *  every place's website, every night, could take most of the watches'
+ *  time (Nov 18 review). The rest are searched on another night. */
+const SEARCH_PAGES_FOR_MS = 60_000
 
 async function eruvLines(failed: string[]) {
   return runEruvLines().catch((err) => {
@@ -93,7 +103,7 @@ async function runAll(started = Date.now()): Promise<Body> {
   // gives each eruv's website its watch (eruvWebsiteRun.ts).
   const [hospitals, hours, eruvWebsites] = await Promise.all([
     step('Refuah', failedBefore, syncRefuahWatches(), []),
-    step('shul and mikvah pages', failedBefore, syncHoursWatches(), []),
+    step('shul and mikvah pages', failedBefore, syncHoursWatches(undefined, undefined, started + SEARCH_PAGES_FOR_MS), []),
     step('eruv websites', failedBefore, syncEruvWebsiteWatches(), []),
   ])
   const { watches, available } = await listAllWatches()

@@ -6,6 +6,7 @@ import { answerFor, hitHoursNote, metaAnswer, nearMissAnswer, timesAnswer, type 
 import type { ZmanimData } from '@/types'
 import type { MinyanSlot } from './upcomingDavening'
 import type { DateFacts } from './schedules'
+import { placeTime } from '@/test/placeTime'
 
 const synagogue = makeCategory({
   id: 'synagogue',
@@ -260,7 +261,7 @@ describe('answerFor — other questions', () => {
     ]
     const result = searchAsk(stores, [storeWithHours], 'is there a place open that sells cheese', {
       coords: here,
-      now: new Date(2026, 8, 26, 12, 0),
+      now: placeTime(2026, 8, 26, 12, 0),
     })
     expect(answerFor(result, { coords: here })?.text).toBe(
       '2 open places have cheese. Nearest: GIANT, 0.3 mi, open until 10:00 PM. 1 more is closed right now.',
@@ -360,7 +361,7 @@ describe('answerFor — "is there a mikvah open today"', () => {
     women_s_hours: allWeek('20:00', '22:00'),
   })
   const noHours = listing('mikvah', 'oh', 'Mikvah Ohel Leah', 39.96)
-  const at = (h: number) => new Date(2026, 8, 26, h, 0)
+  const at = (h: number) => placeTime(2026, 8, 26, h, 0)
   const answer = (input: string, h: number, places = [lowerMerion, noHours]) =>
     answerFor(searchAsk(places, [mikvah], input, { now: at(h) }))
 
@@ -470,7 +471,7 @@ describe('answerFor — "open now" without a location', () => {
       listing('restaurant', 'a', 'A Cafe', 39.95, { hours: allDay }),
       listing('restaurant', 'b', 'B Cafe', 39.96, { hours: allDay }),
     ]
-    const now = new Date(2026, 8, 28, 12, 0)
+    const now = placeTime(2026, 8, 28, 12, 0)
     expect(answerFor(searchAsk(places, [food], 'food open now', { now }))?.text).toBe('2 food places open now, such as A Cafe (open until 11:00 PM).')
     expect(answerFor(searchAsk(places, [food], 'food open now', { now, coords: here }), { coords: here })?.text).toBe(
       '2 food places open now. Nearest: A Cafe, open until 11:00 PM, under 100 ft.',
@@ -492,7 +493,7 @@ describe('answerFor — "open after 6"', () => {
   })
   const early = listing('restaurant', 'e', 'Early Bagels', 39.95, { t: ['Bagels'], hours: allWeek('06:00', '14:00') })
   const late = listing('restaurant', 'l', 'Late Bagels', 39.96, { t: ['Bagels'], hours: allWeek('07:00', '21:00') })
-  const noon = new Date(2026, 8, 28, 12, 0)
+  const noon = placeTime(2026, 8, 28, 12, 0)
   const say = (q: string, places = [early, late]) => answerFor(searchAsk(places, [food], q, { now: noon }))?.text
 
   it('says the time it read, and which places are open then', () => {

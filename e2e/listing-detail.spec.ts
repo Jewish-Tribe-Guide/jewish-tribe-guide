@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, dismissLocationPrompt, listingWithFourActions, openListingEditor } from './helpers'
+import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, listingWithFourActions, openListingEditor, ready } from './helpers'
 import { changedByTests } from './suiteRows'
 
 // Desktop opens a listing in the list's own column, the map staying beside
@@ -14,7 +14,7 @@ test.describe('listing detail — desktop', () => {
     const { category } = await categoryWithListings(request, community)
 
     await page.goto(`/${community}/${category.id}`)
-    await dismissLocationPrompt(page)
+    await ready(page)
 
     const trigger = page.getByRole('button', { name: /^Show details for / }).first()
     const name = (await trigger.getAttribute('aria-label'))!.replace(/^Show details for /, '')
@@ -42,7 +42,7 @@ test.describe('listing detail — desktop', () => {
     const { category, item } = await listingWithFourActions(request, community)
 
     await page.goto(`/${community}/${category.id}/${item.id}`)
-    await dismissLocationPrompt(page)
+    await ready(page)
 
     const column = page.getByTestId('listing-column').filter({ visible: true })
     const actions = column.getByTestId('listing-actions').locator(':scope > a, :scope > button')
@@ -61,7 +61,7 @@ test.describe('listing detail — desktop', () => {
     const { category } = await largestCategory(request, community)
 
     await page.goto(`/${community}/${category.id}`)
-    await dismissLocationPrompt(page)
+    await ready(page)
 
     // The visible one: a hidden streamed copy of the page can be in the DOM too.
     const map = page.getByTestId('category-map').filter({ visible: true })
@@ -112,7 +112,7 @@ test.describe('listing detail — desktop', () => {
     const { category } = await largestCategory(request, community)
     await page.setViewportSize({ width: 1100, height: 800 })
     await page.goto(`/${community}/${category.id}`)
-    await dismissLocationPrompt(page)
+    await ready(page)
 
     const line = page.getByRole('separator', { name: 'Resize the list and the map' })
     await expect(line).toBeVisible()
@@ -153,7 +153,7 @@ test.describe('listing detail — desktop', () => {
     }
 
     await page.goto(`/${community}/${category.id}`)
-    await dismissLocationPrompt(page)
+    await ready(page)
     await page.getByTestId('category-map').getByRole('button', { name: 'Hide map' }).click()
 
     expect(await columnsAt(1920)).toBe(2)
@@ -170,7 +170,7 @@ test.describe('listing detail — desktop', () => {
     const { category } = await largestCategory(request, community)
 
     await page.goto(`/${community}/${category.id}`)
-    await dismissLocationPrompt(page)
+    await ready(page)
 
     const triggers = page.getByRole('button', { name: /^Show details for / })
     const row = triggers.nth(8)
@@ -198,7 +198,9 @@ test.describe('listing detail — desktop', () => {
     const { category } = await categoryWithListings(request, community)
 
     await page.goto(`/${community}/${category.id}`)
-    await dismissLocationPrompt(page)
+    // Measured with the page settled: mid-stream it has two copies of the
+    // top, and the search's place moves when one goes (CI, Nov 18).
+    await ready(page)
     const search = page.getByRole('searchbox', { name: `Search ${category.pluralLabel}` })
     await expect(search).toBeVisible()
     const before = (await search.boundingBox())!
@@ -232,9 +234,12 @@ test.describe('listing detail — desktop', () => {
     const { category } = await largestCategory(request, community)
 
     await page.goto(`/${community}/${category.id}`)
-    await dismissLocationPrompt(page)
+    await ready(page)
 
     const triggers = page.getByRole('button', { name: /^Show details for / })
+    // A one-shot read: the seventh row must be there first (CI read fewer
+    // and compared with undefined, Nov 18).
+    await expect(triggers.nth(6)).toBeAttached()
     const names = await triggers.evaluateAll((els) => els.slice(0, 7).map((el) => el.getAttribute('aria-label')!.replace(/^Show details for /, '')))
     await triggers.first().click()
     const column = page.getByTestId('listing-column')
@@ -256,7 +261,7 @@ test.describe('listing detail — desktop', () => {
       let found = false
       for (const category of grouped) {
         await page.goto(`/${community}/${category.id}`)
-        await dismissLocationPrompt(page)
+        await ready(page)
         if ((await page.locator('button[aria-expanded="false"][aria-controls]').count()) > 0) {
           found = true
           break
@@ -288,7 +293,7 @@ test.describe('listing detail — desktop', () => {
     const { category, item } = await categoryWithHoursField(request, community)
 
     await page.goto(`/${community}/${category.id}`)
-    await dismissLocationPrompt(page)
+    await ready(page)
     await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
     const column = page.getByTestId('listing-column')
     await expect(column.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
@@ -319,7 +324,7 @@ test.describe('listing detail — mobile', () => {
     const { category } = await categoryWithListings(request, community)
 
     await page.goto(`/${community}/${category.id}`)
-    await dismissLocationPrompt(page)
+    await ready(page)
 
     const trigger = page.getByRole('button', { name: /^Show details for / }).first()
     const name = (await trigger.getAttribute('aria-label'))!.replace(/^Show details for /, '')
@@ -357,7 +362,7 @@ test.describe('listing detail — mobile', () => {
     const item = (await res.json()).resources[0] as { id: string; name: string }
 
     await page.goto(`/${community}/${category.id}?item=${item.id}`)
-    await dismissLocationPrompt(page)
+    await ready(page)
 
     const sheet = page.getByRole('dialog', { name: item.name })
     await expect(sheet).toBeVisible()
@@ -379,7 +384,7 @@ test.describe('listing detail — mobile', () => {
     const item = (await res.json()).resources[0] as { id: string; name: string }
 
     await page.goto(`/${community}/${category.id}/${item.id}`)
-    await dismissLocationPrompt(page)
+    await ready(page)
 
     const listing = page.getByTestId('listing-page')
     await expect(listing).toBeVisible()
@@ -394,6 +399,52 @@ test.describe('listing detail — mobile', () => {
     // Waited for, not read once: the category's list can show a moment
     // before the address updates (failed that way once in a full run, Sep 30).
     await expect.poll(() => new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
+  })
+
+  // The listing's own link used to gain `?item=` once it opened, and a
+  // reload of that showed the list with a sheet instead of the page (Nov 18).
+  test('a listing’s own link stays as it is, and a reload is the same page', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithListings(request, community)
+    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
+    const item = (await res.json()).resources[0] as { id: string; name: string }
+
+    await page.goto(`/${community}/${category.id}/${item.id}`)
+    await ready(page)
+    const listing = page.getByTestId('listing-page')
+    await expect(listing).toBeVisible()
+    await page.waitForTimeout(1_000)
+    expect(new URL(page.url()).searchParams.get('item')).toBeNull()
+
+    await page.reload()
+    await ready(page)
+    await expect(listing).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  // Back with a listing's sheet open left the category altogether (Nov 18);
+  // on the Map it closed the sheet. Now it closes the sheet here too, and
+  // Forward opens it again.
+  test('Back closes a listing’s sheet and stays on the list; Forward opens it again', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithListings(request, community)
+
+    await page.goto(`/${community}/${category.id}`)
+    await ready(page)
+    const trigger = page.getByRole('button', { name: /^Show details for / }).first()
+    const name = (await trigger.getAttribute('aria-label'))!.replace(/^Show details for /, '')
+    await trigger.click()
+    const sheet = page.getByRole('dialog', { name })
+    await expect(sheet).toBeVisible()
+
+    await page.goBack()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: `Show details for ${name}` }).first()).toBeVisible()
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
+    expect(new URL(page.url()).searchParams.get('item')).toBeNull()
+
+    await page.goForward()
+    await expect(sheet).toBeVisible()
   })
 
   // Back wrote the category's address behind Next's router (Nov 17): the
@@ -417,7 +468,7 @@ test.describe('listing detail — mobile', () => {
     )
 
     await page.goto(`/${community}/${category.id}/${item.id}`)
-    await dismissLocationPrompt(page)
+    await ready(page)
     const listing = page.getByTestId('listing-page')
     await expect(listing).toBeVisible()
     await page.locator('header').getByRole('button', { name: category.pluralLabel }).click()
@@ -457,7 +508,7 @@ test.describe('listing detail — mobile', () => {
     const item = (await res.json()).resources[0] as { id: string; name: string }
 
     await page.goto(`/${community}/${category.id}?item=${item.id}`)
-    await dismissLocationPrompt(page)
+    await ready(page)
     await expect(page.getByRole('dialog', { name: item.name })).toBeVisible()
     await page.evaluate(() => window.scrollTo(0, 0))
     await page.locator('main').evaluate((main) => {
@@ -483,7 +534,7 @@ test('Request removal, beside Edit, is its own screen, and Back returns to the l
   const { category, item } = await categoryWithHoursField(request, community)
 
   await page.goto(`/${community}/${category.id}`)
-  await dismissLocationPrompt(page)
+  await ready(page)
   await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
   // A sheet on a phone; the list's column on desktop.
   const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
@@ -515,6 +566,115 @@ test('Request removal, beside Edit, is its own screen, and Back returns to the l
   await expect(name).toBeVisible()
 })
 
+// Nov 19: the editor and its Request removal are addresses of their own
+// (?editing=<id>~listing, useEditorInAddress), written through Next's
+// router. They were entries pushed behind it with nothing in the address:
+// a reload went back to the listing with the editor still in the history,
+// so the next Back seemed to do nothing, and Back to one from another page
+// changed the address and drew nothing. Opens nothing that writes.
+test('the editor is an address of its own: a reload, Back, Forward, and Back from another page', async ({ page, request, isMobile }) => {
+  const community = await defaultCommunity(page)
+  const { category, item } = await categoryWithHoursField(request, community)
+
+  await page.goto(`/${community}/${category.id}`)
+  await ready(page)
+  await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
+  const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
+  const name = listing.getByRole('heading', { name: item.name, exact: true })
+  await expect(name).toBeVisible()
+  test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
+  const editing = () => new URL(page.url()).searchParams.get('editing')
+  const editor = page.getByTestId('editor-list')
+
+  await openListingEditor(page, listing)
+  await expect(editor).toBeVisible()
+  await expect.poll(editing).toBe(`${item.id}~listing`)
+
+  // A reload is the editor, and Back from there is the listing.
+  await page.reload()
+  await ready(page)
+  await expect(editor).toBeVisible()
+  await page.goBack()
+  await expect(name).toBeVisible()
+  await expect(editor).toHaveCount(0)
+  expect(editing()).toBeNull()
+  expect(new URL(page.url()).searchParams.get('item')).toBe(item.id)
+  await page.goForward()
+  await expect(editor).toBeVisible()
+
+  // Away to another page, and Back: the editor, drawn.
+  await page.goto(`/${community}`)
+  await ready(page)
+  await page.goBack()
+  await ready(page)
+  await expect(editor).toBeVisible()
+  expect(editing()).toBe(`${item.id}~listing`)
+  // And Back from it, the listing.
+  await page.goBack()
+  await expect(name).toBeVisible()
+  await expect(editor).toHaveCount(0)
+})
+
+test('Request removal from the bar is an address of its own: a reload, and Back to the listing', async ({ page, request, isMobile }) => {
+  const community = await defaultCommunity(page)
+  const { category, item } = await categoryWithHoursField(request, community)
+
+  await page.goto(`/${community}/${category.id}`)
+  await ready(page)
+  await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
+  const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
+  const name = listing.getByRole('heading', { name: item.name, exact: true })
+  await expect(name).toBeVisible()
+  test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
+  const editing = () => new URL(page.url()).searchParams.get('editing')
+  const removal = page.getByRole('heading', { name: 'Request removal' })
+
+  const button = listing.getByRole('button', { name: 'Request removal' })
+  await button.scrollIntoViewIfNeeded()
+  await button.click()
+  await expect(removal).toBeVisible()
+  await expect.poll(editing).toBe(`${item.id}~removal`)
+
+  await page.reload()
+  await ready(page)
+  await expect(removal).toBeVisible()
+  await page.goBack()
+  await expect(name).toBeVisible()
+  await expect(removal).toHaveCount(0)
+  expect(editing()).toBeNull()
+})
+
+// Nov 19: the sheet closed (the dimmed list tapped) with its editor open
+// stepped back one entry, onto the listing's own: the sheet shut on an
+// address naming it, so the next Back did nothing anyone could see and a
+// reload opened the listing again.
+test('phone: closing the sheet with its editor open goes back to the list, address and all', async ({ page, request, isMobile }) => {
+  test.skip(!isMobile, 'the sheet is the phone’s')
+  const community = await defaultCommunity(page)
+  const { category, item } = await categoryWithHoursField(request, community)
+
+  await page.goto(`/${community}/${category.id}`)
+  await ready(page)
+  const listAddress = page.url()
+  await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
+  const listing = page.getByRole('dialog', { name: item.name })
+  await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
+  test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
+  await openListingEditor(page, listing)
+  await expect(page.getByTestId('editor-list')).toBeVisible()
+  await expect.poll(() => new URL(page.url()).searchParams.get('editing')).toBe(`${item.id}~listing`)
+
+  await page.mouse.click(page.viewportSize()!.width / 2, 40)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect.poll(() => page.url()).toBe(listAddress)
+
+  // A reload is the list, with no sheet over it.
+  await page.reload()
+  await ready(page)
+  await expect(page.getByRole('button', { name: `Show details for ${item.name}` }).first()).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+
 // A row of the editor (Oct 11) is a step inside it: the header's Back
 // closes the row, not the editor.
 test('Back steps out of an open row of the editor, not out of editing', async ({ page, request, isMobile }) => {
@@ -523,7 +683,7 @@ test('Back steps out of an open row of the editor, not out of editing', async ({
   const { category, item } = await categoryWithHoursField(request, community, { longest: true })
 
   await page.goto(`/${community}/${category.id}`)
-  await dismissLocationPrompt(page)
+  await ready(page)
   await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
   const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
   await expect(listing).toBeVisible()
@@ -564,7 +724,7 @@ test('a row’s own screen starts at its top, and Back returns to the row', asyn
     const { category, item } = await categoryWithHoursField(request, community, { longest: true })
 
     await page.goto(`/${community}/${category.id}`)
-    await dismissLocationPrompt(page)
+    await ready(page)
     await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
     const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
     await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
@@ -612,7 +772,7 @@ test('a long note grows its box rather than scrolling inside it', async ({ page,
   const { category, item } = await categoryWithHoursField(request, community, { also: 'textarea' })
 
   await page.goto(`/${community}/${category.id}`)
-  await dismissLocationPrompt(page)
+  await ready(page)
   await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
   const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
   await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
@@ -632,4 +792,38 @@ test('a long note grows its box rather than scrolling inside it', async ({ page,
   test.skip((await box.count()) === 0, `${category.id} has no note opening in place`)
   await box.fill(Array.from({ length: 10 }, (_, i) => `Line ${i + 1} of a long note`).join('\n'))
   await expect.poll(() => box.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1)
+})
+
+// An eruv's editor (EruvListing), the same way: its own address, so a
+// reload comes back to it and Back is the eruv (Nov 19). Opens nothing
+// that writes.
+test('an eruv’s editor is an address of its own: a reload, Back and Forward', async ({ page, isMobile }) => {
+  const community = await defaultCommunity(page)
+  await page.goto(`/${community}/eruv`)
+  await ready(page)
+  const row = page.getByTestId('eruv-row').first()
+  await expect(row.or(page.getByTestId('eruv-none'))).toBeVisible()
+  test.skip((await row.count()) === 0, 'no eruvim listed')
+  await row.click()
+  const opened = isMobile ? page.getByRole('dialog') : page.getByTestId('eruv-column')
+  await expect(opened).toBeVisible()
+  const edit = opened.getByRole('button', { name: 'Edit listing' })
+  test.skip((await edit.count()) === 0, 'the eruv can’t be edited')
+  const item = new URL(page.url()).searchParams.get('item')
+  const editing = () => new URL(page.url()).searchParams.get('editing')
+  const editor = page.getByTestId('eruv-editing')
+
+  await edit.click()
+  await expect(editor).toBeVisible()
+  await expect.poll(editing).toBe(`${item}~listing`)
+
+  await page.reload()
+  await ready(page)
+  await expect(editor).toBeVisible()
+  await page.goBack()
+  await expect(editor).toHaveCount(0)
+  await expect(edit).toBeVisible()
+  expect(editing()).toBeNull()
+  await page.goForward()
+  await expect(editor).toBeVisible()
 })

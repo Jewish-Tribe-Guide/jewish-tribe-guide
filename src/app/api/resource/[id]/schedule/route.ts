@@ -1,20 +1,11 @@
 import { after } from 'next/server'
-import { getAdminClient } from '@/lib/supabase/admin'
-import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
-import { isHoneypotTripped } from '@/lib/honeypot'
-import { verifyTurnstile } from '@/lib/turnstile'
-import { ui } from '@/lib/uiConfig'
-import { resolveCapabilities } from '@/lib/categories'
-import { getResourceById } from '@/lib/resourceStore'
-import { getCategoryById } from '@/lib/categoryStore'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
 import { editSubmission } from '@/lib/editSubmission'
 import { cleanSchedule, readSchedules, schedulesKey, formatSchedulesSummary } from '@/lib/schedules'
-import { UUID } from '@/lib/itemMarkRoutes'
-import { community } from '@/community.config'
 import { fetchFestivals } from '@/lib/festivals'
 import { mergeSchedule, scheduleDayDates } from '@/lib/scheduleUpdate'
+import { editableListing, failsBotCheck, keptSourceUrl, openListingWrite, pastedSource } from '@/lib/listingWrite'
 
 // POST /api/resource/:id/schedule   { schedule, source?, turnstileToken, company }
 // "Know their Sukkos times? Add them" on a shul's card (step 4, agreed
@@ -29,43 +20,28 @@ import { mergeSchedule, scheduleDayDates } from '@/lib/scheduleUpdate'
 
 const FAILED = { ok: false, error: 'That didn’t send. Please try again.' }
 export async function POST(request: Request, ctx: RouteContext<'/api/resource/[id]/schedule'>) {
-  const limited = await enforceRateLimit(request, 'submissions', { limit: 10, windowSec: 60 })
-  if (limited) return limited
-
-  const { id } = await ctx.params
-  if (!UUID.test(id)) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
-  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
-  if (body && isHoneypotTripped(body)) return Response.json({ ok: true })
+  const opened = await openListingWrite(request, ctx)
+  if (opened instanceof Response) return opened
+  const { id, body } = opened
   const schedule = cleanSchedule(body?.schedule)
   if (!body || !schedule) return Response.json({ ok: false, error: 'Add at least one time, on a day of the Yom Tov.' }, { status: 400 })
-  if (!(await verifyTurnstile(typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined, clientIp(request)))) {
-    return Response.json({ ok: false, code: 'turnstile', error: 'Verification failed. Please try again.' }, { status: 403 })
-  }
-  if (!ui.contributions.edit) return Response.json({ ok: false, error: 'This action is not available.' }, { status: 403 })
-  const source = typeof body.source === 'string' ? body.source.trim().slice(0, 4000) : ''
-  // A photo or PDF it was read from: only one the reader kept, in the
-  // guide's own storage (/api/schedule/read), never any other address.
-  const kept = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/site-assets/schedule-source/`
-  const sourceUrl = typeof body.sourceUrl === 'string' && body.sourceUrl.startsWith(kept) && /^[\w.-]+$/.test(body.sourceUrl.slice(kept.length)) ? body.sourceUrl : null
+  const bot = await failsBotCheck(request, body)
+  if (bot) return bot
+  const source = pastedSource(body.source)
+  // A photo or PDF it was read from, by either reader (keptSourceUrl): this
+  // one used to take only the schedule reader's, so a Yom Tov schedule read
+  // in the "+ Add" box lost its photo on the way to the queue.
+  const sourceUrl = keptSourceUrl(body.sourceUrl)
 
   try {
-    const { data: row } = await getAdminClient()
-      .from('resource')
-      .select('community_id')
-      .eq('id', id)
-      .eq('status', 'approved')
-      .maybeSingle<{ community_id: string }>()
-    const listing = row ? await getResourceById(id, row.community_id) : null
-    const category = listing && row ? await getCategoryById(row.community_id, listing.category) : null
-    const field = category?.detailFields.find((f) => f.type === 'minyanim')
-    if (!listing || !category || !field || !row) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
-    if (!resolveCapabilities(category.capabilities).edit) {
-      return Response.json({ ok: false, error: 'This action is not available for this category.' }, { status: 403 })
-    }
+    const found = await editableListing(id, (c) => c.detailFields.find((f) => f.type === 'minyanim'))
+    if (found instanceof Response) return found
+    const { community, listing, category, field } = found
 
     const key = schedulesKey(field.key)
     // One of the same name is merged day by day: Shemini Atzeres's times
-    // sent now keep the Chol HaMoed ones already there.
+    // sent now keep the Chol HaMoed ones already there. The festival's
+    // dates where the shul is: its community's clock.
     const festival = (await fetchFestivals(community.timezone)).find((f) => f.from <= schedule.to && schedule.from <= f.to)
     const schedules = mergeSchedule(readSchedules(listing[key]), schedule, (d, s) => scheduleDayDates(d, s, festival?.days))
     const note = [
@@ -74,7 +50,7 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
       ...(source ? [`Read from what they pasted:\n${source}`] : []),
       ...(sourceUrl ? [`Read from their photo or PDF: ${sourceUrl}`] : []),
     ].join('\n\n')
-    const submission = await submitListingUpdate(row.community_id, id, editSubmission(category, listing, { [key]: schedules }), note, null)
+    const submission = await submitListingUpdate(community.slug, id, editSubmission(category, listing, { [key]: schedules }), note, null)
     after(() => sendSubmissionNotification(submission).catch((err) => console.error('[schedule] Admin notification failed:', err)))
     return Response.json({ ok: true })
   } catch (err) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
-import { clockMinutes, noteText, shabbosList, timeText, weekdayTable } from './weekTable'
+import { clockMinutes, noteText, ruleLinesToday, shabbosList, timeText, weekdayTable } from './weekTable'
 
 let n = 0
 const m = (over: Partial<Minyan>): Minyan => ({ id: `m${n++}`, tefillah: 'shacharis', days: [], time: '', ...over })
@@ -38,6 +38,16 @@ describe('the usual weekday times, as one table', () => {
       ['Fri', '7, 8 AM', '—'],
     ])
     expect(t.rules.map((r) => r.text)).toEqual(['10 min before sunset'])
+  })
+
+  // Nov 18 review, item 11: the weekday box said "10 min before sunset:
+  // 4:32 PM today" on Friday and Shabbos, when that Mincha isn't held.
+  it('gives a rule’s time today only on a day it is used', () => {
+    const t = weekdayTable(lowerMerion, 'summer')!
+    const anchors = { sunsetIso: '2026-11-20T16:42:00-05:00' }
+    expect(ruleLinesToday(t.rules, 'mon', anchors)).toEqual(['10 min before sunset: 4:32 PM today.'])
+    expect(ruleLinesToday(t.rules, 'fri', anchors)).toEqual([])
+    expect(ruleLinesToday(t.rules, 'sat', anchors)).toEqual([])
   })
 
   it('this season’s only, the other in one line; notes and extra days under the table (Mekor Habracha)', () => {

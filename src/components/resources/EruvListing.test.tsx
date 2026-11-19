@@ -1,19 +1,27 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import { mockRouter } from '@/test/nextNavigationMock'
+import { historyRouter } from '@/test/nextNavigationMock'
+import { moveTo } from '@/components/admin/useScreenHistory'
 import type { Eruv } from '@/lib/eruv'
 import type { CategoryConfig } from '@/lib/categories'
 import { EruvListing } from './EruvListing'
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => mockRouter,
+  useRouter: () => historyRouter,
   usePathname: () => '/test-community/eruv',
   useSearchParams: () => new URLSearchParams(),
 }))
 
-afterEach(cleanup)
+const here = () => window.location.pathname + window.location.search
+beforeEach(() => window.history.replaceState(null, '', '/test-community/eruv'))
+afterEach(async () => {
+  cleanup()
+  // Moves still on their way land before the next test starts.
+  await moveTo(historyRouter as never, 'replace', here)
+  vi.restoreAllMocks()
+})
 
 // Nov 9: an opened eruv shows the Eruv page's Fields, in its boxes, after
 // its name and status (eruvFields.ts). A page never saved shows the rows an
@@ -84,23 +92,38 @@ describe('EruvListing — the Eruv page’s fields', () => {
   // The admin preview's Editing tab opens an eruv on its Edit listing. Its
   // Back there has no step of its own to go back over: going back in the
   // history would leave the admin's page.
-  it('opened on its Edit listing, Back shows the listing and leaves the history alone', () => {
-    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+  it('opened on its Edit listing, Back shows the listing and leaves the history alone', async () => {
+    const go = vi.spyOn(window.history, 'go')
     renderWithProviders(<EruvListing startEditing eruv={eruv} color="#000" now={new Date('2026-11-09T15:00:00Z')} timezone="America/New_York" candles={null} />, { content: { categories: [page()] } })
     expect(screen.getByTestId('eruv-editing')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.queryByTestId('eruv-editing')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Edit listing/ })).toBeInTheDocument()
-    expect(back).not.toHaveBeenCalled()
-    back.mockRestore()
+    await new Promise((r) => setTimeout(r, 50))
+    expect(go).not.toHaveBeenCalled()
+    expect(here()).toBe('/test-community/eruv')
   })
 
-  it('opened by Edit listing, Back goes back over its step', () => {
-    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+  // Nov 19: its own address, so a reload comes back to it and Back to it
+  // from another page draws it.
+  it('opened by Edit listing, it has an address of its own, and Back goes back over it', async () => {
     open([page()])
     fireEvent.click(screen.getByRole('button', { name: /Edit listing/ }))
+    await waitFor(() => expect(here()).toBe('/test-community/eruv?editing=center-city%7Elisting'))
+
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
-    expect(back).toHaveBeenCalledTimes(1)
-    back.mockRestore()
+    expect(screen.queryByTestId('eruv-editing')).not.toBeInTheDocument()
+    await waitFor(() => expect(here()).toBe('/test-community/eruv'))
+  })
+
+  it('opens on its editor when the address names it, as a reload does, and not on another eruv’s', () => {
+    window.history.replaceState(null, '', '/test-community/eruv?editing=center-city%7Elisting')
+    open([page()])
+    expect(screen.getByTestId('eruv-editing')).toBeInTheDocument()
+    cleanup()
+
+    window.history.replaceState(null, '', '/test-community/eruv?editing=other-eruv%7Elisting')
+    open([page()])
+    expect(screen.queryByTestId('eruv-editing')).not.toBeInTheDocument()
   })
 })

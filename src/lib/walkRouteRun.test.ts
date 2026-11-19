@@ -58,6 +58,20 @@ describe('workOutWalks', () => {
     expect(await workOutWalks(d)).toMatchObject({ asked: 1, walks: 2, leftForTomorrow: 2 })
   })
 
+  // Nov 18 review: a request that fails every night (a place
+  // OpenRouteService can't route to) was first in line every night, and
+  // with enough of them the budget never reached the rest.
+  it('starts at a different request each night, so one that keeps failing isn’t always first', async () => {
+    const asked = async (turn: number) => {
+      const d = deps({ budget: 1, turn })
+      await workOutWalks(d)
+      return Object.keys(d.saved)
+    }
+    expect(await asked(0)).toEqual(['h1'])
+    expect(await asked(1)).toEqual(['h2'])
+    expect(await asked(2)).toEqual(['h1'])
+  })
+
   it('keeps nothing for a listing whose request fails, and carries on', async () => {
     const ask = vi.fn(async (body) => reply(body))
     ask.mockRejectedValueOnce(new Error('OpenRouteService 429'))

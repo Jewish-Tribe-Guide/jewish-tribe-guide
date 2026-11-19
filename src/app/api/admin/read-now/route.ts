@@ -66,14 +66,14 @@ export const POST = adminRead(async (request: Request, { community }) => {
     const apiKey = process.env.OPENAI_API_KEY
     const needsAi = body?.slot === 'page' || body?.slot === 'menu'
     if (needsAi && !apiKey) return Response.json({ ok: false, errors: ['The AI reader isn’t set up here (no OPENAI_API_KEY).'] }, { status: 503 })
-    if (body?.slot === 'page') return Response.json({ ok: true, ...(await readPageNow(category, draft, url, { apiKey: apiKey!, communityName: community.name })) })
+    if (body?.slot === 'page') return Response.json({ ok: true, ...(await readPageNow(category, draft, url, { apiKey: apiKey!, communityName: community.name, where: community })) })
     if (body?.slot === 'menu') return Response.json({ ok: true, ...(await readMenuNow(category, draft, url, apiKey!)) })
     if (body?.slot === 'email') {
       if (!url?.includes('@')) return Response.json({ ok: false, errors: ['That isn’t an email address.'] }, { status: 400 })
       if (!apiKey) return Response.json({ ok: false, errors: ['The AI reader isn’t set up here (no OPENAI_API_KEY).'] }, { status: 503 })
-      return Response.json({ ok: true, ...(await readEmailNow(community.slug, category, draft, url, { apiKey, communityName: community.name })) })
+      return Response.json({ ok: true, ...(await readEmailNow(community.slug, category, draft, url, { apiKey, communityName: community.name, where: community })) })
     }
-    if (body?.slot === 'site') return Response.json({ ok: true, ...(await readSiteNow(category, draft)) })
+    if (body?.slot === 'site') return Response.json({ ok: true, ...(await readSiteNow(category, draft, community.timezone)) })
     if (body?.slot === 'refuah') return Response.json({ ok: true, ...(await readRefuahNow(category, draft, url)) })
     return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
   } catch (err) {

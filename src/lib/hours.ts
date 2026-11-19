@@ -11,8 +11,15 @@
 //   { sun: { open: "HH:MM", close: "HH:MM" } | null, mon: ..., ... }
 // Days absent from the object are treated as closed.
 
+import { community as siteCommunity } from '@/community.config'
+
 export type DayKey = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
-export type DayHours = { open: string; close: string } | null
+/** One day's hours. A close at or before the open is past midnight
+ *  ("17:00"–"02:00"), as the editor allows. `periods`, when there are two or
+ *  more, is the day in full (a lunch break between them); `open`/`close`
+ *  are then the first open and the last close, for anything that reads one
+ *  range. Only Google's hours carry periods today. */
+export type DayHours = { open: string; close: string; periods?: { open: string; close: string }[] } | null
 export type StructuredHours = Partial<Record<DayKey, DayHours>>
 
 export const DAY_KEYS: DayKey[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
@@ -56,6 +63,61 @@ export function dayAndMinutesInTimezone(now: number, timezone: string): { day: D
   // out as 1440 for what is, in fact, minute 0.
   const hour = get('hour') % 24
   return { day, minutes: hour * 60 + get('minute') }
+}
+
+/** The community's own clock. Hours are posted in the place's time, so
+ *  "open now" is read there, whatever the visitor's device is set to (a
+ *  phone that travelled, a kiosk on UTC). Every community is Eastern today;
+ *  the timezone is an argument so a caller can pass its own. */
+export const HOURS_TIMEZONE = siteCommunity.timezone
+
+/** Today in the community: which day, and minutes into it. */
+export function placeClock(now: Date, timezone: string = HOURS_TIMEZONE): { day: DayKey; minutes: number; dayIndex: number } {
+  const { day, minutes } = dayAndMinutesInTimezone(now.getTime(), timezone)
+  return { day, minutes, dayIndex: DAY_KEYS.indexOf(day) }
+}
+
+const toMins = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number)
+  return h * 60 + m
+}
+
+/** A day's ranges, each in minutes from that day's midnight. One past
+ *  midnight ends after 1440; "23:59", the old "through end of day" mark,
+ *  ends at 1440. */
+type Span = { start: number; end: number; close: string }
+function spansOf(day: DayHours | undefined): Span[] {
+  if (!day) return []
+  const list = day.periods && day.periods.length > 0 ? day.periods : day.open && day.close ? [{ open: day.open, close: day.close }] : []
+  return list
+    .filter((p) => p.open && p.close)
+    .map((p) => {
+      const start = toMins(p.open)
+      let end = p.close === '23:59' ? 1440 : toMins(p.close)
+      if (end <= start) end += 1440
+      return { start, end, close: p.close }
+    })
+    .sort((a, b) => a.start - b.start)
+}
+
+/** The range open at this moment, today's or one carried over from
+ *  yesterday past midnight, with how many minutes are left in it. */
+function openSpan(hours: Record<string, DayHours>, now: Date, timezone: string): (Span & { left: number }) | null {
+  const { dayIndex, minutes } = placeClock(now, timezone)
+  for (const sp of spansOf(hours[DAY_KEYS[dayIndex]])) {
+    if (sp.start <= minutes && minutes <= sp.end) return { ...sp, left: sp.end - minutes }
+  }
+  for (const sp of spansOf(hours[DAY_KEYS[(dayIndex + 6) % 7]])) {
+    if (sp.end > 1440 && minutes + 1440 < sp.end) return { ...sp, left: sp.end - 1440 - minutes }
+  }
+  return null
+}
+
+/** A day's hours in words: "9:00 AM – 5:00 PM", or each range for a day
+ *  with a break ("11:30 AM – 2:30 PM, 5:00 PM – 10:00 PM"). */
+export function dayRangesText(day: NonNullable<DayHours>, time: (hhmm: string) => string = fmt12, dash = ' – '): string {
+  const list = day.periods && day.periods.length > 0 ? day.periods : [{ open: day.open, close: day.close }]
+  return list.map((p) => `${time(p.open)}${dash}${time(p.close)}`).join(', ')
 }
 
 const DAY_LABELS: Record<DayKey, string> = {
@@ -107,18 +169,13 @@ export function fmt12(hhmm: string): string {
  * or gives no day's hours at all (see hasAnyHours).
  * Returns false when today's hours are null (explicitly closed) or absent.
  */
-export function hoursOpenNow(v: unknown, now: Date = new Date()): boolean | null {
+export function hoursOpenNow(v: unknown, now: Date = new Date(), timezone: string = HOURS_TIMEZONE): boolean | null {
   if (!hasAnyHours(v)) return null
   const hours = v as Record<string, DayHours>
-  const today = now
-  const dayKey = DAY_KEYS[today.getDay()]
-  const day = hours[dayKey]
-  if (day === null || day === undefined) return false
-  if (!day.open || !day.close) return null
-  const nowMins = today.getHours() * 60 + today.getMinutes()
-  const [oh, om] = day.open.split(':').map(Number)
-  const [ch, cm] = day.close.split(':').map(Number)
-  return nowMins >= oh * 60 + om && nowMins <= ch * 60 + cm
+  if (openSpan(hours, now, timezone)) return true
+  const day = hours[placeClock(now, timezone).day]
+  if (day && (!day.open || !day.close)) return null
+  return false
 }
 
 /**
@@ -136,19 +193,14 @@ export function hoursClosing(
   v: unknown,
   withinMins = 60,
   now: Date = new Date(),
+  timezone: string = HOURS_TIMEZONE,
 ): { closesSoon: boolean; closeLabel: string } | null {
   if (!hasAnyHours(v)) return null
-  const hours = v as Record<string, DayHours>
-  const day = hours[DAY_KEYS[now.getDay()]]
-  if (!day || !day.open || !day.close) return null
-  const nowMins = now.getHours() * 60 + now.getMinutes()
-  const [oh, om] = day.open.split(':').map(Number)
-  const [ch, cm] = day.close.split(':').map(Number)
-  const closeMins = ch * 60 + cm
-  if (nowMins < oh * 60 + om || nowMins > closeMins) return null // not open now
+  const span = openSpan(v as Record<string, DayHours>, now, timezone)
+  if (!span) return null
   return {
-    closesSoon: day.close !== '23:59' && closeMins - nowMins <= withinMins,
-    closeLabel: fmt12(day.close),
+    closesSoon: span.close !== '23:59' && span.left <= withinMins,
+    closeLabel: fmt12(span.close),
   }
 }
 
@@ -161,32 +213,26 @@ export function hoursClosing(
  * hours: a place saved as closed every day has no hours anyone can use, and
  * the row says "No hours listed" for it, the same as for no hours at all.
  */
-export function hoursNextOpening(v: unknown, now: Date = new Date()): string | null {
-  return hoursNextOpeningAt(v, now)?.label ?? null
+export function hoursNextOpening(v: unknown, now: Date = new Date(), timezone: string = HOURS_TIMEZONE): string | null {
+  return hoursNextOpeningAt(v, now, timezone)?.label ?? null
 }
 
 /** hoursNextOpening, with how many minutes away it is, so the soonest of
- *  several places can be picked (Right now overnight, board V3). */
-export function hoursNextOpeningAt(v: unknown, now: Date = new Date()): { minutes: number; label: string } | null {
+ *  several places can be picked (Right now overnight, board V3). A day with
+ *  a break opens again after it, later the same day. */
+export function hoursNextOpeningAt(v: unknown, now: Date = new Date(), timezone: string = HOURS_TIMEZONE): { minutes: number; label: string } | null {
   if (!isStructuredHours(v)) return null
   const hours = v as Record<string, DayHours>
-  const nowMins = now.getHours() * 60 + now.getMinutes()
-  const short = (open: string) => fmt12(open).replace(/:00(?= [AP]M$)/, '')
-  for (let ahead = 0; ahead < 7; ahead++) {
-    const key = DAY_KEYS[(now.getDay() + ahead) % 7]
-    const day = hours[key]
-    if (!day || !day.open || !day.close) continue
-    const [oh, om] = day.open.split(':').map(Number)
-    if (ahead === 0 && oh * 60 + om <= nowMins) continue
-    const time = short(day.open)
-    return { minutes: ahead * 1440 + oh * 60 + om - nowMins, label: ahead === 0 ? time : `${DAY_SHORT[key]} ${time}` }
-  }
-  // Today's opening already passed and nothing else all week: it opens
-  // again a week from now, the same time.
-  const today = hours[DAY_KEYS[now.getDay()]]
-  if (today?.open && today.close) {
-    const [oh, om] = today.open.split(':').map(Number)
-    return { minutes: 7 * 1440 + oh * 60 + om - nowMins, label: `${DAY_SHORT[DAY_KEYS[now.getDay()]]} ${short(today.open)}` }
+  const { dayIndex, minutes: nowMins } = placeClock(now, timezone)
+  const short = (m: number) => fmt12(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`).replace(/:00(?= [AP]M$)/, '')
+  // Up to a week ahead, and today again a week from now when its last
+  // opening has passed and nothing else all week has hours.
+  for (let ahead = 0; ahead <= 7; ahead++) {
+    const key = DAY_KEYS[(dayIndex + ahead) % 7]
+    const next = spansOf(hours[key]).find((sp) => ahead > 0 || sp.start > nowMins)
+    if (!next) continue
+    const time = short(next.start)
+    return { minutes: ahead * 1440 + next.start - nowMins, label: ahead === 0 ? time : `${DAY_SHORT[key]} ${time}` }
   }
   return null
 }
@@ -256,6 +302,7 @@ export function getOpenStatus(
   item: Record<string, unknown>,
   hoursFieldKeys: string[],
   now: Date | null = new Date(),
+  timezone: string = HOURS_TIMEZONE,
 ): {
   isOpen: boolean
   closing: { closesSoon: boolean; closeLabel: string } | null
@@ -265,23 +312,9 @@ export function getOpenStatus(
   if (closure || !now) return { isOpen: false, closing: null, closure }
   const openVal = hoursFieldKeys
     .map((k) => item[k])
-    .find((v) => v !== undefined && hoursOpenNow(v, now) === true && isStructuredHours(v))
+    .find((v) => v !== undefined && hoursOpenNow(v, now, timezone) === true && isStructuredHours(v))
   const isOpen = openVal !== undefined
-  return { isOpen, closing: isOpen ? hoursClosing(openVal, 60, now) : null, closure: null }
-}
-
-/** "2026-06-07T…" → "Synced from Google · updated 3d ago" / "… updated today".
- *  Returns null if unparseable or absent. A listing-level fact (from its
- *  Google placeId), not tied to any one hours field — see PlaceDetailBody's
- *  own use of this for why it isn't gated on the category having hours at all. */
-export function syncedLabel(iso?: string): string | null {
-  if (!iso) return null
-  const then = new Date(iso).getTime()
-  if (Number.isNaN(then)) return null
-  const days = Math.floor((Date.now() - then) / 86_400_000)
-  if (days <= 0) return 'Synced from Google · updated today'
-  if (days === 1) return 'Synced from Google · updated 1d ago'
-  return `Synced from Google · updated ${days}d ago`
+  return { isOpen, closing: isOpen ? hoursClosing(openVal, 60, now, timezone) : null, closure: null }
 }
 
 /**
@@ -290,35 +323,15 @@ export function syncedLabel(iso?: string): string | null {
  *  - Legacy text string → the raw string (unchanged)
  *  - Missing/empty → null
  */
-export function formatTodayHours(v: unknown, now: Date = new Date()): string | null {
+export function formatTodayHours(v: unknown, now: Date = new Date(), timezone: string = HOURS_TIMEZONE): string | null {
   if (!v && v !== false) return null
   if (typeof v === 'string') return v || null
   if (!hasAnyHours(v)) return null
   const hours = v as Record<string, DayHours>
-  const dayKey = DAY_KEYS[now.getDay()]
-  const day = hours[dayKey]
+  const day = hours[placeClock(now, timezone).day]
   if (day === null || day === undefined) return 'Closed today'
   if (!day.open || !day.close) return null
-  return `Today: ${fmt12(day.open)} – ${fmt12(day.close)}`
-}
-
-/**
- * Full 7-day breakdown for the expandable hours view on a directory card.
- *  - Structured hours → one entry per day (Sun→Sat), with today flagged.
- *  - Legacy text string or missing → null (caller falls back to the raw text).
- */
-export function formatWeekHours(
-  v: unknown,
-  now: Date = new Date(),
-): Array<{ key: DayKey; label: string; text: string; isToday: boolean }> | null {
-  if (!hasAnyHours(v)) return null
-  const hours = v as Record<string, DayHours>
-  const todayKey = DAY_KEYS[now.getDay()]
-  return DAY_KEYS.map((key) => {
-    const day = hours[key] ?? null
-    const text = day ? `${fmt12(day.open)} – ${fmt12(day.close)}` : 'Closed'
-    return { key, label: DAY_LABELS[key], text, isToday: key === todayKey }
-  })
+  return `Today: ${dayRangesText(day)}`
 }
 
 /**
@@ -390,37 +403,44 @@ function padTime(h: number, m: number): string {
  */
 export function placesApiHoursToStructured(periods: PlacesApiPeriod[]): StructuredHours | null {
   if (!periods || periods.length === 0) return null
+  return periodsToStructured(
+    periods.map((p) => ({
+      day: p.open.day,
+      open: padTime(p.open.hour, p.open.minute),
+      close: p.close ? { day: p.close.day, time: padTime(p.close.hour, p.close.minute) } : null,
+    })),
+  )
+}
 
-  // 24/7: single open-only period at midnight on day 0.
-  if (periods.length === 1 && !periods[0].close && periods[0].open.hour === 0 && periods[0].open.minute === 0) {
+/** Google's opening periods, in either API's shape once read, as
+ *  StructuredHours: one entry per day, every day closed unless a period
+ *  opens on it.
+ *   • Open 24/7 (one period at midnight with no close) → 00:00–23:59 daily.
+ *   • A close on the next day is kept as its time ("02:00"), which reads as
+ *     past midnight; one with no close, or further on, ends the day (23:59).
+ *   • Two or more periods on one day keep each one (`periods`), the break
+ *     between them included; `open`/`close` span the day. */
+export function periodsToStructured(periods: { day: number; open: string; close: { day: number; time: string } | null }[]): StructuredHours | null {
+  if (periods.length === 0) return null
+  if (periods.length === 1 && !periods[0].close && periods[0].open === '00:00') {
     const allDay: StructuredHours = {}
     for (const key of DAY_KEYS) allDay[key] = { open: '00:00', close: '23:59' }
     return allDay
   }
-
-  const result: StructuredHours = {}
-  for (const key of DAY_KEYS) result[key] = null
-
+  const byDay = new Map<DayKey, { open: string; close: string }[]>()
   for (const p of periods) {
-    const dayIdx = p.open.day
-    if (dayIdx < 0 || dayIdx > 6) continue
-    const key: DayKey = DAY_KEYS[dayIdx]
-    const open = padTime(p.open.hour, p.open.minute)
-    const close =
-      !p.close || p.close.day !== dayIdx
-        ? '23:59'
-        : padTime(p.close.hour, p.close.minute)
-
-    const existing = result[key]
-    if (!existing) {
-      result[key] = { open, close }
-    } else {
-      result[key] = {
-        open: open < existing.open ? open : existing.open,
-        close: close > existing.close ? close : existing.close,
-      }
-    }
+    if (p.day < 0 || p.day > 6) continue
+    const key = DAY_KEYS[p.day]
+    const nextDay = (p.day + 1) % 7
+    const close = !p.close ? '23:59' : p.close.day === p.day ? p.close.time : p.close.day === nextDay && p.close.time <= p.open ? p.close.time : '23:59'
+    byDay.set(key, [...(byDay.get(key) ?? []), { open: p.open, close }])
   }
-
+  const result: StructuredHours = {}
+  for (const key of DAY_KEYS) {
+    const list = (byDay.get(key) ?? []).sort((a, b) => a.open.localeCompare(b.open))
+    if (list.length === 0) result[key] = null
+    else if (list.length === 1) result[key] = list[0]
+    else result[key] = { open: list[0].open, close: list.at(-1)!.close, periods: list }
+  }
   return result
 }

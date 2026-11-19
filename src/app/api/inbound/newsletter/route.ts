@@ -127,6 +127,7 @@ export async function POST(request: Request) {
     const result = await receiveNewsletter(community.slug, email, {
       apiKey,
       communityName: community.name,
+      where: community,
     })
     return Response.json({ ok: true, ...result })
   } catch (err) {

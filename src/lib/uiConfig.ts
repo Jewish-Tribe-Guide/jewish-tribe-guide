@@ -35,3 +35,18 @@ export const ui: UiConfig = {
   },
   upvotes: raw.upvotes ?? true,
 }
+
+export type Contributions = UiConfig['contributions']
+
+/** Which public contributions one community takes: the deployment's switch
+ *  (above) AND the community's own (its row's `ui`, which nothing read
+ *  before, so turning one community's off turned them off for all; Nov 18,
+ *  review item 33). A key the row leaves out stays on. */
+export function contributionsFor(communityUi: unknown, deployment: Contributions = ui.contributions): Contributions {
+  const own = ((communityUi ?? {}) as DeepPartial<UiConfig>).contributions ?? {}
+  return {
+    add: deployment.add && (own.add ?? true),
+    edit: deployment.edit && (own.edit ?? true),
+    report: deployment.report && (own.report ?? true),
+  }
+}

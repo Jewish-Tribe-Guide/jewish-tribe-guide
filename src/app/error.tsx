@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import * as Sentry from '@sentry/nextjs'
+import { reportError } from '@/lib/deferredSentry'
 
 // Catches a render or data error anywhere under the root layout. Without this
 // the visitor got Next's bare error screen, which says nothing about what to do
@@ -16,7 +16,7 @@ export default function Error({
   useEffect(() => {
     // The digest is what ties this to the server-side log entry.
     console.error('[error boundary]', error)
-    Sentry.captureException(error)
+    reportError(error)
   }, [error])
 
   return (

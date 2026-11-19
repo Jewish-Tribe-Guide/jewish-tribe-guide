@@ -117,6 +117,11 @@ export default async function ListingPage(props: PageProps<'/[community]/[slug]/
   const { community, slug, id } = await props.params
   const resolved = await resolve(community, slug, id)
   if (!resolved) notFound()
+  // A bare id (an older link) is sent to the friendly one by the proxy
+  // (bareListingLink.ts), before this renders. Not from here: Next's
+  // on-demand prerender wrote a redirect's Location twice, and the first
+  // visitor's browser followed both as one address to a 404 (Nov 18). This
+  // still renders one if the proxy's lookup failed.
 
   const communities = await listCommunities().catch(() => [])
   const settings = await getSiteSettings(community).catch(() => SITE_SETTINGS_DEFAULTS)

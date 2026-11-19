@@ -7,10 +7,10 @@ import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { ui } from '@/lib/uiConfig'
-import { formatTodayHours, hasAnyHours } from '@/lib/hours'
+import { formatTodayHours, hasAnyHours, placeClock } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { useZmanim } from '@/lib/useZmanim'
-import { useActiveCommunity, useCommunityTimezone } from '@/lib/communityContext'
+import { useActiveCommunity, useCommunityTimezone, useContributions } from '@/lib/communityContext'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { useShareLink } from '@/lib/useShareLink'
 import { directionsUrl, destinationQuery } from '@/lib/googleMapsLinks'
@@ -172,7 +172,8 @@ export default function ListingView({ item, category, color, place = null, upvot
   const shul = useNextMinyan(item.id)
   const { isPinned, toggle: toggleSaved } = usePinned()
 
-  const main = mainThing(item, category)
+  const contributions = useContributions()
+  const main = mainThing(item, category, contributions.edit)
   // Contact or About, where the admin put a field there by name.
   const fixedPlace = fixedPlaceOf(category)
   // A listing's items and this visitor's answers about them, shared by the
@@ -181,10 +182,10 @@ export default function ListingView({ item, category, color, place = null, upvot
   const itemApi = useItemMarks(item, category, itemsF)
   // Where "Still right?" is asked: beside the one thing that's the
   // community's to keep, not about the whole listing (confirmPlace).
-  const confirmAt = confirmPlace(item, category)
+  const confirmAt = confirmPlace(item, category, contributions.edit)
   // Edit under each main box (agreed Oct 10): a sheet with only that box's
   // fields (BoxEditSheet), where the category takes edits.
-  const canEdit = ui.contributions.edit && resolveCapabilities(category.capabilities).edit
+  const canEdit = contributions.edit && resolveCapabilities(category.capabilities).edit
   const [boxEdit, setBoxEdit] = useState<BoxEdit | null>(null)
   const editBox = canEdit ? (edit: BoxEdit) => setBoxEdit(edit) : undefined
   // The whole-listing editor's rows this listing has (editorRows): a box
@@ -585,7 +586,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const otherHours = main === 'groups' ? [] : hoursFields.filter((f) => !f.audienceKey && !placed.has(f.key) && !inAbout(f) && hasAny(item[f.key]))
   // When Google last updated the box, at its foot (Oct 6): one date for
   // the box, not a list of which of its lines are Google's.
-  const googleLead = googleKeepsBox(item, { hours: otherHours.length > 0 }) ? `Checked with Google, ${shortDate(item.googleSyncedAt!, clock)}` : null
+  const googleLead = googleKeepsBox(item, { hours: otherHours.length > 0 }) ? `Checked with Google, ${shortDate(item.googleSyncedAt!, timezone, clock)}` : null
   // The website, by name, with the address and phone (Oct 6): its round
   // button above says only "Website".
   const website = buttons.find((a): a is Extract<ActionSpec, { kind: 'link' }> => a.kind === 'link' && isWebsite(a.field) && !inAbout(a.field))
@@ -687,14 +688,14 @@ export default function ListingView({ item, category, color, place = null, upvot
       {showSetLocation && <SetLocationRow item={item} />}
       {showPhone && (
         <Row icon={<PhoneIcon className="h-[17px] w-[17px]" />}>
-          <a href={`tel:${item.phone!.replace(/\D/g, '')}`} className="text-primary hover:underline">
+          <a href={`tel:${item.phone!.replace(/\D/g, '')}`} className="tap-44 inline-block text-primary hover:underline">
             {item.phone}
           </a>
         </Row>
       )}
       {website && websiteName && (
         <Row icon={<GlobeIcon className="h-[17px] w-[17px]" />}>
-          <a href={website.href} target="_blank" rel="noopener noreferrer" className="break-all text-primary hover:underline">
+          <a href={website.href} target="_blank" rel="noopener noreferrer" className="tap-44 inline-block break-all text-primary hover:underline">
             {websiteName}
           </a>
         </Row>
@@ -719,9 +720,9 @@ export default function ListingView({ item, category, color, place = null, upvot
           }
         >
           {a.kind === 'email' ? (
-            <a href={`mailto:${a.address}`} className="text-primary hover:underline">{a.address}</a>
+            <a href={`mailto:${a.address}`} className="tap-44 inline-block text-primary hover:underline">{a.address}</a>
           ) : a.kind === 'link' ? (
-            <a href={a.href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{(isWebsite(a.field) && siteName(a.href)) || a.field.linkLabel || a.field.label}</a>
+            <a href={a.href} target="_blank" rel="noopener noreferrer" className="tap-44 inline-block text-primary hover:underline">{(isWebsite(a.field) && siteName(a.href)) || a.field.linkLabel || a.field.label}</a>
           ) : null}
         </Row>
       ))}
@@ -729,7 +730,7 @@ export default function ListingView({ item, category, color, place = null, upvot
         <Row key={f.key}>
           {!f.hideLabel && <span className="block text-[13px] text-muted">{f.label}</span>}
           {f.type === 'tel' ? (
-            <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="text-primary hover:underline">{formatPhone(String(item[f.key]))}</a>
+            <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="tap-44 inline-block text-primary hover:underline">{formatPhone(String(item[f.key]))}</a>
           ) : (
             <span className={f.type === 'textarea' ? 'whitespace-pre-line' : undefined}>{String(item[f.key]).trim()}</span>
           )}
@@ -768,13 +769,18 @@ export default function ListingView({ item, category, color, place = null, upvot
   // (migration 078). Edit beside either.
   const editAbout = editRows('About', ['about'])
   const aboutKey = aboutFields.find((f) => !isBasicField(f))?.key
+  // Google's description on a place Google keeps, fetched before the sync
+  // recorded owning it: not marked as Google's, and not put to visitors as
+  // "Still right?" either, since it's Google's text, not the community's
+  // (Nov 18 review, item 13).
+  const googleText = !fromGoogle && aboutKey === 'googleDescription' && !!item.placeId
   const aboutFoot = fromGoogle ? (
-    <span data-testid="about-google">{item.googleSyncedAt ? `Checked with Google, ${shortDate(item.googleSyncedAt, clock)}.` : 'Checked with Google.'}</span>
-  ) : aboutKey ? (
+    <span data-testid="about-google">{item.googleSyncedAt ? `Checked with Google, ${shortDate(item.googleSyncedAt, timezone, clock)}.` : 'Checked with Google.'}</span>
+  ) : aboutKey && !googleText ? (
     <FreshnessFooter resourceId={item.id} {...boxDate(item, aboutKey)} section={aboutKey} onEdit={editAbout} />
   ) : undefined
   const about = (aboutFields.length > 0 || aboutBig.length > 0) && (
-    <Card testId="listing-about" footer={aboutFoot} onEdit={fromGoogle ? editAbout : undefined}>
+    <Card testId="listing-about" footer={aboutFoot} onEdit={fromGoogle || googleText ? editAbout : undefined}>
       <div className="space-y-3 pt-2.5">
         {aboutFields.map((f) =>
           f.type === 'textarea' ? (
@@ -804,8 +810,8 @@ export default function ListingView({ item, category, color, place = null, upvot
   const walks = walkLists.length > 0 && item.geo && main !== 'walk' ? <WalkLists lists={walkLists} from={item.geo} fromItem={item} /> : null
   // The Shabbos card comes right after the main thing on a Friday or Erev
   // Yom Tov, until candle lighting; the rest of the week, after the places
-  // within a walk.
-  const nowMinutes = now ? now.getHours() * 60 + now.getMinutes() : null
+  // within a walk. On the place's clock, as candle lighting is.
+  const nowMinutes = now ? placeClock(now).minutes : null
   const shabbosFirst = candlesAt !== null && nowMinutes !== null && nowMinutes < candlesAt
   // Its date at its foot, with Still right? and Edit (the user, Oct 15:
   // "if it's editable then we should be having last updated and everything
@@ -1137,7 +1143,7 @@ function ShareButton({ path, name, pill = false }: { path: string; name: string;
 
 function Row({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex items-start gap-3 py-2.5 text-[15px] leading-snug text-slate-800">
+    <div className="flex items-start gap-3 py-3 text-[15px] leading-snug text-slate-800">
       <span className="mt-0.5 w-[17px] shrink-0 text-slate-400">{icon}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>

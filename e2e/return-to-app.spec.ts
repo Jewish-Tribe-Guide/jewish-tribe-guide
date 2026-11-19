@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithListings, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { categoryWithListings, defaultCommunity, ready } from './helpers'
 
 // Coming back to the guide from another app, then tapping a category, took
 // seconds on a phone (the user, Oct 18), while scrolling stayed smooth.
@@ -32,7 +32,6 @@ test('a tap right after coming back to the app isn’t held up by a refresh', as
   )
   await page.goto(`/${community}`)
   await ready(page)
-  await dismissLocationPrompt(page)
   const tile = page.locator(`main a[href="/${community}/${category.id}"]`).filter({ visible: true }).first()
   await expect(tile).toBeVisible()
 

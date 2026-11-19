@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { dismissLocationPrompt } from '../e2e/helpers'
 import { FORM_E2E_FORM_ID } from '../scripts/formE2eConstants.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -37,10 +36,6 @@ test('a real wizard submission reaches the database', async ({ page, request }) 
   const uniqueName = `E2E Form Test ${Date.now()}`
 
   await page.goto(`/${community}/${FORM_E2E_FORM_ID}`)
-  // The "Share your live location?" prompt overlays everything and
-  // intercepts clicks — same real-visitor treatment AGENTS.md documents for
-  // the rest of this repo's e2e suite.
-  await dismissLocationPrompt(page)
 
   // Step 1: name (plain text).
   await page.getByPlaceholder('Your full name').fill(uniqueName)

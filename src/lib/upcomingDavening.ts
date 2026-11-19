@@ -1,7 +1,7 @@
 import type { Season } from './season'
 import { outOfSeason } from './seasonPairs'
 import { parseTimeToMinutes, SIGN_UP_MARK, TEFILLAH_LABELS, type Minyan, type MinyanDayKey, type Tefillah } from './davening'
-import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from './useZmanAnchors'
+import { anchorKey, resolveAnchorTime, type AnchorTimes } from './useZmanAnchors'
 import type { LatLng } from './geo'
 import type { ScheduledMinyan } from './schedules'
 
@@ -79,11 +79,11 @@ type Candidate = {
  *
  * `today`/`tomorrow` are the full set of day keys that apply — a plain
  * weekday plus whichever pseudo-days the caller has already resolved to be
- * true (Rosh Chodesh, Yom Tov, a secular holiday; see calendarDaysFor). A
+ * true (Rosh Chodesh, Yom Tov, a secular holiday; see dayKeysFor). A
  * minyan whose `days` don't intersect either set at all is never a
  * candidate. Resolving those pseudo-days is deliberately the caller's job,
  * not this function's — it stays pure and testable with plain arrays,
- * the same reasoning `calendarDaysFor` itself documents for keeping the
+ * the same reasoning as keeping the
  * Jewish-calendar lookup out of the low-level day math.
  *
  * A row this function can't put a number on is never a candidate: an
@@ -101,12 +101,12 @@ export function nextUpcomingDavening(
   shuls: ShulMinyanim[],
   opts: {
     /** Every day key that applies to today — the plain weekday plus any
-     *  pseudo-days already resolved true (see calendarDaysFor). */
+     *  pseudo-days already resolved true (see dayKeysFor). */
     today: MinyanDayKey[]
     tomorrow: MinyanDayKey[]
     nowMinutes: number
     season: Season | null
-    /** Keyed by `geoKey` — see useZmanAnchors. A shul with anchor-based rows
+    /** Keyed by `anchorKey` — see useZmanAnchors. A shul with anchor-based rows
      *  whose location hasn't resolved yet simply contributes no candidates
      *  from those rows until it does; the component re-renders when it does. */
     anchors: Record<string, AnchorTimes>
@@ -139,12 +139,11 @@ function collectCandidates(
       // A regular minyan a special schedule replaces on this date.
       if (row.skipDates?.some((date) => dayKeys.includes(`date:${date}` as MinyanDayKey))) continue
       // A summer/winter pair goes by its zman (seasonPairs.ts).
-      if (outOfSeason(row, shul.minyanim, season, anchors[geoKey(geoOrCommunityDefault(shul.geo))])) continue
+      if (outOfSeason(row, shul.minyanim, season, anchors[anchorKey(shul.geo)])) continue
 
       let time: string | null = null
       if (row.anchor) {
-        const resolvedGeo = geoOrCommunityDefault(shul.geo)
-        time = resolveAnchorTime(row, anchors[geoKey(resolvedGeo)])
+        time = resolveAnchorTime(row, anchors[anchorKey(shul.geo)])
       } else {
         time = row.time
       }
@@ -306,7 +305,7 @@ function shulRowStatus(shul: ShulMinyanim, opts: Parameters<typeof nextUpcomingD
   const rows = shul.minyanim
   if (rows.length === 0) return { text: 'No davening times listed', tone: 'quiet' }
 
-  const shulAnchors = opts.anchors[geoKey(geoOrCommunityDefault(shul.geo))]
+  const shulAnchors = opts.anchors[anchorKey(shul.geo)]
   const today = (row: Minyan) => row.days.some((d) => opts.today.includes(d)) && !outOfSeason(row, rows, opts.season, shulAnchors)
   // Words where a time goes ("Call to confirm"): never the next minyan, so
   // said under it.
@@ -328,7 +327,7 @@ function shulRowStatus(shul: ShulMinyanim, opts: Parameters<typeof nextUpcomingD
     }
   }
 
-  const anchorsReady = !!opts.anchors[geoKey(geoOrCommunityDefault(shul.geo))]
+  const anchorsReady = !!opts.anchors[anchorKey(shul.geo)]
   const soon = (row: Minyan) => row.days.some((d) => opts.today.includes(d) || opts.tomorrow.includes(d))
   if (!anchorsReady && rows.some((row) => row.anchor && soon(row))) return null
 
@@ -397,7 +396,7 @@ export function nextMinyansAcross(
 ): NextMinyanLine[] | null {
   const soon = (row: Minyan) => row.days.some((d) => opts.today.includes(d) || opts.tomorrow.includes(d))
   const waiting = shuls.some(
-    (s) => !opts.anchors[geoKey(geoOrCommunityDefault(s.geo))] && s.minyanim.some((row) => row.anchor && soon(row)),
+    (s) => !opts.anchors[anchorKey(s.geo)] && s.minyanim.some((row) => row.anchor && soon(row)),
   )
   if (waiting) return null
 

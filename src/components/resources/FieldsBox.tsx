@@ -80,14 +80,14 @@ export function BoxField({ field: f, item }: { field: CategoryField; item: Direc
   const text = fieldText(f, item[f.key])
   if (f.type === 'url') {
     return (
-      <a href={text} target="_blank" rel="noopener noreferrer" className="block py-2 text-[15px] font-semibold text-primary hover:underline">
+      <a href={text} target="_blank" rel="noopener noreferrer" className="tap-44 block py-2 text-[15px] font-semibold text-primary hover:underline">
         {f.linkLabel ?? f.label}
       </a>
     )
   }
   if (f.type === 'tel') {
     return (
-      <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="block py-2 text-[15px] font-bold text-primary hover:underline">
+      <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="tap-44 block py-2 text-[15px] font-bold text-primary hover:underline">
         {text}
       </a>
     )

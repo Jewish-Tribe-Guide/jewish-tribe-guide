@@ -1,9 +1,9 @@
 'use client'
 
-import { useCommunityTimezone } from '@/lib/communityContext'
+import { useCommunityPlace, useCommunityTimezone } from '@/lib/communityContext'
 import { isMinyanim, groupByTefillah, mergeSameDayTimes, SEASON_LABELS } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
-import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime, anchorNoun } from '@/lib/useZmanAnchors'
+import { useZmanAnchors, geoKey, resolveAnchorTime, anchorNoun } from '@/lib/useZmanAnchors'
 import { currentSeason } from '@/lib/season'
 import { outOfSeason } from '@/lib/seasonPairs'
 import { useNow } from '@/lib/useNow'
@@ -57,10 +57,12 @@ function breakOnlyAtCommas(label: string): string {
  */
 function StructuredDaveningTimes({ minyanim, geo }: { minyanim: Minyan[]; geo?: { lat: number; lng: number } | null }) {
   const timezone = useCommunityTimezone()
+  const { center } = useCommunityPlace()
   // Pass as a single-shul array so groupByTefillah handles dedup + sort.
   const groups = groupByTefillah([{ name: '', minyanim }])
   const hasAnchorRows = minyanim.some((m) => m.anchor)
-  const resolvedGeo = hasAnchorRows ? geoOrCommunityDefault(geo) : null
+  // A shul with no location of its own: its community's centre.
+  const resolvedGeo = hasAnchorRows ? (geo ?? center) : null
   const anchorMap = useZmanAnchors(resolvedGeo ? [resolvedGeo] : [])
   const anchors = resolvedGeo ? anchorMap[geoKey(resolvedGeo)] : undefined
   // Dimmed, never dropped. A row the shul only runs in the other half of the

@@ -13,6 +13,7 @@ const m = vi.hoisted(() => ({
   notify: vi.fn(),
   festivals: vi.fn(),
   ui: { contributions: { add: true, edit: true, report: true } },
+  communityUi: {} as Record<string, unknown>,
 }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => fn() }))
@@ -26,7 +27,14 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }))
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
-vi.mock('@/lib/uiConfig', () => ({ ui: m.ui }))
+vi.mock('@/lib/uiConfig', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/uiConfig')>()
+  return { ...actual, ui: m.ui, contributionsFor: (own: unknown) => actual.contributionsFor(own, m.ui.contributions) }
+})
+// The listing's own community: its clock, and its own switches (m.communityUi).
+vi.mock('@/lib/communityStore', () => ({
+  resolveCommunity: async (slug: string) => ({ slug, timezone: 'America/New_York', mapCenter: { lat: 39.95, lng: -75.16 }, ui: m.communityUi }),
+}))
 vi.mock('@/lib/resourceStore', () => ({ getResourceById: m.getResourceById }))
 vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
@@ -63,6 +71,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-01T12:00:00Z'))
   m.ui.contributions.edit = true
+  m.communityUi = {}
   m.enforceRateLimit.mockResolvedValue(null)
   m.verifyTurnstile.mockResolvedValue(true)
   m.row.mockResolvedValue({ data: { community_id: 'philly' }, error: null })
@@ -122,5 +131,25 @@ describe('POST /api/resource/:id/times', () => {
     m.ui.contributions.edit = false
     expect((await POST(req({ update: winter, turnstileToken: 't' }), ctx())).status).toBe(403)
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  // Nov 18 review, item 33: a community's own switch was read by nothing,
+  // so turning one community's edits off turned them off for none.
+  it('not where the listing’s own community has edits off', async () => {
+    m.communityUi = { contributions: { edit: false } }
+    const res = await POST(req({ update: winter, turnstileToken: 't' }), ctx())
+    expect(res.status).toBe(403)
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  it('takes a photo kept by either reader, the schedule reader’s or the “+ Add” box’s', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://abc.supabase.co')
+    for (const folder of ['schedule-source', 'message-source']) {
+      m.submitListingUpdate.mockClear()
+      const kept = `https://abc.supabase.co/storage/v1/object/public/site-assets/${folder}/1790-x7.jpeg`
+      await POST(req({ update: winter, sourceUrl: kept, turnstileToken: 't' }), ctx())
+      expect(m.submitListingUpdate.mock.calls[0][3]).toContain(`Read from their photo or PDF: ${kept}`)
+    }
+    vi.unstubAllEnvs()
   })
 })

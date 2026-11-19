@@ -62,8 +62,10 @@ const PAGES: [string, string][] = [
 const pages: [string, string][] = process.argv.length > 2 ? process.argv.slice(2).map((a) => [a.slice(0, a.indexOf('=')), a.slice(a.indexOf('=') + 1)] as [string, string]) : PAGES
 
 const categories = await listCategoriesUncached(COMMUNITY)
-const { data: community } = await getAdminClient().from('community').select('name').eq('slug', COMMUNITY).maybeSingle()
-const communityName = (community as { name?: string } | null)?.name ?? COMMUNITY
+const { data: community } = await getAdminClient().from('community').select('name, timezone, map_center').eq('slug', COMMUNITY).maybeSingle()
+const row = community as { name?: string; timezone: string; map_center: { lat: number; lng: number } }
+const communityName = row.name ?? COMMUNITY
+const where = { timezone: row.timezone, mapCenter: row.map_center }
 const today = changedOn(Date.now())
 
 for (const [name, page] of pages) {
@@ -80,7 +82,7 @@ for (const [name, page] of pages) {
     console.log('   Its category has no davening times or hours.')
     continue
   }
-  const source = await readListingPage(page).catch((err) => {
+  const source = await readListingPage(page, { timezone: where.timezone }).catch((err) => {
     console.log(`   ${err instanceof Error ? err.message : String(err)}`)
     return null
   })
@@ -91,7 +93,7 @@ for (const [name, page] of pages) {
   console.log(`   Read: ${source.text ? `${source.text.length} characters of text` : 'a PDF'} (fingerprint ${menuHash(source).slice(0, 8)}). For: ${reads.kind === 'times' ? 'davening times' : `hours (${reads.keys.join(', ')})`}`)
   let proposal
   try {
-    proposal = await proposeFromPage(listing, category, reads, source, { apiKey: process.env.OPENAI_API_KEY!, communityName })
+    proposal = await proposeFromPage(listing, category, reads, source, { apiKey: process.env.OPENAI_API_KEY!, communityName, where })
   } catch (err) {
     console.log(`   The AI couldn’t read it: ${err instanceof Error ? err.message : String(err)}`)
     continue

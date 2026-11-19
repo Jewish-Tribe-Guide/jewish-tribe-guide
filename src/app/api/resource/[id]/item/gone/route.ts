@@ -1,12 +1,9 @@
 import { revalidateTag } from 'next/cache'
 import { after } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/admin'
-import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
+import { enforceRateLimit } from '@/lib/rateLimit'
 import { TAGS } from '@/lib/cacheTags'
 import { recordActivity, removeVisitorActivity } from '@/lib/activityStore'
-import { isHoneypotTripped } from '@/lib/honeypot'
-import { verifyTurnstile } from '@/lib/turnstile'
-import { ui } from '@/lib/uiConfig'
 import { resolveCapabilities } from '@/lib/categories'
 import { getResourceById } from '@/lib/resourceStore'
 import { getCategoryById } from '@/lib/categoryStore'
@@ -14,6 +11,7 @@ import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
 import { removalSubmission } from '@/lib/itemMarks'
 import { isIso, parseItemTap, UUID, withdrawPending, type MarkRow } from '@/lib/itemMarkRoutes'
+import { editableCommunity, failsBotCheck, openListingWrite } from '@/lib/listingWrite'
 
 // POST /api/resource/:id/item/gone   { field, item, turnstileToken, company }
 // "Not anymore": a visitor says this one item isn't there (agreed Oct 1).
@@ -32,20 +30,22 @@ import { isIso, parseItemTap, UUID, withdrawPending, type MarkRow } from '@/lib/
 const FAILED = { ok: false, error: 'That didn’t send. Please try again.' }
 
 export async function POST(request: Request, ctx: RouteContext<'/api/resource/[id]/item/gone'>) {
-  const limited = await enforceRateLimit(request, 'submissions', { limit: 10, windowSec: 60 })
-  if (limited) return limited
-
-  const { id } = await ctx.params
-  if (!UUID.test(id)) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
-  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   // Bot trap: accepted and ignored, so the bot can't tell.
-  if (body && isHoneypotTripped(body)) return Response.json({ ok: true, changed: false })
+  const opened = await openListingWrite(request, ctx, { ok: true, changed: false })
+  if (opened instanceof Response) return opened
+  const { id, body } = opened
   const tap = parseItemTap(body)
   if (!tap || !body) return Response.json({ ok: false, error: 'Which item?' }, { status: 400 })
-  if (!(await verifyTurnstile(typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined, clientIp(request)))) {
-    return Response.json({ ok: false, code: 'turnstile', error: 'Verification failed. Please try again.' }, { status: 403 })
+  const bot = await failsBotCheck(request, body)
+  if (bot) return bot
+  // Before the warning goes up: a community that takes no edits gets none.
+  try {
+    const community = await editableCommunity(id)
+    if (community instanceof Response) return community
+  } catch (err) {
+    console.error('[item/gone] could not read the listing:', err)
+    return Response.json(FAILED, { status: 502 })
   }
-  if (!ui.contributions.edit) return Response.json({ ok: false, error: 'This action is not available.' }, { status: 403 })
 
   const admin = getAdminClient()
   const { data, error } = await admin.rpc('mark_item', {

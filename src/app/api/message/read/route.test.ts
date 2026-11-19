@@ -16,6 +16,7 @@ const m = vi.hoisted(() => ({
   readMenu: vi.fn(),
   upload: vi.fn(),
   ui: { contributions: { add: true, edit: true, report: true } },
+  communityUi: {} as Record<string, unknown>,
 }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
 vi.mock('@/lib/supabase/admin', () => ({
@@ -24,10 +25,13 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }))
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
-vi.mock('@/lib/uiConfig', () => ({ ui: m.ui }))
+vi.mock('@/lib/uiConfig', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/uiConfig')>()
+  return { ...actual, ui: m.ui, contributionsFor: (own: unknown) => actual.contributionsFor(own, m.ui.contributions) }
+})
 vi.mock('@/lib/communityStore', () => ({
   communitySlugFromRequest: () => 'philly',
-  resolveCommunity: async () => ({ slug: 'philly', name: 'Philadelphia' }),
+  resolveCommunity: async () => ({ slug: 'philly', name: 'Philadelphia', timezone: 'America/New_York', mapCenter: { lat: 39.95, lng: -75.16 }, ui: m.communityUi }),
 }))
 vi.mock('@/lib/resourceStore', () => ({ listApprovedResources: m.listApprovedResources }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
@@ -85,6 +89,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   vi.stubEnv('OPENAI_API_KEY', 'test-key')
   m.ui.contributions.add = m.ui.contributions.edit = true
+  m.communityUi = {}
   m.enforceRateLimit.mockResolvedValue(null)
   m.verifyTurnstile.mockResolvedValue(true)
   m.listApprovedResources.mockResolvedValue(listings)
@@ -110,6 +115,14 @@ describe('POST /api/message/read — refusals before any reading', () => {
     const res = await POST(req({ text: 'Acme has challah' }))
     expect(res.status).toBe(403)
     expect((await res.json()).code).toBe('turnstile')
+    expect(m.readMessage).not.toHaveBeenCalled()
+  })
+
+  // Nov 18 review, item 33: the community's own switches, not only the
+  // deployment's.
+  it('refuses where this community takes neither additions nor edits', async () => {
+    m.communityUi = { contributions: { add: false, edit: false } }
+    expect((await POST(req({ text: 'Acme has challah' }))).status).toBe(403)
     expect(m.readMessage).not.toHaveBeenCalled()
   })
 
@@ -236,7 +249,7 @@ describe('POST /api/message/read — the reading', () => {
     reads({ proposals: [{ kind: 'times', listingId: MEKOR, quote: 'Mincha 6:15', checked: true }] })
     m.readShulWeek.mockResolvedValue({ update: { kind: 'week', days: [] }, model: 'm' })
     const body = await (await POST(req({ text: 'Mekor this week: Mincha 6:15' }))).json()
-    expect(m.readShulWeek).toHaveBeenCalledWith(expect.objectContaining({ id: MEKOR }), 'minyanim', { text: 'Mekor this week: Mincha 6:15' }, 'test-key')
+    expect(m.readShulWeek).toHaveBeenCalledWith(expect.objectContaining({ id: MEKOR }), 'minyanim', { text: 'Mekor this week: Mincha 6:15' }, 'test-key', { where: expect.objectContaining({ timezone: 'America/New_York' }) })
     expect(body.proposals[0]).toMatchObject({ kind: 'times', listing: { name: 'Mekor Habracha' }, update: { kind: 'week' } })
   })
 

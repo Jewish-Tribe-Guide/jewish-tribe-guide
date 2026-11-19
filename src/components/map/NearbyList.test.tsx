@@ -224,8 +224,8 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
           userLocation={null}
           onViewListing={vi.fn()}
           eruvim={[
-            { id: 'center-city', name: 'Center City Eruv', tone: 'green', label: 'Up' },
-            { id: 'university-city', name: 'University City Eruv', tone: 'red', label: 'Down' },
+            { id: 'center-city', name: 'Center City Eruv', tone: 'green', label: 'Up', checked: null },
+            { id: 'university-city', name: 'University City Eruv', tone: 'red', label: 'Down', checked: null },
           ]}
           onSelectEruv={onSelectEruv}
         />
@@ -238,12 +238,57 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
     expect(onSelectEruv).toHaveBeenCalledWith('university-city')
   })
 
+  // With no location set, the list starts in the middle of town rather than
+  // at whatever sorts first by name or upvotes (Nov 18, item 18 of the
+  // public review), and says no distance, since there's nothing to measure
+  // from.
+  it('with no location, starts from the community’s centre, without distances', () => {
+    renderWithProviders(
+      <PinnedProvider>
+        <NearbyList
+          points={[
+            makePoint({ id: 'far', name: 'Aardvark Deli', lat: 40.4, lng: -75 }),
+            makePoint({ id: 'near', name: 'Zayde’s Market', lat: 40.01, lng: -75 }),
+          ]}
+          userLocation={null}
+          onViewListing={vi.fn()}
+        />
+      </PinnedProvider>,
+      { community: { mapCenter: { lat: 40, lng: -75 } } },
+    )
+    const near = screen.getByText('Zayde’s Market')
+    const far = screen.getByText('Aardvark Deli')
+    expect(near.compareDocumentPosition(far) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByText(/\d mi$/)).not.toBeInTheDocument()
+  })
+
+  // Every status says where it came from and when, as the Eruv page does
+  // (Nov 18, item 16 of the public review): the map's rows said "Up" alone.
+  it('says where each eruv’s status was read, and when', () => {
+    renderWithProviders(
+      <PinnedProvider>
+        <NearbyList
+          points={[]}
+          userLocation={null}
+          onViewListing={vi.fn()}
+          eruvim={[
+            { id: 'center-city', name: 'Center City Eruv', tone: 'green', label: 'Up', checked: 'From centercityeruv.com, 2:55 PM' },
+            { id: 'elkins-park', name: 'Elkins Park Eruv', tone: 'grey', label: 'No status online', checked: null },
+          ]}
+        />
+      </PinnedProvider>,
+    )
+    const [center, elkins] = screen.getAllByRole('button', { name: /Eruv/ })
+    expect(center).toHaveTextContent('Center City EruvUpFrom centercityeruv.com, 2:55 PM')
+    expect(elkins).toHaveTextContent(/^Elkins Park EruvNo status online$/)
+  })
+
   // The user, Oct 15: picking a category with the lines on made the eruvim
   // "disappear". They stay, first, with the places under them.
   it('keeps the eruvim first when there are places too, the places under them', () => {
     renderWithProviders(
       <PinnedProvider>
-        <NearbyList points={[makePoint()]} userLocation={null} onViewListing={vi.fn()} eruvim={[{ id: 'center-city', name: 'Center City Eruv', tone: 'green', label: 'Up' }]} />
+        <NearbyList points={[makePoint()]} userLocation={null} onViewListing={vi.fn()} eruvim={[{ id: 'center-city', name: 'Center City Eruv', tone: 'green', label: 'Up', checked: null }]} />
       </PinnedProvider>,
     )
     const eruvim = screen.getByTestId('nearby-eruvim')

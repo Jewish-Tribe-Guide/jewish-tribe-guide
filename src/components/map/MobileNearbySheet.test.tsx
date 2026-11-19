@@ -485,22 +485,30 @@ describe('MobileNearbySheet', () => {
       fireEvent.pointerDown(screen.getByRole('button', { name: /nearby list/ }), { clientY: 300 })
       fireEvent.pointerUp(screen.getByRole('button', { name: /nearby list/ }))
     }
-    expect(screen.getByTestId('sheet-peek-line')).toHaveTextContent('Goldi Market — drag up')
+    expect(screen.getByTestId('sheet-peek-line')).toHaveTextContent(/^Goldi Market$/)
   })
 
   // The Eruv chip from everything (Oct 15): the lines alone, no places. The
-  // peek says what's there, not "0 places nearby".
+  // peek says what's there, not "0 places".
   it('peeks with the eruvim when they are all the map shows', () => {
-    const eruv = (id: string) => ({ id, name: id, tone: 'green' as const, label: 'Up' })
+    const eruv = (id: string) => ({ id, name: id, tone: 'green' as const, label: 'Up', checked: null })
     const { rerender } = render(<MobileNearbySheet points={[]} userLocation={null} categories={[category]} containerHeight={600} eruvim={[eruv('a'), eruv('b')]} />)
-    expect(screen.getByText('2 eruvim — drag up')).toBeInTheDocument()
+    expect(screen.getByText('2 eruvim')).toBeInTheDocument()
     rerender(<MobileNearbySheet points={[]} userLocation={null} categories={[category]} containerHeight={600} eruvim={[eruv('a')]} />)
-    expect(screen.getByText('1 eruv — drag up')).toBeInTheDocument()
+    expect(screen.getByText('1 eruv')).toBeInTheDocument()
     // Places over the lines (Oct 15): the eruvim still lead, both counted.
     rerender(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} eruvim={[eruv('a')]} />)
-    expect(screen.getByText('1 eruv · 1 place — drag up')).toBeInTheDocument()
+    expect(screen.getByText('1 eruv · 1 place')).toBeInTheDocument()
     // Lines off: places as ever.
     rerender(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />)
-    expect(screen.getByText('1 place nearby — drag up')).toBeInTheDocument()
+    expect(screen.getByTestId('sheet-peek-line')).toHaveTextContent(/^1 place$/)
+  })
+
+  // Nov 18 (item 18 of the public review): "137 places nearby — drag up"
+  // with no location set. Near nothing, so a count; and the handle is the
+  // drag, so it doesn't need saying.
+  it('peeks with a count of the places, not "nearby", and no instructions', () => {
+    render(<MobileNearbySheet points={[point, { ...point, id: 'p2' }]} userLocation={null} categories={[category]} containerHeight={600} />)
+    expect(screen.getByTestId('sheet-peek-line')).toHaveTextContent(/^2 places$/)
   })
 })

@@ -3,8 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
+import { makeCategory, makeListing } from '@/test/providerFixtures'
+import type { DirectoryResource } from '@/types'
 import { useCommunityTimezone } from './communityContext'
 import { useMinyanSchedule } from './useMinyanSchedule'
+import { anchorKey } from './useZmanAnchors'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -45,5 +48,41 @@ describe('the community’s own time zone', () => {
     vi.setSystemTime(at)
     renderWithProviders(<Probe />, { community: { timezone: 'America/New_York' } })
     expect(await screen.findByText('America/New_York tue 30')).toBeInTheDocument()
+  })
+})
+
+// A shul with no address of its own is timed by its community's centre, and
+// "is today Yom Tov" is asked there too while the visitor hasn't said where
+// they are (Nov 19: both were Philadelphia's centre for every community).
+describe('the community’s own centre', () => {
+  const shuls = makeCategory({ id: 'shuls', kind: 'listing', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
+  const noAddress = makeListing({
+    id: 'beth-am',
+    category: 'shuls',
+    geo: undefined,
+    minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['sun', 'mon', 'tue', 'wed', 'thu'], time: '', anchor: 'sunset', offsetMinutes: -15 }],
+  } as Partial<DirectoryResource>)
+
+  function SunsetProbe() {
+    const schedule = useMinyanSchedule(null, [noAddress])
+    return <p data-testid="sunset">{schedule?.anchors[anchorKey(undefined)]?.sunsetIso ?? 'none'}</p>
+  }
+
+  it('is where zmanim are asked for, and times a shul with no address', async () => {
+    vi.setSystemTime(new Date('2026-10-06T18:00:00Z'))
+    const fetchMock = vi.fn(async (url: string) => {
+      const lat = new URL(url, 'http://x').searchParams.get('lat')
+      const data = { dailyZmanim: [{ label: 'Sunset', iso: `sunset-at-${lat}` }], shabbos: {} }
+      return new Response(JSON.stringify({ ok: true, data }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    renderWithProviders(<SunsetProbe />, {
+      community: { timezone: 'America/Los_Angeles', mapCenter: { lat: 34.05, lng: -118.24 } },
+      content: { categories: [shuls] },
+    })
+    expect(await screen.findByText('sunset-at-34.05')).toBeInTheDocument()
+    const lats = fetchMock.mock.calls.map(([u]) => new URL(u, 'http://x').searchParams.get('lat'))
+    expect(lats.length).toBeGreaterThan(0)
+    expect(new Set(lats)).toEqual(new Set(['34.05']))
   })
 })

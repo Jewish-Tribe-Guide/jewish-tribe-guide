@@ -46,8 +46,17 @@ function loadTurnstileScript(): Promise<void> {
   return scriptPromise
 }
 
-const TurnstileWidget = forwardRef<TurnstileHandle, { onVerify: (token: string) => void }>(
-  function TurnstileWidget({ onVerify }, ref) {
+type Props = {
+  onVerify: (token: string) => void
+  /** 'interaction-only' shows nothing unless Cloudflare wants the visitor
+   *  to click (a photo upload's challenge, which runs beside a form that
+   *  already shows one). Default: Cloudflare's own, always shown. */
+  appearance?: 'interaction-only'
+}
+
+const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
+  function TurnstileWidget({ onVerify, appearance }, ref) {
+    const appearanceRef = useRef(appearance)
     const containerRef = useRef<HTMLDivElement>(null)
     // Keep the latest callback in a ref so re-renders don't re-mount the widget.
     const cbRef = useRef(onVerify)
@@ -77,6 +86,7 @@ const TurnstileWidget = forwardRef<TurnstileHandle, { onVerify: (token: string) 
             callback: (token: string) => cbRef.current(token),
             'error-callback': () => cbRef.current(''),
             'expired-callback': () => cbRef.current(''),
+            ...(appearanceRef.current ? { appearance: appearanceRef.current } : {}),
           })
         })
         .catch((err) => console.error('[turnstile]', err))
@@ -93,7 +103,9 @@ const TurnstileWidget = forwardRef<TurnstileHandle, { onVerify: (token: string) 
     }, [])
 
     if (!SITE_KEY) return null
-    return <div ref={containerRef} className="my-2" />
+    // No margin when it only shows for an interaction: an empty box would
+    // still push the field below it down.
+    return <div ref={containerRef} className={appearance ? undefined : 'my-2'} />
   },
 )
 

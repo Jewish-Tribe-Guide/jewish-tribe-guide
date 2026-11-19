@@ -24,6 +24,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { CategoryKind } from './categories'
+import { stepCount } from './stepAddress'
 
 /** The three cards (see resourceCards in home/sections.tsx) that open a fixed,
  *  hand-built screen rather than a normal listing directory — About Your
@@ -210,12 +211,13 @@ export const routes = {
 /** Serializes the map's live view into query params, so a shared map link
  *  reopens the same pins and filters. Omits anything at its default rather than
  *  writing an empty value, keeping the common URL short. */
-/** How many entries back the map was opened from: one, plus one each for
- *  a place's sheet (MobileNearbySheet), its edit form and the form's
- *  removal step (MapPlaceDetail), each pushed on top of the one before. */
-export function mapBackSteps(state: unknown): number {
-  const s = (state ?? {}) as { mapSheetOpen?: boolean; mapSheetForm?: unknown; mapSheetRemoval?: boolean }
-  return 1 + (s.mapSheetOpen ? 1 : 0) + (s.mapSheetForm ? 1 : 0) + (s.mapSheetRemoval ? 1 : 0)
+/** How many entries back the map was opened from: one, plus one for a
+ *  place's sheet (MobileNearbySheet, in the entry's state) and one for each
+ *  of its editor's steps (MapPlaceDetail, in the address: the edit, and
+ *  Request removal on top), each pushed on top of the one before. */
+export function mapBackSteps(state: unknown, search: string): number {
+  const s = (state ?? {}) as { mapSheetOpen?: boolean }
+  return 1 + (s.mapSheetOpen ? 1 : 0) + stepCount(search, ['editing'])
 }
 
 export function mapQueryString(state: {

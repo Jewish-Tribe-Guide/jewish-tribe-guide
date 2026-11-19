@@ -14,7 +14,7 @@ import { useNow } from '@/lib/useNow'
 import { listingRowFacts, type RowFact } from '@/lib/listingRow'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
 import { FACT_TONE } from '@/components/resources/rowFactTone'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunityCenter, useCommunitySlug } from '@/lib/communityContext'
 import { useShareLink } from '@/lib/useShareLink'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
@@ -31,8 +31,9 @@ import { pointerHover } from '@/lib/pointerHover'
 type LatLng = { lat: number; lng: number }
 type InputPoint = MapPoint & { filterId: string; raw?: DirectoryResource }
 export type ScoredPoint = InputPoint & { miles: number | null }
-/** An eruv whose lines are on the map, with its status now. */
-export type NearbyEruv = { id: string; name: string; tone: EruvTone; label: string }
+/** An eruv whose lines are on the map, with its status now and where and
+ *  when that was read ("From centercityeruv.com, 2:55 PM"), or null. */
+export type NearbyEruv = { id: string; name: string; tone: EruvTone; label: string; checked: string | null }
 
 // Hospitals are curated data — they have no directory listing to open.
 const HOSPITALS_FILTER_ID = '__hospitals__'
@@ -100,22 +101,28 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
   // all one: "Food" on every row of a Food list says nothing.
   const mixed = new Set(points.map((p) => p.filterId)).size > 1
 
+  // With no location, the list starts in the middle of town: the
+  // community's centre, without saying a distance from it (Nov 18).
+  const center = useCommunityCenter()
   const sorted = useMemo<ScoredPoint[]>(() => {
-    const scored = points.map((p) => ({
-      ...p,
-      miles: userLocation ? haversineMiles(userLocation, { lat: p.lat, lng: p.lng }) : null,
-    }))
-    return scored.sort((a, b) => {
-      // Saved places keep their place (Oct 14): nearest first means nearest
-      // first. Their badge is how they stand out.
-      if (a.miles === null && b.miles === null) {
-        return (b.raw?.upvotes ?? 0) - (a.raw?.upvotes ?? 0) || a.name.localeCompare(b.name)
-      }
-      if (a.miles === null) return 1
-      if (b.miles === null) return -1
-      return a.miles - b.miles
+    const from = userLocation ?? center
+    const scored = points.map((p) => {
+      const away = from ? haversineMiles(from, { lat: p.lat, lng: p.lng }) : null
+      return { p: { ...p, miles: userLocation ? away : null }, away }
     })
-  }, [points, userLocation])
+    return scored
+      .sort((a, b) => {
+        // Saved places keep their place (Oct 14): nearest first means nearest
+        // first. Their badge is how they stand out.
+        if (a.away === null && b.away === null) {
+          return (b.p.raw?.upvotes ?? 0) - (a.p.raw?.upvotes ?? 0) || a.p.name.localeCompare(b.p.name)
+        }
+        if (a.away === null) return 1
+        if (b.away === null) return -1
+        return a.away - b.away
+      })
+      .map((s) => s.p)
+  }, [points, userLocation, center])
 
   // The eruvim drawn on the map, first, each with its status: whether
   // they're up is what turning the lines on asks. They stay at the top when
@@ -129,6 +136,7 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
           <span className="min-w-0 flex-1">
             <span className="block truncate font-semibold text-slate-900">{e.name}</span>
             <span className={`block text-[13.5px] font-semibold ${TONE_WORDS[e.tone]}`}>{e.label}</span>
+            {e.checked && <span className="block truncate text-[13px] text-muted">{e.checked}</span>}
           </span>
         </button>
       ))}

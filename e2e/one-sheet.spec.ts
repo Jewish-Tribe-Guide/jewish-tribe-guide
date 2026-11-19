@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categories, categoryAddButton, categoryWithListings, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { categories, categoryAddButton, categoryWithListings, defaultCommunity, ready } from './helpers'
 
 // One sheet at a time on a phone (Oct 10): Edit under a listing's box used
 // to slide a second sheet up over the listing's. Now it takes the listing's
@@ -29,7 +29,6 @@ test('Edit under a listing’s box takes the listing’s place, and Back returns
 
   await page.goto(`/${community}/${found!.category}?item=${found!.id}`)
   await ready(page)
-  await dismissLocationPrompt(page)
   const listing = page.getByRole('dialog', { name: found!.name })
   const edit = listing.getByTestId('davening-shabbos').getByRole('button', { name: 'Edit', exact: true })
   await edit.scrollIntoViewIfNeeded()
@@ -59,7 +58,6 @@ test('dragging across the box’s text selects it, and leaves the sheet where it
   const { category } = await categoryWithListings(request, community)
   await page.goto(`/${community}/${category.id}`)
   await ready(page)
-  await dismissLocationPrompt(page)
   await categoryAddButton(page).click()
   const sheet = page.getByRole('dialog', { name: 'Add or update a place' })
   const box = sheet.getByLabel('Your message')

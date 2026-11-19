@@ -4,6 +4,7 @@ import { beforeCandles, browseLine, candleItemHref, candleItemLine, dayLine, ite
 import { hrefFilters, withFilters } from './searchLands'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { CategoryField } from './categories'
+import { placeTime } from '@/test/placeTime'
 
 const NY = 'America/New_York'
 const zmanim = (over: Partial<ZmanimData> = {}) =>
@@ -122,7 +123,7 @@ describe('before candles', () => {
   const from = { lat: 0, lng: 0 }
   // Local time, as every hours test here: whether a place is open is read
   // off the device's clock (see getOpenStatus).
-  const friday = new Date(2026, 9, 9, 13, 30)
+  const friday = placeTime(2026, 9, 9, 13, 30)
   const said = (rows: CandleItemRow[]) => rows.map((r) => [r.item, candleItemLine(r)])
 
   // The user, Oct 28: it used to name the one store with all three, which
@@ -248,7 +249,7 @@ describe('a Browse row’s live line: what the category’s own page says first'
   const open = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '09:00', close: '21:00' }]))
   const shut = { tue: { open: '15:00', close: '16:00' } }
   // Local time, as every hours test here (see getOpenStatus).
-  const tuesday = new Date(2026, 9, 6, 12, 30)
+  const tuesday = placeTime(2026, 9, 6, 12, 30)
   const food = makeCategory({ id: 'restaurant', detailFields: [hours], groupBy: { kind: 'open' } })
   const places = [makeListing({ id: 'a', category: 'restaurant', hours: open }), makeListing({ id: 'b', category: 'restaurant', hours: open }), makeListing({ id: 'c', category: 'restaurant', hours: shut })]
 

@@ -1,16 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { businessClosure, dayAndMinutesInTimezone, effectiveBusinessStatus, fmt12, formatHoursSummary, formatTodayHours, formatWeekHours, getOpenStatus, hasAnyHours, hoursClosing, hoursNextOpening, hoursOpenNow, isStructuredHours, placesApiHoursToStructured, syncedLabel, type StructuredHours } from './hours'
+import { businessClosure, dayAndMinutesInTimezone, effectiveBusinessStatus, fmt12, formatHoursSummary, formatTodayHours, getOpenStatus, hasAnyHours, hoursClosing, hoursNextOpening, hoursOpenNow, isStructuredHours, placesApiHoursToStructured, type StructuredHours } from './hours'
+import { placeTime } from '@/test/placeTime'
 
-// Everything here reads `new Date()`, so each test pins the clock. The local
-// timezone matters: hoursOpenNow uses getDay()/getHours(), i.e. the *viewer's*
-// clock, which is the intended behavior (a visitor standing outside the store
-// cares about their own wall time). Tests set a fixed instant and assert
-// against what that instant is locally.
+// Everything here reads `new Date()`, so each test pins the clock. Open/Closed
+// reads the place's own clock (the community's timezone, Nov 18 review item
+// 9), not the viewer's, so each instant is set on that clock with placeTime;
+// `new Date(y, m, d, h)` would be the machine's, and the suite runs in UTC.
 //
-// 2026-06-24 is a Wednesday. Times below are constructed with the local-time
-// `new Date(y, m, d, h, m)` form so they don't drift with the machine's zone.
-const WEDNESDAY = (h: number, m = 0) => new Date(2026, 5, 24, h, m, 0)
-const SUNDAY = (h: number, m = 0) => new Date(2026, 5, 28, h, m, 0)
+// 2026-06-24 is a Wednesday.
+const WEDNESDAY = (h: number, m = 0) => placeTime(2026, 5, 24, h, m)
+const SUNDAY = (h: number, m = 0) => placeTime(2026, 5, 28, h, m)
 
 const WEEKDAY_9_TO_5: StructuredHours = {
   sun: null,
@@ -193,22 +192,6 @@ describe('formatTodayHours', () => {
   })
 })
 
-describe('formatWeekHours', () => {
-  it('returns all seven days in order and flags today', () => {
-    vi.setSystemTime(WEDNESDAY(12))
-    const week = formatWeekHours(WEEKDAY_9_TO_5)
-    expect(week?.map((d) => d.key)).toEqual(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'])
-    expect(week?.find((d) => d.isToday)?.key).toBe('wed')
-    expect(week?.find((d) => d.key === 'sun')?.text).toBe('Closed')
-    expect(week?.find((d) => d.key === 'fri')?.text).toBe('9:00 AM – 2:00 PM')
-  })
-
-  it('returns null for a legacy text value', () => {
-    vi.setSystemTime(WEDNESDAY(12))
-    expect(formatWeekHours('Mon-Fri 9-5')).toBeNull()
-  })
-})
-
 describe('formatHoursSummary', () => {
   it('collapses consecutive identical days into a range', () => {
     expect(formatHoursSummary(WEEKDAY_9_TO_5)).toBe(
@@ -255,11 +238,11 @@ describe('placesApiHoursToStructured', () => {
     expect(result?.tue).toBeNull()
   })
 
-  it('closes at 23:59 when the period runs past midnight into the next day', () => {
+  it('keeps a close past midnight as its time', () => {
     const result = placesApiHoursToStructured([
       { open: { day: 5, hour: 20, minute: 0 }, close: { day: 6, hour: 2, minute: 0 } },
     ])
-    expect(result?.fri).toEqual({ open: '20:00', close: '23:59' })
+    expect(result?.fri).toEqual({ open: '20:00', close: '02:00' })
   })
 
   it('ignores an out-of-range day index', () => {
@@ -274,45 +257,15 @@ describe('placesApiHoursToStructured', () => {
     })
   })
 
-  // Google returns split periods for a place that shuts for lunch. The mapper
-  // widens to the outer bounds rather than storing both windows, so the break
-  // is not represented and the place reads as open through it. Locking in the
-  // current behavior — StructuredHours has no way to express two windows in a
-  // day, so changing this would mean changing the stored shape.
-  it('merges split periods in one day into a single outer window', () => {
+  // Google returns split periods for a place that shuts for lunch. Until
+  // Nov 18 they were widened to one window and the place read Open through
+  // the break; the day now keeps each period.
+  it('keeps split periods in one day, spanning the day', () => {
     const result = placesApiHoursToStructured([
       { open: { day: 2, hour: 9, minute: 0 }, close: { day: 2, hour: 12, minute: 0 } },
       { open: { day: 2, hour: 14, minute: 0 }, close: { day: 2, hour: 18, minute: 0 } },
     ])
-    expect(result?.tue).toEqual({ open: '09:00', close: '18:00' })
-  })
-})
-
-describe('syncedLabel', () => {
-  beforeEach(() => {
-    vi.setSystemTime(WEDNESDAY(12))
-  })
-
-  it('returns null when there is nothing to sync from', () => {
-    expect(syncedLabel(undefined)).toBeNull()
-  })
-
-  it('returns null for an unparseable timestamp', () => {
-    expect(syncedLabel('not a date')).toBeNull()
-  })
-
-  it('says "today" for anything synced today', () => {
-    expect(syncedLabel(WEDNESDAY(9).toISOString())).toBe('Synced from Google · updated today')
-  })
-
-  it('says "1d ago" for yesterday', () => {
-    const yesterday = new Date(2026, 5, 23, 12)
-    expect(syncedLabel(yesterday.toISOString())).toBe('Synced from Google · updated 1d ago')
-  })
-
-  it('counts multiple days', () => {
-    const fiveDaysAgo = new Date(2026, 5, 19, 12)
-    expect(syncedLabel(fiveDaysAgo.toISOString())).toBe('Synced from Google · updated 5d ago')
+    expect(result?.tue).toEqual({ open: '09:00', close: '18:00', periods: [{ open: '09:00', close: '12:00' }, { open: '14:00', close: '18:00' }] })
   })
 })
 
@@ -327,7 +280,7 @@ describe('business closures outrank posted hours', () => {
     ...(status ? { businessStatus: status } : {}),
   })
   // A Monday, midday — the hours above say open.
-  const monday = new Date(2026, 7, 31, 12, 0)
+  const monday = placeTime(2026, 7, 31, 12, 0)
 
   it('reports a trading business as open', () => {
     const status = getOpenStatus(item('OPERATIONAL'), ['hours'], monday)
@@ -406,7 +359,7 @@ describe('an admin override outranks Google', () => {
     const status = getOpenStatus(
       { hours: { mon: { open: '00:00', close: '23:59' } }, businessStatusOverride: 'CLOSED_TEMPORARILY' },
       ['hours'],
-      new Date(2026, 7, 31, 12, 0),
+      placeTime(2026, 7, 31, 12, 0),
     )
     expect(status.isOpen).toBe(false)
     expect(status.closure).toBe('temporary')
@@ -459,7 +412,7 @@ describe('hoursNextOpening', () => {
   // Friday Oct 2 2026, 2 PM, local. Made in each test, not once here: a
   // test above changes the machine's timezone, and a Date made before that
   // is a different local time after it.
-  const friday2pm = () => new Date(2026, 9, 2, 14, 0)
+  const friday2pm = () => placeTime(2026, 9, 2, 14, 0)
 
   it('says the time for later today, and the day for any other', () => {
     expect(hoursNextOpening({ fri: { open: '16:00', close: '20:00' } }, friday2pm())).toBe('4 PM')
@@ -483,13 +436,12 @@ describe('a place saved as closed every day (fixes table, Sep 29)', () => {
   // Chalavita, The Brazilian BBQ and four more: almost always a form saved
   // empty. It said "Closed today", and Closed for every day of the week.
   const allClosed = { sun: null, mon: null, tue: null, wed: null, thu: null, fri: null, sat: null }
-  const tuesdayNoon = new Date(2026, 8, 29, 12, 0)
+  const tuesdayNoon = placeTime(2026, 8, 29, 12, 0)
 
   it('has no hours, the same as none saved, wherever hours are read', () => {
     expect(hasAnyHours(allClosed)).toBe(false)
     expect(hoursOpenNow(allClosed, tuesdayNoon)).toBeNull()
     expect(formatTodayHours(allClosed, tuesdayNoon)).toBeNull()
-    expect(formatWeekHours(allClosed, tuesdayNoon)).toBeNull()
     expect(hoursClosing(allClosed, 60, tuesdayNoon)).toBeNull()
   })
 

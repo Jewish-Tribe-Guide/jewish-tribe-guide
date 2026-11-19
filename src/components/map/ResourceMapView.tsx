@@ -63,6 +63,9 @@ import { useLearnAfterPause } from '@/lib/useLearnAfterPause'
 import AskTheGroup from '@/components/home/AskTheGroup'
 import type { DirectoryResource, MapFilters } from '@/types'
 import { useKeptListScroll } from './useKeptListScroll'
+import { useRouter } from 'next/navigation'
+import { moveBackTo } from '@/components/admin/useScreenHistory'
+import { stepCount, stepsIn, withoutSteps } from '@/lib/stepAddress'
 
 // Shared by the initial useState below and the resync effect further down
 // (see its own comment) — one place for the initialSelectedCategories-vs-
@@ -100,9 +103,6 @@ function openNowIdsFor(
     })
     .map((p) => p.id)
 }
-// The hospital pin's colour and glyph live in categoryColor.ts.
-// Re-exported here for the map's own callers.
-export { HOSPITAL_COLOR, HOSPITAL_ICON }
 // A dropped pin's marker id is prefixed with this so a click handler can
 // tell it apart from a real listing/hospital point without a separate prop
 // threaded through every consumer — see droppedMapPoints below.
@@ -134,7 +134,6 @@ const stripApostrophes = (s: string) => s.replace(/['’‘ʼʻ]/g, '')
 type SelectablePoint = MapPoint & { filterId: string; raw?: DirectoryResource }
 
 type Props = {
-  onUp: () => void
   /** Initial location from the header's "Set location" control, if already set. */
   userLocation?: LatLng | null
   /** Pre-select a single category filter on arrival (from a category's "Map" button). */
@@ -260,7 +259,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
         lng: p.lng,
         name: p.label,
         color: DROPPED_PIN_COLOR,
-        glyph: '📍',
         categoryLabel: 'Your pin',
         filterId: DROPPED_FILTER_ID,
       })),
@@ -408,10 +406,34 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     (next: HostedEditor | null) => setEditor(next && desktopSelectedId ? { ...next, id: desktopSelectedId } : null),
     [desktopSelectedId],
   )
+  // A place opened on the computer's map is an entry in the history, as on
+  // a phone (MobileNearbySheet): Back closes it rather than leaving the map
+  // and its search (Nov 18). Not when the address names it already (a
+  // link, a reload). Closed on the screen, it takes that entry back, and
+  // the popstate listener below clears it.
   const setDesktopSelected = (p: SelectablePoint | null) => {
+    const stepped = (window.history.state as { mapPlaceOpen?: boolean } | null)?.mapPlaceOpen
+    if (!p && stepped && standalone) {
+      window.history.back()
+      return
+    }
+    if (p && !desktopSelected && !stepped && standalone && new URLSearchParams(window.location.search).get('place') !== p.id) {
+      window.history.pushState({ ...(window.history.state ?? {}), mapPlaceOpen: true }, '')
+    }
     setDesktopSelectedRaw(p)
     setSelectedPointId(p?.id)
   }
+  const onPlacePop = useEffectEvent((e: PopStateEvent) => {
+    if (isMobile || !desktopSelected || (e.state as { mapPlaceOpen?: boolean } | null)?.mapPlaceOpen) return
+    setDesktopSelectedRaw(null)
+    setSelectedPointId(undefined)
+  })
+  useEffect(() => {
+    if (!standalone) return
+    const listener = (e: PopStateEvent) => onPlacePop(e)
+    window.addEventListener('popstate', listener)
+    return () => window.removeEventListener('popstate', listener)
+  }, [standalone])
   // Desktop-only — the embedded home-screen map starts as a contained card
   // (like a widget, not the whole page); this expands it to cover the
   // viewport, and collapses it back in place. The standalone page-level map
@@ -429,15 +451,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // "small map" on Escape (or the fullscreen-toggle button) that a real user
   // reported seeing. Leaving `fullscreen` true keeps this screen showing its
   // real layout right up until it's replaced.
-  // Mid-edit, the place's editor has pushed history entries of its own
-  // (mapSheetForm, and mapSheetRemoval on top), so a router.back() would
-  // only pop one of those: ✕ took you out of editing and left you on the
-  // map. Unwind them first, one popstate at a time, then leave. Nothing
-  // asks "discard?", the same as closing the listing dialog mid-edit.
+  // Mid-edit, the place's editor has entries of its own (?editing=<id>~listing,
+  // and its Request removal on top; useEditorInAddress), so a router.back()
+  // would only go back over one of those: ✕ took you out of editing and
+  // left you on the map. Go back over them first, then leave. Nothing asks
+  // "discard?", the same as closing the listing dialog mid-edit.
+  const router = useRouter()
   const unwindEditorHistory = (then: () => void) => {
-    if (!(window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm) return then()
-    window.addEventListener('popstate', () => unwindEditorHistory(then), { once: true })
-    window.history.back()
+    const editing = () => stepCount(window.location.search, ['editing'])
+    if (editing() === 0) return then()
+    void moveBackTo(router, editing, () => withoutSteps(window.location.pathname, window.location.search, ['editing']), { keepState: true }).then(then)
   }
   const exitFullscreen = () => {
     const leave = () => {
@@ -452,10 +475,20 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // unwinds the editor's history entries — left behind, Back would land in
   // an edit of whatever's showing by then — and only then does it. The ←
   // and Escape step back without asking, as the editor's own ‹ always has;
-  // so does ✕ (exitFullscreen).
-  const leaveEditThen = (then: () => void) => {
+  // so does ✕ (exitFullscreen). A phone's sheet hosts its editor itself,
+  // telling nobody, so there it's the address that says one is open: a pin
+  // tapped then swaps the place in the same entry, and the editor's entries
+  // would have stayed on top of the next place (Nov 19).
+  //
+  // `to`: the place being opened, by the id its editor goes by. The one
+  // whose editor the address names is no leaving: the restore below picks
+  // it again once the editor's own entry lands (a navigation, so the map
+  // hears of the place for the first time) and after a reload, and
+  // unwinding there closed the editor it had just opened.
+  const leaveEditThen = (then: () => void, to?: string) => {
+    if (to !== undefined && stepsIn(window.location.search, 'editing', to).length > 0) return then()
     const open = editorRef.current
-    if (!open) return then()
+    if (!open) return unwindEditorHistory(then)
     if (open.changed && !window.confirm('Discard your changes?')) return
     editorRef.current = null
     setEditor(null)
@@ -544,15 +577,19 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // the pin-tap handler passed to ResourceMap below, which is the one place
   // that does.
   const selectPlace = (p: SelectablePoint, frame = true) =>
-    leaveEditThen(() => {
-      if (p.raw?.id && countCommunity) countEvent(countCommunity, 'listing_view', p.raw.id)
-      if (isMobile) nearbySheetRef.current?.selectPoint(p, frame)
-      else {
-        setDesktopSelected(p)
-        setSidebarCollapsed(false)
-        if (frame) setFrameToken((t) => t + 1)
-      }
-    })
+    leaveEditThen(
+      () => {
+        if (p.raw?.id && countCommunity) countEvent(countCommunity, 'listing_view', p.raw.id)
+        if (isMobile) nearbySheetRef.current?.selectPoint(p, frame)
+        else {
+          setDesktopSelected(p)
+          setSidebarCollapsed(false)
+          if (frame) setFrameToken((t) => t + 1)
+        }
+      },
+      // An eruv's editor goes by the eruv's own id, a listing's by its.
+      p.id.startsWith(ERUV_PREFIX) ? p.id.slice(ERUV_PREFIX.length) : (p.raw?.id ?? p.id),
+    )
   const deselectPlace = () => {
     if (isMobile) nearbySheetRef.current?.deselectPoint()
     else leaveEditThen(() => setDesktopSelected(null))
@@ -1128,10 +1165,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       // the ‹ back is still there after a chip or a pin.
       from: new URLSearchParams(window.location.search).get('from'),
     })
-    const url = `${window.location.pathname}${qs}`
+    // A place's editor open over it keeps its own step (useEditorInAddress).
+    const params = new URLSearchParams(qs)
+    const editing = new URLSearchParams(window.location.search).get('editing')
+    if (editing) params.set('editing', editing)
+    const search = params.toString()
+    const url = `${window.location.pathname}${search ? `?${search}` : ''}`
     if (url === `${window.location.pathname}${window.location.search}`) return
     window.history.replaceState(window.history.state, '', url)
-    ownWritesRef.current = [...ownWritesRef.current, normalizeSearch(qs)].slice(-20)
+    ownWritesRef.current = [...ownWritesRef.current, normalizeSearch(new URL(url, window.location.origin).search)].slice(-20)
     // The view is the visitor's now, no link's: the same link again is a
     // new navigation, even if this write never comes back as props (Next
     // doesn't always echo one).
@@ -1584,53 +1626,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               mobile's: matching places while typing, click one to jump
               straight to its card. ─────────────────────────────────────── */}
       {dropdownShown && (
-        <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-lg">
-          {showOpenNowSuggestion && (
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={selectOpenNow}
-              className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
-            >
-              <span
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"
-                aria-hidden="true"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="9" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
-                </svg>
-              </span>
-              <span className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-900">Open now</p>
-                <p className="truncate text-xs text-slate-400">Show only listings open right now</p>
-              </span>
-            </button>
-          )}
-          {searchSuggestions.map((p) => (
-            <button
-              key={p.id}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => selectSuggestion(p)}
-              className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
-            >
-              <span
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base"
-                style={{ backgroundColor: categoryTint(p.color) }}
-                aria-hidden="true"
-              >
-                {p.glyph ?? '📍'}
-              </span>
-              <span className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-900">{p.name}</p>
-                <p className="truncate text-xs text-slate-400">
-                  {p.categoryLabel}
-                  {p.address ? ` · ${p.address}` : ''}
-                </p>
-              </span>
-            </button>
-          ))}
-          {typedNothing && nothingBox(input, 'rounded-none border-0')}
-        </div>
+        <SearchSuggestions
+          className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-lg"
+          rowPadding="px-3"
+          openNow={showOpenNowSuggestion}
+          onOpenNow={selectOpenNow}
+          places={searchSuggestions}
+          onPick={selectSuggestion}
+          nothing={typedNothing && nothingBox(input, 'rounded-none border-0')}
+        />
       )}
     </div>
   )
@@ -1649,6 +1653,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const campaignHighlighted = !!campaignOption && effectiveSelected.has(campaignOption.id) && !allChipsOn
   const campaignChip = campaignOption && (
     <div
+      data-testid="campaign-chip"
       className={`relative flex shrink-0 items-stretch rounded-full text-sm font-semibold transition-colors ${
         campaignHighlighted ? 'text-white' : 'bg-gradient-to-r from-amber-50 to-amber-100 text-amber-900'
       }`}
@@ -1659,7 +1664,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
         aria-pressed={effectiveSelected.has(campaignOption.id)}
         className={`flex items-center gap-1 ${CHIP_SIZE} rounded-full cursor-pointer ${campaignHighlighted ? '' : 'hover:from-amber-100 hover:to-amber-200'}`}
       >
-        <span aria-hidden="true">✨</span>
+        <CategoryGlyph categoryId={campaignOption.id} className={`${CHIP_GLYPH} shrink-0`} />
         <span>{campaignOption.label}</span>
       </button>
     </div>
@@ -1732,7 +1737,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       eruvimOn && eruvData && clock !== null
         ? eruvimWithLines.map(({ eruv: e }) => {
             const v = eruvView(e, new Date(clock), eruvData.timezone, eruvData.candles)
-            return { id: e.id, name: e.name, tone: v.tone, label: v.label }
+            // Where and when, without how often (the eruv's page says that).
+            return { id: e.id, name: e.name, tone: v.tone, label: v.label, checked: v.checked?.split(' · ')[0] ?? null }
           })
         : [],
     [eruvimOn, eruvData, eruvimWithLines, clock],
@@ -1750,7 +1756,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       leaveEditThen(() => {
         setDesktopSelected(p)
         setSidebarCollapsed(false)
-      })
+      }, id)
   }
   // A link to an open eruv (?place=eruv:center-city) opens it again, with
   // the layer on, once the eruvim have arrived (their fetch outlasts the
@@ -2352,7 +2358,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                       : 'bg-white text-slate-600 ring-slate-900/10 hover:bg-slate-50'
                   }`}
                 >
-                  <span aria-hidden="true">📍</span>
+                  {/* The phone's location button's arrow, not an emoji. */}
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 2 19 21 12 17 5 21z" />
+                  </svg>
                 </button>
               )}
               {/* ── Floating search + filters (mobile) — laid directly over the
@@ -2507,55 +2516,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                           places while typing, tap one to jump straight to its
                           card instead of just narrowing the list. ─────────── */}
                   {dropdownShown && (
-                    <div className="mt-2 overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-900/5">
-                      {showOpenNowSuggestion && (
-                        <button
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={selectOpenNow}
-                          className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
-                        >
-                          <span
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"
-                            aria-hidden="true"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                              <circle cx="12" cy="12" r="9" />
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
-                            </svg>
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-slate-900">Open now</p>
-                            <p className="truncate text-xs text-slate-400">Show only listings open right now</p>
-                          </span>
-                        </button>
-                      )}
-                      {searchSuggestions.map((p) => (
-                        <button
-                          key={p.id}
-                          // Prevents the input's blur (which would close this
-                          // dropdown before the click lands) from firing at all.
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => selectSuggestion(p)}
-                          className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
-                        >
-                          <span
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base"
-                            style={{ backgroundColor: categoryTint(p.color) }}
-                            aria-hidden="true"
-                          >
-                            {p.glyph ?? '📍'}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-slate-900">{p.name}</p>
-                            <p className="truncate text-xs text-slate-400">
-                              {p.categoryLabel}
-                              {p.address ? ` · ${p.address}` : ''}
-                            </p>
-                          </span>
-                        </button>
-                      ))}
-                      {typedNothing && nothingBox(input, 'rounded-none border-0')}
-                    </div>
+                    <SearchSuggestions
+                      className="mt-2 overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-900/5"
+                      rowPadding="px-4"
+                      openNow={showOpenNowSuggestion}
+                      onOpenNow={selectOpenNow}
+                      places={searchSuggestions}
+                      onPick={selectSuggestion}
+                      nothing={typedNothing && nothingBox(input, 'rounded-none border-0')}
+                    />
                   )}
                 </div>
               )}
@@ -2753,6 +2722,69 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
  *  the sidebar first, else the row under the pointer. Reads the hover store
  *  itself, so only the map redraws as the pointer moves down the list. A
  *  hover never moves the map: ResourceMap frames only on frameToken. */
+/** The search box's dropdown, on the computer and the phone alike (it was
+ *  written out twice, Nov 18 review item 42): "Open now" when the words
+ *  could mean it, then the matching places, each a tap straight to its
+ *  card, then what to do when nothing matched. A press doesn't take the
+ *  focus off the box, which would close the list before the tap landed. */
+function SearchSuggestions<P extends SelectablePoint>({ className, rowPadding, openNow, onOpenNow, places, onPick, nothing }: {
+  className: string
+  rowPadding: string
+  openNow: boolean
+  onOpenNow: () => void
+  places: P[]
+  onPick: (p: P) => void
+  nothing: ReactNode
+}) {
+  const row = `flex w-full items-center gap-3 ${rowPadding} py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer`
+  return (
+    <div className={className}>
+      {openNow && (
+        <button onMouseDown={(e) => e.preventDefault()} onClick={onOpenNow} className={row}>
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500" aria-hidden="true">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-900">Open now</p>
+            <p className="truncate text-xs text-slate-400">Show only listings open right now</p>
+          </span>
+        </button>
+      )}
+      {places.map((p) => (
+        <button key={p.id} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(p)} className={row}>
+          <SuggestionIcon point={p} />
+          <span className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-900">{p.name}</p>
+            <p className="truncate text-xs text-slate-400">
+              {p.categoryLabel}
+              {p.address ? ` · ${p.address}` : ''}
+            </p>
+          </span>
+        </button>
+      ))}
+      {nothing}
+    </div>
+  )
+}
+
+/** A search line's icon: the place's category's line icon on its tint, a
+ *  pin for a pin of your own. Category emoji used to show here, and 📍 for
+ *  the rest (Nov 18: no emoji as icons). */
+function SuggestionIcon({ point }: { point: SelectablePoint }) {
+  return (
+    <span
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+      style={{ backgroundColor: categoryTint(point.color), color: point.color }}
+      aria-hidden="true"
+    >
+      {point.filterId === DROPPED_FILTER_ID ? <PinIcon className="h-4 w-4" /> : <CategoryGlyph categoryId={point.filterId} className="h-4 w-4" />}
+    </span>
+  )
+}
+
 function MapWithHover({ highlight, selectedId, ...props }: ComponentProps<typeof ResourceMap> & { highlight: Highlight }) {
   const hovered = useSyncExternalStore(highlight.subscribe, highlight.get, () => null)
   // A map Google broke stays in its own box: the page's search, chips and

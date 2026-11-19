@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useNow } from '@/lib/useNow'
+import { useCommunityTimezone } from '@/lib/communityContext'
 import { isStale } from '@/lib/listingView'
 import { useFetchOrPreview } from '@/lib/previewSend'
 import { EditButton, shortDate } from './listingParts'
@@ -73,6 +74,7 @@ export default function FreshnessFooter(props: Props) {
 
 function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, subject, ask = true, section, onEdit, source, by }: Props) {
   const now = useNow()
+  const timezone = useCommunityTimezone()
   const fetchOrPreview = useFetchOrPreview()
   // A Yes given here earlier this visit, if the page's copy predates it.
   const [confirmedAt, setConfirmedAt] = useState(() => confirmedAtHere(resourceId, section, initialConfirmedAt))
@@ -172,7 +174,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
       <div className="flex items-center gap-2" data-testid="freshness">
         <p className={`min-w-0 flex-1 text-[13.5px] leading-snug ${asking ? 'text-caution' : 'text-slate-600'}`}>
           {leadText}
-          {confirmedAt ? `${giver ? `${giver},` : 'Confirmed'} ${shortDate(confirmedAt, now)}` : 'Not confirmed yet'}
+          {confirmedAt ? `${giver ? `${giver},` : 'Confirmed'} ${shortDate(confirmedAt, timezone, now)}` : 'Not confirmed yet'}
           {asking && (confirmedAt ? ' · Still right?' : ' · Right?')}
           {failed}
         </p>
@@ -191,7 +193,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
     return (
       <p className="text-[13.5px] leading-snug text-slate-600" data-testid="freshness">
         {leadText}
-        {confirmedAt ? `${what} ${lower ? `${lower},` : 'last checked'} ${shortDate(confirmedAt, now)}.` : `${what} not checked by anyone yet.`}
+        {confirmedAt ? `${what} ${lower ? `${lower},` : 'last checked'} ${shortDate(confirmedAt, timezone, now)}.` : `${what} not checked by anyone yet.`}
       </p>
     )
   }
@@ -215,7 +217,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
     return (
       <p className="text-[13.5px] leading-snug text-slate-600" data-testid="freshness">
         {leadText}
-        {subject ? `${subject} ${lower ? `${lower},` : 'confirmed'}` : giver ? `${giver},` : 'Confirmed'} {shortDate(confirmedAt, now)}.
+        {subject ? `${subject} ${lower ? `${lower},` : 'confirmed'}` : giver ? `${giver},` : 'Confirmed'} {shortDate(confirmedAt, timezone, now)}.
         {stale && <> Still right? {button('Yes')}</>}
         {failed}
       </p>

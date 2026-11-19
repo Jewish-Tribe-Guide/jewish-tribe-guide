@@ -46,7 +46,7 @@ export default function MapScreen() {
           // Past the map's own entries (a place's sheet, its edit form):
           // ‹ goes back to where the map was opened from, not to the map's
           // list (Nov 17, from a listing's map tile).
-          const steps = mapBackSteps(window.history.state)
+          const steps = mapBackSteps(window.history.state, window.location.search)
           if (window.history.length > steps) {
             if (steps === 1) router.back()
             else window.history.go(-steps)
@@ -82,7 +82,6 @@ export default function MapScreen() {
   return (
     <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-0 pb-[calc(3.75rem+env(safe-area-inset-bottom))] sm:pt-8 sm:pb-8 animate-[fadeIn_180ms_ease-out]">
       <ResourceMapView
-        onUp={goHome}
         userLocation={coords}
         initialSelectedCategories={view.categories ?? undefined}
         initialPinned={view.pinned}

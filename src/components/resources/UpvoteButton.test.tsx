@@ -94,6 +94,27 @@ describe('UpvoteButton', () => {
     expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'false')
   })
 
+  // Storage that refuses writes (Safari blocking cookies, a full store):
+  // remembering the vote threw inside the request's try, and its catch
+  // rolled back a vote the server had counted (Nov 18).
+  it('keeps a counted vote when this browser can’t remember it', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ ok: true, count: 6, voted: true }) }))
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      removeItem: () => {},
+      clear: () => {},
+      setItem: () => {
+        throw new DOMException('The quota has been exceeded.', 'QuotaExceededError')
+      },
+    })
+    const user = userEvent.setup()
+    render(<UpvoteButton resourceId="r1" count={5} />)
+    await user.click(screen.getByRole('button'))
+    await waitFor(() => expect(screen.getByRole('button')).not.toBeDisabled())
+    expect(screen.getByText('6')).toBeInTheDocument()
+    expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('rolls back on a network failure too', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
     const user = userEvent.setup()
@@ -146,39 +167,32 @@ describe('UpvoteButton', () => {
     expect(onCardClick).not.toHaveBeenCalled()
   })
 
-  it('renders the compact inline variant used in a collapsed listing header', () => {
-    render(<UpvoteButton resourceId="r1" count={5} variant="inline" />)
-    expect(screen.getByRole('button')).toHaveTextContent('👍5')
-  })
-
-  // Reported live as unclear that it's tappable at all — it used to be
-  // plain colored text with no background or border, sitting right next to
-  // the non-interactive distance text at the exact same visual weight. A
-  // border was tried first and swapped for a filled chip (see the
-  // component's own comment) because a 1px outline at this size is easy to
-  // miss without a hover state to reinforce it.
-  it('gives the inline variant a filled background, so it reads as a button next to the (non-interactive) distance text beside it', () => {
-    render(<UpvoteButton resourceId="r1" count={5} variant="inline" />)
-    expect(screen.getByRole('button').className).toMatch(/\bbg-slate-100\b/)
+  // No emoji as icons (how-we-work.md). Its unused looks drew a 👍; the one
+  // it keeps draws the site's line thumb (Nov 18, review item 43).
+  it('draws a line thumb, not an emoji', () => {
+    render(<UpvoteButton resourceId="r1" count={5} />)
+    const button = screen.getByRole('button')
+    expect(button.textContent).not.toMatch(/\p{Extended_Pictographic}/u)
+    expect(button.querySelector('svg')).not.toBeNull()
   })
 
   // The user, Nov 5: people know "upvote", not "recommend". The listing's
   // button is a thumb and a count, so its label and hover say the word.
   it('names the listing\'s button Upvote, with the count in upvotes', () => {
-    render(<UpvoteButton resourceId="r1" count={12} variant="recommend" name="Goldie" />)
+    render(<UpvoteButton resourceId="r1" count={12} name="Goldie" />)
     const button = screen.getByRole('button', { name: 'Upvote Goldie, 12 upvotes' })
     expect(button).toHaveAttribute('title', 'Upvote this place')
     cleanup()
-    render(<UpvoteButton resourceId="r1" count={1} variant="recommend" name="Goldie" />)
+    render(<UpvoteButton resourceId="r1" count={1} name="Goldie" />)
     expect(screen.getByRole('button', { name: 'Upvote Goldie, 1 upvote' })).toBeInTheDocument()
   })
 
-  it('tints the inline variant\'s background once voted, distinct from its at-rest color', () => {
-    render(<UpvoteButton resourceId="r1" count={5} variant="inline" />)
+  it('tints once voted, distinct from its at-rest look', () => {
+    render(<UpvoteButton resourceId="r1" count={5} />)
     const before = screen.getByRole('button').className
     localStorage.setItem('jpc_voted', JSON.stringify(['r1']))
     cleanup()
-    render(<UpvoteButton resourceId="r1" count={5} variant="inline" />)
+    render(<UpvoteButton resourceId="r1" count={5} />)
     const after = screen.getByRole('button').className
     expect(after).toMatch(/\bbg-primary\/10\b/)
     expect(after).not.toBe(before)

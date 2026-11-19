@@ -77,6 +77,14 @@ describe('listPublishedForms', () => {
     await expect(listPublishedForms('philly')).rejects.toThrow('Failed to load forms: boom')
   })
 
+  // Nov 18 review, item 30: the type said no drafts, the object still had one.
+  it('leaves out an unpublished draft', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, draft: { ...rawRow, title: 'Not yet' } }], error: null }))
+    const [form] = await listPublishedForms('philly')
+    expect(form).not.toHaveProperty('draft')
+    expect(form.title).toBe('Support Request')
+  })
+
   it('excludes inactive forms', async () => {
     mockFrom.mockReturnValue(
       chainable({ data: [rawRow, { ...rawRow, id: 'hidden-form', active: false }], error: null }),

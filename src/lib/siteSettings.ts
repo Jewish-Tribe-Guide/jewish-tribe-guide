@@ -5,8 +5,8 @@ import { community } from '@/community.config'
 //
 // The admin-editable slice of on-page branding text — everything else in
 // community.config.ts (region, timezone, feature flags, theme color) stays
-// code-only. Server code reads/writes via siteSettingsStore.ts; client code
-// fetches via GET /api/site-settings (see useSiteSettings.ts).
+// code-only. Server code reads/writes via siteSettingsStore.ts; the page gets
+// them from the community layout's content (see useSiteSettings.ts).
 //
 // NOTE: the browser tab <title>, the search-engine meta description, and the
 // PWA manifest (src/app/layout.tsx, src/app/manifest.ts) are computed at

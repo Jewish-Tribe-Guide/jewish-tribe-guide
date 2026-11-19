@@ -166,31 +166,22 @@ export function CategoryGlyph({ categoryId: id, className }: Props) {
   )
 }
 
-/** The plain-DOM equivalent of CategoryGlyph, for the one caller that isn't
- *  React: ResourceMap.tsx builds Google Maps markers by hand, and
- *  PinElement's `glyph` slot wants a real Element (or a plain string it
- *  renders as text) — not JSX. Always white (map pins have a solid color
- *  background); `glyphColor` on PinElement is ignored once `glyph` is an
- *  Element, so this has to color itself rather than relying on that. */
-export function glyphElementFor(categoryId: string | undefined): SVGElement | undefined {
+/** CategoryGlyph for a Google Maps pin, which isn't React: the line icon as
+ *  an SVG image (a data URL) for PinElement's `glyphSrc`. Always white (map
+ *  pins have a solid color background), and it has to color itself: an
+ *  image takes no `glyphColor`. It used to be an SVG Element in PinElement's
+ *  `glyph`, which Google deprecated and warned about on every map load
+ *  (Nov 18, review item 47). */
+export function glyphSrcFor(categoryId: string | undefined): string {
   const markup = (categoryId ? CATEGORY_ICON_MARKUP[categoryId] : undefined) ?? DEFAULT_ICON_MARKUP
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-  svg.setAttribute('viewBox', '0 0 24 24')
-  svg.setAttribute('width', '18')
-  svg.setAttribute('height', '18')
-  svg.setAttribute('fill', 'none')
-  svg.setAttribute('stroke', '#ffffff')
-  svg.setAttribute('stroke-width', '1.8')
-  svg.setAttribute('stroke-linecap', 'round')
-  svg.setAttribute('stroke-linejoin', 'round')
-  svg.innerHTML = markup
-  return svg
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#ffffff" ' +
+    `stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${markup}</svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
 
 /** The plain-text equivalent of CategoryGlyph's text-glyph branch (an "H"
- *  for hospitals) — PinElement happily takes a plain string as `glyph` and
- *  colors it via `glyphColor`, so the map marker doesn't need an Element for
- *  this case the way glyphElementFor's icons do. */
+ *  for hospitals), for PinElement's `glyphText`, colored by `glyphColor`. */
 export function glyphTextFor(categoryId: string | undefined): string | undefined {
   return categoryId ? CATEGORY_ICON_TEXT[categoryId] : undefined
 }

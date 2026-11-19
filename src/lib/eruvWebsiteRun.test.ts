@@ -111,3 +111,12 @@ it('gives each eruv’s website its watch, and takes away one no eruv has', asyn
   expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: URL_, resourceId: null, label: 'Lower Merion Eruv’s website', createdBy: ERUV_WEBSITE_CREATOR })
   expect(m.removeWatch).toHaveBeenCalledWith('philly', 'w-gone')
 })
+
+// Nov 18 review: eruv website watches were still added for a community
+// that had turned eruvs off.
+it('adds and takes away nothing for a community that turned eruvs off', async () => {
+  m.watches = [{ id: 'w-gone', url: 'https://gone.org/', createdBy: ERUV_WEBSITE_CREATOR }, { id: 'off', url: 'https://guide.invalid/job-off/eruvs', createdBy: 'job off' }]
+  expect(await syncEruvWebsiteWatches()).toEqual([])
+  expect(m.addWatch).not.toHaveBeenCalled()
+  expect(m.removeWatch).not.toHaveBeenCalled()
+})

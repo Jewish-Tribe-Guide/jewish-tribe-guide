@@ -1,6 +1,6 @@
 'use client'
 
-import { ui } from '@/lib/uiConfig'
+import { useContributions } from '@/lib/communityContext'
 import TellUsCard, { HELP_CARD, HelpCardBody } from './TellUsCard'
 
 /** About's "Ways to help" (board About v2): tell us something, help run the
@@ -8,6 +8,7 @@ import TellUsCard, { HELP_CARD, HelpCardBody } from './TellUsCard'
  *  two are an email to the address the page's own text gives, so they
  *  appear only when it gives one. */
 export default function AboutHelpCards({ email }: { email: string | null }) {
+  const contributions = useContributions()
   const mail = (subject: string) => `mailto:${email}?subject=${encodeURIComponent(subject)}`
 
   return (
@@ -15,7 +16,7 @@ export default function AboutHelpCards({ email }: { email: string | null }) {
       <h2 id="ways-to-help" className="mx-1 mt-3 text-[20px] font-extrabold tracking-tight text-slate-900 desktop:mx-0 desktop:mt-1 desktop:text-[24px]">
         Ways to help
       </h2>
-      {ui.contributions.add && <TellUsCard />}
+      {contributions.add && <TellUsCard />}
       {email && (
         <a className={HELP_CARD} href={mail('Helping run the guide')}>
           <HelpCardBody icon="check" title="Help run the guide" text="Email us to look after shuls, kosher food or another part of it." />

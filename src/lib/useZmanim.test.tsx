@@ -110,6 +110,15 @@ describe('useZmanim', () => {
     expect(url).toMatch(/^\/api\/zmanim\?lat=41\.12&lng=-73\.99&tzid=/)
   })
 
+  // Nov 18 review, item 14: one address for every day let the CDN hand back
+  // yesterday's times just after midnight.
+  it('puts today’s date, in the community’s time, in the address', async () => {
+    render(<Probe testId="a" coords={{ lat: 38.5, lng: -77.25 }} />)
+    await flush()
+    const url = String(vi.mocked(fetch).mock.calls[0]![0])
+    expect(url).toMatch(/&date=\d{4}-\d{2}-\d{2}$/)
+  })
+
   it('shares one fetch between two simultaneously-mounted callers for the identical coordinates', async () => {
     const coords = freshCoords()
     render(

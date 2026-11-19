@@ -1,5 +1,6 @@
-import * as Sentry from '@sentry/nextjs'
 import { startPostHogWhenIdle } from '@/lib/deferredPostHog'
+import { sentryRouterTransition, startSentryAfterLoad } from '@/lib/deferredSentry'
+import { storeTappedPage } from '@/lib/storeTappedPage'
 
 // Same no-op-until-configured behavior as src/instrumentation.ts. Also gated
 // on actually being the live Vercel production deployment — NEXT_PUBLIC_SENTRY_DSN
@@ -10,15 +11,12 @@ import { startPostHogWhenIdle } from '@/lib/deferredPostHog'
 // NEXT_PUBLIC_VERCEL_ENV is the client-safe form Vercel auto-injects — plain
 // VERCEL_ENV isn't NEXT_PUBLIC_-prefixed, so it wouldn't survive into this
 // bundle.
-if (process.env.NEXT_PUBLIC_VERCEL_ENV === 'production') {
-  Sentry.init({
-    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-    tracesSampleRate: 0.1,
-    // Session replay isn't worth the bundle weight for this app's traffic; leave off.
-    replaysSessionSampleRate: 0,
-    replaysOnErrorSampleRate: 0,
-  })
-}
+// Loaded once the page has, not in the first download: see deferredSentry.ts.
+startSentryAfterLoad({
+  enabled: process.env.NEXT_PUBLIC_VERCEL_ENV === 'production',
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  load: () => import('@sentry/nextjs'),
+})
 
 // Set up deliberately (not via PostHog's GitHub-App code wizard — see the
 // abandoned posthog/instrumentation-4fc419 branch, never merged, generated
@@ -41,4 +39,8 @@ startPostHogWhenIdle({
   load: () => import('posthog-js'),
 })
 
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart
+// Next calls this as a tap starts moving to another page.
+export function onRouterTransitionStart(href: string, navigationType: 'push' | 'replace' | 'traverse') {
+  sentryRouterTransition(href, navigationType)
+  storeTappedPage(href)
+}

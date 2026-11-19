@@ -10,6 +10,13 @@ import react from '@vitejs/plugin-react'
 // a `// @vitest-environment jsdom` docblock at the top of the file, rather
 // than switching the whole suite to jsdom, so the fast majority of tests keep
 // paying zero DOM-simulation cost.
+// Every run is in UTC, as CI's machines are. Hours, candle lighting and
+// zmanim are read on the community's clock, and a test that sets "noon" on
+// the machine's clock instead passed on a laptop in New York and failed in
+// CI (Nov 18: 37 tests, PR 396). Set before the workers start, which inherit
+// it; src/test/testTimezone.test.ts fails if it stops applying.
+process.env.TZ = 'UTC'
+
 export default defineConfig({
   plugins: [react()],
   // Resolves the `@/*` paths from tsconfig.json. Native to Vite now — the

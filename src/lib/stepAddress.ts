@@ -15,7 +15,10 @@
 // `preview`: Home page's or a form's preview full size. `question`: a
 // form's question on its own screen, by its place (Nov 18: both were
 // entries pushed behind Next's router, with nothing in the address).
-export const STEP_PARAMS = ['found', 'over', 'edit', 'row', 'step', 'box', 'card', 'preview', 'question'] as const
+// `editing`: a listing's editor opened over the listing, on a category page,
+// a listing's own page or the Map, and its Request removal screen
+// (useEditorInAddress; Nov 19, for the same reason).
+export const STEP_PARAMS = ['found', 'over', 'edit', 'row', 'step', 'box', 'card', 'preview', 'question', 'editing'] as const
 export type StepParam = (typeof STEP_PARAMS)[number]
 
 /** `owner`: a screen sharing its parameter with others mounted beside it

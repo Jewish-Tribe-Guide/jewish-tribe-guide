@@ -13,6 +13,8 @@ const m = vi.hoisted(() => ({
   notify: vi.fn(),
   festivals: vi.fn(),
   ui: { contributions: { add: true, edit: true, report: true } },
+  communityUi: {} as Record<string, unknown>,
+  timezone: 'America/New_York',
 }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => fn() }))
@@ -26,7 +28,14 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }))
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
-vi.mock('@/lib/uiConfig', () => ({ ui: m.ui }))
+vi.mock('@/lib/uiConfig', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/uiConfig')>()
+  return { ...actual, ui: m.ui, contributionsFor: (own: unknown) => actual.contributionsFor(own, m.ui.contributions) }
+})
+// The listing's own community: its clock, and its own switches (m.communityUi).
+vi.mock('@/lib/communityStore', () => ({
+  resolveCommunity: async (slug: string) => ({ slug, timezone: m.timezone, mapCenter: { lat: 39.95, lng: -75.16 }, ui: m.communityUi }),
+}))
 vi.mock('@/lib/resourceStore', () => ({ getResourceById: m.getResourceById }))
 vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
@@ -74,6 +83,8 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-01T12:00:00Z'))
   m.ui.contributions.edit = true
+  m.communityUi = {}
+  m.timezone = 'America/New_York'
   m.enforceRateLimit.mockResolvedValue(null)
   m.verifyTurnstile.mockResolvedValue(true)
   m.row.mockResolvedValue({ data: { community_id: 'philly' }, error: null })
@@ -109,6 +120,28 @@ describe('POST /api/resource/:id/schedule', () => {
       expect(m.submitListingUpdate.mock.calls[0][3]).not.toContain('photo or PDF')
     }
     vi.unstubAllEnvs()
+  })
+
+  // Nov 18 review, item 44: this copy took a photo only from the schedule
+  // reader's folder, the times route's from the "+ Add" box's too.
+  it('takes a photo the “+ Add” box’s reader kept, as the times route does', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://abc.supabase.co')
+    const kept = 'https://abc.supabase.co/storage/v1/object/public/site-assets/message-source/1790-x7.jpeg'
+    await POST(req({ schedule: sukkos, sourceUrl: kept, turnstileToken: 't' }), ctx())
+    expect(m.submitListingUpdate.mock.calls[0][3]).toContain(`Read from their photo or PDF: ${kept}`)
+    vi.unstubAllEnvs()
+  })
+
+  // Nov 18 review, item 33: the festival's days were read on the
+  // deployment config's clock, and its switch was the only one.
+  it('reads the festival on the listing’s own community’s clock, and keeps to its switch', async () => {
+    m.timezone = 'Asia/Jerusalem'
+    await POST(req({ schedule: sukkos, turnstileToken: 't' }), ctx())
+    expect(m.festivals).toHaveBeenCalledWith('Asia/Jerusalem')
+    m.submitListingUpdate.mockClear()
+    m.communityUi = { contributions: { edit: false } }
+    expect((await POST(req({ schedule: sukkos, turnstileToken: 't' }), ctx())).status).toBe(403)
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 
   it('merges a schedule of the same name day by day, keeping the days it doesn’t give', async () => {

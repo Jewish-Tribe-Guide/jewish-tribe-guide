@@ -1,5 +1,6 @@
 import { GUIDE_PAGE_ERROR, isGuidePage } from '@/lib/guidePage'
 import { adminRead } from '@/lib/adminRoute'
+import { resolveCommunity } from '@/lib/communityStore'
 import { jobFindings } from '@/lib/watchFindingStore'
 import { addWatch, listWatches, removeWatch, updateWatch } from '@/lib/watchStore'
 import { runAndRecord } from '@/lib/watchRunner'
@@ -122,7 +123,7 @@ function reasonFor(pages: readonly Watch[], now: number, job: PageJob): string |
  *  found none kept (recordSearch). Check now and Turn back on. */
 async function searchFor(slug: string, place: DirectoryResource, watches: readonly Watch[], job: PageJob, has = 0): Promise<{ added: Watch[]; reason: string | null }> {
   const website = websiteOf(place)
-  const got = website ? await deadline(searchHoursPages(website, undefined, job).catch(() => null), CHECK_SEARCH_MS) : null
+  const got = website ? await deadline(searchHoursPages(website, (await resolveCommunity(slug)).timezone, undefined, job).catch(() => null), CHECK_SEARCH_MS) : null
   const added: Watch[] = []
   for (const p of got && !('error' in got) ? got.found : []) {
     if (watches.some((w) => samePage(w.url, p.url))) continue

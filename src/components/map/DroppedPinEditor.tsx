@@ -14,10 +14,9 @@ type Props = {
 
 /** Names (or renames/removes) a dropped pin — opened both right after a
  *  long-press drops a new one (see ResourceMap's contextmenu handling) and
- *  when tapping an already-placed one. Same full-screen overlay treatment as
- *  LiveLocationPrompt, for the same reason: a modal decision, not a popover
- *  hanging off a control that might not even be on screen right now (a pin
- *  can be tapped from anywhere on the map). */
+ *  when tapping an already-placed one. A full-screen overlay: a modal
+ *  decision, not a popover hanging off a control that might not even be on
+ *  screen right now (a pin can be tapped from anywhere on the map). */
 export default function DroppedPinEditor({ initialLabel, onSave, onDelete, onCancel }: Props) {
   const [label, setLabel] = useState(initialLabel ?? '')
   const trimmed = label.trim()

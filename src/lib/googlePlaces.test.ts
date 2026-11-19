@@ -153,33 +153,36 @@ describe('googleHoursToStructured', () => {
     expect(result?.mon).toBeNull()
   })
 
-  it('caps an overnight period (close rolls to the next day) at 23:59 on the open day', () => {
+  // Until Nov 18 this was capped at 23:59: the listing said "11:59 PM" and
+  // Closed from midnight to 2 AM, while the place was open.
+  it('keeps a close past midnight as its time, on the open day', () => {
     const result = googleHoursToStructured({
       periods: [{ open: { day: 5, time: '1800' }, close: { day: 6, time: '0200' } }],
     })
-    expect(result?.fri).toEqual({ open: '18:00', close: '23:59' })
+    expect(result?.fri).toEqual({ open: '18:00', close: '02:00' })
     // The rollover close is attributed to the open day, not written to Saturday.
     expect(result?.sat).toBeNull()
   })
 
-  it('collapses split hours (e.g. a lunch break) to the widest open/close of the day', () => {
+  // Until Nov 18 the break was lost and the place read Open through it.
+  it('keeps both of a day’s periods (a lunch break), spanning the day', () => {
     const result = googleHoursToStructured({
       periods: [
         { open: { day: 3, time: '0900' }, close: { day: 3, time: '1200' } },
         { open: { day: 3, time: '1300' }, close: { day: 3, time: '2100' } },
       ],
     })
-    expect(result?.wed).toEqual({ open: '09:00', close: '21:00' })
+    expect(result?.wed).toEqual({ open: '09:00', close: '21:00', periods: [{ open: '09:00', close: '12:00' }, { open: '13:00', close: '21:00' }] })
   })
 
-  it('widens correctly regardless of period order within the day', () => {
+  it('puts a day’s periods in order, whatever order Google sends them in', () => {
     const result = googleHoursToStructured({
       periods: [
         { open: { day: 4, time: '1300' }, close: { day: 4, time: '2100' } },
         { open: { day: 4, time: '0900' }, close: { day: 4, time: '1200' } },
       ],
     })
-    expect(result?.thu).toEqual({ open: '09:00', close: '21:00' })
+    expect(result?.thu).toEqual({ open: '09:00', close: '21:00', periods: [{ open: '09:00', close: '12:00' }, { open: '13:00', close: '21:00' }] })
   })
 
   it('ignores a period with an out-of-range day index rather than throwing', () => {

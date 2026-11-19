@@ -50,7 +50,7 @@ function setup(props: Partial<React.ComponentProps<typeof RemovalRequest>> = {})
 
 describe('RemovalRequest', () => {
   // No title or explanatory copy of its own any more — the embedding caller
-  // (ListingDetailModal/MapPlaceDetail/FindResources) shows "Request removal
+  // (MapPlaceDetail/FindResources) shows "Request removal
   // of {name}" as its own dialog title via onRemovalOpenChange, instead of a
   // second, smaller one repeated here. Covered by each of those components'
   // own tests, not this one, which has no such caller to report to.

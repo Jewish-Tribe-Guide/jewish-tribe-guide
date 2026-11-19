@@ -4,15 +4,15 @@ import { useContext, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { formatDays, isMinyanim, signUpAction, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from '@/lib/davening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
-import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from '@/lib/useZmanAnchors'
+import { anchorKey, resolveAnchorTime, type AnchorTimes } from '@/lib/useZmanAnchors'
 import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, shabbosComesFirst, thisWeeksDays, weekByDates, type DayPosting, type SpecialSchedule, type WeekDayTimes } from '@/lib/schedules'
 import { isShabbosRow } from '@/lib/minyanText'
-import { clockMinutes, noteText, SHABBOS_PART_LABELS, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
+import { clockMinutes, noteText, SHABBOS_PART_LABELS, ruleLinesToday, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
 import { DAY_KEYS, type DayKey } from '@/lib/hours'
 import { boxDate, isMinyanOnly } from '@/lib/listingView'
 import { THIS_WEEK_SECTION } from '@/lib/boxDates'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
-import { ui } from '@/lib/uiConfig'
+import { useContributions } from '@/lib/communityContext'
 import { ChevronRightIcon, PlusIcon } from '@/components/icons'
 import AddScheduleBox from './AddScheduleBox'
 import UpdateTimesBox from './UpdateTimesBox'
@@ -69,7 +69,7 @@ export default function DaveningCard({
   const tapped = useTappedMinyan(item.id)?.minyanId
   const tappedRow = tapped && isMinyanim(minyanim) ? minyanim.find((m) => m.id === tapped) : undefined
   const schedule = useMinyanSchedule(null, [item])
-  const canAdd = ui.contributions.edit && (!category || resolveCapabilities(category.capabilities).edit)
+  const canAdd = useContributions().edit && (!category || resolveCapabilities(category.capabilities).edit)
 
   // Whose times today's and tomorrow's are: a special schedule's, or the
   // regular ones on a festival day with none posted.
@@ -104,7 +104,7 @@ export default function DaveningCard({
   // nothing else; no asking for the Shabbos or weekday times it won't have.
   const minyanOnly = !!category && isMinyanOnly(item, category)
   const season = schedule?.season ?? null
-  const anchors = schedule?.anchors[geoKey(geoOrCommunityDefault(item.geo))]
+  const anchors = schedule?.anchors[anchorKey(item.geo)]
   // A summer/winter pair goes by its zman (seasonPairs.ts).
   const week = weekdayTable(rows, season, anchors)
   const shab = shabbosList(rows, season, anchors)
@@ -280,10 +280,7 @@ export default function DaveningCard({
           <WeekTable table={week} today={today} marks={!week.everySignUp} />
           <Notes
             lines={[
-              ...week.rules.map((r) => {
-                const at = resolveAnchorTime(r.row, anchors)
-                return at ? `${capital(r.text)}: ${at} today.` : null
-              }),
+              ...ruleLinesToday(week.rules, today, anchors),
               ...week.notes,
               week.otherSeason,
             ]}
@@ -532,8 +529,6 @@ function datesText(fromDate: string, toDate: string): string {
 const weekdayOf = (date: string): DayKey => DAY_KEYS[new Date(`${date}T12:00:00Z`).getUTCDay()]
 
 const daysFrom = (date: string, days: number) => new Date(Date.parse(`${date}T12:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)
-
-const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 function Notes({ lines }: { lines: (string | null | undefined)[] }) {
   const shown = lines.filter((l): l is string => !!l)

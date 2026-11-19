@@ -22,7 +22,7 @@ function tableMissing(message: string | undefined): boolean {
 }
 
 /** A remembered reading, and whether a person approved it. */
-export async function findReading(community: string, key: string): Promise<{ reading: Reading; approved: boolean } | null> {
+export async function findReading(community: string, key: string): Promise<{ reading: Reading; approved: boolean; hits: number } | null> {
   const { data, error } = await getAdminClient()
     .from('question_reading')
     .select('reading, hits, approved_at')
@@ -34,14 +34,19 @@ export async function findReading(community: string, key: string): Promise<{ rea
     return null
   }
   if (!data) return null
-  // Counted, for the admin's list of what people ask most. Not awaited.
-  void getAdminClient()
+  return { reading: data.reading as Reading, approved: !!data.approved_at, hits: (data.hits as number) ?? 0 }
+}
+
+/** One more ask, for the admin's list of what people ask most. The route
+ *  decides whether an ask counts (once per visitor per question a day) and
+ *  runs this after the answer has gone. */
+export async function countAsked(community: string, key: string, hits: number): Promise<void> {
+  const { error } = await getAdminClient()
     .from('question_reading')
-    .update({ hits: (data.hits as number) + 1, last_used_at: new Date().toISOString() })
+    .update({ hits: hits + 1, last_used_at: new Date().toISOString() })
     .eq('community_id', community)
     .eq('key', key)
-    .then(({ error: e }) => e && console.error('[question-reader] hit count failed:', e.message))
-  return { reading: data.reading as Reading, approved: !!data.approved_at }
+  if (error) console.error('[question-reader] hit count failed:', error.message)
 }
 
 export async function saveReading(community: string, key: string, question: string, reading: Reading, model: string): Promise<void> {

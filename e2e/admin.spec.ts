@@ -132,7 +132,7 @@ test.describe('admin console', () => {
     // Every box renders even with nothing counted or decided yet.
     await expect(page.getByRole('heading', { name: 'Listing views' })).toBeVisible({ timeout: 10_000 })
     await expect(page.getByRole('heading', { name: /^Decided in / })).toBeVisible()
-    await expect(page.getByRole('columnheader', { name: 'Taken' })).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'Approved' })).toBeVisible()
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
   })
 

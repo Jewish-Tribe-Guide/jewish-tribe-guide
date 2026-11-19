@@ -7,7 +7,8 @@
 // deploy. This file holds the shared types plus the branching condition DSL —
 // a serializable stand-in for the hand-written `when: (answers) => boolean`
 // predicates the wizards used before. Server code reads forms via
-// formStore.ts; client code fetches them from `GET /api/forms`.
+// formStore.ts; the page gets them from the community layout's content
+// (see useForms.ts).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type StepKind = 'single' | 'multi' | 'text' | 'tel' | 'number' | 'date' | 'textarea' | 'contact'

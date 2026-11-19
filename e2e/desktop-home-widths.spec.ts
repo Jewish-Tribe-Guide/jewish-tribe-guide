@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test'
-import { defaultCommunity, dismissLocationPrompt, previewSettings, ready } from './helpers'
+import { defaultCommunity, previewSettings, ready } from './helpers'
 
 // The computer home sizes each section by its own box, not by the window
 // (the user, Nov 12: "our desktop homepage is [not] so great at shrinking").
@@ -19,7 +19,6 @@ async function open(page: import('@playwright/test').Page, width: number) {
   const community = await defaultCommunity(page)
   await previewSettings(page, community, { homeStyle: 'classic' })
   await page.goto(`/${community}?preview=1`)
-  await dismissLocationPrompt(page)
   await ready(page)
 }
 

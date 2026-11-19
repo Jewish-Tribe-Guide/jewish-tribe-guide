@@ -154,15 +154,20 @@ describe('AdminFrame', () => {
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 
-  // The user, Nov 5: a lone Team tab is a row of one, so it goes.
-  it('offers Communities under Settings to the site owner only, and no lone Team tab', () => {
+  // Default location joined Team on Nov 19, so a community's own admin
+  // has a row of two; Communities is the site owner's alone.
+  it('offers Communities under Settings to the site owner only', () => {
     show('/philly/admin/team')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Settings')
-    expect(screen.queryByRole('navigation', { name: 'Settings' })).toBeNull()
+    expect(within(screen.getByRole('navigation', { name: 'Settings' })).getAllByRole('link').map((a) => a.textContent)).toEqual([
+      'Team',
+      'Default location',
+    ])
     cleanup()
     show('/philly/admin/team', true)
     expect(within(screen.getByRole('navigation', { name: 'Settings' })).getAllByRole('link').map((a) => a.textContent)).toEqual([
       'Team',
+      'Default location',
       'Communities',
     ])
   })

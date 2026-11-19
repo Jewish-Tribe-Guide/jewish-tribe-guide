@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { defaultCommunity, dismissLocationPrompt, previewSettings, ready } from './helpers'
+import { defaultCommunity, previewSettings, ready } from './helpers'
 
 // "Explore by Category" (CategoryTileRow, desktop only): photo tiles, five
 // across in two rows (board W7l, Nov 15) — the first 9 cards and an "All categories" tile
@@ -15,7 +15,6 @@ test.describe('home — Browse everything grid', () => {
     // The classic home's grid, whichever home the admin has chosen.
     await previewSettings(page, community, { homeStyle: 'classic' })
     await page.goto(`/${community}?preview=1`)
-    await dismissLocationPrompt(page)
     await ready(page)
 
     const card = page.getByTestId('browse-everything-card')

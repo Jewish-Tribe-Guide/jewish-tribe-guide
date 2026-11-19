@@ -29,6 +29,11 @@ const CARRIES_MARK = /replaceState\(\s*(?:(?:window\.)?history\.state|\{\s*\.\.\
 // with no re-render at all, which taking the mark off would give up (Next
 // would move its router, and useSearchParams readers re-render). Left as
 // they were by the admin review (Nov 18); see docs/where-things-stand.md.
+// What that cost (a refresh on coming back wrote the router's older address
+// over theirs) is answered where the refresh is: RefreshContentOnReturn puts
+// their address back once the refresh lands, mark and all, so the router
+// still isn't told. Telling it before the refresh made Next replay an older
+// cached copy of the page over the fresh one (Nov 18).
 const LEFT_AS_THEY_WERE = new Set(['components/FindResourcesConnected.tsx', 'components/map/ResourceMapView.tsx'])
 
 describe('replaceState that changes the address', () => {

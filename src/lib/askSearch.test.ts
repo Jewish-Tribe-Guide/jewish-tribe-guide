@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { DirectoryResource } from '@/types'
 import { foundFor, nearMiss, searchAsk } from './askSearch'
+import { placeTime } from '@/test/placeTime'
 
 // Shaped on real Philly listings: the fields, tags and spellings are the ones
 // the guide actually has, so a phrasing that works here works on the site.
@@ -176,7 +177,7 @@ describe('searchAsk — "open now"', () => {
   // "Meat Grill" in its name, so it matches better than either of the others.
   const meatGrill = listing('restaurant', 'Meat Grill', 39.95, -75.17, { t: ['Meat'], hours: allWeek('11:00', '15:00') })
   const places = [lateGrill, lunchGrill, meatGrill]
-  const tenPmThursday = new Date(2026, 8, 24, 22, 0)
+  const tenPmThursday = placeTime(2026, 8, 24, 22, 0)
 
   it('lists only places open right now, however well a closed one matches', () => {
     // Reported live: "which meat restaurants are open now" listed closed ones.
@@ -216,7 +217,7 @@ describe('searchAsk — "open today", and hours nobody has entered', () => {
   const none = listing('mikvah', 'No Hours Mikvah', 39.951, -75.17)
   const empty = listing('mikvah', 'Empty Hours Mikvah', 39.952, -75.17, { hours: noDays })
   const all = [both, womenOnly, none, empty]
-  const at = (h: number) => new Date(2026, 8, 26, h, 0)
+  const at = (h: number) => placeTime(2026, 8, 26, h, 0)
 
   it('counts a place that opens later today as open today', () => {
     const result = searchAsk(all, [mikvah], "is there a mikvah that's open today", { now: at(7) })
@@ -229,6 +230,21 @@ describe('searchAsk — "open today", and hours nobody has entered', () => {
       { label: "Men's", opens: '4:30 AM', closes: '10:00 AM', openNow: true },
       { label: 'Women’s', opens: '8:00 PM', closes: '10:00 PM', openNow: false },
     ])
+  })
+
+  // Nov 18 review, item 10: a day's second period, and last night's hours
+  // still running past midnight.
+  it('says a break’s second period is still to come, and a late night is still open', () => {
+    const split = listing('mikvah', 'Split Mikvah', 39.95, -75.17, {
+      women_s_hours: Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '09:00', close: '22:00', periods: [{ open: '09:00', close: '11:00' }, { open: '20:00', close: '22:00' }] }])),
+    })
+    expect(searchAsk([split], [mikvah], 'mikvah open today', { now: at(12) }).hits[0].today).toEqual([
+      { label: 'Women’s', opens: '8:00 PM', closes: '10:00 PM', openNow: false },
+    ])
+    const late = listing('mikvah', 'Late Mikvah', 39.95, -75.17, { women_s_hours: allWeek('20:00', '02:00') })
+    expect(searchAsk([late], [mikvah], 'mikvah open today', { now: at(1) }).hits[0].today[0]).toEqual(
+      { label: 'Women’s', opens: '8:00 PM', closes: '2:00 AM', openNow: true },
+    )
   })
 
   it('drops hours already over for the day', () => {
@@ -301,7 +317,7 @@ describe('searchAsk — distance and mikvah hours', () => {
   const near = listing('mikvah', 'Near Mikvah', 39.95, -75.17, { men_s_hours: allWeek('20:00', '23:00') })
   const far = listing('mikvah', 'Far Mikvah', 40.2, -75.17, { men_s_hours: allWeek('20:00', '23:00') })
   const unlisted = listing('mikvah', 'No Hours Mikvah', 39.951, -75.17)
-  const nine = new Date(2026, 8, 24, 21, 0)
+  const nine = placeTime(2026, 8, 24, 21, 0)
   const here = { lat: 39.95, lng: -75.17 }
 
   it("counts men's hours as opening hours, ready for when they're entered", () => {
@@ -570,7 +586,7 @@ describe('searchAsk — "open after 6"', () => {
   const unknown = listing('restaurant', 'No Hours Grill', 39.95, -75.17, { t: ['Meat'] })
   const places = [lunch, late, overnight, unknown, cambria]
   // Asked at noon: "open now" and "open after 6" must not agree by accident.
-  const noon = new Date(2026, 8, 24, 12, 0)
+  const noon = placeTime(2026, 8, 24, 12, 0)
   const names = (q: string) => searchAsk(places, categories, q, { now: noon }).hits.map((h) => h.item.name)
 
   it('keeps only places open at some point after the time, whatever the hour now', () => {

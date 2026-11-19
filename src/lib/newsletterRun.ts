@@ -4,12 +4,11 @@
 // Gmail script sends. Server-only.
 
 import { createHash } from 'node:crypto'
-import { community as communityConfig } from '@/community.config'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
-import { readShulWeek } from '@/lib/shulWeekReading'
+import { readShulWeek, type CommunityPlace } from '@/lib/shulWeekReading'
 import { buildCatalog, itemsChange, readMessage } from '@/lib/messageReader'
 import { fieldsEdit, readFieldChanges } from '@/lib/fieldChanges'
 import { editSubmission } from '@/lib/editSubmission'
@@ -112,7 +111,7 @@ export async function newsletterSenders(community: string): Promise<string[]> {
 export async function receiveNewsletter(
   community: string,
   email: NewsletterEmail,
-  { apiKey, communityName, now = new Date().toISOString() }: { apiKey: string; communityName: string; now?: string },
+  { apiKey, communityName, where, now = new Date().toISOString() }: { apiKey: string; communityName: string; where: CommunityPlace; now?: string },
 ): Promise<NewsletterResult> {
   const address = senderAddress(email.from)
   if (!address) return { status: 'not_newsletter' }
@@ -131,6 +130,7 @@ export async function receiveNewsletter(
     const filed = await readAndFile(community, watch, email, {
       apiKey,
       communityName,
+      where,
     })
     const { update } = afterRun(watch, { ok: true, filed }, now)
     await updateWatch(community, watch.id, {
@@ -153,7 +153,7 @@ async function readAndFile(
   community: string,
   watch: Watch,
   email: NewsletterEmail,
-  { apiKey, communityName }: { apiKey: string; communityName: string },
+  { apiKey, communityName, where }: { apiKey: string; communityName: string; where: CommunityPlace },
 ): Promise<number> {
   const [listings, categories] = await Promise.all([listApprovedResources(community), listCategories(community)])
   const live = categories.filter((c) => c.active !== false)
@@ -174,8 +174,8 @@ async function readAndFile(
   // "Mincha at … Mikveh Israel") is that shul's, not this one's.
   const guide = async () => listings
   const [fromText, fromFile, others] = await Promise.all([
-    key && text.length >= 10 ? readShulWeek(shul, key, { text }, apiKey, { sentAt, others: guide }) : null,
-    key && fileSource ? readShulWeek(shul, key, fileSource, apiKey, { sentAt, others: guide }) : null,
+    key && text.length >= 10 ? readShulWeek(shul, key, { text }, apiKey, { where, sentAt, others: guide }) : null,
+    key && fileSource ? readShulWeek(shul, key, fileSource, apiKey, { where, sentAt, others: guide }) : null,
     text.length >= 10
       ? readMessage({ text, images: [] }, buildCatalog(listings, live), {
           apiKey,
@@ -220,7 +220,7 @@ async function readAndFile(
     // A newsletter's week holds what it gives, never the usual times it
     // left out (the user, Oct 28). Dates past a week's length come back as
     // their own weeks (datedAsWeeks).
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: communityConfig.timezone }).format(new Date())
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: where.timezone }).format(new Date())
     const applied = update.u.filter(changesAnything).reduce<ReturnType<typeof applyUpdate>>(
       (sofar, u) => {
         const next = applyUpdate(sofar.minyanim, sofar.schedules, u, u.kind === 'week' ? { onlyRead: { today } } : {})
