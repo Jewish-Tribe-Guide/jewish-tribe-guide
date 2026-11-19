@@ -1131,7 +1131,10 @@ Done:
     and links, and the map's chips each take a 44px tap without changing
     how they look (`tap-44` in `globals.css`). A listing's details rows
     are 4px taller to fit them. Not done: a hospital contact's phones and
-    email, which sit too close together for it, and Cards/List (left out).
+    email, which sit 4px apart, so 44px targets would overlap and a tap
+    could dial the wrong number. It needs each on a row of its own about
+    44px tall, a contact visibly taller: **your call**, a drawing first
+    (checked Nov 19). Cards/List left out.
   - Sentry loads after the page instead of in its first download
     (`deferredSentry.ts`). Errors thrown before it arrives are kept and
     sent; the page-load trace now starts when it arrives.
