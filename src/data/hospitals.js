@@ -1,6 +1,6 @@
 // Starter hospital data, loaded into the `hospital` DB table by
 // scripts/seed-hospitals.mjs (run by `npm run setup`). After seeding, the app
-// reads hospitals from the database (via /api/hospitals), not this file — so
+// reads hospitals from the database, not this file — so
 // edit here for a new community's initial set, or leave the array empty for a
 // non-hospital community.
 export const hospitals = [

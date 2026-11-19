@@ -42,8 +42,8 @@ function toConfig(row: FormRow): FormConfig {
 }
 
 // Every form, published content only — no drafts — and filtered to active
-// forms. Used by the public GET /api/forms that the live wizards read, and
-// by everything downstream that resolves a form's URL (sitemap, direct-URL
+// forms. Used by the community layout's content (the live wizards read it
+// from there), the public GET /api/forms, and by everything downstream that resolves a form's URL (sitemap, direct-URL
 // resolution). An inactive form is invisible here but still returned by
 // listFormsForAdmin, so the admin manager can edit and re-activate it.
 export async function listPublishedForms(community: string): Promise<Omit<FormConfig, 'draft'>[]> {
