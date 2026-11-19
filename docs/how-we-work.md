@@ -82,7 +82,9 @@ work is in `docs/where-things-stand.md`.
   weekly schedule. One time highlighted for a date (a homepage's "this
   Shabbos" box, an events list) is ignored: a person wouldn't read it as
   the week, or as "the usual times except this". A day with a week shows
-  that week only; a day without one shows the usual times, as usual.
+  that week only; a day without one shows the usual times, labelled as
+  usual. A shul with no whole week that week (no calendar, no newsletter
+  yet) shows no "this week" box at all.
 - **Watch everything that's out there, cheaply.** Every field needs
   something keeping it current. Google keeps what it owns on a listing
   (`details.googleFields`), and the website watch checks the rest. Address
