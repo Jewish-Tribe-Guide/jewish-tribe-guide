@@ -2157,9 +2157,11 @@ for that exact change, in the same conversation. Show the dry run first.
    undated one, The Brazillian BBQ (spelled so on live, off Keystone-K's
    list), was confirmed by someone that evening. The trust line now says
    "every listing dated" once the live cache refreshes (any admin save).
-   Shtetl, Rita's, New York Bagel Bakery and Sababa Falafel are dated by
-   Google's sync but still have the problems that held them back (off
-   Keystone-K's list, closed temporarily, bad place id): fix or remove each.
+   Shtetl, Rita's, New York Bagel Bakery and Sababa Falafel (checked on
+   live Nov 19): Shtetl is archived. Google says three of the four live
+   Rita's and New York Bagel Bakery are closed temporarily (Rita's is
+   seasonal). Sababa Falafel has no Google place, so the nightly sync
+   skips it: setting one needs the id looked up, shown, and a yes.
 3. **Check the menu reader's browser on the preview** (Oct 20): Admin →
    Main dishes → Insomnia Cookies → "Read again" should come back with
    cookies, brownies and ice cream within about 20 seconds. It's the one
