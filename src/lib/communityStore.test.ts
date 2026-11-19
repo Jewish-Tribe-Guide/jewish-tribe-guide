@@ -51,6 +51,8 @@ const {
   setCommunityEmailLists,
   addCommunityAdminEmail,
   setCommunityVisibility,
+  setCommunityDefaultLocation,
+  getCommunityDefaultLocation,
   listCommunityVisibility,
   listCommunityPreviewTokens,
   getCommunityPreviewToken,
@@ -760,5 +762,56 @@ describe('communitySlugFromRequest', () => {
   it('returns null when the param is absent', () => {
     const request = new Request('https://example.com/api/categories')
     expect(communitySlugFromRequest(request)).toBeNull()
+  })
+})
+
+// Settings › Default location (Nov 19): an admin moves where a visitor is
+// taken to be; the time zone follows the place, the name and region stay.
+describe('the default location', () => {
+  it('saves the place with its name, and the time zone it is in', async () => {
+    const builder = chainable({ data: [{ slug: 'pgh' }], error: null })
+    mockFrom.mockReturnValue(builder)
+    const saved = await setCommunityDefaultLocation('pgh', { lat: 40.4383, lng: -79.9227, label: ' Squirrel Hill, Pittsburgh, PA ' })
+    expect(builder.update).toHaveBeenCalledWith({ map_center: { lat: 40.4383, lng: -79.9227, label: 'Squirrel Hill, Pittsburgh, PA' }, timezone: 'America/New_York' })
+    expect(builder.eq).toHaveBeenCalledWith('slug', 'pgh')
+    expect(saved.timezone).toBe('America/New_York')
+  })
+
+  it('takes the time zone from where the place is, not the old one', async () => {
+    const builder = chainable({ data: [{ slug: 'la' }], error: null })
+    mockFrom.mockReturnValue(builder)
+    expect((await setCommunityDefaultLocation('la', { lat: 34.07, lng: -118.35, label: 'Pico-Robertson' })).timezone).toBe('America/Los_Angeles')
+  })
+
+  it.each([
+    ['a latitude off the map', { lat: 91, lng: 0, label: 'x' }],
+    ['no coordinates at all', { lat: NaN, lng: 0, label: 'x' }],
+    ['no name', { lat: 40, lng: -75, label: '  ' }],
+  ])('refuses %s, writing nothing', async (_n, place) => {
+    mockFrom.mockReturnValue(chainable({ data: [], error: null }))
+    await expect(setCommunityDefaultLocation('pgh', place)).rejects.toBeInstanceOf(RangeError)
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('says so when there is no such community', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [], error: null }))
+    await expect(setCommunityDefaultLocation('nope', { lat: 40, lng: -75, label: 'x' })).rejects.toThrow('No community')
+  })
+
+  it('reads back the picked name, and the point without it', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { map_center: { lat: 40.44, lng: -79.92, label: 'Squirrel Hill' }, region: 'Pittsburgh', timezone: 'America/New_York' }, error: null }))
+    expect(await getCommunityDefaultLocation('pgh')).toEqual({ center: { lat: 40.44, lng: -79.92 }, label: 'Squirrel Hill', region: 'Pittsburgh', timezone: 'America/New_York' })
+  })
+
+  it('has no name until an admin picks one (the city it was made with)', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { map_center: { lat: 40.44, lng: -79.99 }, region: 'Pittsburgh', timezone: 'America/New_York' }, error: null }))
+    expect((await getCommunityDefaultLocation('pgh'))?.label).toBeNull()
+  })
+
+  it("keeps the name out of the community's centre, and on its own", async () => {
+    mockFrom.mockReturnValue(chainable({ data: [{ ...philly, map_center: { lat: 39.95, lng: -75.16, label: 'Center City' } }], error: null }))
+    const [c] = await listCommunities()
+    expect(c.mapCenter).toEqual({ lat: 39.95, lng: -75.16 })
+    expect(c.mapCenterLabel).toBe('Center City')
   })
 })

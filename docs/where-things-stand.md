@@ -1193,6 +1193,19 @@ Done:
     Privacy page's date (one policy for the site) and `HOURS_TIMEZONE`,
     the last resort when a caller passes no clock (its callers weren't
     audited).
+  - A community's own admins set its default location (Nov 19), the
+    place a visitor is taken to be until they set their own: Settings ›
+    Default location, one place picker labelled "Until a visitor sets
+    their own location, we use", a small map of it, its time zone, Save.
+    It starts as the city picked when the community was made. Only a
+    place picked from the list saves; the time zone follows the place
+    (`tz-lookup`); the community's name and region don't change. The
+    picked place's name is kept in `map_center` (`label`), so no
+    migration. `PUT /api/admin/default-location`, any of the community's
+    admins, then `revalidatePublicContent`. Checked locally on the test
+    project: the home's zmanim moved to the new spot, and the row was put
+    back. Not seen locally: the map and the picker's suggestions (Google
+    refuses the key on localhost) — check them on the Vercel preview.
 
 ## Open from the boxes and fields work (Nov 10)
 

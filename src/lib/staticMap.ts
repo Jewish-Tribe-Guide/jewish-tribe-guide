@@ -7,11 +7,13 @@
 /** The pin, in the site's blue (`--color-primary`). */
 const PIN = '0x1d4ed8'
 
-export function staticMapUrl(geo: { lat: number; lng: number }, key: string, size: { width: number; height: number }): string {
+/** `zoom`: 16 shows a place's street (the listing's tile); about 13 shows
+ *  a neighbourhood (an admin's default location). */
+export function staticMapUrl(geo: { lat: number; lng: number }, key: string, size: { width: number; height: number }, zoom = 16): string {
   const at = `${geo.lat.toFixed(6)},${geo.lng.toFixed(6)}`
   const params = new URLSearchParams({
     center: at,
-    zoom: '16',
+    zoom: String(zoom),
     // Twice the pixels, for a phone's screen; Google's limit is 640 a side.
     size: `${Math.min(640, Math.round(size.width))}x${Math.min(640, Math.round(size.height))}`,
     scale: '2',
