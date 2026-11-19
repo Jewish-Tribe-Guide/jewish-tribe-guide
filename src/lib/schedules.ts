@@ -117,6 +117,18 @@ export type DateFacts = {
   festival: string | null
   /** "Hoshana Rabbah", "Shemini Atzeres", "Chol HaMoed". */
   name: string | null
+  /** Set when the calendar has said the date is Rosh Chodesh (withRoshChodesh):
+   *  today from the zmanim's isRoshChodesh, the days ahead from its
+   *  roshChodeshDays. Unset is "not known to be", never a guess. */
+  roshChodesh?: boolean
+}
+
+/** The week's dates with Rosh Chodesh marked where the calendar says so:
+ *  today by the converter (`today`), the days after it by the calendar's
+ *  days ahead (`ahead`). Until Nov 19 only today was marked, so a shul's
+ *  Rosh Chodesh minyan tomorrow was never offered as "Next". */
+export function withRoshChodesh(dates: readonly DateFacts[], today: boolean | undefined, ahead: readonly string[] | undefined): DateFacts[] {
+  return dates.map((d, i) => ((i === 0 ? today : i > 0 && !!ahead?.includes(d.date)) ? { ...d, roshChodesh: true } : d))
 }
 
 /** A date's facts from the calendar's days ahead (see jewishDays.ts).

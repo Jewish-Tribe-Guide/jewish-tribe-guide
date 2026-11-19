@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { act, cleanup, render } from '@testing-library/react'
 import RefreshContentOnReturn, { MIN_REFRESH_INTERVAL_MS, QUIET_MS, REFRESHES_PER_VERSION } from './RefreshContentOnReturn'
 import { mockRouter, resetMockRouter } from '@/test/nextNavigationMock'
 
@@ -75,6 +75,61 @@ describe('RefreshContentOnReturn', () => {
 
     expect(fetchMock).toHaveBeenCalledWith('/api/content-version?community=philly', { cache: 'no-store' })
     expect(mockRouter.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  // Nov 18: the Minyan view's `?davening=1` and its `step`, written behind
+  // Next's router, were wiped by the refresh's commit, which writes the
+  // router's address and none of the page's own keys.
+  describe('what the page wrote into the address', () => {
+    /** What Next's commit does as the refresh lands: its own address and
+     *  state, nothing of the page's. */
+    function refreshWrites(routerAddress: string) {
+      mockRouter.refresh.mockImplementationOnce(() => {
+        window.history.replaceState({ __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: 'fresh' }, '', routerAddress)
+      })
+    }
+    async function comeBack() {
+      show()
+      letThrottleExpire()
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+        await settle()
+      })
+      expect(mockRouter.refresh).toHaveBeenCalledTimes(1)
+    }
+    const address = () => window.location.pathname + window.location.search
+
+    it('is put back once the refresh lands, with its keys', async () => {
+      window.history.replaceState({ __NA: true, step: 'minyanim' }, '', '/philly/synagogue?davening=1')
+      refreshWrites('/philly/synagogue')
+      await comeBack()
+      expect(address()).toBe('/philly/synagogue?davening=1')
+      expect(window.history.state).toEqual({ __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: 'fresh', step: 'minyanim' })
+    })
+
+    // A write without `__NA` tells Next's router, and on the real site that
+    // replayed the page's older cached copy over the fresh one, so a renamed
+    // category never arrived (e2e-cache, "regains focus").
+    it('is never told to the router around a refresh', async () => {
+      window.history.replaceState({ __NA: true, step: 'minyanim' }, '', '/philly/synagogue?davening=1')
+      refreshWrites('/philly/synagogue')
+      const replace = vi.spyOn(window.history, 'replaceState')
+      try {
+        await comeBack()
+        expect(replace).toHaveBeenCalled()
+        for (const [state] of replace.mock.calls) expect(state).toMatchObject({ __NA: true })
+      } finally {
+        replace.mockRestore()
+      }
+    })
+
+    it('gives way to another page the visitor went to meanwhile', async () => {
+      window.history.replaceState({ __NA: true, step: 'minyanim' }, '', '/philly/synagogue?davening=1')
+      refreshWrites('/philly/food')
+      await comeBack()
+      expect(address()).toBe('/philly/food')
+      expect(window.history.state).toEqual({ __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: 'fresh' })
+    })
   })
 
   it('leaves the page alone when nothing changed, so a tap never waits on a refresh', async () => {

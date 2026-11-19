@@ -144,7 +144,7 @@ export default function RemovalRequest({
     // and needed to explain and set itself apart from the form above it.
     // Now the dialog's OWN title becomes "Request removal of {name}" (see
     // onRemovalOpenChange, reported to whichever caller embeds this — e.g.
-    // ListingDetailModal), so repeating that fact and a bordered box around
+    // FindResources' Edit dialog), so repeating that fact and a bordered box around
     // it here was just saying the same thing twice. No "moderator reviews
     // this" copy either — the editor's Sent screen says that ("An admin
     // checks a removal before anything changes"), and the rest ("this isn't for a wrong address")

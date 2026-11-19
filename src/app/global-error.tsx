@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import * as Sentry from '@sentry/nextjs'
+import { reportError } from '@/lib/deferredSentry'
 
 // The last resort: an error in the root layout itself, above every other
 // boundary. It replaces the whole document, so it has to render its own <html>
@@ -15,7 +15,7 @@ export default function GlobalError({
   reset: () => void
 }) {
   useEffect(() => {
-    Sentry.captureException(error)
+    reportError(error)
   }, [error])
 
   return (

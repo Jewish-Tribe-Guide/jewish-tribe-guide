@@ -54,44 +54,57 @@ import { nightKindOf } from '@/lib/nightKinds'
 export const maxDuration = 300
 
 /** No watch starts after this much of the run: one AI read can take half
- *  a minute (Oct 24: 31s; 34s the slowest seen), and the alerts still go
- *  out after the last, inside maxDuration. 200s until Oct 26, when the
+ *  a minute (Oct 24: 31s; 34s the slowest seen), and a shul's calendar is
+ *  read a week at a time, this week and next (68s), and the alerts still
+ *  go out after the last, inside maxDuration. 200s until Oct 26, when the
  *  night every shul's page is read for its new week (32 AI reads more)
- *  would have left the menus, checked last, for the next night. */
-const START_NO_WATCH_AFTER_MS = 250_000
+ *  would have left the menus, checked last, for the next night; 250s
+ *  until Nov 18, which a two-week read started at the end ran past. The
+ *  searches before the watches have their own limit now
+ *  (SEARCH_PAGES_FOR_MS), so the watches keep most of the run. */
+const START_NO_WATCH_AFTER_MS = 220_000
 
-async function eruvLines() {
+/** The shul and mikvah page search (syncHoursWatches) starts no place's
+ *  search after this much of the run, each search given its own 20s:
+ *  every place's website, every night, could take most of the watches'
+ *  time (Nov 18 review). The rest are searched on another night. */
+const SEARCH_PAGES_FOR_MS = 60_000
+
+async function eruvLines(failed: string[]) {
   return runEruvLines().catch((err) => {
     console.error('[cron/watches] eruv lines failed:', err)
+    failed.push('eruv lines')
     return [{ id: '*', result: 'failed' as const, error: err instanceof Error ? err.message : String(err) }]
+  })
+}
+
+/** A step of the run that failed: logged, named in `failed` for the run's
+ *  warning, and given `empty` so the rest goes on. */
+function step<T>(name: string, failed: string[], work: Promise<T>, empty: T): Promise<T> {
+  return work.catch((err) => {
+    console.error(`[cron/watches] ${name} failed:`, err)
+    failed.push(name)
+    return empty
   })
 }
 
 type Body = Record<string, unknown> & { run: WatchesRun }
 
 async function runAll(started = Date.now()): Promise<Body> {
+  // The steps before the watches (and the eruv lines beside them) that
+  // failed, in the run's warning. Ordered as below, the eruv lines last.
+  const failedBefore: string[] = []
+  const failedLines: string[] = []
   // Started at once: nothing in it waits on the watches.
-  const lines = eruvLines()
+  const lines = eruvLines(failedLines)
   // Before listing them, so a place given a menu link yesterday is read today.
-  const menus = await syncMenuWatches().catch((err) => {
-    console.error('[cron/watches] menu watches failed:', err)
-    return []
-  })
+  const menus = await step('menu links', failedBefore, syncMenuWatches(), [])
   // At once: one asks Refuah, one the mikvahs' websites; the last only
   // gives each eruv's website its watch (eruvWebsiteRun.ts).
   const [hospitals, hours, eruvWebsites] = await Promise.all([
-    syncRefuahWatches().catch((err) => {
-      console.error('[cron/watches] Refuah matches failed:', err)
-      return []
-    }),
-    syncHoursWatches().catch((err) => {
-      console.error('[cron/watches] hours pages failed:', err)
-      return []
-    }),
-    syncEruvWebsiteWatches().catch((err) => {
-      console.error('[cron/watches] eruv websites failed:', err)
-      return []
-    }),
+    step('Refuah', failedBefore, syncRefuahWatches(), []),
+    step('shul and mikvah pages', failedBefore, syncHoursWatches(undefined, undefined, started + SEARCH_PAGES_FOR_MS), []),
+    step('eruv websites', failedBefore, syncEruvWebsiteWatches(), []),
   ])
   const { watches, available } = await listAllWatches()
 
@@ -104,10 +117,7 @@ async function runAll(started = Date.now()): Promise<Body> {
 
   const budget = newMenuReadBudget()
   // Without them, a listing's page goes by its label (watchGroupOf).
-  const listings = await loadListings(watches.map((w) => w.communityId)).catch((err) => {
-    console.error('[cron/watches] listing reads failed:', err)
-    return undefined
-  })
+  const listings = await step('reading the listings', failedBefore, loadListings(watches.map((w) => w.communityId)), undefined)
   // What a community turned off isn't read, so it costs nothing (jobOff.ts).
   const off = jobsOffByCommunity(watches)
   const wanted = watches.filter((w) => {
@@ -124,9 +134,16 @@ async function runAll(started = Date.now()): Promise<Body> {
     run: async (watch) => {
       // A watch that breaks is told of in the nightly email (nightlyEmail.ts).
       // What it found agreeing is kept for Activity (validatedDuring.ts).
-      const { result, validated: found } = await validatedDuring(() => runAndRecord(watch, undefined, budget))
-      if (found.length) validated.set(watch.id, found)
-      return { id: watch.id, url: watch.url, ...result.outcome }
+      try {
+        const { result, validated: found } = await validatedDuring(() => runAndRecord(watch, undefined, budget))
+        if (found.length) validated.set(watch.id, found)
+        return { id: watch.id, url: watch.url, ...result.outcome }
+      } catch (err) {
+        // Its save failed (runAndRecord's own reading never throws): one
+        // watch not working, never the end of the night's run (Nov 18).
+        console.error(`[cron/watches] ${watch.id} failed:`, err)
+        return { id: watch.id, url: watch.url, ok: false as const, error: err instanceof Error ? err.message : String(err) }
+      }
     },
   })
 
@@ -134,8 +151,18 @@ async function runAll(started = Date.now()): Promise<Body> {
   // as checked, and its kind's line says Not reached.
   const skipped = results.filter((r) => r.ok && r.skipped).length
   const read = new Set(results.filter((r) => r.ok && !r.skipped).map((r) => r.id))
-  const run = { active: queue.length, ran: results.length - skipped, notWorking: results.filter((r) => !r.ok).length, left, skipped, kinds: countWatchKinds(queue, read, listings?.readsOf, listings?.siteGap, validated) }
-  return { ok: true, recorded: true, menus, hospitals, hours, eruvWebsites, results, left, eruvLines: await lines, run }
+  const eruvLineResults = await lines
+  const failedSteps = [...failedBefore, ...failedLines]
+  const run = {
+    active: queue.length,
+    ran: results.length - skipped,
+    notWorking: results.filter((r) => !r.ok).length,
+    left,
+    skipped,
+    kinds: countWatchKinds(queue, read, listings?.readsOf, listings?.siteGap, validated),
+    ...(failedSteps.length ? { failedSteps } : {}),
+  }
+  return { ok: true, recorded: true, menus, hospitals, hours, eruvWebsites, results, left, eruvLines: eruvLineResults, run }
 }
 
 async function recorded(): Promise<NextResponse> {

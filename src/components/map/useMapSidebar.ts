@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { storageGet, storageSet } from '@/lib/safeStorage'
 
 // ── The desktop results sidebar's own width/collapse/drag mechanics —
 // extracted out of ResourceMapView.tsx, which stayed one of the largest
@@ -59,7 +60,7 @@ export function clampSidebarWidth(px: number): number {
 
 function loadStoredSidebarWidth(): number {
   if (typeof window === 'undefined') return SIDEBAR_DEFAULT_WIDTH
-  const raw = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY)
+  const raw = storageGet(SIDEBAR_WIDTH_STORAGE_KEY)
   const parsed = raw === null ? NaN : Number(raw)
   return Number.isFinite(parsed) ? clampSidebarWidth(parsed) : SIDEBAR_DEFAULT_WIDTH
 }
@@ -113,7 +114,7 @@ export function useMapSidebar() {
     if (!sidebarDragRef.current) return
     sidebarDragRef.current = null
     setIsDraggingSidebar(false)
-    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth))
+    storageSet(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth))
   }
 
   // Same reasoning as MobileSheet's own onHandlePointerCancel: the browser
@@ -133,7 +134,7 @@ export function useMapSidebar() {
     e.preventDefault()
     const next = clampSidebarWidth(sidebarWidth + (e.key === 'ArrowRight' ? ARROW_STEP : -ARROW_STEP))
     setSidebarWidth(next)
-    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(next))
+    storageSet(SIDEBAR_WIDTH_STORAGE_KEY, String(next))
   }
 
   return {

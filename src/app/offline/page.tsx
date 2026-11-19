@@ -24,6 +24,18 @@ export default function OfflinePage() {
         Pages you’ve already visited still work without a signal — try going back. Hospital
         basements and lifts are the usual culprits; a floor up or near a window is often enough.
       </p>
+      {/* A plain link, not next/link: with no signal only a whole-page
+          load is answered by the service worker, which opens "/" as the
+          community home saved last (sw.js); a router move would ask for
+          data nothing has saved. Without it, an installed app opened with
+          no signal was stuck here (Nov 18, review item 36). */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+      <a
+        href="/"
+        className="mt-6 inline-flex min-h-11 items-center rounded-full bg-slate-900 px-5 text-sm font-semibold text-white"
+      >
+        Go to the home page
+      </a>
     </main>
   )
 }

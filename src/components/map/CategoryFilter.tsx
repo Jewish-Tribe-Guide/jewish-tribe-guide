@@ -80,7 +80,7 @@ type Props = {
  *  should follow"; Oct 16, the phone's too). For the row's own chips and
  *  the ones the map hands it (Filters, Saved, a campaign), so they stay one
  *  size. */
-export const CHIP_SIZE = 'px-3 py-[5px] text-sm'
+export const CHIP_SIZE = 'tap-44 px-3 py-[5px] text-sm'
 export const CHIP_GLYPH = 'h-4 w-4'
 
 /** The filter bar above the map: a chip per category that doubles as the color
@@ -216,7 +216,10 @@ export default function CategoryFilter({
           // therefore its own scroll bounds) would change depending on
           // state, which is exactly the kind of self-referential loop that
           // caused the shaking bug this file's tests document.
-          : `chip-scroll flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 ${scrollArrow ? 'pl-9 pr-9' : ''}`
+          // The extra 6px above and below (taken back by -my-1.5) is room
+          // for each chip's 44px tap area (tap-44), which the scroll row
+          // would otherwise clip (Nov 18, review item 39).
+          : `chip-scroll -my-1.5 flex flex-nowrap items-center gap-1.5 overflow-x-auto pt-1.5 pb-2.5 ${scrollArrow ? 'pl-9 pr-9' : ''}`
       }
     >
       {/* Always resets to everything — there's no "hide everything" state

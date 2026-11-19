@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 16, 2026.
+Last updated: Nov 18, 2026.
 
 ## The branch
 
@@ -434,6 +434,28 @@ Kept up card stays a card above the search, chevron and all (decided Nov
 14: it's how people find out they can trust the site, and opening it shows
 how everything is checked).
 
+**Drawn Nov 18, parked by the user the same day** ("maybe it's fine the
+way it is now idk" → "Park it for now"; today's home stays). If it comes
+back, my recommendation was Flip C plain (the weekday board with small
+square pictures); the full-pictures board got an "uch". (Canvas
+https://claude.ai/artifact/AR8hb7s66iPhAdqsqhbQsU, "Phone home: boxes and
+rows"): the user asked whether Right now should be a box and the
+categories rows ("these bunched up boxes and pictures"). Three boards:
+Today as built; Flip A, Right now as one white box of lines (the same
+words as Q1, no photo, chevrons) and the categories as one white box of
+rows with a 40px picture each; Flip B, the same rows with Right now as
+one box split in two halves. Would undo Q1, R3 and Oct 17's tiles. Rows
+come out about 70px longer than tiles. Then Flip C, the user's own
+("truly reversing the way it is today"), a weekday and a Friday: Right
+now as two separate boxes side by side, each category its own row 8px
+apart, pictures held as small squares for a later round. On Friday the
+two boxes are Shabbos (candles) and Shabbos shopping, white; the eruv
+line becomes its own row under them; the cards' Minyanim/Zmanim and item
+buttons are dropped (each box one tap). The user OK'd Flip C's layout
+("Yes, no coding yet"), then asked for pictures: "Flip C: full
+pictures" draws the weekday with every Right now box and category row a
+full photo, white words over a dark fade. Not built until the user picks.
+
 Boards U1 + U3f/U3g (Nov 14, canvas
 https://claude.ai/artifact/1L9Ep2cBxk84xQ2BePNbzL, built Nov 15): the
 computer home has Right now under Explore by Category, the same answers as
@@ -829,6 +851,361 @@ Nov 14, later, the user's yes to both:
   category pages, Browse, What changed, Feedback and You. The Add button
   sits beside Feedback · About · Privacy at the bottom now, in Safari as
   it already did in the home-screen app.
+
+## The admin review (Nov 18, on `redesign/suite-rows`)
+
+The user asked for a look over the whole admin: what to fix, what to
+refactor, which watches don't work right. Fixed the same day, each with a
+test that failed against the old code:
+
+- Approve and reject act only on a change still waiting. Two approvals of
+  one new place at once (two tabs, a double tap) put it live twice, and
+  rejecting a change already approved marked it rejected while it stayed
+  live. The approval now claims the row first and hands it back if the
+  apply fails.
+- Category banner upload: that community's admins, not superadmins only.
+  Philly's 3 non-superadmin admins and Washington's 1 couldn't upload a
+  banner (as hero and logo before them).
+- Category page preview: its own community's places and zmanim, not
+  Philly's (it read `community.config`).
+- Watches: one watch's failed save no longer ends the night's run; it
+  counts as not working and the rest run.
+- Menu watch: a reading an admin skipped stays skipped on the nightly run,
+  not only on Read now.
+- Mekor watch: one place on Google is filed once. The Brodsky Center was
+  filed twice on Nov 4 (two names on Mekor's list, one Google place).
+  **Live queue still holds both** (the user's to reject one; 7 Mekor new
+  places waiting, 14–30 days old).
+
+Then, the rest of the list (the user, Nov 18: "keep going through the
+whole list"), each with a test that failed against the old code unless
+it says otherwise:
+
+- Sign-in links (admin and inbox) go back to the guide, never to an
+  Origin header a request claims (d27471f5).
+- Home page and Feedback keep what was typed when the sign-in token
+  refreshes (431a5f89).
+- Add a place names a save that failed after the listing was made ("Not
+  saved: …"), and stays until Done (f4c61656).
+- A sign-in check that couldn't be made (no signal, a 5xx) says "Couldn't
+  check your access" with Try again, instead of "not an admin" and a
+  sign-out (7acbbd51).
+- Watches run and nightly email (0e9036b9): a failed step of the watches
+  run is named in its warning; a run cut off past its time limit is
+  emailed (live: read-menus Oct 27, watches Nov 6 were never told of); a
+  job that didn't run at all is emailed the first night it's late.
+- A page with part of a change waiting isn't AI-read again every night
+  (87411c2c), which was using up the night's reads.
+- Keystone-K and Mekor: a place Google said is closed isn't asked about
+  again for 30 days (c9717ddc); Keystone skips a new place already waiting
+  in the queue, by name or Google place (63896a05).
+- Google sync takes the longest-unasked listings first past its 500 cap,
+  and every Google request gives up after 10s (937e0802).
+- read-menus and look-again: a late answer always lands after its "took
+  too long" save (it raced it before); walk-routes' request times out
+  (f864d927). A late look-again try counted as failed has no test.
+- Back, Forward and reload (each checked in a real browser):
+  - `replaceState` calls in To do, Places and the sign-in gate drop Next's
+    mark (`replaceAddress`, 42da8b3e); a unit test fails on any new one.
+  - Home page's full-size preview (`?preview=open`), a form's question
+    (`?question=N`) and its preview (b220a7b4).
+  - Add a place's form after Find (`?step=finish`) and a source over it
+    (`?over=…`); a reload on the form is Find again, the address fixed in
+    place (58bed9f1).
+  - New community on the superadmin console (`?step=new`, 736d1797).
+- Gone: `People.tsx`, ChangeReview's unused `inPlace` (b0b75bd0), and the
+  unused `/api/admin/subscribers` routes (no test: nothing called them).
+- Settled with the user later on Nov 18 (they agreed to all three):
+  - A category's id can't be renamed: no screen offered it since Nov 5,
+    and a rename moved only the listings, so `renameCategoryId`, the
+    id-usage route and the editor's rename gate are gone (9181c66a).
+  - A form's tile has no emoji to pick: the site always drew its line
+    icon. The picker, the unused `PinColorField` and Support's and
+    Volunteer's emoji fallbacks are gone (1b4d2641).
+  - About and Privacy and Communities live only in the superadmin
+    console (`/admin/pages`, `/admin`); the community's menu links there
+    and its two copies are gone.
+- A listing that says KCL and that no name on KCL's list could be now
+  gets a card in To do, to take KCL off or keep it (the user chose it
+  over a line on the Kosher certification page, Nov 18). Before, it was
+  never dated and nothing said why. One that a name on the list might be
+  (two names, or a name too short to match on) is left alone. The card
+  isn't filed again once decided, until the listing's hechshers change,
+  and the Kosher certification page shows it as a difference too.
+- The three screen nits, fixed Nov 18: Places says the street of a place
+  another place has the name of (68d03fd5); Reports and History say
+  Approved and Rejected, as To do's buttons do, not Taken and Left
+  (8d549ac4, a change to the Oct 29 Reports board's wording; `e2e/admin.
+  spec.ts` still looked for "Taken" and failed, fixed on the public
+  review's branch); a shul's
+  usual times on its admin listing read by tefillah then time, Shabbos's
+  Friday first (d17d456c).
+
+- The watch fixes, later on Nov 18:
+  - A job turned off isn't searched for its pages (hours, menus, Refuah,
+    eruv websites), and a site's candidate pages are read three at a time
+    (84ccccd9).
+  - Each community's pages, calendars, newsletters and pasted times are
+    read on its own timezone and map centre, not community.config's
+    (cceefa9c). The fetch user-agent still says PhillyJewishGuide: the
+    site's name, and shul sites already let it through.
+  - Cron routes compare their secret in constant time (567c5ec8).
+  - Walk routes start somewhere else in the line each night, communities
+    too, so requests that fail every night can't hold the budget
+    (35440032).
+  - The morning run: the page search gets the first 60s and takes places
+    in turn; no watch starts after 220s, room for a calendar's two-week
+    read (40782d43).
+- The public site's `replaceState` calls (`FindResourcesConnected`,
+  `ResourceMapView`) carry Next's mark, and were checked in a real
+  browser on Nov 18: the address survives a focus refresh, a navigation
+  away and Back. Left as they are (still allowlisted in
+  `replaceStateMark.test.ts`).
+- The Brodsky Center's second copy in the live queue: the user rejected
+  it on Nov 18.
+
+Still open:
+
+- **A dated shul week is still compared with the usual times**
+  (`shulWeekReading.ts`, `dropListed`), against the rule. The user, Nov
+  18: talk about it after the rest.
+- With the admin-refactors session (PR 395): To do's own open/close is a
+  raw `history.pushState` (`goTo` in ModerationQueue; it works today,
+  checked in the browser after a reload, but it's the pattern AGENTS.md
+  warns against), one `useAdminApi` hook for the token/fetch/error
+  pattern, one admin route wrapper for auth + community + invalidation,
+  one change-review component (ChangeReview and TodoChange), and one
+  kosher-list runner for Keystone and Mekor.
+
+## The public site review (Nov 18, on `claude/public-review-46a065`)
+
+The same exercise as the admin review, for everything a visitor sees. Six
+areas reviewed (getting around, a listing, the map, contributing, public
+API and caching, speed and phones); 47 findings, the user said yes to all
+of them in seven batches on Nov 18, with item 3 (Back closes a phone's
+listing sheet) and item 4 (Forward to a search shows the search again).
+Each fix has a test that failed against the old code. The full list is in
+the session's notes; what's done is below.
+
+Left out on purpose:
+
+- Forms are hidden (Oct 31), so the intake wizard's findings wait until
+  they come back: answers to questions a branch hid are still sent, a form
+  ending on a single-choice question has no Submit, a failed Turnstile
+  says "refresh" and loses the answers, the steps are raw `pushState`, the
+  "✅" and section emoji, and Support/Volunteer as the generic wizard.
+- The parked Today home stays parked (the user, Nov 18).
+
+Done:
+
+- "Next:" and the minyan lists count public holidays and Rosh Chodesh
+  (`dayKeysFor`). On Thanksgiving a shul said "Next: Shacharis 7 AM
+  tomorrow" right above "8:30 AM also on public holidays". The days
+  ahead carry Rosh Chodesh too since Nov 19 (the calendar is asked with
+  `nx=on`; `roshChodeshDays`, `withRoshChodesh`), so tomorrow's Rosh
+  Chodesh minyan is offered as Next. Not checked against Hebcal itself
+  from here (its site was blocked to the session): the item category
+  `roshchodesh` is the one `dateZmanim.ts` already reads. A cached answer
+  from before it says nothing ahead, as before. The unused
+  `calendarDaysFor` is gone.
+- What reaches the queue and the site from a visitor, tightened:
+  - A sender is their email only. A name they typed ("Keystone-K
+    (automated)") no longer makes the queue say it was read from a watch,
+    or approval say "Confirmed by" one.
+  - A new place from "+ Add" gets the same clean-up as the listing form
+    (`prepareSubmission`: the site's own keys off, contacts tidied, bare
+    websites given their scheme).
+  - Undoing a "checked" needs the stamp it was given, so a listing's date
+    can't be set to any day.
+  - Undoing "gone" puts "Reported gone" back only while a report of it is
+    waiting in the queue.
+  - A new place can't be sent into a hidden category.
+- Email the site sends: a request's type comes from the site (one of the
+  five built-in kinds, or a published form's own title found by its id),
+  never from the sender, since it is the email's subject. Its confirmation
+  goes to one address. The email signup has the Turnstile challenge,
+  mounted once someone types in it, so the home page still loads nothing
+  from Cloudflare (`budgets.spec.ts` now checks the home page too).
+- Photo uploads are stored with the type their bytes show, and refused
+  when the bytes are not a PNG, JPG, GIF or WebP, whatever the label says.
+  Since Nov 19 an upload also needs a passed Turnstile challenge: the
+  photo field runs its own (`challenge` on `ImageUploadField`), started
+  when a picture is picked, shown only if Cloudflare wants a click, a
+  fresh token per upload; after 20s without one it sends anyway and the
+  route decides. The admin's own editors use the same field and pass it
+  too. **Your call:** clearing photos no listing uses (it deletes stored
+  files, so it waits for a yes on what counts as unused: a rejected
+  edit's photo, an old photo in What changed).
+- Public reads: a form's unpublished draft no longer goes out with the
+  published form, and `/api/eruv` says a read failed and when, not the
+  error's text.
+- Counts: a vote needs an approved listing in a category with upvotes on,
+  real UUIDs, and one machine gets four taps a listing an hour. A
+  remembered question counts toward "most asked" once per visitor a day,
+  written after the answer.
+- A listing's hours read the place's clock (the community's timezone),
+  not the visitor's. A place open past midnight keeps its real close
+  ("Open until 2 AM", still open at 1 AM) instead of "11:59 PM" and
+  Closed, and a lunch or dinner break shows Closed (Google's split hours
+  are kept as `periods`; the old shape stays as it was for everything
+  else). Search's "open now" reads them the same way, and so do tonight's
+  candle lighting and the Shabbos card's place on a Friday, so "closes
+  before candles" compares like with like (Nov 18, after CI failed them).
+  The unit suite runs in UTC, as CI does (`vitest.config.mts`); a test
+  sets its times with `placeTime`, on the community's clock.
+- A shul's weekday box no longer says "10 min before sunset: 4:32 PM
+  today" on Friday or Shabbos (`ruleLinesToday` checks the rule's days).
+- The footer says "Tap Edit listing", the button's name.
+- Google's own description no longer asks "Still right?" on older
+  listings.
+- Zmanim are fetched with the date, in the community's time, so a CDN
+  can't hand back yesterday's just after midnight. A date more than a
+  day off is refused; today's is cached, any other isn't.
+- Back, Forward and reload (items 1–7):
+  - Coming back to the tab after an admin's change no longer drops the
+    search, Filters, an open listing or the Minyan view from the address
+    (the refresh wrote back the router's older address, and dropped the
+    page's own Back step with it). Both are put back once the refresh
+    lands, still behind the router. The first fix told the router the
+    address before refreshing, and Next then replayed the page's older
+    cached copy over the fresh one, so the admin's change never arrived
+    (CI's cache suite, "regains focus", 3 of 3 on Nov 18).
+  - Back and Forward onto a category show the search its address carries,
+    as a link does; before, they blanked it, and after a reload Back threw
+    a hydration error. `backForwardNavigation.ts` is gone.
+  - A phone's listing sheet opened from the list is a step: Back closes it
+    and stays on the list, Forward reopens it. A listing's own link no
+    longer gains `?item=`, so a reload is the same page.
+  - The computer's Map: a place opened is an entry, so Back closes it
+    instead of leaving the map. The phone's Map no longer adds a second
+    entry for a place after a reload (Back needed two presses).
+  - A bare-id listing link redirects (308) to the friendly one, from
+    the proxy (`bareListingLink.ts`); the approval email builds the
+    friendly one. Not from the page: Next 16.3 wrote a page redirect's
+    Location twice for a listing rendered on demand, and on the first
+    request the browser got `a, a` and a 404.
+- The map (items 15–20):
+  - No emoji on the map: the search lines draw the category's line icon
+    (a pin for your own pins), the computer's tracking button the phone's
+    arrow, the campaign chip its category's icon instead of a sparkle,
+    and "You are here" is words. The forms' emoji wait with the forms.
+  - The map's eruv rows say where and when their status was read
+    ("From centercityeruv.com, 2:55 PM"), as the Eruv page does.
+  - When the map can't load, it says everything on it is in the list,
+    not to check an API key (one message, `MapUnavailable`, for both
+    ways it fails).
+  - With no location set, the map's list starts from the community's
+    centre, and the phone's lowered sheet says "137 places", not "137
+    places nearby — drag up".
+  - The "Share your live location?" box no longer opens with the site
+    (the user, Nov 18: "I think we can fix the location ask"). Location is
+    asked for when the visitor reaches for it: "Use my location" above a
+    list, Set location in the header, or Distance with nothing to measure
+    from, each of which opens the header's location menu. A visitor who
+    shared before is picked up again silently, as before. The box, its
+    three-day re-ask and the e2e suites' `dismissLocationPrompt` are gone.
+  - With storage blocked (Safari's "Block all cookies"), the Map and the
+    home no longer show "Something went wrong": saved places, pins and
+    searches read as none, the sidebar opens at its usual width, a vote
+    keeps a token for the visit and a counted vote stays counted
+    (`safeStorage.ts`).
+- Speed and phones (items 35–41):
+  - A page is handed over as it arrives; the service worker stores its
+    copy afterwards. Before, every page on an installed or returning
+    phone waited for its last byte and the cache write.
+  - On one bar, a page that hasn't answered in 4 seconds shows its saved
+    copy; the request carries on and stores the fresh one.
+  - With no signal: "/" (where the installed app opens) shows the
+    community home visited last, not the offline page; a page saved
+    without its query string still opens with one; and a page reached by
+    a tap is there too: the page asks the worker to keep it, 3 seconds
+    after the tap, at most every 6 hours a page, never with Data Saver
+    (`storeTappedPage.ts`). The offline page links home.
+  - The script cache keeps 300 files, oldest out first, instead of every
+    deploy's.
+  - `/` redirects with 307, not 308: it follows a remembered community,
+    and a browser keeps a permanent redirect after the visitor switches.
+    **Your call:** the installed app's name and icon are Philly's for
+    every community (`manifest.ts`).
+  - The header's Set location, a listing's phone number, website, email
+    and links, and the map's chips each take a 44px tap without changing
+    how they look (`tap-44` in `globals.css`). A listing's details rows
+    are 4px taller to fit them. Not done: a hospital contact's phones and
+    email, which sit 4px apart, so 44px targets would overlap and a tap
+    could dial the wrong number. It needs each on a row of its own about
+    44px tall, a contact visibly taller: **your call**, a drawing first
+    (checked Nov 19). Cards/List left out.
+  - Sentry loads after the page instead of in its first download
+    (`deferredSentry.ts`). Errors thrown before it arrives are kept and
+    sent; the page-load trace now starts when it arrives.
+  - JS budgets for a category page, a listing's own page and the map
+    (`budgets.spec.ts`), counting the site's own scripts.
+- Tidying (items 33, 42–44, 47):
+  - Each community's own clock: zmanim, festivals, a shul's week read
+    from a photo and its times are worked out in the listing's community's
+    timezone, not Philly's (`apiUsesCommunityClock.test.ts` fails if a
+    route under `src/app/api` reads the deployment's config community).
+  - Contributions on or off per community: a community's `ui` row can
+    switch add, edit or report off for itself (`contributionsFor`); the
+    deployment switch still wins. Nothing sets it yet, so nothing changes
+    on the site.
+  - The four routes a visitor changes a shul or a listing's items through
+    share one start (`listingWrite.ts`). The photo check had drifted: a
+    week read from the "+ Add" box's photo was refused by one of them.
+  - The map's search suggestions are one list for the phone and the
+    computer.
+  - A listing's editor and its Request removal are addresses of their own
+    (Nov 19): `?editing=<id>~listing`, `<id>~listing/removal` and
+    `<id>~removal` (`useEditorInAddress`), written through Next's router.
+    A reload comes back to them, Back from one is the listing, and Back to
+    one from another page draws it. Everywhere a listing opens: the
+    computer's column, a phone's sheet and a listing's own page, the Map's
+    sidebar and phone sheet, and an eruv. Under the listing's id, so the
+    next listing a phone or the Map opens doesn't come up in the editor of
+    the one before. `?editing=` rather than `?form=edit`, which already
+    means the box over the list. A row opened inside the editor is still
+    a step of the screen alone (its ‹ closes it). A phone's sheet closed
+    with its editor open (the dimmed list tapped) now goes back to the
+    list; it used to stop on the listing's address with the sheet shut, so
+    the next Back did nothing and a reload reopened it (already so before
+    the editor had an address).
+  - The computer's Edit dialog (`ListingDetailModal`) is gone: a computer
+    has opened listings in the list's column since Sep 30, so nothing
+    reached it.
+  - Dead code out: the upvote button's two looks no screen used (both
+    drew a 👍), `formatWeekHours`, `syncedLabel`, the map's unused `onUp`
+    and its re-export of the hospital colour. Five public reads no screen
+    calls stay (`/api/site-settings`, `home-sections`, `forms`,
+    `hospitals`, `campaign-banners`): the e2e suites read them to know
+    what the site should show, and warm the cache through them. Their
+    comments said screens fetched them; they say who does now.
+  - The map's pins use Google's current pin (`glyphText`, `glyphSrc`,
+    the pin as its own element), so the console no longer warns about
+    the old one on every map load.
+  - Each community's own centre, area name and clock, everywhere on the
+    site and in the admin (Nov 19): a shul with no location of its own is
+    timed by its community's centre (`anchorKey`, `COMMUNITY_SPOT`), the
+    map opens there, distances and the home's zmanim are measured from it,
+    the footer and Volunteer wizard name its region, and "seen today" and
+    "last checked Oct 2" read its clock (`useCommunityPlace`,
+    `useCommunityTimezone`). `publicUsesCommunityPlace.test.ts` fails on
+    any new read of the config's. Left on the config on purpose: the
+    Privacy page's date (one policy for the site) and `HOURS_TIMEZONE`,
+    the last resort when a caller passes no clock (its callers weren't
+    audited).
+  - A community's own admins set its default location (Nov 19), the
+    place a visitor is taken to be until they set their own: Settings ›
+    Default location, one place picker labelled "Until a visitor sets
+    their own location, we use", a small map of it, its time zone, Save.
+    It starts as the city picked when the community was made. Only a
+    place picked from the list saves; the time zone follows the place
+    (`tz-lookup`); the community's name and region don't change. The
+    picked place's name is kept in `map_center` (`label`), so no
+    migration. `PUT /api/admin/default-location`, any of the community's
+    admins, then `revalidatePublicContent`. Checked locally on the test
+    project: the home's zmanim moved to the new spot, and the row was put
+    back. Not seen locally: the map and the picker's suggestions (Google
+    refuses the key on localhost) — check them on the Vercel preview.
 
 ## Open from the boxes and fields work (Nov 10)
 

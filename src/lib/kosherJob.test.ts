@@ -139,6 +139,19 @@ describe('kosherPlaces', () => {
     expect(kosherSection(places[1])).not.toBe('not_listed')
   })
 
+  // Nov 18: one that says KCL and isn't on it is a difference to check,
+  // with its card's state, as Mekor's IKC one is.
+  it('a listing that says KCL and isn’t on KCL’s list is a difference, filed or not', () => {
+    const l = listing({ id: 'z', name: 'Zayde’s Deli', details: { kosherCert: ['OU', 'KCL'] } })
+    const kcl = [{ name: 'South Side Smokehouse' }]
+    const { places } = kosherPlaces({ listings: [l], keystone: null, mekor: null, kcl })
+    expect(places[0].differences).toEqual([{ list: 'kcl', line: 'The listing says KCL; KCL’s list doesn’t have it by this name', filed: 'next' }])
+    expect(kosherSection(places[0])).toBe('to_check')
+    const key = 'cert:z:["OU"]'
+    const queued = kosherPlaces({ listings: [l], keystone: null, mekor: null, kcl, filed: { kcl: { pending: new Set([key]), settled: new Set() } } })
+    expect(queued.places[0].differences[0].filed).toBe('queued')
+  })
+
   it('a place on neither list is not listed, not checked', () => {
     const l = listing({ id: 'star', name: 'Star K Place', details: { kosherCert: ['Star-K'] } })
     const { places } = kosherPlaces({ listings: [l], keystone: [cherryEntry], mekor: [] })

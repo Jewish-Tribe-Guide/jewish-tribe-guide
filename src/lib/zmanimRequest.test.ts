@@ -81,6 +81,14 @@ describe('zmanim batch request', () => {
     expect(a).toBe('/api/zmanim/batch?p=39.95,-75.16&p=40,-75.2')
   })
 
+  // Nov 18 review, item 33: the batch was the one request that never said
+  // whose clock, so another community's shuls got the config's sunset day.
+  it('carries the community’s clock, as the single-spot path does', () => {
+    expect(zmanimBatchPath([{ lat: 31.78, lng: 35.22 }, { lat: 31.8, lng: 35.2 }], 'Asia/Jerusalem', '2026-11-18')).toBe(
+      '/api/zmanim/batch?p=31.78,35.22&p=31.8,35.2&tzid=Asia%2FJerusalem&date=2026-11-18',
+    )
+  })
+
   it('parses points, rounding and de-duplicating them', () => {
     const r = parseZmanimBatchRequest(qs('p=39.951,-75.161&p=39.95,-75.16&p=40,-75.2'), 'America/New_York')
     expect(r).toEqual({

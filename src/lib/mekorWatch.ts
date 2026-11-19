@@ -344,6 +344,33 @@ function newDetails(e: MekorEntry, links: Set<string>): Record<string, unknown> 
   }
 }
 
+/** The queue's new food places, as a list compares them. Shared by
+ *  both lists' runs (mekorRun.ts, keystoneRun.ts). */
+export function pendingCreates(rows: { id: unknown; payload: unknown }[], categories: readonly string[]): PendingCreate[] {
+  return rows
+    .map((s) => ({ id: s.id as string, p: (s.payload ?? {}) as Record<string, unknown> }))
+    .filter(({ p }) => categories.includes(String(p.category)))
+    .map(({ id, p }) => ({
+      id,
+      name: String(p.name ?? ''),
+      address: (p.address as string | null) ?? null,
+      phone: (p.phone as string | null) ?? null,
+      details: (p.details ?? {}) as Record<string, unknown>,
+    }))
+}
+
+/** Google's place ids of the queue's new places. */
+export function queuedPlaceIds(pending: readonly PendingCreate[]): Set<string> {
+  return new Set(pending.map((p) => p.details.placeId).filter((id): id is string => typeof id === 'string' && id !== ''))
+}
+
+/** Whether a place a list names is one already waiting in the queue as a
+ *  new place, by name or by address or phone. Shared with Keystone-K's
+ *  run (keystoneRun.ts), so neither files one the other already has. */
+export function alreadyQueued(p: Place, pending: readonly PendingCreate[]): boolean {
+  return pending.some((q) => sameByName(p, q) || sameByContact(p, q))
+}
+
 /** Every difference between Mekor's list and the guide. `pending` is the
  *  queue's new places, so one Keystone-K's watch (or a visitor) has
  *  already suggested isn't suggested again. */
@@ -357,9 +384,7 @@ export function compareMekor(entries: MekorEntry[], listings: GuideListing[], pe
     if (!listing) {
       if (unsure.has(e.slug)) continue
       const p = { name: e.name, address: e.address, phone: e.phone }
-      const queued = pending.some(
-        (q) => sameByName(p, q) || sameByContact(p, q) || (links.has(linkKey(e.certificate)) && linkKey(q.details.k) === linkKey(e.certificate)),
-      )
+      const queued = alreadyQueued(p, pending) || pending.some((q) => links.has(linkKey(e.certificate)) && linkKey(q.details.k) === linkKey(e.certificate))
       if (!queued) findings.push({ kind: 'new', entry: e, details: newDetails(e, links), archived: null })
       continue
     }

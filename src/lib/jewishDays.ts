@@ -68,6 +68,23 @@ export type CalendarDay = DayFacts & { date: string }
  * asked for; outside it, nothing is known, and callers mustn't read a
  * missing day as an ordinary one.
  */
+/**
+ * Each date from `from` to `to` (YYYY-MM-DD, inclusive) that is Rosh
+ * Chodesh, from a Hebcal date-range response asked with `nx=on`. Its
+ * `roshchodesh` items are titled "Rosh Chodesh Kislev"; a two-day Rosh
+ * Chodesh is two items. Erev Rosh Chodesh is not Rosh Chodesh: a minyan
+ * tagged Rosh Chodesh means the day itself.
+ */
+export function roshChodeshDates(items: readonly { category: string; title: string; date: string }[], from: string, to: string): string[] {
+  const dates = new Set<string>()
+  for (const i of items) {
+    if (i.category !== 'roshchodesh' || !i.title.startsWith('Rosh Chodesh')) continue
+    const date = i.date.slice(0, 10)
+    if (date >= from && date <= to) dates.add(date)
+  }
+  return [...dates].sort()
+}
+
 export function calendarDaysFrom(items: readonly { category: string; title: string; date: string }[], from: string, to: string): CalendarDay[] {
   const out = new Map<string, CalendarDay>()
   for (const i of items) {

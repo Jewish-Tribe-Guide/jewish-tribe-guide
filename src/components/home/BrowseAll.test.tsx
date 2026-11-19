@@ -10,6 +10,7 @@ import type { MinyanSchedule } from '@/lib/useMinyanSchedule'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { clearEruvStatuses } from '@/lib/useEruvStatuses'
 import BrowseAll from './BrowseAll'
+import { placeTime } from '@/test/placeTime'
 
 const features = vi.hoisted(() => ({ todayHome: false, whatChanged: true }))
 vi.mock('@/lib/features', () => ({ features }))
@@ -45,7 +46,7 @@ const centre = { lat: 39.9526, lng: -75.1652 }
  *  with Mikveh Israel's Mincha at 2. */
 function tuesday(): MinyanSchedule {
   return {
-    now: new Date(2026, 9, 6, 12, 30).getTime(),
+    now: placeTime(2026, 9, 6, 12, 30).getTime(),
     nowMinutes: 12 * 60 + 30,
     todayKey: 'tue',
     tomorrowKey: 'wed',

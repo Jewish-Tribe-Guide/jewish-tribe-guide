@@ -8,6 +8,7 @@ import { NEWSLETTER_WATCH_NAME } from './newsletter'
 import { REFUAH_WATCH_NAME } from './refuahWatch'
 import { KEYSTONE_WATCH_NAME } from './keystoneWatch'
 import { MEKOR_WATCH_NAME } from './mekorWatch'
+import { KCL_WATCH_NAME } from './kclWatch'
 import { submissionSource } from './submissionSource'
 import { regularMinyanim, readSchedules, schedulesKey, type SpecialSchedule } from './schedules'
 import type { Minyan } from './davening'
@@ -39,7 +40,7 @@ export const FINDING_SOURCES: Record<FindingJob, readonly string[]> = {
   // them (Main dishes board 3, Oct 22).
   dishes: [LISTING_PAGE_WATCH_NAME],
   hospitals: [REFUAH_WATCH_NAME],
-  kosher: [KEYSTONE_WATCH_NAME, MEKOR_WATCH_NAME],
+  kosher: [KEYSTONE_WATCH_NAME, MEKOR_WATCH_NAME, KCL_WATCH_NAME],
   // Any other place's website (a grocery's, a childcare's): its phone,
   // email and hours, where Google doesn't have them. They wait under its
   // kind's row on the Watches tab (the user, Oct 25).
@@ -53,6 +54,7 @@ const FROM: Record<string, string> = {
   [REFUAH_WATCH_NAME]: 'Refuah',
   [KEYSTONE_WATCH_NAME]: 'Keystone-K’s list',
   [MEKOR_WATCH_NAME]: 'Mekor Habracha’s list',
+  [KCL_WATCH_NAME]: 'KCL’s list',
 }
 
 /** The heading over what it says, beside "The listing says". */
@@ -62,6 +64,7 @@ const SAYS: Record<string, string> = {
   [REFUAH_WATCH_NAME]: 'Refuah says',
   [KEYSTONE_WATCH_NAME]: 'Keystone-K says',
   [MEKOR_WATCH_NAME]: 'Mekor Habracha says',
+  [KCL_WATCH_NAME]: 'KCL’s list says',
 }
 
 export const watchNameOf = (s: Pick<SubmissionRow, 'submitted_by'>): string | null => s.submitted_by?.name ?? null

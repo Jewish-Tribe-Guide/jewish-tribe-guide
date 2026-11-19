@@ -5,8 +5,7 @@ import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import { AddButton } from '@/components/AddButton'
 import { useCategories } from '@/lib/useCategories'
-import { useOptionalCommunitySlug } from '@/lib/communityContext'
-import { ui } from '@/lib/uiConfig'
+import { useOptionalCommunitySlug, useContributions } from '@/lib/communityContext'
 
 // "+ Add" on every screen but the Map (decided Oct 5, reversing the earlier
 // "no general Add": the box needs no category, so nobody is asked to pick
@@ -45,7 +44,8 @@ export default function SiteAddButton() {
     document.addEventListener('jpc:open-add', onOpen)
     return () => document.removeEventListener('jpc:open-add', onOpen)
   }, [])
-  if (!community || !ui.contributions.add || !showsSiteAdd(pathname, community, (categories ?? []).map((c) => c.id))) return null
+  const contributions = useContributions()
+  if (!community || !contributions.add || !showsSiteAdd(pathname, community, (categories ?? []).map((c) => c.id))) return null
   return (
     <>
       <AddButton onClick={() => setOpen(true)} />

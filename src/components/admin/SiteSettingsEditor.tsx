@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
+import { useLatestRef } from '@/lib/useLatestRef'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import type { SiteSettings } from '@/lib/siteSettings'
 import type { HomeSection, DraftHomeSection } from '@/lib/homeSections'
@@ -103,20 +104,23 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   // The full-size preview has its own history entry, as Category pages' and
   // Forms' do, so browser Back closes it rather than leaving the page, and
   // Forward opens it again (the user, Nov 4). Forward shows what's typed
-  // now, not what was typed when it was first opened.
+  // now, not what was typed when it was first opened. In the address as
+  // ?preview=open, so a reload stays on it (Nov 18: it was an entry pushed
+  // behind Next's router, with nothing in the address).
   const shownDraft = useRef<Parameters<typeof writePreviewDraft>[0] | null>(null)
-  useEffect(() => {
-    function onPopState(e: PopStateEvent) {
-      const open = !!(e.state as { editorPreview?: boolean } | null)?.editorPreview
-      if (open && shownDraft.current) writePreviewDraft(shownDraft.current)
-      setPreviewing(open)
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [])
+  useStepsInAddress('preview', previewing ? ['open'] : [], ([to]) => {
+    if (to === 'open' && shownDraft.current) writePreviewDraft(shownDraft.current)
+    setPreviewing(to === 'open')
+  })
   useEffect(() => {
     shownDraft.current = draft && sectionsDraft ? { settings: draft, sections: sectionsDraft } : null
   }, [draft, sectionsDraft])
+  // Reopened by a reload before the boxes had loaded: what it shows is
+  // written once they have (the preview below waits for them too).
+  const previewOpen = previewing && !!draft && !!sectionsDraft
+  useEffect(() => {
+    if (previewOpen && shownDraft.current) writePreviewDraft(shownDraft.current)
+  }, [previewOpen])
   // The box being worked on, which the preview lights up.
   const [spot, setSpot] = useState<string | null>(null)
   const spotOn = (name: string | null) => ({ onMouseEnter: () => setSpot(name), onFocusCapture: () => setSpot(name) })
@@ -132,12 +136,16 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   const rightNowLoaded = useRightNowData(community.slug)
   const rightNowData = rightNowLoaded && sectionsDraft ? inHomeOrder(rightNowLoaded, sectionsDraft) : null
 
+  // The token is read, not depended on: a new one (hourly) would load the
+  // draft again over what's being typed.
+  const tokenRef = useLatestRef(token)
   const load = useCallback(async () => {
     setError(null)
+    const headers = { Authorization: `Bearer ${tokenRef.current}` }
     try {
       const [settingsRes, sectionsRes] = await Promise.all([
-        fetch(withCommunity('/api/admin/site-settings', community.slug), { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(withCommunity('/api/admin/home-sections', community.slug), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(withCommunity('/api/admin/site-settings', community.slug), { headers }),
+        fetch(withCommunity('/api/admin/home-sections', community.slug), { headers }),
       ])
       const settingsBody = await parseOkJson<{ settings: SiteSettings }>(settingsRes, 'Failed to load.')
       const sectionsBody = await parseOkJson<{ sections: HomeSection[] }>(sectionsRes, 'Failed to load.')
@@ -148,7 +156,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community.slug])
+  }, [tokenRef, community.slug])
 
   useLoadOnMount(load)
 
@@ -217,13 +225,12 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   // Narrower than the preview beside needs: the page full size, with what
   // hasn't been saved (board 21c), on the version picked.
   if (previewing) {
-    return <DevicePreviewFrame src={previewUrl(community.slug)} initialDevice={device === 'phone' ? 'mobile' : 'desktop'} onClose={() => history.back()} />
+    return <DevicePreviewFrame src={previewUrl(community.slug)} initialDevice={device === 'phone' ? 'mobile' : 'desktop'} onClose={() => setPreviewing(false)} />
   }
 
   const openPreview = () => {
     writePreviewDraft({ settings: draft, sections: sectionsDraft, day: previewDay })
     setPreviewing(true)
-    history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
   }
 
   const computer = device === 'computer'

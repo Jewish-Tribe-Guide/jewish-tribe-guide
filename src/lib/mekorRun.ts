@@ -12,7 +12,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import type { WatchDigestItem } from '@/lib/email'
 import { submitListingCreate, submitListingUpdate } from '@/lib/submissionStore'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
-import { askGoogleIfOpen, withPlaceId } from '@/lib/keystoneRun'
+import { askGoogleIfOpen, knownClosed, withPlaceId, type ClosedSeen } from '@/lib/keystoneRun'
 import { confirmFromSource } from '@/lib/sourceConfirm'
 import { KOSHER_SECTION } from '@/lib/boxDates'
 import { listDifference, type ListRead } from '@/lib/watches'
@@ -28,7 +28,8 @@ import {
   type GuideListing,
   type MekorEntry,
   type MekorFinding,
-  type PendingCreate,
+  pendingCreates,
+  queuedPlaceIds,
 } from '@/lib/mekorWatch'
 
 /** Fewer places than this means the page changed shape, not that Mekor
@@ -63,6 +64,8 @@ export type MekorRun =
       /** Listings the list names that agree with it. */
       matching: number
       closedOnGoogle: string[]
+      /** Those, with when Google said so (keystoneRun.ts's ClosedSeen). */
+      closedSeen: ClosedSeen[]
       /** Every place it differs on, a line each (listDifference). */
       differences: string[]
       /** Listings the list agreed with, dated today. */
@@ -88,7 +91,7 @@ export async function readMekorList(url: string): Promise<{ updated: string | nu
   return { updated, entries }
 }
 
-export async function runMekorWatch(community: string, url: string, { dry = false }: { dry?: boolean } = {}): Promise<MekorRun> {
+export async function runMekorWatch(community: string, url: string, { dry = false, closedBefore, now = Date.now() }: { dry?: boolean; closedBefore?: readonly ClosedSeen[]; now?: number } = {}): Promise<MekorRun> {
   const list = await readMekorList(url)
   if ('error' in list) return { ok: false, error: list.error }
   const { updated, entries } = list
@@ -114,16 +117,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
     .eq('operation', 'create')
     .eq('target_type', 'listing')
   if (queuedError) return { ok: false, error: `Couldn’t read the queue: ${queuedError.message}` }
-  const pending: PendingCreate[] = (queued ?? [])
-    .map((s) => ({ id: s.id as string, p: (s.payload ?? {}) as Record<string, unknown> }))
-    .filter(({ p }) => CATEGORIES.includes(String(p.category)))
-    .map(({ id, p }) => ({
-      id,
-      name: String(p.name ?? ''),
-      address: (p.address as string | null) ?? null,
-      phone: (p.phone as string | null) ?? null,
-      details: (p.details ?? {}) as Record<string, unknown>,
-    }))
+  const pending = pendingCreates(queued ?? [], CATEGORIES)
 
   const findings = compareMekor(entries, (rows ?? []) as GuideListing[], pending)
   const agree = mekorAgrees(entries, (rows ?? []) as GuideListing[], findings)
@@ -145,19 +139,30 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
   const notes = new Map<MekorFinding, string>()
   const placeIds = new Map<MekorFinding, string>()
   const closed: string[] = []
+  const closedSeen: ClosedSeen[] = []
   const closedNow = new Set<MekorFinding>()
   const fresh: MekorFinding[] = []
+  // Google's place for each new place already waiting or suggested in this
+  // run. Mekor lists some places twice, under two names (the Brodsky
+  // Center, filed twice on Nov 4), and a name match can't see that.
+  const queuedPlaces = queuedPlaceIds(pending)
   for (const f of unfiled) {
     let note = findingNote(f, updated)
     if (f.kind === 'new') {
-      const g = await askGoogleIfOpen(f.entry.name, f.entry.address)
+      const known = knownClosed(closedBefore, f.entry.name, now)
+      const g = known ? { closed: true as const, line: '' } : await askGoogleIfOpen(f.entry.name, f.entry.address)
       if (g.closed) {
         closed.push(f.entry.name)
+        closedSeen.push(known ?? { name: f.entry.name, at: new Date(now).toISOString() })
         closedNow.add(f)
         continue
       }
+      if (g.placeId && queuedPlaces.has(g.placeId)) continue
       note += `\n${g.line}`
-      if (g.placeId) placeIds.set(f, g.placeId)
+      if (g.placeId) {
+        placeIds.set(f, g.placeId)
+        queuedPlaces.add(g.placeId)
+      }
     }
     notes.set(f, note)
     fresh.push(f)
@@ -177,6 +182,7 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
       filed: 0,
       matching: agree.length,
       closedOnGoogle: closed,
+      closedSeen,
       differences,
       wouldFile: fresh.map((f) => ({ kind: f.kind, ...describe(f), note: notes.get(f)! })),
     }
@@ -228,5 +234,5 @@ export async function runMekorWatch(community: string, url: string, { dry = fals
   // What a kosher list says is the certification: that's what it dates.
   const confirmed = await confirmFromSource(community, agree, MEKOR_NAME, [KOSHER_SECTION])
 
-  return { ok: true, entries: entries.length, listRead: { updated, entries }, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, differences, confirmed }
+  return { ok: true, entries: entries.length, listRead: { updated, entries }, findings: findings.length, filed: items.length, matching: agree.length, closedOnGoogle: closed, closedSeen, differences, confirmed }
 }

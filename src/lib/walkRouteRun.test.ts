@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { DirectoryResource } from '@/types'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
-import { ORS_SPACING_MS, workOutWalks, type WalkRouteDeps } from './walkRouteRun'
+import { ORS_SPACING_MS, askOpenRouteService, workOutWalks, type WalkRouteDeps } from './walkRouteRun'
 import type { WalkRoute } from './walkRoutes'
 
 const at = { lat: 39.95, lng: -75.16 }
@@ -58,6 +58,20 @@ describe('workOutWalks', () => {
     expect(await workOutWalks(d)).toMatchObject({ asked: 1, walks: 2, leftForTomorrow: 2 })
   })
 
+  // Nov 18 review: a request that fails every night (a place
+  // OpenRouteService can't route to) was first in line every night, and
+  // with enough of them the budget never reached the rest.
+  it('starts at a different request each night, so one that keeps failing isn’t always first', async () => {
+    const asked = async (turn: number) => {
+      const d = deps({ budget: 1, turn })
+      await workOutWalks(d)
+      return Object.keys(d.saved)
+    }
+    expect(await asked(0)).toEqual(['h1'])
+    expect(await asked(1)).toEqual(['h2'])
+    expect(await asked(2)).toEqual(['h1'])
+  })
+
   it('keeps nothing for a listing whose request fails, and carries on', async () => {
     const ask = vi.fn(async (body) => reply(body))
     ask.mockRejectedValueOnce(new Error('OpenRouteService 429'))
@@ -71,5 +85,20 @@ describe('workOutWalks', () => {
   it('does nothing for a category with no walk list, or one listing a category that’s gone', async () => {
     const d = deps({ categories: [{ ...hotels, walkList: { categoryId: 'gone', maxMinutes: 30 } }, shuls] })
     expect(await workOutWalks(d)).toMatchObject({ listings: 0, asked: 0 })
+  })
+})
+
+// Nov 18 review: the request had no timeout inside the job's 60s limit, so
+// one that never answered ran the job into Vercel's cutoff.
+describe('askOpenRouteService', () => {
+  it('gives up rather than waiting for an answer that never comes', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))
+    vi.stubGlobal('fetch', fetchSpy)
+    try {
+      await askOpenRouteService('k', { locations: [], sources: [], destinations: [], metrics: ['duration'] } as never)
+      expect(fetchSpy.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

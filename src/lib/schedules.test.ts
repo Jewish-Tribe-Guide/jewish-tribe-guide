@@ -3,7 +3,7 @@ import type { Minyan } from './davening'
 import type { CalendarDay } from './jewishDays'
 import { cleanSchedule, factsFor, formatSchedulesSummary, readSchedules, resolveDay, sendsWeekly, shabbosIsOver, signUpGroup, thisWeeksDays, weekByDates, weekPostDays, weekPostRows, withSchedules, withWeekRows, dateKey, type SpecialSchedule } from './schedules'
 import { listMinyanim, nextUpcomingDavening } from './upcomingDavening'
-import { geoKey, geoOrCommunityDefault } from './useZmanAnchors'
+import { anchorKey } from './useZmanAnchors'
 
 // This week, as the calendar has it (Hebcal, Oct 1 2026): Chol HaMoed
 // Thursday, Hoshana Rabbah Friday, Shemini Atzeres on Shabbos, Simchas
@@ -227,7 +227,7 @@ describe('the next minyan, with a schedule applied', () => {
       ...sukkos,
       minyanim: [{ id: 'e', tefillah: 'mincha', on: ['chol_hamoed'], time: '10 min before Sunset', anchor: 'sunset', offsetMinutes: -10 }],
     }
-    const anchors = { [geoKey(geoOrCommunityDefault(undefined))]: { sunsetIso: '2026-10-01T18:40:00-04:00' } }
+    const anchors = { [anchorKey(undefined)]: { sunsetIso: '2026-10-01T18:40:00-04:00' } }
     const list = listMinyanim(shul([fromSunset]), { ...opts, today: [...opts.today], tomorrow: [...opts.tomorrow], anchors })
     expect(list.today.map((s) => [s.tefillah, s.time, s.anchored])).toEqual([['mincha', '6:30 PM', true]])
   })

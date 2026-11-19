@@ -104,8 +104,8 @@ describe('useCategorySaveWorkflow — creating a new category', () => {
   })
 })
 
-describe('useCategorySaveWorkflow — editing, id unchanged', () => {
-  it('goes straight to PATCH with no id-usage check', async () => {
+describe('useCategorySaveWorkflow — editing', () => {
+  it('goes straight to PATCH', async () => {
     const initial = baseCategory()
     const onSaved = vi.fn()
     const { result } = renderHook(() =>
@@ -120,60 +120,6 @@ describe('useCategorySaveWorkflow — editing, id unchanged', () => {
       'Save failed.',
     )
     expect(onSaved).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('useCategorySaveWorkflow — id-rename gate', () => {
-  it('checks id usage instead of saving, when the id changed', async () => {
-    const initial = baseCategory({ id: 'grocery' })
-    vi.mocked(fetchJson).mockResolvedValueOnce({ count: 4 })
-    const onSaved = vi.fn()
-    const { result } = renderHook(() =>
-      useCategorySaveWorkflow({ draft: baseDraft({ id: 'groceries-new' }), initial, isNew: false, token: 't', community: 'philly', onSaved }),
-    )
-    await act(async () => result.current.save())
-
-    expect(fetchJson).toHaveBeenCalledTimes(1)
-    expect(fetchJson).toHaveBeenCalledWith(
-      '/api/admin/categories/grocery/id-usage?community=philly',
-      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer t' }) }),
-      'Could not check existing listings.',
-    )
-    expect(result.current.pendingIdRename).toEqual({ oldId: 'grocery', newId: 'groceries-new', count: 4 })
-    expect(onSaved).not.toHaveBeenCalled()
-    expect(result.current.saving).toBe(false)
-  })
-
-  it('proceeds to save (with newId in the payload) once the rename is already confirmed', async () => {
-    const initial = baseCategory({ id: 'grocery' })
-    vi.mocked(fetchJson)
-      .mockResolvedValueOnce({ count: 4 }) // id-usage check
-      .mockResolvedValueOnce({ ok: true }) // the actual save
-    const onSaved = vi.fn()
-    const { result } = renderHook(() =>
-      useCategorySaveWorkflow({ draft: baseDraft({ id: 'groceries-new' }), initial, isNew: false, token: 't', community: 'philly', onSaved }),
-    )
-    await act(async () => result.current.save()) // sets pendingIdRename
-    await act(async () => result.current.save()) // confirmed — proceeds
-
-    expect(fetchJson).toHaveBeenCalledTimes(2)
-    const saveCall = vi.mocked(fetchJson).mock.calls[1]!
-    const body = JSON.parse((saveCall[1] as RequestInit).body as string)
-    expect(body.newId).toBe('groceries-new')
-    expect(onSaved).toHaveBeenCalledTimes(1)
-    expect(result.current.pendingIdRename).toBeNull()
-  })
-
-  it('cancelIdRename clears the gate without saving', async () => {
-    const initial = baseCategory({ id: 'grocery' })
-    vi.mocked(fetchJson).mockResolvedValueOnce({ count: 1 })
-    const { result } = renderHook(() =>
-      useCategorySaveWorkflow({ draft: baseDraft({ id: 'new-id' }), initial, isNew: false, token: 't', community: 'philly', onSaved: vi.fn() }),
-    )
-    await act(async () => result.current.save())
-    expect(result.current.pendingIdRename).not.toBeNull()
-    act(() => result.current.cancelIdRename())
-    expect(result.current.pendingIdRename).toBeNull()
   })
 })
 

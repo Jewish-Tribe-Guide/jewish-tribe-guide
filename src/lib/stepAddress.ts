@@ -12,7 +12,13 @@
 
 // `box`: the site's + Add box (TellUsSheet), on any page. `card`: a home
 // card's own screen in Home page (Right now, the Map; boards V4/V4b).
-export const STEP_PARAMS = ['found', 'over', 'edit', 'row', 'step', 'box', 'card'] as const
+// `preview`: Home page's or a form's preview full size. `question`: a
+// form's question on its own screen, by its place (Nov 18: both were
+// entries pushed behind Next's router, with nothing in the address).
+// `editing`: a listing's editor opened over the listing, on a category page,
+// a listing's own page or the Map, and its Request removal screen
+// (useEditorInAddress; Nov 19, for the same reason).
+export const STEP_PARAMS = ['found', 'over', 'edit', 'row', 'step', 'box', 'card', 'preview', 'question', 'editing'] as const
 export type StepParam = (typeof STEP_PARAMS)[number]
 
 /** `owner`: a screen sharing its parameter with others mounted beside it

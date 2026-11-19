@@ -6,6 +6,8 @@
 // (corrupt JSON, a stale localStorage entry, the cap) are testable without a
 // DOM. See pinnedContext.tsx for the provider that wraps this in state.
 
+import { storageGet } from './safeStorage'
+
 export type PinnedListing = {
   id: string
   /** The category id the listing lives in — lets a marker/row be resolved
@@ -46,7 +48,7 @@ export function parsePinned(raw: string | null): PinnedListing[] {
 }
 
 export function loadPinned(): PinnedListing[] {
-  return parsePinned(localStorage.getItem(STORAGE_KEY))
+  return parsePinned(storageGet(STORAGE_KEY))
 }
 
 export function savePinned(pins: PinnedListing[]): void {

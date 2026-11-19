@@ -19,7 +19,7 @@
 //
 // Returns null rather than guessing for a zone with no DST at all (Phoenix,
 // much of Africa and Asia). Callers treat null as "don't dim anything", the
-// same never-narrow-on-missing-data rule calendarDays.ts follows. A community
+// never-narrow-on-missing-data rule. A community
 // there would need a real boundary — equinox, or Pesach–Sukkos — and this is
 // where it would go.
 

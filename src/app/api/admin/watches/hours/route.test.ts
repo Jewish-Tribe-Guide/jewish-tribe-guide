@@ -16,7 +16,7 @@ const m = vi.hoisted(() => ({
 }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: async () => null }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
-vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly' }) }))
+vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly', timezone: 'America/New_York' }) }))
 vi.mock('@/lib/hoursJobRun', async (real) => ({ ...(await real<typeof import('@/lib/hoursJobRun')>()), hoursJobPlaces: m.hoursJobPlaces, searchHoursPages: m.searchHoursPages }))
 vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches, addWatch: m.addWatch, updateWatch: m.updateWatch, removeWatch: m.removeWatch }))
 vi.mock('@/lib/watchRunner', () => ({ runAndRecord: m.runAndRecord }))
@@ -144,7 +144,7 @@ describe('the Shul times page (?job=times)', () => {
     m.listWatches.mockResolvedValue({ watches: [], available: true })
     // Check now searches it as a shul, and keeps what it said.
     await POST(req('POST', { action: 'check', resourceId: KESHER }, '?job=times'))
-    expect(m.searchHoursPages).toHaveBeenCalledWith('https://kesher.org/', undefined, 'times')
+    expect(m.searchHoursPages).toHaveBeenCalledWith('https://kesher.org/', 'America/New_York', undefined, 'times')
     expect(m.addWatch).toHaveBeenCalledWith('philly', expect.objectContaining({ url: hoursSearchedUrl(KESHER, 'times'), createdBy: HOURS_SEARCHED_CREATOR, active: false }))
     // And its POSTs are for its places.
     expect((await POST(req('POST', { action: 'off', resourceId: KESHER }))).status).toBe(400)
@@ -274,7 +274,7 @@ describe('POST /api/admin/watches/hours', () => {
     m.searchHoursPages.mockResolvedValueOnce({ found: [{ url: 'https://lmcmikvah.org/mens-mikvah/', link: 'Men' }, { url: 'https://lmcmikvah.org/keilim/', link: 'Keilim' }], unloaded: [] })
     m.addWatch.mockImplementationOnce(async (_c: string, x: Partial<Watch>) => w({ id: 'keilim', lastRunAt: null, lastCheck: null, ...x }))
     const body = await (await POST(req('POST', { action: 'check', resourceId: LMC }))).json()
-    expect(m.searchHoursPages).toHaveBeenCalledWith('http://lmcmikvah.org/', undefined, 'hours')
+    expect(m.searchHoursPages).toHaveBeenCalledWith('http://lmcmikvah.org/', 'America/New_York', undefined, 'hours')
     expect(m.addWatch).toHaveBeenCalledTimes(1)
     expect(m.addWatch).toHaveBeenCalledWith('philly', expect.objectContaining({ url: 'https://lmcmikvah.org/keilim/', resourceId: LMC, createdBy: HOURS_FOUND_CREATOR }))
     // Nothing read in this request: Sons of Israel's four pages, read by

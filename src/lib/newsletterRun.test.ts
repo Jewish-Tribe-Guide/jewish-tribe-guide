@@ -79,7 +79,7 @@ const email = {
   text: 'Shabbos Noach. Shacharis 9:00am. Kiddush sponsored by the Cohens.',
   attachment: null,
 }
-const opts = { apiKey: 'k', communityName: 'Philadelphia', now: '2026-10-16T15:00:00.000Z' }
+const opts = { apiKey: 'k', communityName: 'Philadelphia', where: { timezone: 'America/New_York', mapCenter: { lat: 39.95, lng: -75.16 } }, now: '2026-10-16T15:00:00.000Z' }
 
 const changed = {
   kind: 'schedule',
@@ -187,7 +187,7 @@ describe('receiveNewsletter: who it’s from', () => {
 describe('receiveNewsletter: what it changes', () => {
   it('files the shul’s changed times as from the shul, and the watch remembers the email', async () => {
     expect(await receiveNewsletter('philly', email, opts)).toEqual({ status: 'read', filed: 1 })
-    expect(m.readShulWeek).toHaveBeenCalledWith(shul, 'minyanim', { text: email.text }, 'k', { sentAt: Date.parse(email.date), others: expect.any(Function) })
+    expect(m.readShulWeek).toHaveBeenCalledWith(shul, 'minyanim', { text: email.text }, 'k', { where: opts.where, sentAt: Date.parse(email.date), others: expect.any(Function) })
     const [community, target, payload, note, by] = m.submitListingUpdate.mock.calls[0]
     expect([community, target, by]).toEqual(['philly', SHUL, { name: NEWSLETTER_WATCH_NAME }])
     expect(payload.details.minyanim.map((x: { tefillah: string; time: string }) => `${x.tefillah} ${x.time}`).sort()).toEqual(['mincha 12:20pm', 'shacharis 9:00am'])
@@ -265,7 +265,7 @@ describe('receiveNewsletter: what it changes', () => {
     const pdf = { mime: 'application/pdf', b64: Buffer.from('%PDF').toString('base64') }
     m.readShulWeek.mockImplementation(async (_l: unknown, _k: string, source: Record<string, string>) => ({ update: source.pdf ? changed : allGone, model: 'x' }))
     expect(await receiveNewsletter('philly', { ...email, attachment: pdf }, opts)).toEqual({ status: 'read', filed: 1 })
-    expect(m.readShulWeek).toHaveBeenCalledWith(shul, 'minyanim', { pdf: pdf.b64 }, 'k', { sentAt: Date.parse(email.date), others: expect.any(Function) })
+    expect(m.readShulWeek).toHaveBeenCalledWith(shul, 'minyanim', { pdf: pdf.b64 }, 'k', { where: opts.where, sentAt: Date.parse(email.date), others: expect.any(Function) })
     expect(m.upload).toHaveBeenCalledWith(expect.stringMatching(/^newsletter-source\/.+\.pdf$/), expect.any(Buffer), { contentType: 'application/pdf', upsert: false })
     expect(m.submitListingUpdate.mock.calls[0][2].source.photoUrl).toMatch(/^https:\/\/kept\/newsletter-source\//)
   })

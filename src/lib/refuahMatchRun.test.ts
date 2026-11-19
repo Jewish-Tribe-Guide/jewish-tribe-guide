@@ -44,6 +44,16 @@ beforeEach(() => {
 })
 
 describe('syncRefuahWatches', () => {
+  // Nov 18 review: Refuah was asked every night for a community that had
+  // turned its hospitals job off.
+  it('asks Refuah nothing for a community that turned hospitals off', async () => {
+    m.listWatches.mockResolvedValue({ watches: [{ id: 'off', url: 'https://guide.invalid/job-off/hospitals', resourceId: null, createdBy: 'job off', active: false }], available: true })
+    const fetcher = refuah([PA])
+    expect(await syncRefuahWatches(fetcher)).toEqual([])
+    expect(fetcher).not.toHaveBeenCalled()
+    expect(m.addWatch).not.toHaveBeenCalled()
+  })
+
   it('gives a hospital the Refuah page nearest it, marked as the run’s own, asking from where it is', async () => {
     const fetcher = refuah([PA])
     expect(await syncRefuahWatches(fetcher)).toEqual([{ community: 'philly', added: 1, removed: 0 }])

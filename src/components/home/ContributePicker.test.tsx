@@ -50,6 +50,17 @@ describe('ContributePicker', () => {
     expect(screen.queryByText('Synagogues')).not.toBeInTheDocument()
   })
 
+  // Nov 18 review, item 33: a community's own switch (its row's `ui`) was
+  // read by nothing, so turning additions off there left every Add showing.
+  it('lists nothing where this community has turned additions off', () => {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderWithProviders(<ContributePicker onClose={vi.fn()} />, {
+      content: { categories: [grocery] },
+      community: { ui: { contributions: { add: false } } },
+    })
+    expect(screen.queryByText('Grocery Stores')).not.toBeInTheDocument()
+  })
+
   // Names only from Nov 14 looked unfinished; the user (Nov 16) chose the
   // home tiles' photos beside them. Still no icons or emoji.
   it('shows each category with its home tile’s photo, and no icon', () => {

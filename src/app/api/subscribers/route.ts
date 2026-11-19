@@ -1,7 +1,9 @@
 import { after } from 'next/server'
 import { createSubscriber } from '@/lib/subscriberStore'
 import { sendSubscribeConfirmation } from '@/lib/subscriberEmail'
-import { enforceRateLimit } from '@/lib/rateLimit'
+import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
+import { verifyTurnstile } from '@/lib/turnstile'
+import { normalizeEmail } from '@/lib/activity'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -11,9 +13,8 @@ type Body = {
   notifyAdd?: boolean
   notifyClosure?: boolean
   company?: string
+  turnstileToken?: string
 }
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // POST /api/subscribers — public endpoint for the desktop home screen's
 // "stay in the loop" signup (see SubscribeSection.tsx). Instant, not
@@ -34,8 +35,17 @@ export async function POST(request: Request) {
   // Bot trap — silently accept so the bot can't tell it was caught.
   if (isHoneypotTripped(body)) return Response.json({ ok: true })
 
-  const email = body.email?.trim() ?? ''
-  if (!EMAIL_RE.test(email)) {
+  // Every signup sends an email to the address given, so a script must not be
+  // able to sign strangers up by the thousand (Nov 18 review, item 25).
+  if (!(await verifyTurnstile(body.turnstileToken, clientIp(request)))) {
+    return Response.json(
+      { ok: false, code: 'turnstile', errors: ['Verification failed. Please try again.'] },
+      { status: 403 },
+    )
+  }
+
+  const email = normalizeEmail(body.email)
+  if (!email) {
     return Response.json({ ok: false, errors: ['Please enter a valid email address.'] }, { status: 400 })
   }
 

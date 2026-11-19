@@ -27,7 +27,11 @@ export async function GET(request: Request) {
     const place = { latitude: community.mapCenter.lat, longitude: community.mapCenter.lng, timezone: community.timezone }
     const candles = await candlesToday(place, now)
     const read = await refreshStale(eruvim, { now, timezone: community.timezone, candles, save: (id, r) => saveStatusRead(community.slug, id, r) })
-    return Response.json({ ok: true, available: true, timezone: community.timezone, candles, eruvim: read, mapsVersion }, { headers: { 'Cache-Control': CACHE_CONTROL } })
+    // Why a read failed is the admin's to see (the Watches tab); a visitor's
+    // page needs only that it did, and when (statusErrorAt).
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- left out, see above
+    const eruvimForVisitors = read.map(({ statusError: _why, ...e }) => e)
+    return Response.json({ ok: true, available: true, timezone: community.timezone, candles, eruvim: eruvimForVisitors, mapsVersion }, { headers: { 'Cache-Control': CACHE_CONTROL } })
   } catch (err) {
     console.error('[eruv] GET failed:', err)
     return Response.json({ ok: false, eruvim: [] }, { status: 502 })

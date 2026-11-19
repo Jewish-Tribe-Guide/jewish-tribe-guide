@@ -1,11 +1,11 @@
 'use client'
 
+import { EDIT_LISTING_LABEL } from './resources/editListingLabel'
 import Link from 'next/link'
 import FeedbackButton from './FeedbackButton'
 import { SkylineIcon } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
-import { useCommunitySlug } from '@/lib/communityContext'
-import { community } from '@/community.config'
+import { useCommunityPlace, useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import type { SiteSettings } from '@/lib/siteSettings'
 
@@ -26,6 +26,7 @@ export default function SiteFooter({
   const live = useSiteSettings()
   const settings = previewSettings ?? live
   const communitySlug = useCommunitySlug()
+  const { region } = useCommunityPlace()
 
   return (
     <footer className="mt-16 border-t border-slate-200/80 bg-surface desktop:bg-white">
@@ -48,7 +49,7 @@ export default function SiteFooter({
             <SkylineIcon className="h-10 w-[86px] shrink-0 text-slate-400" />
             <div>
               <p className="text-sm font-semibold text-slate-900">
-                A more connected {community.region}
+                A more connected {region}
               </p>
               <p className="mt-1.5 text-sm leading-relaxed text-muted">
                 Whether you&rsquo;re a lifelong local, new to the city, or just visiting — the {settings.name} helps
@@ -65,7 +66,7 @@ export default function SiteFooter({
                 the guide is likely wrong (a tester, Nov 17). And the links
                 it named, Edit and Report, are long gone. */}
             <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-muted sm:ml-auto">
-              Tap <span className="font-medium text-slate-600">Suggest an edit</span> on any listing, or{' '}
+              Tap <span className="font-medium text-slate-600">{EDIT_LISTING_LABEL}</span> on any listing, or{' '}
               <span className="font-medium text-slate-600">+ Add</span> for a new place. A person checks each one.
             </p>
           </div>

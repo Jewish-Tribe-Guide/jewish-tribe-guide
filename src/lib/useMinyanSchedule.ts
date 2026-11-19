@@ -1,6 +1,6 @@
 'use client'
 
-import { useCommunityTimezone } from '@/lib/communityContext'
+import { useCommunityPlace, useCommunityTimezone } from '@/lib/communityContext'
 import { useCategories } from '@/lib/useCategories'
 import { useAllListings } from '@/lib/useAllListings'
 import { useNow } from '@/lib/useNow'
@@ -8,15 +8,15 @@ import { currentSeason, type Season } from '@/lib/season'
 import { DAY_KEYS, dayAndMinutesInTimezone, type DayKey } from '@/lib/hours'
 import type { MinyanDayKey } from '@/lib/davening'
 import { minyanimPage } from '@/lib/davening'
-import { dateKey, factsFor, readSchedules, regularMinyanim, schedulesKey, shabbosIsOver, withSchedules, type DateFacts, type DayPosting } from '@/lib/schedules'
+import { dateKey, factsFor, readSchedules, withRoshChodesh, regularMinyanim, schedulesKey, shabbosIsOver, withSchedules, type DateFacts, type DayPosting } from '@/lib/schedules'
 import { dayInTimezone } from '@/lib/activity'
 import { listMinyanim, minyanimOn, type ShulMinyanim } from '@/lib/upcomingDavening'
 import type { AnswerSchedule } from '@/lib/askAnswer'
 import { useZmanim } from '@/lib/useZmanim'
-import { useZmanAnchors, geoOrCommunityDefault } from '@/lib/useZmanAnchors'
+import { secularHoliday } from '@/lib/secularHolidays'
+import { useZmanAnchors, COMMUNITY_SPOT, geoKey } from '@/lib/useZmanAnchors'
 import type { AnchorTimes } from '@/lib/useZmanAnchors'
 import type { LatLng } from '@/lib/geo'
-import { community } from '@/community.config'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
@@ -67,6 +67,7 @@ export type MinyanSchedule = {
  */
 export function useMinyanSchedule(coords: LatLng | null, only?: readonly DirectoryResource[]): MinyanSchedule | null {
   const timezone = useCommunityTimezone()
+  const { center } = useCommunityPlace()
   const categories = useCategories()
   // A category page passes its own listings (`only`): it has no provider of
   // every listing on the site, which only the home screen and the map load.
@@ -87,14 +88,14 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   // plain `new Date(now).getDay()` produced whenever the two disagreed.
   // Falls back to the community's own default location: whether today is
   // Yom Tov doesn't depend on which address a visitor set.
-  const { data: zmanimData } = useZmanim(coords ?? community.mapCenter)
+  const { data: zmanimData } = useZmanim(coords ?? center)
   // Today and the six days after it: what "Shabbos" or "Sunday" means when
   // asked this week, which a festival can change (Shemini Atzeres on
   // Shabbos). Counted on the calendar from today, not 24 hours at a time:
   // the day the clocks go back has 25, so just after midnight that week two
   // steps landed on it and the last day was never shown.
   const todayDate = now === null ? null : dayInTimezone(timezone, new Date(now))
-  const dates =
+  const onCalendar =
     todayDate === null
       ? []
       : Array.from({ length: 7 }, (_, i) =>
@@ -102,7 +103,8 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
         )
   // Today's Yom Tov answer is the converter's own (isYomTov); the days
   // ahead only fill in what it doesn't say.
-  if (dates[0] && typeof zmanimData?.isYomTov === 'boolean') dates[0] = { ...dates[0], yomTov: zmanimData.isYomTov }
+  if (onCalendar[0] && typeof zmanimData?.isYomTov === 'boolean') onCalendar[0] = { ...onCalendar[0], yomTov: zmanimData.isYomTov }
+  const dates = withRoshChodesh(onCalendar, zmanimData?.isRoshChodesh, zmanimData?.roshChodeshDays)
 
   const posting: Record<string, Record<string, DayPosting>> = {}
   const shuls: ShulMinyanim[] = (listings ?? [])
@@ -118,8 +120,13 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   // Only shuls with at least one anchor-based row need a resolved sunset —
   // fetching zmanim for every shul's location regardless would cost a
   // request per distinct address for a card that mostly doesn't need it.
-  const anchorGeos = shuls.filter((s) => s.minyanim.some((m) => m.anchor)).map((s) => geoOrCommunityDefault(s.geo))
-  const anchors = useZmanAnchors(anchorGeos)
+  // A shul with no location of its own is timed by its community's centre,
+  // filed under COMMUNITY_SPOT for the functions that look shuls up
+  // (anchorKey).
+  const anchorGeos = shuls.filter((s) => s.minyanim.some((m) => m.anchor)).map((s) => s.geo ?? center)
+  const bySpot = useZmanAnchors(anchorGeos)
+  const atCentre = bySpot[geoKey(center)]
+  const anchors = atCentre ? { ...bySpot, [COMMUNITY_SPOT]: atCentre } : bySpot
 
   // Nothing is scheduled before the page has hydrated, when there's no time
   // yet (see useNow).
@@ -140,9 +147,19 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
 }
 
 /** The day keys a date's minyanim match: its weekday, its own date (a
- *  special schedule's), and Yom Tov when the calendar says so. */
+ *  special schedule's), Yom Tov when the calendar says so, a public
+ *  holiday (worked out here, so always known), and Rosh Chodesh when the
+ *  calendar has said it is (withRoshChodesh). Unknown is not Rosh Chodesh:
+ *  "Next:" mustn't name a minyan that may not be running. */
 export function dayKeysFor(d: DateFacts): MinyanDayKey[] {
-  return [d.weekday, dateKey(d.date), ...(d.yomTov ? (['yom_tov'] as const) : [])]
+  const [y, m, day] = d.date.split('-').map(Number)
+  return [
+    d.weekday,
+    dateKey(d.date),
+    ...(d.yomTov ? (['yom_tov'] as const) : []),
+    ...(secularHoliday(new Date(y, m - 1, day)) ? (['holiday'] as const) : []),
+    ...(d.roshChodesh ? (['rosh_chodesh'] as const) : []),
+  ]
 }
 
 /** The schedule as a search answer needs it (see askAnswer's

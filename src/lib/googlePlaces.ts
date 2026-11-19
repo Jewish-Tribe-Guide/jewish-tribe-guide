@@ -12,8 +12,8 @@
 // consistency with geo.ts, which already calls the legacy
 // maps.googleapis.com web services with this key.
 
-import type { BusinessStatus, DayKey, StructuredHours } from './hours'
-import { DAY_KEYS } from './hours'
+import type { BusinessStatus, StructuredHours } from './hours'
+import { periodsToStructured } from './hours'
 
 // BusinessStatus used to be declared here too, an identical copy of hours.ts's
 // own — nothing ever imported this one (every real consumer already imported
@@ -187,6 +187,11 @@ export function namesOverlap(a: string, b: string): boolean {
 
 // ── Find Place id ───────────────────────────────────────────────────────────
 
+/** How long a Google request may take before it counts as failed. The
+ *  nightly sync asks about every listing one after another inside a 300s
+ *  limit, so one call that never answered used to end the whole run. */
+const GOOGLE_TIMEOUT_MS = 10_000
+
 /**
  * Resolves a Google place id from a name + address. Used once, by the place-id
  * backfill. Returns null if Google can't confidently match the query (callers
@@ -201,7 +206,7 @@ export async function findPlaceId(name: string, address: string): Promise<string
     const url =
       `https://maps.googleapis.com/maps/api/place/findplacefromtext/json` +
       `?input=${encodeURIComponent(input)}&inputtype=textquery&fields=place_id&key=${key}`
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS) })
     if (!res.ok) return null
     const data = (await res.json()) as { status: string; candidates?: { place_id?: string }[] }
     if (data.status !== 'OK' || !data.candidates?.[0]?.place_id) return null
@@ -227,7 +232,7 @@ export async function findPlaceStatus(
     const url =
       `https://maps.googleapis.com/maps/api/place/findplacefromtext/json` +
       `?input=${encodeURIComponent(input)}&inputtype=textquery&fields=place_id,name,business_status&key=${key}`
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS) })
     if (!res.ok) return null
     const data = (await res.json()) as {
       status: string
@@ -251,7 +256,7 @@ export async function searchPlaces(query: string): Promise<{ placeId: string; na
   if (!key || !q) return null
   try {
     const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(q)}&key=${key}`
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS) })
     if (!res.ok) return null
     const data = (await res.json()) as { status: string; results?: { place_id?: string; name?: string; formatted_address?: string }[] }
     if (data.status === 'ZERO_RESULTS') return []
@@ -301,7 +306,7 @@ export async function fetchPlaceSync(placeId: string, { statusOnly = false }: { 
     const url =
       `https://maps.googleapis.com/maps/api/place/details/json` +
       `?place_id=${encodeURIComponent(placeId)}&fields=${fields}&key=${key}`
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS) })
     if (!res.ok) return null
     const data = (await res.json()) as { status: string; result?: GooglePlaceResult }
     if (data.status !== 'OK' || !data.result) return null
@@ -333,52 +338,15 @@ function hhmm(time: string): string {
 }
 
 /**
- * Maps Google's `opening_hours.periods` to this app's StructuredHours
- * ({ sun: { open, close } | null, … }). Returns null when Google has no hours
- * at all, so the caller leaves the listing's existing hours untouched rather
- * than blanking them.
- *
- * Approximations (StructuredHours stores one open/close range per day):
- *   • 24-hour places (a single open period with no close) → every day 00:00–23:59.
- *   • Split hours within a day (e.g. lunch break) collapse to the earliest open
- *     and latest close of that day.
- *   • A period that closes after midnight is attributed to its open day and
- *     capped at 23:59.
+ * Maps Google's `opening_hours.periods` to this app's StructuredHours. Returns
+ * null when Google has no hours at all, so the caller leaves the listing's
+ * existing hours untouched rather than blanking them. The reading itself is
+ * hours.ts's periodsToStructured, shared with the Places JS API's shape.
  */
 export function googleHoursToStructured(oh: GoogleOpeningHours | undefined): StructuredHours | null {
   const periods = oh?.periods
   if (!periods || periods.length === 0) return null
-
-  // Open 24/7: Google returns one period, open day 0 time "0000", no close.
-  if (periods.length === 1 && !periods[0].close && periods[0].open.time === '0000') {
-    const allDay: StructuredHours = {}
-    for (const key of DAY_KEYS) allDay[key] = { open: '00:00', close: '23:59' }
-    return allDay
-  }
-
-  const result: StructuredHours = {}
-  // Days absent from `result` mean "closed" downstream, so start every day closed.
-  for (const key of DAY_KEYS) result[key] = null
-
-  for (const p of periods) {
-    const dayIdx = p.open.day
-    if (dayIdx < 0 || dayIdx > 6) continue
-    const key: DayKey = DAY_KEYS[dayIdx]
-    const open = hhmm(p.open.time)
-    // No close, or close rolls into another day → cap at end of the open day.
-    const close = !p.close || p.close.day !== dayIdx ? '23:59' : hhmm(p.close.time)
-
-    const existing = result[key]
-    if (!existing) {
-      result[key] = { open, close }
-    } else {
-      // Split hours: widen to the earliest open / latest close of the day.
-      result[key] = {
-        open: open < existing.open ? open : existing.open,
-        close: close > existing.close ? close : existing.close,
-      }
-    }
-  }
-
-  return result
+  return periodsToStructured(
+    periods.map((p) => ({ day: p.open.day, open: hhmm(p.open.time), close: p.close ? { day: p.close.day, time: hhmm(p.close.time) } : null })),
+  )
 }

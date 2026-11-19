@@ -5,7 +5,9 @@ const m = vi.hoisted(() => ({
   createBucket: vi.fn(),
   upload: vi.fn(),
   getPublicUrl: vi.fn(),
+  verifyTurnstile: vi.fn(),
 }))
+vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
@@ -15,22 +17,49 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 const { POST } = await import('./route')
 
-function upload(file?: File | string) {
+function upload(file?: File | string, turnstileToken?: string) {
   const form = new FormData()
   if (file !== undefined) form.set('file', file)
+  if (turnstileToken !== undefined) form.set('turnstileToken', turnstileToken)
   return POST(new Request('http://x/api/submissions/photo', { method: 'POST', body: form }))
 }
-const png = (bytes = 10) => new File([new Uint8Array(bytes)], 'p.png', { type: 'image/png' })
+const SIGNATURES: Record<string, number[]> = {
+  'image/png': [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+  'image/jpeg': [0xff, 0xd8, 0xff, 0xe0],
+  'image/gif': [...new TextEncoder().encode('GIF89a')],
+  'image/webp': [...new TextEncoder().encode('RIFF\0\0\0\0WEBP')],
+}
+/** A file that really is the kind it says, `size` bytes long. */
+const image = (type: string, size = 16, name = 'f') => {
+  const bytes = new Uint8Array(size)
+  bytes.set(SIGNATURES[type])
+  return new File([bytes], name, { type })
+}
+const png = (bytes = 16) => image('image/png', bytes, 'p.png')
 
 beforeEach(() => {
   vi.resetAllMocks()
   m.enforceRateLimit.mockResolvedValue(null)
+  m.verifyTurnstile.mockResolvedValue(true)
   m.createBucket.mockResolvedValue({ error: null })
   m.upload.mockResolvedValue({ error: null })
   m.getPublicUrl.mockReturnValue({ data: { publicUrl: 'https://cdn/x.png' } })
 })
 
 describe('POST /api/submissions/photo', () => {
+  it('stores nothing without a passed challenge', async () => {
+    m.verifyTurnstile.mockResolvedValue(false)
+    const res = await upload(png(), 'used-token')
+    expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject({ ok: false, code: 'turnstile' })
+    expect(m.upload).not.toHaveBeenCalled()
+  })
+
+  it('checks the token the upload carries, from the uploader', async () => {
+    expect((await upload(png(), 'tok')).status).toBe(200)
+    expect(m.verifyTurnstile).toHaveBeenCalledWith('tok', '1.2.3.4')
+  })
+
   it('returns the rate limiter’s response and stores nothing', async () => {
     m.enforceRateLimit.mockResolvedValue(new Response('slow', { status: 429 }))
     expect((await upload(png())).status).toBe(429)
@@ -57,7 +86,22 @@ describe('POST /api/submissions/photo', () => {
   })
 
   it.each(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])('accepts %s', async (type) => {
-    expect((await upload(new File(['x'], 'f', { type }))).status).toBe(200)
+    expect((await upload(image(type))).status).toBe(200)
+  })
+
+  // The type on a file is whatever the sender wrote (Nov 18 review, item 26).
+  it('refuses a file whose bytes are not the image its label says', async () => {
+    const res = await upload(new File(['<html><script>alert(1)</script>'], 'p.png', { type: 'image/png' }))
+    expect(res.status).toBe(400)
+    expect(m.upload).not.toHaveBeenCalled()
+  })
+
+  it('stores a file with the type its bytes show, not its label', async () => {
+    const jpeg = image('image/jpeg')
+    await upload(new File([await jpeg.arrayBuffer()], 'p.png', { type: 'image/png' }))
+    const [path, , opts] = m.upload.mock.calls[0]
+    expect(path).toMatch(/\.jpeg$/)
+    expect(opts).toEqual({ contentType: 'image/jpeg', upsert: false })
   })
 
   it('refuses a file over 5MB and accepts one exactly at the limit', async () => {
@@ -75,7 +119,7 @@ describe('POST /api/submissions/photo', () => {
   })
 
   it('never uses the visitor’s own filename in the stored path', async () => {
-    await upload(new File(['x'], '../../etc/passwd.png', { type: 'image/png' }))
+    await upload(new File([await png().arrayBuffer()], '../../etc/passwd.png', { type: 'image/png' }))
     expect(m.upload.mock.calls[0][0]).not.toMatch(/passwd|\.\./)
   })
 

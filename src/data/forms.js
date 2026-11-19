@@ -1,7 +1,6 @@
 // Intake forms, expressed as data so they're editable via the /admin "Forms"
 // tab without a code change. Seeded into the `form` table by
-// scripts/seed-forms.mjs, and used as the client-side fallback (see
-// src/lib/useForms.ts) if /api/forms is unreachable. Mirrors
+// scripts/seed-forms.mjs. The site reads the table, not this file. Mirrors
 // src/data/categories.js.
 //
 // `steps[].when`: an array of conditions, ALL of which must hold for the step

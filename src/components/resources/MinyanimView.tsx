@@ -8,7 +8,7 @@ import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
-import { useActiveCommunity } from '@/lib/communityContext'
+import { useActiveCommunity, useCommunityTimezone } from '@/lib/communityContext'
 import { SIGN_UP_MARK, TEFILLAH_LABELS } from '@/lib/davening'
 import { milesText } from '@/lib/geo'
 import { dayLabel } from '@/lib/hours'
@@ -402,12 +402,12 @@ export default function MinyanimView({
  *  "Usual time · last checked Oct 12", so a time nobody has sent for this
  *  week doesn't look like one (the user, Oct 23: "Trust is our biggest
  *  thing"). */
-function whose(p: DayPosting, inSentence = false, checkedAt?: string): string {
+function whose(p: DayPosting, inSentence = false, checked?: { at: string; timezone: string }): string {
   if (p.kind === 'schedule' && p.thisWeek) return inSentence ? ', its times for this week' : 'This week’s times'
   if (p.kind === 'schedule') return inSentence ? `, its ${p.name.replace(/\s+\d{4}$/, '')} times` : `${p.name.replace(/\s+\d{4}$/, '')} times`
   if (p.kind === 'not-posted') return inSentence ? `, regular times (${p.festival} not posted)` : `Regular times · ${p.festival} not posted`
   if (inSentence) return ''
-  return checkedAt ? `Usual time · last checked ${shortDate(checkedAt)}` : 'Usual time'
+  return checked ? `Usual time · last checked ${shortDate(checked.at, checked.timezone)}` : 'Usual time'
 }
 
 /** Reports how many the list shows, after it changes: its own component,
@@ -446,7 +446,8 @@ export function MinyanRow({
    *  walk list has its card's own padding. */
   inset?: boolean
 }) {
-  const tag = whose(posting, false, checkedAt)
+  const timezone = useCommunityTimezone()
+  const tag = whose(posting, false, checkedAt ? { at: checkedAt, timezone } : undefined)
   const body = (
     <>
         <span className="w-[4.5rem] shrink-0 text-[16.5px] font-extrabold text-slate-900">{clockTime(slot.minutes)}</span>

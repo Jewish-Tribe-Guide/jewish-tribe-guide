@@ -105,7 +105,7 @@ describe('the answer says when the item was last seen (agreed Oct 1)', () => {
     { ...store('ShopRite', ['Challah'], 39.96), itemSeen: { m: { Challah: '2026-07-02T14:00:00Z' } } },
     store('GIANT', ['Challah'], 39.97),
   ]
-  const ask = (q: string, list = dated, n: number | null = now) => answerFor(searchAsk(list, [grocery], q, { coords: here }), { coords: here, now: n })?.text
+  const ask = (q: string, list = dated, n: number | null = now, timezone = 'America/New_York') => answerFor(searchAsk(list, [grocery], q, { coords: here }), { coords: here, now: n, timezone })?.text
 
   it('the nearest’s date, and how many were seen this week', () => {
     expect(ask('challah')).toBe('3 places have Challah. Seen this week at 1. Nearest: Acme, 0.1 mi, seen today.')
@@ -115,6 +115,16 @@ describe('the answer says when the item was last seen (agreed Oct 1)', () => {
     expect(ask('challah', [dated[2], dated[1]])).toBe('2 places have Challah. Nearest: ShopRite, 0.7 mi, seen Jul 2.')
     expect(ask('challah', [dated[2]])).toBe('GIANT has Challah, 1.4 mi.')
     expect(ask('challah', dated, null)).toBe('3 places have Challah. Nearest: Acme, 0.1 mi.')
+  })
+
+  // On the community's own clock (Nov 19): it was the deployment config's,
+  // Philly's, for every community. 11:30 PM in New York is 8:30 PM in Los
+  // Angeles, and an hour and a half later New York is on the next day.
+  it('says "today" by the community’s own clock', () => {
+    const seen = [{ ...store('Acme', ['Challah'], 39.951), itemSeen: { m: { Challah: '2026-10-09T03:30:00Z' } } }]
+    const at = Date.parse('2026-10-09T05:00:00Z')
+    expect(ask('challah', seen, at, 'America/Los_Angeles')).toBe('Acme has Challah, 0.1 mi, seen today.')
+    expect(ask('challah', seen, at, 'America/New_York')).toBe('Acme has Challah, 0.1 mi, seen yesterday.')
   })
 })
 
@@ -156,7 +166,7 @@ describe('main dishes on Food (agreed Oct 1)', () => {
     place('Bagel Place', [], { dishes: ['Burgers'] }, 39.98),
     place('Pretzel Co.', ['Parve'], { googleDescription: 'Hand-rolled soft pretzels.' }, 39.99),
   ]
-  const ask = (q: string, list = places) => answerFor(searchAsk(list, [food], q, { coords: here }), { coords: here, now })?.text
+  const ask = (q: string, list = places) => answerFor(searchAsk(list, [food], q, { coords: here }), { coords: here, now, timezone: 'America/New_York' })?.text
 
   it('"burger" finds the burgers, however each menu names them, and says where they’re meatless', () => {
     expect(ask('burger')).toBe(

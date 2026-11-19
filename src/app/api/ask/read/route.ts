@@ -1,9 +1,10 @@
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
-import { enforceRateLimit, sharedLimit } from '@/lib/rateLimit'
+import { after } from 'next/server'
+import { enforceRateLimit, rateLimit, sharedLimit } from '@/lib/rateLimit'
 import { placeFor, questionKey, readerPlaces, readerVocabulary } from '@/lib/questionReader'
-import { findReading, saveReading } from '@/lib/questionReadingStore'
+import { countAsked, findReading, saveReading } from '@/lib/questionReadingStore'
 import { DEFAULT_READER_MODEL, readQuestion } from '@/lib/readQuestion'
 
 // POST /api/ask/read { question } → { ok: true, reading } | { ok: false, reason }
@@ -48,6 +49,14 @@ export async function POST(request: Request) {
     const key = questionKey(question)
     const remembered = await findReading(community.slug, key)
     if (remembered && (remembered.approved || apiKey)) {
+      // Counted for the admin's "most asked" once per visitor per question a
+      // day, so a loop can't put a question at the top; written after the
+      // answer, and awaited there so the write isn't cut off (Nov 18 review,
+      // item 32).
+      after(async () => {
+        const once = await rateLimit(request, `question-asked:${community.slug}:${key}`, { limit: 1, windowSec: 86_400 })
+        if (once.ok) await countAsked(community.slug, key, remembered.hits)
+      })
       return Response.json({ ok: true, reading: remembered.reading, remembered: true, approved: remembered.approved })
     }
     if (!apiKey) return Response.json({ ok: false, reason: 'off' })

@@ -111,8 +111,8 @@ export default function ReportsPanel({ token }: { token: string }) {
                     <th className="px-4 pt-2.5 pb-1.5 text-left font-normal">
                       <span className="sr-only">What</span>
                     </th>
-                    <th className="pt-2.5 pb-1.5 text-right font-normal w-20">Taken</th>
-                    <th className="px-4 pt-2.5 pb-1.5 text-right font-normal w-20">Left</th>
+                    <th className="pt-2.5 pb-1.5 text-right font-normal w-20">Approved</th>
+                    <th className="px-4 pt-2.5 pb-1.5 text-right font-normal w-20">Rejected</th>
                   </tr>
                 </thead>
                 <tbody>

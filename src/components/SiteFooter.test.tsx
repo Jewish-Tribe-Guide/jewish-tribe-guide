@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { EDIT_LISTING_LABEL } from './resources/editListingLabel'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -41,7 +42,10 @@ describe('SiteFooter — the contributing line', () => {
     expect(screen.getByText('Know something we don’t?')).toBeInTheDocument()
     expect(screen.queryByText(/wrong or missing/i)).not.toBeInTheDocument()
     const line = screen.getByText(/A person checks each one\./)
-    expect(line).toHaveTextContent('Tap Suggest an edit on any listing, or + Add for a new place.')
+    // The listing's own button, by the name it has (it said "Suggest an
+    // edit" for a month after the button became Edit listing; Nov 18 review).
+    expect(line).toHaveTextContent(`Tap ${EDIT_LISTING_LABEL} on any listing, or + Add for a new place.`)
+    expect(EDIT_LISTING_LABEL).toBe('Edit listing')
     expect(line).not.toHaveTextContent(/Report/)
   })
 })

@@ -141,6 +141,27 @@ describe('what stopped working', () => {
     expect(stoppedJobs(runs, since, 'philly')).toEqual([{ name: 'Watches (nightly job)', why: 'Boom', kind: 'job', path: '/philly/admin/watches' }])
   })
 
+  // Live: read-menus on Oct 27 and watches on Nov 6 never finished, and no
+  // email said so. A run still unfinished well past its time limit was
+  // read as "still going", and the next night's fine run as nothing to tell
+  // (Nov 18 review).
+  it('a run cut off last night, past its time limit, is told of', () => {
+    const since = new Date(NOW.getTime() - 24 * 3_600_000).toISOString()
+    const cut = run({ startedAt: '2026-11-13T07:00:00Z', finishedAt: null, ok: null })
+    const runs = new Map<string, JobRun[]>([['watches', [cut, run({ startedAt: LAST_WEEK })]]])
+    expect(stoppedJobs(runs, since, 'philly', NOW.getTime())).toEqual([expect.objectContaining({ name: 'Watches (nightly job)', why: 'Stopped before it finished' })])
+  })
+
+  it('a job that didn’t run at all is told of, the first night it’s late', () => {
+    const since = new Date(NOW.getTime() - 24 * 3_600_000).toISOString()
+    const lastRan = new Date(NOW.getTime() - 31 * 3_600_000).toISOString()
+    const runs = new Map<string, JobRun[]>([['watches', [run({ startedAt: lastRan })]]])
+    expect(stoppedJobs(runs, since, 'philly', NOW.getTime())).toEqual([expect.objectContaining({ name: 'Watches (nightly job)', why: expect.stringMatching(/^Hasn’t run since /) })])
+    // Not again every night after.
+    const longAgo = new Date(NOW.getTime() - 80 * 3_600_000).toISOString()
+    expect(stoppedJobs(new Map([['watches', [run({ startedAt: longAgo })]]]), since, 'philly', NOW.getTime())).toEqual([])
+  })
+
   it('this email’s own run broke last night: told of the night after', () => {
     const since = new Date(NOW.getTime() - 24 * 3_600_000).toISOString()
     const going = run({ job: 'nightly-email', startedAt: NOW.toISOString(), finishedAt: null, ok: null })

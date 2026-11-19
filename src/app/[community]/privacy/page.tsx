@@ -43,10 +43,12 @@ export async function generateMetadata(props: PageProps<'/[community]/privacy'>)
 // "Last updated" reads the row's own updated_at rather than a hardcoded
 // string — a hand-maintained date would need a code change every time the
 // text does, defeating the point of making this admin-editable at all.
-// `community.timezone` here is the static app config (src/community.config.ts),
-// not the per-community DB row — this app's zmanim/hours logic reads the same
-// static value regardless of which community is browsing, so formatting a
-// timestamp with it is consistent with everything else, not a shortcut.
+// `community.timezone` here is the deployment's config (src/community.config.ts),
+// not the per-community row, on purpose: the policy is one document for the
+// whole site, so its date is one date wherever it's read. Everything that is
+// a community's own — zmanim, hours, "today", "seen Oct 2" — reads the
+// community's clock (useCommunityTimezone; src/test/publicUsesCommunityPlace
+// .test.ts keeps it that way and lists this file as the exception).
 export default async function PrivacyPage() {
   const page = await getPage('privacy')
   const title = page?.title ?? 'Privacy Policy'

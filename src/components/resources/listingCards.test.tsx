@@ -9,6 +9,7 @@ import type { DirectoryResource, ZmanimData } from '@/types'
 import ListingView from './ListingView'
 import { forgetLoadedPlaces } from './WalkList'
 import { clearEruvStatuses } from '@/lib/useEruvStatuses'
+import { placeTime } from '@/test/placeTime'
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 vi.mock('next/navigation', () => ({
@@ -20,7 +21,7 @@ vi.mock('next/navigation', () => ({
 const zmanim = {
   dayOfWeek: 5,
   isFriday: true,
-  shabbos: { candleLighting: { label: 'Friday', time: '6:13 PM', iso: '2026-10-09T18:13:00' }, havdalah: null },
+  shabbos: { candleLighting: { label: 'Friday', time: '6:13 PM', iso: '2026-10-09T18:13:00-04:00' }, havdalah: null },
 } as unknown as ZmanimData
 vi.mock('@/lib/useZmanim', () => ({ useZmanim: () => ({ data: zmanim, status: 'ready' }) }))
 const location = { anchorListingId: null as string | null, setListingAnchor: vi.fn(), unsetListingAnchor: vi.fn(), directionsOrigin: null }
@@ -100,7 +101,7 @@ afterEach(() => {
 
 describe('A hospital’s own main card', () => {
   it('leads with who to call: their name, what they help with, and a Call button named for them', () => {
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30)) // Tue Oct 6
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30)) // Tue Oct 6
     open()
     const card = screen.getByTestId('listing-section')
     expect(within(card).getByRole('heading', { name: 'Who to call first' })).toBeInTheDocument()
@@ -112,7 +113,7 @@ describe('A hospital’s own main card', () => {
   })
 
   it('says it isn’t in the guide yet, rather than leaving a gap', () => {
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30))
     open({ ...hup, who: '', who_phone: '', who_helps: '' })
     // And asks nobody to confirm that: just its Edit, as under every box
     // (Oct 15).
@@ -120,7 +121,7 @@ describe('A hospital’s own main card', () => {
   })
 
   it('asks "Still right?" about what it says once it says something', () => {
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30))
     open()
     // Not the card's name again (Oct 10): the line is under it.
     expect(within(screen.getByTestId('listing-section')).getByTestId('freshness')).toHaveTextContent(/^Not confirmed yet · Right\?YesEdit$/)
@@ -140,7 +141,7 @@ describe('A hotel’s own main card (Oct 6; always shown since Oct 10)', () => {
     listingParts: { main: { title: 'Shabbos here', fields: ['shabbatFriendly', 'notes'] } },
   })
   const hotel = (details: Record<string, unknown>) => {
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30))
     renderWithProviders(<ListingView item={makeListing({ id: 'cambria', ...details }) as DirectoryResource} category={hotels} color="#000" path="/test" foot={null} />, {
       content: { categories: [hotels] },
     })
@@ -173,7 +174,7 @@ describe('A hotel’s own main card (Oct 6; always shown since Oct 10)', () => {
 
 describe('This Shabbos', () => {
   it('on a Friday before candle lighting, comes right after the main card, with tonight’s time', () => {
-    vi.setSystemTime(new Date(2026, 9, 9, 13, 30)) // Fri Oct 9, 1:30 PM
+    vi.setSystemTime(placeTime(2026, 9, 9, 13, 30)) // Fri Oct 9, 1:30 PM
     open()
     expect(order()).toEqual(['listing-section', 'listing-shabbos', 'walk-list'])
     const card = screen.getByTestId('listing-shabbos')
@@ -182,7 +183,7 @@ describe('This Shabbos', () => {
   })
 
   it('the rest of the week, after the places within a walk, with Friday’s time', () => {
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30)) // Tue Oct 6
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30)) // Tue Oct 6
     open()
     expect(order()).toEqual(['listing-section', 'walk-list', 'listing-shabbos'])
     expect(screen.getByTestId('listing-shabbos')).toHaveTextContent('Candle lightingFriday 6:13 PM, for Test Region')
@@ -210,7 +211,7 @@ describe('This Shabbos', () => {
   // Oct 15: it used to link to a status page written into the code, which
   // was Philadelphia's, in every community.
   it('without the eruv table, an eruv is just its name; what nobody has filled in says so', async () => {
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30))
     vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(String(url).startsWith('/api/eruv') ? { ok: true, available: false, eruvim: [] } : { ok: true, resources: [] }))))
     open()
     const card = screen.getByTestId('listing-shabbos')
@@ -251,7 +252,7 @@ describe('Set as my location', () => {
   // every listing's (Directions, Call, Website, Share). Oct 10: on every
   // listing with an address, not a hospital's only.
   it('is on any listing with an address, with no setting for it, and not on one without', () => {
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30))
     const food = makeCategory({ id: 'restaurant', label: 'Food', pluralLabel: 'Food' })
     const cafe = makeListing({ id: 'cafe', name: 'Cafe', address: '1 Main St', geo: { lat: 39.95, lng: -75.16 } })
     const view = (item: DirectoryResource) =>
@@ -264,7 +265,7 @@ describe('Set as my location', () => {
   })
 
   it('is a row under the address, not a button, and sets the hospital as where every page measures from', () => {
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30))
     open()
     expect(within(screen.getByTestId('listing-actions')).queryByRole('button', { name: /location/i })).not.toBeInTheDocument()
     const details = screen.getByTestId('listing-details')
@@ -275,7 +276,7 @@ describe('Set as my location', () => {
 
   // Oct 15: an Undo you can see, not "Tap to undo" under it.
   it('once set, says so, with an Undo beside it', () => {
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30))
     location.anchorListingId = 'hup'
     open()
     const details = screen.getByTestId('listing-details')
@@ -348,19 +349,19 @@ describe('A hospital’s boxes', () => {
       .map((el) => (el.getAttribute('data-testid') === 'listing-box' ? el.querySelector('h2')!.textContent : el.getAttribute('data-testid')))
 
   it('in the admin’s order, This Shabbos where they put it, then the places within a walk and the contact box', () => {
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30)) // Tue Oct 6
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30)) // Tue Oct 6
     show()
     expect(parts()).toEqual(['Who to call · 4', 'Kosher food', 'A place to stay', 'listing-shabbos', 'Rides', 'Miscellaneous', 'walk-list', 'listing-details'])
   })
 
   it('on a Friday before candles, This Shabbos comes first', () => {
-    vi.setSystemTime(new Date(2026, 9, 9, 13, 30)) // Fri Oct 9
+    vi.setSystemTime(placeTime(2026, 9, 9, 13, 30)) // Fri Oct 9
     show()
     expect(parts().slice(0, 2)).toEqual(['listing-shabbos', 'Who to call · 4'])
   })
 
   it('two lists in one box each under its own heading, with a count when there’s more than one', () => {
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30))
     show()
     const food = screen.getAllByTestId('listing-box')[1]
     expect(food).toHaveTextContent('Pantry · 2')
@@ -369,7 +370,7 @@ describe('A hospital’s boxes', () => {
   })
 
   it('each entry: who, where from, the note, its phones to call, its email and website', () => {
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30))
     show()
     const [call, , stay, rides, also] = screen.getAllByTestId('listing-box')
     const naomi = within(call).getAllByTestId('contact')[1]
@@ -382,13 +383,13 @@ describe('A hospital’s boxes', () => {
   })
 
   it('a box with nothing in it isn’t shown', () => {
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30))
     show({ ...chop, pantry: [], packages: undefined, rides: [{ nope: 1 }] } as DirectoryResource)
     expect(parts()).toEqual(['Who to call · 4', 'A place to stay', 'listing-shabbos', 'Miscellaneous', 'walk-list', 'listing-details'])
   })
 
   it('each box asks “Still right?” on its own date', () => {
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30))
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30))
     show({ ...chop, sectionConfirmed: { pantry: '2026-10-05T12:00:00Z' } } as DirectoryResource)
     const boxes = screen.getAllByTestId('listing-box')
     for (const box of boxes) expect(within(box).getByTestId('freshness')).toBeInTheDocument()
@@ -397,11 +398,11 @@ describe('A hospital’s boxes', () => {
   })
 
   it('the sukkah only from Rosh Hashanah to the end of Sukkos', () => {
-    vi.setSystemTime(new Date(2026, 8, 30, 13, 30)) // Wed Sep 30, Chol HaMoed
+    vi.setSystemTime(placeTime(2026, 8, 30, 13, 30)) // Wed Sep 30, Chol HaMoed
     show()
     expect(screen.getByTestId('listing-shabbos')).toHaveTextContent('SukkahIn the Brodsky Garden')
     cleanup()
-    vi.setSystemTime(new Date(2026, 9, 6, 13, 30)) // Tue Oct 6, after Sukkos
+    vi.setSystemTime(placeTime(2026, 9, 6, 13, 30)) // Tue Oct 6, after Sukkos
     show()
     expect(screen.getByTestId('listing-shabbos')).not.toHaveTextContent('Sukkah')
     // Nor anywhere else on the listing.

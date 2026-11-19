@@ -3,7 +3,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { TAGS } from '@/lib/cacheTags'
 import { recordActivity, removeVisitorActivity } from '@/lib/activityStore'
-import { isIso, ITEM_COOLDOWN_SECONDS, parseItemTap, UUID, type MarkRow } from '@/lib/itemMarkRoutes'
+import { goneReportWaiting, isIso, ITEM_COOLDOWN_SECONDS, parseItemTap, UUID, type MarkRow } from '@/lib/itemMarkRoutes'
 
 // POST /api/resource/:id/item   { field, item }
 // "Still here": a visitor saw this one item on the shelf (agreed Oct 1).
@@ -81,6 +81,16 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
     }
   }
 
+  // A cleared warning returns only with its report still in the queue.
+  let restoreGone: string | null = null
+  if (clearedGone !== null) {
+    try {
+      if (await goneReportWaiting(id, tap.field, tap.item)) restoreGone = clearedGone as string
+    } catch (err) {
+      console.error('[item] could not read the queue:', err)
+    }
+  }
+
   const { data, error } = await getAdminClient().rpc('unmark_item', {
     p_id: id,
     p_field: tap.field,
@@ -88,7 +98,7 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
     p_kind: 'seen',
     p_expected: seenAt,
     p_previous: previous,
-    p_restore_gone: clearedGone,
+    p_restore_gone: restoreGone,
   })
   if (error) {
     console.error('[item] unmark_item failed:', error)

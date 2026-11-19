@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useRef, useState } from 'react'
 import type { EnrichedSubmission, ResourceSubmission } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { diffLines } from '@/lib/submissionDiff'
@@ -21,8 +21,10 @@ import { TheOriginal, fieldKeyFor } from './SubmissionReview'
 import ThingSwitches from './ThingSwitches'
 import { changeEdit } from './changeEdit'
 
-// A change opened from To do (boards 3 and 20, Oct 29; one list since Oct 31,
-// the user: "drop original vs now"): what's new highlighted and what's going
+// A change a read found, opened from a place in Places (Read now; To do
+// opens its changes on the place's own screen, TodoChange.tsx). Drawn as
+// boards 3 and 20 (Oct 29; one list since Oct 31, the user: "drop original
+// vs now"): what's new highlighted and what's going
 // crossed out, where the change came from, and three answers. "Update the listing" takes it as it came; "Edit, then
 // update" opens the rows it changes in the site's own editor (a shul's
 // times in its minyan editor, boards 20b and 20c) and updating saves what
@@ -49,7 +51,6 @@ export default function ChangeReview({
   token,
   onModerate,
   onUpdated,
-  inPlace,
 }: {
   submission: EnrichedSubmission
   category: CategoryConfig
@@ -62,10 +63,6 @@ export default function ChangeReview({
   /** Saved from "Edit, then update": it's approved and gone from the list,
    *  or with `partial`, that part went on and the rest still waits. */
   onUpdated: (id: string, partial?: boolean) => void
-  /** Opened as one of the things waiting at a place (To do, Nov 2): the
-   *  place's switches in place of the change's own, `part` the one open
-   *  (none: the change whole), and whether its Edit is open. */
-  inPlace?: { part?: string; switches: ReactNode; onEditing: (editing: boolean) => void }
 }) {
   const community = useCommunitySlug()
   const fields = category.detailFields
@@ -77,13 +74,8 @@ export default function ChangeReview({
   const savedPart = useRef(false)
   const [on, setOn] = useState<string | null>(null)
   // The switches stay till the change is decided, the answered ones ticked.
-  const part = inPlace
-    ? parts.length > 1
-      ? parts.find((p) => p.id === inPlace.part)
-      : undefined
-    : order.length > 1 && parts.length > 0
-      ? (parts.find((p) => p.id === on && !done.includes(p.id)) ?? parts.find((p) => !done.includes(p.id)) ?? parts[0])
-      : undefined
+  const part =
+    order.length > 1 && parts.length > 0 ? (parts.find((p) => p.id === on && !done.includes(p.id)) ?? parts.find((p) => !done.includes(p.id)) ?? parts[0]) : undefined
   const weeks = useEditWeek(fields.some((f) => f.type === 'minyanim'))
   const { sent, changed, rows: onlyRows, preset } = changeEdit(s, category, part, weeks)
   const things = [...order, ...parts.filter((p) => !order.some((o) => o.id === p.id))].map((p) => ({ ...p, done: done.includes(p.id) }))
@@ -113,12 +105,6 @@ export default function ChangeReview({
     },
     { owner: s.id.slice(0, 8) },
   )
-  const onEditing = inPlace?.onEditing
-  useEffect(() => {
-    onEditing?.(editing)
-    return () => onEditing?.(false)
-  }, [editing, onEditing])
-
   const name = sent.name || s.current?.name || '(unknown listing)'
   const before = (s.current?.details ?? {}) as Record<string, unknown>
   // A shul's times by the box they changed in, as the listing has them
@@ -149,8 +135,6 @@ export default function ChangeReview({
     return (
       <div className="flex flex-col gap-4">
         <AdminBack back={{ label: step ? 'Back' : 'The change', onClick: step ? step.back : () => setEditing(false) }} title={title} />
-        {/* The edit is kept while another thing at the place is open. */}
-        {!step && inPlace?.switches}
         <ListingEditor
           item={normalizeRow(s.current)}
           category={category}
@@ -207,7 +191,7 @@ export default function ChangeReview({
       <p className="m-0 -mt-2 text-[14px] text-slate-600 md:-mt-4">
         {[s.categoryLabel, what && `a change to ${what}`].filter(Boolean).join(' · ')}
       </p>
-      {inPlace ? inPlace.switches : part && <ThingSwitches things={things} on={part.id} onPick={setOn} />}
+      {part && <ThingSwitches things={things} on={part.id} onPick={setOn} />}
 
       {changed.map((row) => {
         // Its own key, not the field it's edited with: a schedule isn't the usual times.

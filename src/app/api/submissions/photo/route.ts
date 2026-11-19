@@ -1,11 +1,14 @@
 import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
+import { imageTypeOf } from '@/lib/imageBytes'
+import { verifyTurnstile } from '@/lib/turnstile'
 
 // Same bucket every other admin-uploaded image uses (see
 // admin/categories/icon/route.ts) — a separate path prefix, not a separate
 // bucket. Uses the admin (service-role) Supabase client because there's no
 // admin session here to check: this route is public, gated by rate limiting
-// instead, same posture as POST /api/submissions itself.
+// instead, and by the Turnstile challenge, same posture as POST
+// /api/submissions itself.
 const BUCKET = 'site-assets'
 const MAX_BYTES = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
@@ -36,6 +39,15 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, errors: ['Invalid upload.'] }, { status: 400 })
   }
 
+  // Every upload writes to storage, so a script mustn't be able to fill it
+  // (Nov 19). The photo goes up when it's picked, before the listing's own
+  // send, so it has its own challenge (ImageUploadField's `challenge`): a
+  // token is single-use, and the send needs the form's.
+  const turnstileToken = form.get('turnstileToken')
+  if (!(await verifyTurnstile(typeof turnstileToken === 'string' ? turnstileToken : undefined, clientIp(request)))) {
+    return Response.json({ ok: false, code: 'turnstile', errors: ['Couldn’t check this upload. Please try again.'] }, { status: 403 })
+  }
+
   const file = form.get('file')
   if (!(file instanceof File)) {
     return Response.json({ ok: false, errors: ['No file provided.'] }, { status: 400 })
@@ -47,15 +59,23 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, errors: ['Image is too large — please keep it under 5MB.'] }, { status: 400 })
   }
 
+  // The label is only a first filter: what is stored, and the type it is
+  // served with, come from the file's own bytes.
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const type = imageTypeOf(bytes)
+  if (!type) {
+    return Response.json({ ok: false, errors: ['Please upload a PNG, JPG, WebP, or GIF image.'] }, { status: 400 })
+  }
+
   try {
     await ensureBucket()
 
-    const ext = file.type.split('/')[1]
+    const ext = type.split('/')[1]
     const path = `listing-photo/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
 
     const { error: uploadError } = await getAdminClient()
       .storage.from(BUCKET)
-      .upload(path, await file.arrayBuffer(), { contentType: file.type, upsert: false })
+      .upload(path, bytes, { contentType: type, upsert: false })
     if (uploadError) throw uploadError
 
     const { data } = getAdminClient().storage.from(BUCKET).getPublicUrl(path)

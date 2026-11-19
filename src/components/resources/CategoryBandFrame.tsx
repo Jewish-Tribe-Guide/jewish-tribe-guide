@@ -130,7 +130,8 @@ export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, 
     // transform, and a transform on an ancestor creates a new containing
     // block for any `position: fixed` descendant instead of the viewport.
     // `children` here is the whole category screen, listing grid included,
-    // and GenericListingCard's desktop dialog (ListingDetailModal) is
+    // and the computer's listing dialog then (ListingDetailModal, gone
+    // since Nov 19; any `fixed` overlay drawn in place now) was
     // `fixed inset-0` — so with the transform in place that dialog was
     // positioned relative to THIS div's own box, which moves as the page
     // scrolls, instead of staying centered in the viewport. Confirmed live:

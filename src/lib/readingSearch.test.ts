@@ -5,6 +5,7 @@ import { answerFor } from './askAnswer'
 import { readerPlaces, type Reading } from './questionReader'
 import { searchAsk } from './askSearch'
 import { describeReading, needsReading, ownConditions, ownFrom, readingAnswers, readingChips, readingLoses, readingOffers, searchReading, type Asked } from './readingSearch'
+import { placeTime } from '@/test/placeTime'
 
 const allWeek = (open: string, close: string) => Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open, close }]))
 const hours = { key: 'hours', label: 'Hours', type: 'hours' as const, filterable: true }
@@ -40,7 +41,7 @@ const shul = place('synagogue', 'Mekor', 39.95, -75.17)
 const hup = place('hospital', 'Hospital of the University of Pennsylvania', 39.9496, -75.1936)
 const listings = [lateGrill, lunchGrill, dairy, shoprite, giant, sheraton, motel, shul, hup]
 const places = readerPlaces(listings, 'philly')
-const sixPm = new Date(2026, 8, 24, 18, 0)
+const sixPm = placeTime(2026, 8, 24, 18, 0)
 const me = { lat: 39.95, lng: -75.17 }
 const asked = (reading: Reading, question = 'q'): Asked => ({ reading, own: ownConditions(question) })
 const ask = (reading: Reading, question = 'q', opts: { categoryId?: string; coords?: typeof me | null; now?: Date } = {}) =>

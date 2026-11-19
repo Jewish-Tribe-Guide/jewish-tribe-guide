@@ -46,9 +46,8 @@ export default function ListingAdd({ category, listings, isMobile, isOpen, onClo
   const [step, setStep] = useState<'find' | 'finish'>(firstStep)
   const [sendSlot, setSendSlot] = useState<HTMLElement | null>(null)
 
-  // Back to the search each time it opens — adjusted during render, as
-  // ListingDetailModal resets its own steps, so a reopened Add never shows
-  // one frame of the last one's second step.
+  // Back to the search each time it opens — adjusted during render, so a
+  // reopened Add never shows one frame of the last one's second step.
   const [wasOpen, setWasOpen] = useState(isOpen)
   if (isOpen !== wasOpen) {
     setWasOpen(isOpen)

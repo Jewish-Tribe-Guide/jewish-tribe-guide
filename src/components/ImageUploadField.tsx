@@ -3,6 +3,13 @@
 import { useRef, useState, useSyncExternalStore } from 'react'
 import ImageCropModal from './ImageCropModal'
 import { useFetchOrPreview } from '@/lib/previewSend'
+import TurnstileWidget, { type TurnstileHandle } from './TurnstileWidget'
+import { useTurnstileActive } from './resources/useListingSubmit'
+
+/** How long an upload waits for its challenge before going without a token
+ *  (the script blocked or Cloudflare down), so it never sits on
+ *  "Uploading…" for good. The route then decides. */
+export const CHALLENGE_WAIT_MS = 20_000
 
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml'
 
@@ -18,6 +25,11 @@ type Props = {
    *  submission form), whose upload route has no admin session to check and
    *  relies on its own rate limiting instead. */
   token?: string
+  /** Run the Turnstile challenge for each upload and send its token (the
+   *  public photo route, /api/submissions/photo, refuses one without). It
+   *  starts when a picture is picked, shows nothing unless Cloudflare wants
+   *  a click, and each upload takes a fresh token. */
+  challenge?: boolean
   /** Small circular preview (an icon) vs. a larger square one — purely
    *  visual; both upload the same way. */
   shape?: 'circle' | 'square'
@@ -81,6 +93,7 @@ export default function ImageUploadField({
   onChange,
   uploadUrl,
   token,
+  challenge = false,
   shape = 'circle',
   aspect = 1,
   originalSource: controlledOriginalSource,
@@ -91,6 +104,37 @@ export default function ImageUploadField({
 }: Props) {
   const [uploading, setUploading] = useState(false)
   const fetchOrPreview = useFetchOrPreview()
+  const challenged = useTurnstileActive() && challenge
+  // Mounted from the first pick on, so its token is usually ready by the
+  // time the crop is confirmed.
+  const [challengeMounted, setChallengeMounted] = useState(false)
+  const challengeRef = useRef<TurnstileHandle>(null)
+  const tokenRef = useRef('')
+  const waitingRef = useRef<((token: string) => void) | null>(null)
+  function onChallenge(token: string) {
+    tokenRef.current = token
+    if (token && waitingRef.current) waitingRef.current(token)
+  }
+  /** This upload's token, once the challenge has one ('' after
+   *  CHALLENGE_WAIT_MS). Single-use, so it's taken, and the challenge reset
+   *  for the next. */
+  function takeToken(): Promise<string> {
+    setChallengeMounted(true)
+    const take = (t: string) => {
+      waitingRef.current = null
+      tokenRef.current = ''
+      challengeRef.current?.reset()
+      return t
+    }
+    if (tokenRef.current) return Promise.resolve(take(tokenRef.current))
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(take('')), CHALLENGE_WAIT_MS)
+      waitingRef.current = (t) => {
+        clearTimeout(timer)
+        resolve(take(t))
+      }
+    })
+  }
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
   // Starts open unless the caller asked to collapse it (see collapseUrlInput's
@@ -178,6 +222,7 @@ export default function ImageUploadField({
   }
 
   function pickNewFile(file: File) {
+    if (challenged) setChallengeMounted(true)
     setOriginalSource(file)
     setCropSource(file)
   }
@@ -191,6 +236,7 @@ export default function ImageUploadField({
       // notion of a filename) — wrap it so the upload route's multipart
       // parser sees a real file, same as the unmodified original would have.
       body.append('file', new File([file], 'photo.jpg', { type: file.type || 'image/jpeg' }))
+      if (challenged) body.append('turnstileToken', await takeToken())
       // The admin console's preview uploads nothing: the photo is shown
       // from this browser's own copy.
       const res = await fetchOrPreview(
@@ -455,6 +501,7 @@ export default function ImageUploadField({
         </label>
       )}
       {helpText && <span className="block text-[11px] text-muted mt-1">{helpText}</span>}
+      {challenged && challengeMounted && <TurnstileWidget ref={challengeRef} appearance="interaction-only" onVerify={onChallenge} />}
 
       {cropSource && (
         <ImageCropModal

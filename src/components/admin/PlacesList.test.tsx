@@ -133,6 +133,18 @@ describe('Places', () => {
     expect(screen.getByText('2 of 2')).toBeInTheDocument()
   })
 
+  it('tells two places with one name apart by their street', async () => {
+    renderPlaces([
+      place('ACME', { id: 'acme-1', listing: { id: 'acme-1', category: 'food', name: 'ACME', anchorId: 'all', distance: 0, address: '1 Main St, Philadelphia' } }),
+      place('ACME', { id: 'acme-2', listing: { id: 'acme-2', category: 'food', name: 'ACME', anchorId: 'all', distance: 0, address: '9 Oak Ave, Bala Cynwyd' } }),
+      place('Goldie'),
+    ])
+    await screen.findByRole('region', { name: 'Places' })
+    expect(screen.getByRole('button', { name: 'Open ACME, 1 Main St' })).toHaveTextContent(/^ACME1 Main StFood$/)
+    expect(screen.getByRole('button', { name: 'Open ACME, 9 Oak Ave' })).toHaveTextContent(/^ACME9 Oak AveFood$/)
+    expect(screen.getByRole('button', { name: 'Open Goldie' })).toHaveTextContent(/^GoldieFood$/)
+  })
+
   it('shows the first 50, all of them, and folds back to 50', async () => {
     const user = userEvent.setup()
     renderPlaces(Array.from({ length: 52 }, (_, i) => place(`Place ${String(i).padStart(2, '0')}`)))

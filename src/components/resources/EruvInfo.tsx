@@ -7,10 +7,9 @@ import { mapQueryString, routes } from '@/lib/routes'
 import DirectoryHeader from './DirectoryHeader'
 import { CategoryBandFrame, HeroTitle } from './CategoryBandFrame'
 import { ChevronRightIcon } from '@/components/icons'
-import { community } from '@/community.config'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunityPlace, useCommunitySlug, useContributions } from '@/lib/communityContext'
 import { useNow } from '@/lib/useNow'
 import { eruvView, localParts, type Eruv } from '@/lib/eruv'
 import { fullestEruv } from '@/lib/eruvFields'
@@ -31,7 +30,6 @@ import { usePinned } from '@/lib/pinnedContext'
 import { pointerHover } from '@/lib/pointerHover'
 import { AddButton } from '@/components/AddButton'
 import { resolveCapabilities } from '@/lib/categories'
-import { ui } from '@/lib/uiConfig'
 import dynamic from 'next/dynamic'
 
 // Loaded on the first tap of "+ Add", as every category page loads it.
@@ -92,6 +90,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', color = '#64748b', band
   useSetScreenHeader(true, title, onUp)
   const isMobile = useIsMobile()
   const slug = useCommunitySlug()
+  const { center } = useCommunityPlace()
   const clock = useNow()
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [pointedId, setPointedId] = useState<string | null>(null)
@@ -137,7 +136,8 @@ export default function EruvInfo({ onUp, title = 'Eruv', color = '#64748b', band
   const ready = loaded?.available && now ? loaded : null
   const eruvPage = useCategories()?.find((c) => c.kind === 'eruv')
   const open = ready?.eruvim.find((e) => e.id === openId) ?? (ready && openFullest && eruvPage ? fullestEruv(ready.eruvim, eruvPage) : null)
-  const canAdd = !!ready && ui.contributions.add && !!eruvPage && resolveCapabilities(eruvPage.capabilities).add
+  const contributions = useContributions()
+  const canAdd = !!ready && contributions.add && !!eruvPage && resolveCapabilities(eruvPage.capabilities).add
   // The + Add box, kept on the page once opened so it slides away when
   // closed (SiteAddButton's note).
   const [tellOpen, setTellOpen] = useState(false)
@@ -187,9 +187,10 @@ export default function EruvInfo({ onUp, title = 'Eruv', color = '#64748b', band
   useEffect(() => {
     if (!column) return
     const onKey = (e: KeyboardEvent) => {
-      // While editing, Escape steps back out of the edit; the arrows are
-      // the form's.
-      if ((window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm) {
+      // While editing, Escape steps back out of the edit, an entry of its
+      // own (useEditorInAddress); the arrows are the form's. Opened on the
+      // editor (the admin preview's), there's no entry to step back over.
+      if (editing && !startEditing) {
         if (e.key === 'Escape') window.history.back()
         return
       }
@@ -224,7 +225,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', color = '#64748b', band
     <EruvMap
       eruvim={mapped}
       you={you}
-      fallbackCenter={community.mapCenter}
+      fallbackCenter={center}
       onSelect={openEruv}
       highlightId={open?.id ?? pointedId}
       onHover={isMobile ? undefined : setPointedId}

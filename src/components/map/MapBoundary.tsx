@@ -1,7 +1,8 @@
 'use client'
 
 import { Component, type ReactNode } from 'react'
-import * as Sentry from '@sentry/nextjs'
+import { reportError } from '@/lib/deferredSentry'
+import MapUnavailable from './MapUnavailable'
 
 /** Keeps a failing Google map from taking the page down with it. When Google
  *  refuses the map (a key that doesn't allow the address, billing off), its
@@ -18,14 +19,10 @@ export default class MapBoundary extends Component<{ children: ReactNode }, { fa
   }
   componentDidCatch(error: unknown) {
     console.error('[map]', error)
-    Sentry.captureException(error)
+    reportError(error)
   }
   render() {
     if (!this.state.failed) return this.props.children
-    return (
-      <div role="status" className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-100 px-8 text-center text-[14px] text-slate-600">
-        The map couldn’t load. Everything on it is in the list.
-      </div>
-    )
+    return <MapUnavailable />
   }
 }

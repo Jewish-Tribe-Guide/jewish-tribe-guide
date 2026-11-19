@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { isCategorySyncEligible, type CategoryConfig } from '@/lib/categories'
 import { sectionFlags, type EditorRow, type EditorValues } from '@/lib/editorRows'
 import { fetchJson } from '@/lib/fetchJson'
@@ -24,6 +24,7 @@ import { addRowSources, foundLines, type AddLine, type AddRead, type AddSlot, ty
 import ListingEditorScreen from './ListingEditorScreen'
 import { RowJob, SourceScreen, SourceWords, type SourceScreenProps } from './PlaceListing'
 import { sourceActions } from './sourceActions'
+import { useStepsInAddress } from './useStepsInAddress'
 
 // Add a place (boards AddFind8, AddRows11, AddSelf11, Nov 1): find it on
 // Google first, as visitors do, then the rows and lines of a saved listing,
@@ -35,7 +36,10 @@ type ReadNowReply = { state: 'done' | 'none' | 'failed' | 'not-found' | 'found' 
 type Found = { id: string; payload: unknown }
 type PageReply = { pages?: { watch: { id: string; url: string; lastError?: string | null } }[] }
 /** Added: being read, a page that couldn't be, or what's found. */
-type AddedAs = { listing: DirectoryResource; stage: 'reading' | 'failed' | 'found' | 'no-email'; lines: string[]; fromEmail?: boolean; retry?: { job: 'hours' | 'times'; watchId: string; was: string } }
+type AddedAs = { listing: DirectoryResource; stage: 'reading' | 'failed' | 'found' | 'no-email' | 'done'; lines: string[]; fromEmail?: boolean; retry?: { job: 'hours' | 'times'; watchId: string; was: string }; notSaved?: string[] }
+
+/** What a Change or Add a source screen asks for. */
+type ScreenSpec = { title: string; label: string; slot: AddSlot; placeholder?: string }
 
 /** No email has come: the guide has to be on its list (EmailNone14). */
 export function SignUpLine({ account }: { account: string | null }) {
@@ -67,8 +71,9 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   const [picked, setPicked] = useState<Partial<Record<CheckedField, string>> | null>(null)
   const [given, setGiven] = useState<GivenSources>({})
   const [stopped, setStopped] = useState<ReadonlySet<CheckedField>>(new Set())
-  const [screen, setScreen] = useState<{ title: string; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> } | null>(null)
+  const [screen, setScreen] = useState<{ key: string; title: string; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> } | null>(null)
   const [addedAs, setAddedAs] = useState<AddedAs | null>(null)
+  const [takeFailed, setTakeFailed] = useState(false)
   const [reads, setReads] = useState<Partial<Record<AddSlot, AddRead>>>({})
   const [kosher, setKosher] = useState<KosherLookup | null>(null)
   const [kosherUsed, setKosherUsed] = useState<string | null>(null)
@@ -107,6 +112,38 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
 
   const back = googleFirst ? () => setStep('find') : onClose
   useSetScreenHeader(step === 'find', 'Add a place', onClose)
+
+  // The form after Find, and a source's Change or Add a source over it, each
+  // have an address and an entry (?step=finish, ?over=page.change), so Back
+  // goes to Find rather than out of Add, and Forward and a reload land on
+  // each (Nov 18: both were only state). What was typed isn't kept, so a
+  // reload on the form is Find again, as Add starts; Forward, with the form
+  // still here, is the form.
+  const beenToForm = useRef(step === 'finish')
+  if (step === 'finish') beenToForm.current = true
+  useStepsInAddress(
+    googleFirst ? 'step' : null,
+    step === 'finish' ? ['finish'] : [],
+    ([to]) => {
+      if (to === 'finish' && !beenToForm.current) return false
+      setStep(to === 'finish' ? 'finish' : 'find')
+    },
+    { inner: ['row', 'over'] },
+  )
+  // The Change and Add a source the lines have offered, for one to open again.
+  const screensSeen = useRef(new Map<string, ScreenSpec>())
+  const [overAsked, setOverAsked] = useState<string | null>(null)
+  useStepsInAddress('over', screen ? [screen.key] : [], ([to]) => {
+    if (to && googleFirst && !beenToForm.current) return false
+    setOverAsked(to ?? null)
+    if (!to) setScreen(null)
+  })
+  useEffect(() => {
+    const spec = overAsked ? screensSeen.current.get(overAsked) : undefined
+    if (!overAsked || !spec) return
+    setOverAsked(null)
+    openScreen(overAsked, spec)
+  })
 
   if (step === 'find') {
     return (
@@ -195,8 +232,9 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     setKosherUsed(on.name)
   }
 
-  const openScreen = (title: string, label: string, slot: AddSlot, placeholder?: string) =>
+  function openScreen(key: string, { title, label, slot, placeholder }: ScreenSpec) {
     setScreen({
+      key,
       title,
       props: {
         label,
@@ -209,6 +247,13 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
         },
       },
     })
+  }
+  /** A Change or Add a source on a line: offered, and so can open again. */
+  const screenControl = (words: string, spec: ScreenSpec, kind: 'change' | 'add') => {
+    const key = `${spec.slot}.${kind}`
+    screensSeen.current.set(key, spec)
+    return control(words, () => openScreen(key, spec))
+  }
 
   const control = (words: string, onClick: () => void) => (
     <button type="button" onClick={onClick} className={LINE_LINK}>
@@ -228,11 +273,11 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     }
     if (line.change) {
       const c = line.change
-      out.push(control('Change', () => openScreen('Change', c.label, c.slot, c.placeholder)))
+      out.push(screenControl('Change', { title: 'Change', label: c.label, slot: c.slot, placeholder: c.placeholder }, 'change'))
     }
     if (line.add) {
       const a = line.add
-      out.push(control(a.words ?? 'Add a source', () => openScreen(a.words ?? 'Add a source', a.label, a.slot, a.placeholder)))
+      out.push(screenControl(a.words ?? 'Add a source', { title: a.words ?? 'Add a source', label: a.label, slot: a.slot, placeholder: a.placeholder }, 'add'))
     }
     if (line.googleStop) {
       const f = line.googleStop
@@ -274,11 +319,13 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   }
 
   /** What's found waiting, or back to Places with nothing to say. */
-  async function seeFound(listing: DirectoryResource, noEmail = false, fromEmail = false) {
+  async function seeFound(listing: DirectoryResource, noEmail = false, fromEmail = false, notSaved: string[] = []) {
     const { found = [] } = await fetchJson<{ found?: Found[] }>(withCommunity(`/api/admin/listings/${listing.id}/found`, community), { headers }, 'Could not see what it found.').catch(() => ({ found: [] as Found[] }))
     const lines = foundLines(category, listing as unknown as Record<string, unknown>, found, new Date().toISOString().slice(0, 10))
-    if (lines.length) setAddedAs({ listing, stage: 'found', lines, fromEmail })
-    else if (noEmail) setAddedAs({ listing, stage: 'no-email', lines: [] })
+    if (lines.length) setAddedAs({ listing, stage: 'found', lines, fromEmail, notSaved })
+    else if (noEmail) setAddedAs({ listing, stage: 'no-email', lines: [], notSaved })
+    // Something didn't save: stay, so it's seen.
+    else if (notSaved.length) setAddedAs({ listing, stage: 'done', lines: [], notSaved })
     else onClose()
   }
 
@@ -299,15 +346,18 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   async function added(listing: DirectoryResource) {
     setAddedAs({ listing, stage: 'reading', lines: [] })
     const actions = sourceActions(listing.id, post)
-    // Each saved as the listing's own Change would, and none stopping the rest.
-    const saves: Promise<unknown>[] = [...stopped].map((field) => post('/api/admin/watches/google', { action: 'stop_field', id: listing.id, field }))
-    if (given.email) saves.push(actions.addSource({ job: 'times', email: true, label: '' }, given.email))
-    if (given.menu) saves.push(actions.addSource({ job: 'dishes', email: false, label: '' }, given.menu, { waitForMenu: true }))
-    if (given.refuah) saves.push(actions.change({ kind: 'refuah' }, given.refuah))
-    if (given.keystone) saves.push(actions.change({ kind: 'keystone' }, given.keystone))
-    await Promise.allSettled(saves)
+    // Each saved as the listing's own Change would, and none stopping the
+    // rest. What fails is named on the screen, not dropped (Nov 18 review).
+    const saves: [string, Promise<unknown>][] = []
+    if (stopped.size) saves.push(['Google’s Stops', Promise.all([...stopped].map((field) => post('/api/admin/watches/google', { action: 'stop_field', id: listing.id, field })))])
+    if (given.email) saves.push(['Its email', actions.addSource({ job: 'times', email: true, label: '' }, given.email)])
+    if (given.menu) saves.push(['Its menu', actions.addSource({ job: 'dishes', email: false, label: '' }, given.menu, { waitForMenu: true })])
+    if (given.refuah) saves.push(['Refuah', actions.change({ kind: 'refuah' }, given.refuah)])
+    if (given.keystone) saves.push(['Keystone-K', actions.change({ kind: 'keystone' }, given.keystone)])
+    const settled = await Promise.allSettled(saves.map(([, p]) => p))
+    const notSaved = saves.filter((_, i) => settled[i].status === 'rejected').map(([name]) => name)
     // Picked on Google: its Google read now, with Stops already kept.
-    if (picked) await post(`/api/admin/listings/${listing.id}/found`, { action: 'google' }).catch(() => null)
+    if (picked && !(await post(`/api/admin/listings/${listing.id}/found`, { action: 'google' }).then(() => true, () => false))) notSaved.push('Google’s details')
     // Its email looked for now, and filed as the hourly run would.
     const looked = given.email ? await post<{ state?: string; account?: string | null }>(`/api/admin/listings/${listing.id}/found`, { action: 'email', address: given.email }).catch(() => null) : null
     if (looked?.account) setGuideGmail(looked.account)
@@ -321,16 +371,23 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       const reply = await post<PageReply>(path, { action: 'give', resourceId: listing.id, url: given.page }).catch(() => null)
       const page = reply?.pages?.find((p) => samePage(p.watch.url, given.page!))
       if (!page || page.watch.lastError) {
-        setAddedAs({ listing, stage: 'failed', lines: [], retry: { job, watchId: page?.watch.id ?? '', was: page ? given.page : '' } })
+        setAddedAs({ listing, stage: 'failed', lines: [], retry: { job, watchId: page?.watch.id ?? '', was: page ? given.page : '' }, notSaved })
         return
       }
     } else if (website || given.menu) await readAdded(listing)
-    await seeFound(listing, noEmail, fromEmail)
+    await seeFound(listing, noEmail, fromEmail, notSaved)
   }
 
   async function takeFound(listing: DirectoryResource) {
     setTaking(true)
-    await post(`/api/admin/listings/${listing.id}/found`, { action: 'take' }).catch(() => null)
+    setTakeFailed(false)
+    try {
+      await post(`/api/admin/listings/${listing.id}/found`, { action: 'take' })
+    } catch {
+      setTakeFailed(true)
+      setTaking(false)
+      return
+    }
     onClose()
   }
 
@@ -342,6 +399,16 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       <div className="flex flex-col gap-4">
         <AdminBack back={{ label: 'Back', onClick: onClose }} title={title} />
         {banner}
+        {!!addedAs.notSaved?.length && (
+          <p role="alert" className="m-0 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[15px] font-bold text-amber-900">
+            Not saved: {addedAs.notSaved.join(' · ')}
+          </p>
+        )}
+        {stage === 'done' && (
+          <button type="button" onClick={onClose} className={SUBMIT_PILL}>
+            Done
+          </button>
+        )}
         {stage === 'reading' && <p className="m-0 text-[15px] text-slate-600">{website || given.page ? 'Reading its website…' : 'Looking in the guide’s Gmail…'}</p>}
         {stage === 'no-email' && (
           <>
@@ -377,6 +444,11 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
                 ))}
               </ul>
             </div>
+            {takeFailed && (
+              <p role="alert" className="m-0 text-[15px] font-bold text-red-700">
+                Couldn’t add it. Try again.
+              </p>
+            )}
             <button type="button" disabled={taking} onClick={() => void takeFound(listing)} className={SUBMIT_PILL}>
               {taking ? 'Adding…' : 'Add to the listing'}
             </button>

@@ -1,4 +1,5 @@
 import { getAdminClient } from '@/lib/supabase/admin'
+import { jobsOff } from '@/lib/jobOff'
 import { listCategoriesUncached } from '@/lib/categoryStore'
 import { getResourceRowById, normalizeRow } from '@/lib/resourceStore'
 import { keepsMenuLink, menuWebsite, readElsewhere } from '@/lib/menuLink'
@@ -107,6 +108,8 @@ export async function syncMenuWatches(): Promise<{ community: string; added: num
     if (listError) throw new Error(`Couldn’t list the food places: ${listError.message}`)
     const { watches, available } = await listWatches(slug)
     if (!available) continue
+    // Menus turned off (jobOff.ts): no menu watch is added or taken away.
+    if (jobsOff(watches).includes('menus')) continue
     // Before the menu_reading table exists, only menu links are watched.
     const { readings } = await listMenuReadings(slug)
     const wanted = wantedMenuWatches(categories, ((rows ?? []) as ResourceRow[]).map(normalizeRow), readings)
@@ -261,19 +264,21 @@ export async function runMenuWatch(
   // missing isn't among them.
   if (field) await dateFromMenu(watch, listing, category, field.key, read.dishes.map((d) => d.name))
   if (found.length === 0 && missing.length === 0) return { ok: true, filed: 0, pageHash, check: check(null) }
-  if (opts.full) {
-    const kept = await getMenuReading(watch.communityId, listing.id)
-    const lower = (n: string) => n.trim().toLowerCase()
-    const had = new Set((kept?.dishes ?? []).map((d) => lower(d.name)))
-    const hadMissing = new Set((kept?.missing ?? []).map(lower))
-    if (
-      kept &&
-      (kept.status === 'proposed' || kept.status === 'skipped') &&
-      found.every((d) => had.has(lower(d.name))) &&
-      missing.every((n) => hadMissing.has(lower(n)))
-    ) {
-      return { ok: true, filed: 0, pageHash, check: check('before') }
-    }
+  // Nothing it hasn't said before: a reading waiting or skipped stands, on
+  // "Check now" and the nightly run alike. Until Nov 18 only "Check now"
+  // looked, so any change to the page (a price, a special) brought dishes
+  // an admin skipped back as new.
+  const kept = await getMenuReading(watch.communityId, listing.id)
+  const lower = (n: string) => n.trim().toLowerCase()
+  const had = new Set((kept?.dishes ?? []).map((d) => lower(d.name)))
+  const hadMissing = new Set((kept?.missing ?? []).map(lower))
+  if (
+    kept &&
+    (kept.status === 'proposed' || kept.status === 'skipped') &&
+    found.every((d) => had.has(lower(d.name))) &&
+    missing.every((n) => hadMissing.has(lower(n)))
+  ) {
+    return { ok: true, filed: 0, pageHash, check: check('before') }
   }
   await saveMenuReading(watch.communityId, listing.id, {
     status: 'proposed',

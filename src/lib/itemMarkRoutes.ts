@@ -57,3 +57,23 @@ export async function withdrawPending(submissionId: string, listingId: string): 
   if (error) throw new Error(error.message)
   return (data ?? []).length > 0
 }
+
+/** Whether a "Not anymore" on this item is still waiting in the queue: a
+ *  pending edit to the listing whose list leaves the item out (item/gone
+ *  files it as removalSubmission). Only then may an undone "Still here"
+ *  put the "reported gone" warning back; otherwise a warning would go up
+ *  with nothing for an admin to review. */
+export async function goneReportWaiting(listingId: string, field: string, item: string): Promise<boolean> {
+  const { data, error } = await getAdminClient()
+    .from('submission')
+    .select('payload')
+    .eq('target_id', listingId)
+    .eq('status', 'pending')
+    .eq('operation', 'update')
+  if (error) throw new Error(error.message)
+  const lower = item.toLowerCase()
+  return (data ?? []).some(({ payload }) => {
+    const list = (payload as Record<string, unknown> | null)?.[field] ?? ((payload as { details?: Record<string, unknown> } | null)?.details?.[field])
+    return Array.isArray(list) && !list.some((v) => typeof v === 'string' && v.toLowerCase() === lower)
+  })
+}

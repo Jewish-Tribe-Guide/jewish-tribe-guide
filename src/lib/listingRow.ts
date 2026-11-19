@@ -1,5 +1,6 @@
 import { selectValues, type CategoryConfig, type CategoryField } from './categories'
-import { CLOSURE_LABELS, getOpenStatus, hoursNextOpening } from './hours'
+import { CLOSURE_LABELS, dayAndMinutesInTimezone, getOpenStatus, HOURS_TIMEZONE, hoursNextOpening } from './hours'
+import { zmanimDate } from './zmanimRequest'
 import { travelParts } from './listingTravel'
 import type { DirectoryResource, ZmanimData } from '@/types'
 import { parseTimeToMinutes } from './davening'
@@ -247,16 +248,16 @@ export function listingRowNote(
 
 /** Tonight's candle lighting in minutes since midnight, when it's tonight:
  *  a Friday's, or erev Yom Tov's. Null any other day, or before the day's
- *  zmanim (or the time) have arrived. */
-export function candlesToday(zmanim: ZmanimData | null | undefined, now: Date | null): number | null {
+ *  zmanim (or the time) have arrived. Read on the place's clock, the one
+ *  its hours are posted in, so "closes before candles" compares like with
+ *  like on a device set to another timezone. */
+export function candlesToday(zmanim: ZmanimData | null | undefined, now: Date | null, timezone: string = HOURS_TIMEZONE): number | null {
   if (!zmanim || !now) return null
+  const today = zmanimDate(now.getTime(), timezone)
   const lightings = [zmanim.shabbos.candleLighting, ...(zmanim.holidayPeriod?.candleLightings ?? [])]
   for (const entry of lightings) {
-    if (!entry?.iso) continue
-    const at = new Date(entry.iso)
-    if (at.getFullYear() === now.getFullYear() && at.getMonth() === now.getMonth() && at.getDate() === now.getDate()) {
-      return at.getHours() * 60 + at.getMinutes()
-    }
+    const at = entry?.iso ? Date.parse(entry.iso) : NaN
+    if (Number.isFinite(at) && zmanimDate(at, timezone) === today) return dayAndMinutesInTimezone(at, timezone).minutes
   }
   return null
 }

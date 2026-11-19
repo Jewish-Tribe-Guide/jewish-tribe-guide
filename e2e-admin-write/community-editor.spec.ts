@@ -63,7 +63,7 @@ test('creating a community through the real UI, starting empty, makes it live wi
   pendingSlugs.push(slug)
   const name = `E2E Fresh ${slug}`
 
-  await page.goto('/philly/admin/communities')
+  await page.goto('/admin')
   await visible(page, page.getByRole('button', { name: '+ New community' })).click()
 
   await page.getByLabel('Name').fill(name)
@@ -136,7 +136,7 @@ test('cloning from an existing community carries its categories over', async ({ 
   // revalidatePublicContent() — otherwise the cached GET /api/communities
   // the second creation's "Clone from…" dropdown reads wouldn't know this
   // community exists yet, and there'd be nothing to select below.
-  await page.goto('/philly/admin/communities')
+  await page.goto('/admin')
   await visible(page, page.getByRole('button', { name: '+ New community' })).click()
   await page.getByLabel('Name').fill(sourceName)
   await page.getByLabel('URL slug').fill(sourceSlug)
@@ -172,7 +172,7 @@ test('cloning from an existing community carries its categories over', async ({ 
   // below can't out-wait a stale first load — only a fresh navigation can.
   // Poll with real reloads instead of trusting the first one.
   await expect(async () => {
-    await page.goto('/philly/admin/communities')
+    await page.goto('/admin')
     // Scoped to the community-list card's own link, not just any text match
     // — the admin's own community switcher also renders this name as an
     // <option>, which a plain getByText matches too and makes ambiguous.
@@ -216,7 +216,7 @@ test('deleting a community through the real UI removes it and everything in it',
   // /api/admin/communities read instead of sitting behind
   // cacheLife('days')'s stale-while-revalidate window with nothing to ever
   // invalidate it.
-  await page.goto('/philly/admin/communities')
+  await page.goto('/admin')
   await visible(page, page.getByRole('button', { name: '+ New community' })).click()
   await page.getByLabel('Name').fill(name)
   await page.getByLabel('URL slug').fill(slug)
@@ -256,7 +256,7 @@ test('deleting a community through the real UI removes it and everything in it',
   // marks the entry stale rather than purging it, so the very next read can
   // still serve the pre-creation snapshot while a fresh one regenerates.
   await expect(async () => {
-    await page.goto('/philly/admin/communities')
+    await page.goto('/admin')
     await expect(page.getByRole('link', { name })).toBeVisible({ timeout: 2_000 })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000, 3_000] })
 
@@ -288,7 +288,7 @@ test('deleting a community through the real UI removes it and everything in it',
   // marks the cached list stale rather than purging it), so confirm with a
   // poll rather than trusting the reload's own first paint.
   await expect(async () => {
-    await page.goto('/philly/admin/communities')
+    await page.goto('/admin')
     await expect(page.getByRole('link', { name })).not.toBeVisible({ timeout: 2_000 })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000, 3_000] })
 

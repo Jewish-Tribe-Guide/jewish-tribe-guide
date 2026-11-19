@@ -1,5 +1,6 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { getAdminClient } from '@/lib/supabase/admin'
 
 // Same bucket every admin-uploaded image goes to (see
@@ -17,11 +18,14 @@ async function ensureBucket() {
 // POST /api/admin/categories/band — uploads an image file (multipart
 // form-data, field "file") to storage and returns its public URL, for use as
 // a category's desktop directory-banner photo (CategoryConfig.cardBandImageUrl).
-// Admin only. Doesn't touch the category row itself — same as
+// That community's admins (`?community=<slug>`), as the hero and logo
+// uploads: a community admin not on SUPERADMIN_EMAILS got "Not authorized"
+// here until Nov 18. Doesn't touch the category row itself — same as
 // that old icon upload, the editor sets the returned URL on its draft, batched
 // into the normal Save changes flow via PATCH /api/admin/categories/:id.
 export async function POST(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   let form: FormData

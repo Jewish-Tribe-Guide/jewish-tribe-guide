@@ -4,7 +4,7 @@ import { useCommunityTimezone } from '@/lib/communityContext'
 import { useEffect, useState } from 'react'
 import type { ZmanimData } from '@/types'
 import { useToday } from '@/lib/useNow'
-import { zmanimPath } from '@/lib/zmanimRequest'
+import { zmanimDate, zmanimPath } from '@/lib/zmanimRequest'
 
 /** 'no-location' means no coords were passed at all — a distinct state from
  *  'error', since the fix is the visitor entering an address rather than a
@@ -83,7 +83,7 @@ export function useZmanim(coords?: { lat: number; lng: number } | null): {
 
     let promise = inFlight.get(key)
     if (!promise) {
-      const url = zmanimPath(coords.lat, coords.lng, timezone)
+      const url = zmanimPath(coords.lat, coords.lng, timezone, zmanimDate(Date.now(), timezone))
       promise = loadOne(url).finally(() => inFlight.delete(key))
       inFlight.set(key, promise)
     }

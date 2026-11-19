@@ -3,6 +3,7 @@ import type { CategoryField } from './categories'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { Eruv } from './eruv'
 import { eruvSummary, openNowRows, rightNowChosen, rightNowDay, rightNowPicks, sourcesRead, sourcesSentence, trustFacts, trustLine } from './phoneHome'
+import { placeTime } from '@/test/placeTime'
 
 const NY = 'America/New_York'
 const DAY = 24 * 60 * 60 * 1000
@@ -84,7 +85,7 @@ describe('right now, on a weekday: what’s open', () => {
   const shut = Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: '06:00', close: '07:00' }]))
   const place = (id: string, category: string, h: unknown, extra: Record<string, unknown> = {}) => makeListing({ id, category, hours: h, ...extra })
   // Local time, as every hours test: open is read off the device's clock.
-  const lunch = new Date(2026, 9, 13, 12, 30)
+  const lunch = placeTime(2026, 9, 13, 12, 30)
 
   it('the first two categories with hours, in the admin’s order, broken down by their first pick-list', () => {
     const listings = [
@@ -115,7 +116,7 @@ describe('right now, on a weekday: what’s open', () => {
   })
 
   it('overnight: the soonest of several, today’s time with no day; a place Google says is closed doesn’t count', () => {
-    const three = new Date(2026, 9, 13, 3, 0)
+    const three = placeTime(2026, 9, 13, 3, 0)
     const at = (o: string) => Object.fromEntries(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((d) => [d, { open: o, close: '21:00' }]))
     const rows = openNowRows(
       [

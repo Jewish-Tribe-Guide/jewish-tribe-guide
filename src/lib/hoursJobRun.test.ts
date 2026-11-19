@@ -81,7 +81,7 @@ describe('searchHoursPages', () => {
   // Its appointments page has no clock time, but says how Shabbos works:
   // a section's note, read since Oct 22.
   it('keeps the pages with a clock time or appointments on them, from its home page and its links', async () => {
-    expect(await searchHoursPages('http://lmcmikvah.org/', reach)).toEqual({
+    expect(await searchHoursPages('http://lmcmikvah.org/', 'America/New_York', reach)).toEqual({
       found: [
         { url: 'https://lmcmikvah.org/', link: null },
         { url: 'https://lmcmikvah.org/appointments-and-membership/', link: 'Appointments and Membership' },
@@ -92,9 +92,9 @@ describe('searchHoursPages', () => {
   })
 
   it('says why when its website doesn’t open, and which pages didn’t load', async () => {
-    expect(await searchHoursPages('https://philamikvah.org/', reach)).toEqual({ error: 'it couldn’t be reached' })
+    expect(await searchHoursPages('https://philamikvah.org/', 'America/New_York', reach)).toEqual({ error: 'it couldn’t be reached' })
     const slow = { ...reach, readPage: vi.fn(async (url: string) => (url.endsWith('mens-mikvah/') ? null : { url, text: PAGES[url], pdf: null })) }
-    expect(await searchHoursPages('http://lmcmikvah.org/', slow)).toMatchObject({ unloaded: ['https://lmcmikvah.org/mens-mikvah/'] })
+    expect(await searchHoursPages('http://lmcmikvah.org/', 'America/New_York', slow)).toMatchObject({ unloaded: ['https://lmcmikvah.org/mens-mikvah/'] })
   })
   // Beth Zion-Beth Israel as Oct 21's check of every shul page found it:
   // five pages read, all showing its calendar's week, two of them its High
@@ -118,12 +118,58 @@ describe('searchHoursPages', () => {
           ? { url, text: [...week, '', bzbi[url]].join('\n'), pdf: null, weeks: [{ sunday: '2026-10-18', from: '2026-10-21', to: '2026-10-24', lines: week }] }
           : { url, text: 'Thursday: 10:30am — 6:00pm\nSunday: 10:30am — 4:30pm', pdf: null },
     }
-    expect(await searchHoursPages('http://www.bzbi.org/', shulReach, 'times')).toEqual({ found: [{ url: 'https://bzbi.org/worship/', link: 'Worship' }], unloaded: [] })
-    expect(await searchHoursPages('http://rosenbach.org/', shulReach, 'times')).toEqual({ found: [], unloaded: [] })
+    expect(await searchHoursPages('http://www.bzbi.org/', 'America/New_York', shulReach, 'times')).toEqual({ found: [{ url: 'https://bzbi.org/worship/', link: 'Worship' }], unloaded: [] })
+    expect(await searchHoursPages('http://rosenbach.org/', 'America/New_York', shulReach, 'times')).toEqual({ found: [], unloaded: [] })
   })
 })
 
 describe('syncHoursWatches', () => {
+  // Nov 18 review: a job a community turned off wasn't read, but its
+  // places' websites were still searched for its pages every night.
+  it('searches no website for a job the community turned off', async () => {
+    m.listWatches.mockResolvedValue({ watches: [{ id: 'off', url: 'https://guide.invalid/job-off/hours', resourceId: null, createdBy: 'job off', active: false }], available: true })
+    await syncHoursWatches(reach)
+    expect(reach.fetchHome).not.toHaveBeenCalled()
+    expect(m.addWatch).not.toHaveBeenCalled()
+  })
+
+  // And it could take most of the morning run: every place, every night.
+  it('starts no place’s search after its stop time, and takes the places in turn each night', async () => {
+    m.rows = [row('lmc', 'Lower Merion Community Mikvah', 'http://lmcmikvah.org/'), row('mei', 'Mikvah Mei Shalva', 'https://philamikvah.org/')]
+    expect(await syncHoursWatches(reach, undefined, Date.now() - 1)).toEqual([{ community: 'philly', added: 0, removed: 0 }])
+    expect(reach.fetchHome).not.toHaveBeenCalled()
+    // Not reached isn't "searched and found nothing": no reason kept.
+    expect(m.updateWatch).not.toHaveBeenCalled()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const firstOn = async (iso: string) => {
+      vi.setSystemTime(Date.parse(iso))
+      reach.fetchHome.mockClear()
+      await syncHoursWatches(reach)
+      return reach.fetchHome.mock.calls[0][0]
+    }
+    expect(await firstOn('2026-11-17T08:00:00Z')).not.toBe(await firstOn('2026-11-18T08:00:00Z'))
+    vi.useRealTimers()
+  })
+
+  // And a website's candidate pages were read all in one moment.
+  it('reads a website’s pages a few at a time', async () => {
+    const links = Array.from({ length: 10 }, (_, i) => `<a href="/hours-${i}/">Hours ${i}</a>`).join('')
+    let now = 0
+    let most = 0
+    const busy = {
+      fetchHome: async () => ({ url: 'https://lmcmikvah.org/', body: links }),
+      readPage: async (url: string) => {
+        most = Math.max(most, ++now)
+        await new Promise((r) => setTimeout(r, 5))
+        now--
+        return { url, text: 'Sunday 9 AM – 5 PM', pdf: null }
+      },
+    }
+    await searchHoursPages('http://lmcmikvah.org/', 'America/New_York', busy)
+    expect(most).toBeGreaterThan(1)
+    expect(most).toBeLessThanOrEqual(3)
+  })
+
   it('watches each place’s hours pages, marked as found', async () => {
     expect(await syncHoursWatches(reach)).toEqual([{ community: 'philly', added: 3, removed: 0 }])
     expect(m.addWatch).toHaveBeenCalledWith('philly', {

@@ -14,6 +14,7 @@ import { listSubscribersForCategory } from '@/lib/subscriberStore'
 import { sendNewListingNotification, sendClosureNotification } from '@/lib/subscriberEmail'
 import { siteUrl } from '@/lib/siteUrl'
 import { routes } from '@/lib/routes'
+import { listingSlug } from '@/lib/listingSlug'
 
 // PATCH /api/admin/submissions/:id
 // body: { status: 'approved' | 'rejected', reason?: string, payload?: listing, only?: string[] }
@@ -134,7 +135,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
         if (subscribers.length === 0) return
 
         if (kind === 'add') {
-          const url = `${siteUrl()}${routes.listing(community.slug, resource.category, resource.id)}`
+          const url = `${siteUrl()}${routes.listing(community.slug, resource.category, listingSlug(resource))}`
           await sendNewListingNotification(subscribers, { name: resource.name, url }, category.pluralLabel)
         } else {
           await sendClosureNotification(subscribers, { name: resource.name }, category.pluralLabel)

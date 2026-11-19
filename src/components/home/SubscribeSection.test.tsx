@@ -13,6 +13,17 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
+// Stands in for Cloudflare: says it is there, and hands over a token at once.
+vi.mock('@/components/TurnstileWidget', async () => {
+  const { forwardRef, useEffect } = await import('react')
+  return {
+    default: forwardRef(function FakeTurnstile({ onVerify }: { onVerify: (t: string) => void }, _ref) {
+      useEffect(() => onVerify('tok-1'), [onVerify])
+      return <div data-testid="turnstile" />
+    }),
+  }
+})
+
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
@@ -281,6 +292,22 @@ describe('SubscribeSection', () => {
 
       expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument()
       expect(screen.getByLabelText('Email address')).toBeInTheDocument()
+    })
+  
+    // A signup emails the address given, so it needs the challenge, but the
+    // home page must not load it just to be looked at (Nov 18 review, item 25).
+    it('mounts the challenge once the email box is used, and sends its token', async () => {
+      const user = userEvent.setup()
+      const fetchMock = stubFetch({ ok: true })
+      renderWithProviders(<SubscribeSection band />, { content: { categories: [grocery] } })
+      expect(screen.queryByTestId('turnstile')).not.toBeInTheDocument()
+
+      await user.type(screen.getByLabelText('Email address'), 'person@example.com')
+      expect(screen.getByTestId('turnstile')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+      expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ turnstileToken: 'tok-1' })
     })
   })
 })

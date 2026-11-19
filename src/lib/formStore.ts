@@ -42,8 +42,8 @@ function toConfig(row: FormRow): FormConfig {
 }
 
 // Every form, published content only — no drafts — and filtered to active
-// forms. Used by the public GET /api/forms that the live wizards read, and
-// by everything downstream that resolves a form's URL (sitemap, direct-URL
+// forms. Used by the community layout's content (the live wizards read it
+// from there), the public GET /api/forms, and by everything downstream that resolves a form's URL (sitemap, direct-URL
 // resolution). An inactive form is invisible here but still returned by
 // listFormsForAdmin, so the admin manager can edit and re-activate it.
 export async function listPublishedForms(community: string): Promise<Omit<FormConfig, 'draft'>[]> {
@@ -56,7 +56,13 @@ export async function listPublishedForms(community: string): Promise<Omit<FormCo
     .eq('community_id', community)
     .order('id')
   if (error) throw new Error(`Failed to load forms: ${error.message}`)
-  return (data as FormRow[]).map(toConfig).filter((f) => f.active !== false)
+  // The draft comes off here, not only in the type: the result goes to every
+  // visitor's page, and an admin's unpublished edit was going with it.
+  return (data as FormRow[])
+    .map(toConfig)
+    .filter((f) => f.active !== false)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- left out, see above
+    .map(({ draft: _unpublished, ...form }) => form)
 }
 
 // Every form including drafts, for the admin Forms manager.

@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import CommunityManager from './CommunityManager'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { adminBase } from '@/lib/adminNav'
 import type { Community } from '@/lib/communityStore'
 import { readFileSync } from 'fs'
+import { mockRouter } from '@/test/nextNavigationMock'
 
 // The "New Community" flow's client-side validation (submit() in
 // CommunityManager.tsx) was exercised only by the e2e happy path, which
@@ -18,6 +19,7 @@ import { readFileSync } from 'fs'
 // context.
 
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => mockRouter, usePathname: () => '/admin', useSearchParams: () => new URLSearchParams() }))
 
 // Same stub pattern ListingEditor.test.tsx uses for the same component — a
 // real AddressInput needs Google Maps loaded, which this test env has no
@@ -109,6 +111,10 @@ async function fillValidForm(user: ReturnType<typeof userEvent.setup>) {
 
 beforeEach(() => {
   vi.mocked(fetchJson).mockResolvedValue({ community: makeCommunity({ slug: 'baltimore' }) })
+  // The router writes the address, as Next's does (New community has one).
+  window.history.replaceState({}, '', '/admin')
+  mockRouter.push.mockImplementation((url: string) => window.history.pushState({}, '', url))
+  mockRouter.replace.mockImplementation((url: string) => window.history.replaceState({}, '', url))
 })
 
 afterEach(() => {
@@ -158,6 +164,29 @@ describe('CommunityManager — the community list', () => {
 })
 
 describe('CommunityManager — new community form', () => {
+  // Nov 18: it was only state, so the browser's Back left the console.
+  it('is a screen of its own: Back closes it, Forward and a reload open it, Cancel goes back', async () => {
+    const user = userEvent.setup()
+    await renderAndWaitForList()
+    await user.click(screen.getByRole('button', { name: '+ New community' }))
+    await waitFor(() => expect(window.location.search).toBe('?step=new'))
+
+    act(() => history.back())
+    expect(await screen.findByText('Every community this site hosts.')).toBeInTheDocument()
+    act(() => history.forward())
+    expect(await screen.findByRole('heading', { name: 'New community' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(window.location.search).toBe(''))
+    expect(screen.getByText('Every community this site hosts.')).toBeInTheDocument()
+
+    cleanup()
+    window.history.replaceState({}, '', '/admin?step=new')
+    mockList([makeCommunity()])
+    render(<CommunityManager token="tok" />)
+    expect(await screen.findByRole('heading', { name: 'New community' })).toBeInTheDocument()
+  })
+
   it('auto-derives the slug from the name, and stops once the slug is edited directly', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList()

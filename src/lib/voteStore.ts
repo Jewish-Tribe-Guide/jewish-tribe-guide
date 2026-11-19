@@ -1,4 +1,21 @@
 import { getAdminClient } from './supabase/admin'
+import { listCategories } from './categoryStore'
+
+/** Whether a listing takes votes: it is on the site (approved) and its
+ *  category has upvotes switched on. Anything else a vote would only count
+ *  where nobody sees it, or where the admin turned counts off. */
+export async function canVote(resourceId: string): Promise<boolean> {
+  const { data, error } = await getAdminClient()
+    .from('resource')
+    .select('status, category, community_id')
+    .eq('id', resourceId)
+    .maybeSingle()
+  if (error) throw new Error(`Failed to load the listing: ${error.message}`)
+  const row = data as { status: string; category: string; community_id: string } | null
+  if (!row || row.status !== 'approved') return false
+  const categories = await listCategories(row.community_id)
+  return categories.some((c) => c.id === row.category && c.upvotesEnabled === true)
+}
 
 // Upvote counts for every listing in a community (id → count).
 //

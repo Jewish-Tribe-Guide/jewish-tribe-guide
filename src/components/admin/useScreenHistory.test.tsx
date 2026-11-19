@@ -71,4 +71,35 @@ describe('a move still waiting when the page goes', () => {
       vi.useRealTimers()
     }
   })
+
+  // The same again for a move queued behind it, which then worked out its
+  // address with no page left (PR 396, Nov 18, from ModerationQueue.test.tsx).
+  it('drops the moves queued behind it', async () => {
+    vi.useFakeTimers()
+    try {
+      const router = { push: vi.fn(), replace: vi.fn() } as never
+      void moveTo(router, 'push', () => '/never-lands')
+      const queued = moveTo(router, 'push', () => `${window.location.pathname}?b=1`)
+      await vi.advanceTimersByTimeAsync(20)
+      vi.stubGlobal('window', undefined)
+      await vi.advanceTimersByTimeAsync(40)
+      vi.unstubAllGlobals()
+      await expect(queued).resolves.toBeUndefined()
+    } finally {
+      vi.unstubAllGlobals()
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('a move that fails', () => {
+  it('leaves the moves after it to run', async () => {
+    window.history.replaceState(null, '', '/page')
+    const failed = moveTo(router as never, 'push', () => {
+      throw new Error('no address')
+    })
+    await expect(failed).rejects.toThrow('no address')
+    await moveTo(router as never, 'push', () => '/page?after=1')
+    expect(here()).toBe('/page?after=1')
+  })
 })

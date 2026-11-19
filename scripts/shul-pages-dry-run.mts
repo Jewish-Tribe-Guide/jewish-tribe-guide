@@ -53,7 +53,7 @@ const LOOKS_LIKE_TIMES = /\b\d{1,2}:\d\d\b|\b\d{1,2}\s*(am|pm)\b|\b(shacharis|sh
 type Tally = { shul: string; site: boolean; opens: boolean; pages: number; readFrom: number; differs: number; given: string[]; givenFound: number; clockOnRead: number; bareOnly: number }
 const tallies: Tally[] = []
 
-async function dryRun(slug: string, communityName: string, category: Awaited<ReturnType<typeof listCategoriesUncached>>[number], reads: NonNullable<ReturnType<typeof pageReadsFor>>, row: ResourceRow, given: string[]): Promise<string[]> {
+async function dryRun(slug: string, communityName: string, where: { timezone: string; mapCenter: { lat: number; lng: number } }, category: Awaited<ReturnType<typeof listCategoriesUncached>>[number], reads: NonNullable<ReturnType<typeof pageReadsFor>>, row: ResourceRow, given: string[]): Promise<string[]> {
   const out: string[] = []
   const say = (l: string) => out.push(l)
   const listing = normalizeRow(row)
@@ -75,7 +75,7 @@ async function dryRun(slug: string, communityName: string, category: Awaited<Ret
   t.givenFound = given.filter((g) => pages.some((p) => samePage(p.url, g))).length
   for (const { url: page, link } of pages) {
     say(`\n   ── ${page}${link ? ` (its “${link}” link)` : ''}`)
-    const source = await readListingPage(page, { pictures: true }).catch(() => null)
+    const source = await readListingPage(page, { timezone: where.timezone, pictures: true }).catch(() => null)
     if (!source) {
       say('      Can’t be read (blocked, moved, or nearly empty).')
       continue
@@ -85,7 +85,7 @@ async function dryRun(slug: string, communityName: string, category: Awaited<Ret
     say(`      ${source.weeks ? `A calendar, ${source.weeks.length} week(s). ` : ''}The page says:${lines.length ? '' : ' nothing like times.'}`)
     for (const l of lines.slice(0, 14)) say(`        | ${l}`)
     try {
-      const reading = await readPageFor(listing, category, reads, source, { apiKey: process.env.OPENAI_API_KEY!, communityName })
+      const reading = await readPageFor(listing, category, reads, source, { apiKey: process.env.OPENAI_API_KEY!, communityName, where })
       say(`      The AI read: ${reading.read.length ? '' : 'no times.'}`)
       for (const l of reading.read.slice(0, 14)) say(`        · ${l}`)
       if (reading.note) say(`      Note: ${reading.note}`)
@@ -104,8 +104,9 @@ async function dryRun(slug: string, communityName: string, category: Awaited<Ret
   return out
 }
 
-const { data: communities } = await getAdminClient().from('community').select('slug, name')
-for (const { slug, name: communityName } of (communities ?? []) as { slug: string; name: string }[]) {
+const { data: communities } = await getAdminClient().from('community').select('slug, name, timezone, map_center')
+for (const { slug, name: communityName, timezone, map_center } of (communities ?? []) as { slug: string; name: string; timezone: string; map_center: { lat: number; lng: number } }[]) {
+  const where = { timezone, mapCenter: map_center }
   const { watches } = await listWatches(slug)
   for (const category of await listCategoriesUncached(slug)) {
     const reads = pageReadsFor(category)
@@ -115,7 +116,7 @@ for (const { slug, name: communityName } of (communities ?? []) as { slug: strin
     // A few shuls at a time; each one's lines printed together.
     for (let i = 0; i < list.length; i += 4) {
       const batch = list.slice(i, i + 4)
-      const outs = await Promise.all(batch.map((row) => dryRun(slug, communityName, category, reads, row, watches.filter((w) => w.resourceId === row.id && isListingPageWatch(w)).map((w) => w.url))))
+      const outs = await Promise.all(batch.map((row) => dryRun(slug, communityName, where, category, reads, row, watches.filter((w) => w.resourceId === row.id && isListingPageWatch(w)).map((w) => w.url))))
       for (const o of outs) console.log(o.join('\n'))
     }
   }

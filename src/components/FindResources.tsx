@@ -1,5 +1,6 @@
 'use client'
 
+import { useCommunityPlace } from '@/lib/communityContext'
 import { useEffect, useRef, useState } from 'react'
 import ResourceLoader from '@/components/resources/ResourceLoader'
 import ListingAdd from '@/components/resources/ListingAdd'
@@ -15,7 +16,6 @@ import type { DirectoryResource, DirectoryAnchor } from '@/types'
 import { useCategories } from '@/lib/useCategories'
 import { resolveCapabilities, bandImageFor } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
-import { community } from '@/community.config'
 import { useIsMobile } from '@/lib/useIsMobile'
 import type { ParamsOpts } from '@/components/resources/GenericDirectory'
 import { parseTappedMinyan } from '@/components/resources/TappedMinyan'
@@ -122,8 +122,9 @@ export default function FindResources({
   // Zmanim is a city-wide resource. It anchors on the visitor's typed address
   // when set, otherwise on the community's configured center + label — so it
   // works for any community.
-  const zmanimCoords = anchor.coords ?? community.mapCenter
-  const locationLabel = anchor.label || community.region
+  const { center, region } = useCommunityPlace()
+  const zmanimCoords = anchor.coords ?? center
+  const locationLabel = anchor.label || region
 
   // Gates Add/Edit's presentation below — a bottom sheet layered over
   // the still-mounted directory on mobile, a centered dialog over it on
@@ -279,9 +280,9 @@ export default function FindResources({
         // expand its card. GenericDirectory's own reopenItemId effect can't
         // tell those two reasons apart, though: it opens whatever `?item=`
         // names unconditionally. Reached only from a COLLAPSED row's kebab or
-        // a deep link now (an already-expanded card's own Edit morphs
-        // its dialog in place instead — see ListingDetailModal's doc — and
-        // never calls this), so the card was never genuinely open before
+        // a deep link now (an opened listing's own Edit swaps the listing
+        // for its editor in place instead — see MapPlaceDetail — and never
+        // calls this), so the card was never genuinely open before
         // this ran; goToCategoryList clears `item` back out on close so it
         // doesn't linger as a false "reopen this" signal once the reason it
         // was there (this form) is gone. Confirmed live: without that, a

@@ -7,6 +7,7 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { adminBase } from '@/lib/adminNav'
 import AddressInput from '@/components/intake/AddressInput'
+import { useStepsInAddress } from './useStepsInAddress'
 import type { Community } from '@/lib/communityStore'
 
 // GET /api/admin/communities adds adminEmails/previewToken on top of the
@@ -126,6 +127,10 @@ export default function CommunityManager({ token }: { token: string }) {
   // access-denied message instead of the list-of-communities-with-links.
   const [forbidden, setForbidden] = useState(false)
   const [creating, setCreating] = useState(false)
+  // New community is a screen of its own, with an address (?step=new), so
+  // Back closes it and Forward and a reload open it again (Nov 18: it was
+  // only state, and Back left the console).
+  useStepsInAddress('step', creating ? ['new'] : [], ([to]) => setCreating(to === 'new'))
   const [saving, setSaving] = useState(false)
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [draft, setDraft] = useState<Draft>(emptyDraft())

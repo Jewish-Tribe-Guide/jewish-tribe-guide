@@ -1,146 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { DEFAULT_CATEGORY_ICON, type CategoryConfig } from '@/lib/categories'
 import ImageUploadField from '@/components/ImageUploadField'
-import CategoryIcon from '@/components/CategoryIcon'
-import { categoryColorUsage, PIN_COLORS, type ColorUser } from '@/lib/categoryColor'
-
-// ── Shared form-field building blocks used by CategoryEditor and
-// SingletonEditor (in CategoryManager.tsx), and by FormEditor. ──
-
-export const inputClass =
-  'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
-
-// A starter palette for the icon picker — common, recognizable choices for a
-// community directory, grouped for scanability. Not exhaustive: the text
-// field next to it accepts any emoji, so this is a shortcut, not a limit.
-const ICON_CHOICES: { group: string; options: { emoji: string; label: string }[] }[] = [
-  {
-    group: 'Places',
-    options: [
-      { emoji: '🏫', label: 'School' },
-      { emoji: '🏥', label: 'Hospital' },
-      { emoji: '🏨', label: 'Hotel' },
-      { emoji: '🏠', label: 'House' },
-      { emoji: '🏢', label: 'Building' },
-      { emoji: '🕍', label: 'Synagogue' },
-      { emoji: '💧', label: 'Water drop' },
-      { emoji: '🏦', label: 'Bank' },
-      { emoji: '📚', label: 'Library' },
-    ],
-  },
-  {
-    group: 'Food & shopping',
-    options: [
-      { emoji: '🍽️', label: 'Restaurant' },
-      { emoji: '🛒', label: 'Grocery cart' },
-      { emoji: '☕', label: 'Cafe' },
-      { emoji: '🍞', label: 'Bakery' },
-      { emoji: '🛍️', label: 'Shopping' },
-    ],
-  },
-  {
-    group: 'People & community',
-    options: [
-      { emoji: '🧑‍🤝‍🧑', label: 'People' },
-      { emoji: '🤝', label: 'Handshake' },
-      { emoji: '💛', label: 'Heart' },
-      { emoji: '👶', label: 'Childcare' },
-      { emoji: '🙏', label: 'Prayer' },
-    ],
-  },
-  {
-    group: 'Symbols & info',
-    options: [
-      { emoji: '✡️', label: 'Star of David' },
-      { emoji: '🕯️', label: 'Candle' },
-      { emoji: '🗺️', label: 'Map' },
-      { emoji: '💬', label: 'Chat' },
-      { emoji: '📅', label: 'Calendar' },
-      { emoji: '☎️', label: 'Phone' },
-      { emoji: '🌐', label: 'Website' },
-      { emoji: '📋', label: 'Clipboard (default)' },
-    ],
-  },
-]
-
-// The emoji field + curated browse panel — a form's icon (FormEditor). A
-// category's icon isn't set any more: the site draws its kind's line icon
-// (the user, Nov 11).
-export function IconField({
-  icon,
-  onChange,
-}: {
-  icon: string
-  onChange: (value: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  return (
-    // The emoji <input> below carries its own aria-label="Icon".
-    <div className="block">
-      <span className="block text-xs font-medium text-slate-700 mb-1">Icon</span>
-      <div className="flex gap-2">
-        {/* inputClass bakes in w-full — wrap it rather than adding a competing
-            w-16 to the same className, which Tailwind doesn't resolve by
-            source order and would silently lose to w-full. */}
-        <div className="w-16 shrink-0">
-          <input
-            value={icon}
-            onChange={(e) => onChange(e.target.value)}
-            className={`${inputClass} text-center text-lg`}
-            placeholder={DEFAULT_CATEGORY_ICON}
-            maxLength={4}
-            aria-label="Icon"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="text-sm font-medium border border-slate-300 rounded-md px-3 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
-        >
-          {open ? 'Hide icons' : 'Browse icons…'}
-        </button>
-      </div>
-      {/* A plain scrolling div, not a native <select> — the browser's own
-          dropdown popup can't be restyled (comes out cramped regardless of
-          how the closed control is sized) and its built-in overflow arrows
-          only scroll one direction at a time. This scrolls like any other
-          page content. */}
-      {open && (
-        <div className="mt-2 border border-slate-200 rounded-md p-2 max-h-52 overflow-y-auto space-y-2 bg-slate-50/60">
-          {ICON_CHOICES.map((group) => (
-            <div key={group.group}>
-              <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">
-                {group.group}
-              </span>
-              <div className="flex flex-wrap gap-1">
-                {group.options.map((o) => (
-                  <button
-                    key={o.emoji}
-                    type="button"
-                    onClick={() => { onChange(o.emoji); setOpen(false) }}
-                    title={o.label}
-                    className={`text-lg leading-none rounded-md px-2 py-1.5 transition-colors cursor-pointer ${
-                      icon === o.emoji ? 'bg-primary/10 ring-1 ring-primary' : 'hover:bg-white'
-                    }`}
-                  >
-                    {o.emoji}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      <span className="block text-[11px] text-muted mt-1">
-        Browse a curated list, or type/paste any emoji directly into the box. Shown beside the
-        form’s name.
-      </span>
-
-    </div>
-  )
-}
+import { withCommunity } from '@/lib/useCommunityData'
 
 // The banner on a computer, the one photo a page has — shared by the full
 // category editor and SingletonEditor. The same picker as the Home page's
@@ -154,6 +15,7 @@ export function CardBandImageField({
   cardImageUrl,
   onChange,
   token,
+  community,
   originalSource,
   onOriginalSourceChange,
 }: {
@@ -162,6 +24,7 @@ export function CardBandImageField({
   /** The new banner photo, and the older pasted one (always cleared). */
   onChange: (cardBandImageUrl: string, cardImageUrl: string) => void
   token: string
+  community: string
   originalSource?: File | string | null
   onOriginalSourceChange?: (source: File | string | null) => void
 }) {
@@ -169,7 +32,7 @@ export function CardBandImageField({
     <ImageUploadField
       value={cardBandImageUrl.trim() || cardImageUrl.trim()}
       onChange={(url) => onChange(url, '')}
-      uploadUrl="/api/admin/categories/band"
+      uploadUrl={withCommunity('/api/admin/categories/band', community)}
       token={token}
       shape="square"
       aspect={5}
@@ -179,125 +42,4 @@ export function CardBandImageField({
       onOriginalSourceChange={onOriginalSourceChange}
     />
   )
-}
-
-/** The category's pin colour — the swatch its map pins and listing avatars are
- *  drawn in.
- *
- *  Offers the twenty-colour palette rather than a free colour input: these are
- *  chosen to stay apart from each other and to keep the white glyph on a pin
- *  legible, and a free picker invites a pale yellow that makes the icon
- *  vanish. `#RRGGBB` typed by hand is still accepted by the API for anyone who
- *  needs an exact brand colour.
- *
- *  "Automatic" is a real option, not an empty state — it clears the stored
- *  value and lets getCategoryColor fall back to the positional palette, which
- *  is what every category did before colours were stored. */
-export function PinColorField({
-  value,
-  onChange,
-  fallback,
-  icon,
-  categoryId,
-  siblings,
-}: {
-  value: string
-  onChange: (value: string) => void
-  /** What the positional rule would pick, previewed under "Automatic". */
-  fallback: string
-  icon: string
-  categoryId?: string
-  /** Every category, so each swatch can say who already has it. Null while
-   *  they're still loading — the row then just renders plain, as before. */
-  siblings?: CategoryConfig[] | null
-}) {
-  const active = value || fallback
-  // Who already has each colour. Keyed on `siblings` (a stable array from the
-  // manager, not rebuilt per keystroke) so typing a name doesn't recompute it.
-  const takenBy = useMemo(() => categoryColorUsage(siblings, categoryId), [siblings, categoryId])
-  const clash = takenBy.get(active.toLowerCase()) ?? []
-  return (
-    <div className="pt-1">
-      <span className="block text-xs font-medium text-slate-700 mb-1">Pin colour</span>
-      <div className="flex items-start gap-3">
-        <CategoryIcon
-          icon={icon || '📍'}
-          categoryId={categoryId}
-          color={active}
-          className="h-11 w-11 text-2xl"
-          sizePx={44}
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => onChange('')}
-              className={`rounded px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer ${
-                value ? 'text-slate-600 hover:bg-slate-100' : 'bg-slate-900 text-white'
-              }`}
-            >
-              Automatic
-            </button>
-            {PIN_COLORS.map((c) => {
-              const owners = takenBy.get(c.toLowerCase()) ?? []
-              return (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => onChange(c)}
-                  aria-label={owners.length > 0 ? `${c} — already used by ${ownerNames(owners)}` : c}
-                  title={owners.length > 0 ? `${c} — already used by ${ownerNames(owners)}` : c}
-                  className={`relative h-6 w-6 rounded-full border transition-transform cursor-pointer ${
-                    value.toLowerCase() === c.toLowerCase()
-                      ? 'border-slate-900 scale-110'
-                      : 'border-slate-300 hover:scale-110'
-                  }`}
-                  style={{ backgroundColor: c }}
-                >
-                  {/* The owner's own glyph, sitting on the swatch — the whole
-                      point is to answer "is this one taken, and by what?"
-                      without opening the preview and comparing pins by eye. */}
-                  {owners.length > 0 && (
-                    <span
-                      className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] leading-none"
-                      aria-hidden="true"
-                    >
-                      {owners.length > 1 ? '•' : owners[0].icon || DEFAULT_CATEGORY_ICON}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-          {clash.length > 0 && (
-            <span className="block text-[11px] text-amber-700 mt-1.5">
-              Same colour as {ownerNames(clash)}
-              {clash.every((o) => o.automatic) ? ' (automatic — it may move on its own)' : ''}. Pins
-              and listing icons for {clash.length > 1 ? 'them' : 'both'} will look alike; a swatch
-              with no glyph on it is free.
-            </span>
-          )}
-          <span className="block text-[11px] text-muted mt-1.5">
-            Used for this category&rsquo;s map pins and the round icon on its listings.{' '}
-            {value ? (
-              <>Set explicitly, so it stays put when categories are renamed or hidden.</>
-            ) : (
-              <>
-                Automatic picks one by position in the category list — which means renaming or
-                hiding another category can change it. Choose a swatch to pin it down.
-              </>
-            )}
-          </span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/** "Synagogues", or "Synagogues and Hotels", or "Synagogues, Hotels and 2 more" —
- *  short enough for a swatch tooltip. */
-function ownerNames(owners: ColorUser[]): string {
-  if (owners.length === 1) return owners[0].label
-  if (owners.length === 2) return `${owners[0].label} and ${owners[1].label}`
-  return `${owners[0].label}, ${owners[1].label} and ${owners.length - 2} more`
 }

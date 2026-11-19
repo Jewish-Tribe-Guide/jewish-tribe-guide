@@ -432,6 +432,20 @@ describe('ListingView — about', () => {
     view({ item: { ...judah, placeId: 'p1', googleFields: ['hours'] } })
     expect(screen.getByTestId('listing-about')).not.toHaveTextContent(/Description from/)
   })
+  // Nov 18 review, item 13: those same listings asked visitors whether
+  // Google's own text was "Still right?".
+  it('asks nobody to confirm Google’s description on a place Google keeps, and keeps Edit', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-15T15:00:00Z'))
+    try {
+      view({ item: { ...judah, placeId: 'p1', googleFields: ['hours'], confirmedAt: '2026-03-01T15:00:00Z' } })
+      const about = screen.getByTestId('listing-about')
+      expect(about).not.toHaveTextContent(/Still right|Confirmed/)
+      expect(within(about).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
   it('says nothing about where it came from on a listing never matched to Google', () => {
     view()
     expect(screen.getByTestId('listing-about')).not.toHaveTextContent(/Description from/)
@@ -479,9 +493,9 @@ describe('ListingView — how sure', () => {
     view({ item: { ...judah, placeId: 'p1', googleSyncedAt: '2026-09-30T06:59:09Z', googleFields: ['phone', 'website'], confirmedAt: '2026-06-01T16:30:00Z' } })
     expect(screen.queryByText(/last checked/)).not.toBeInTheDocument()
     expect(within(screen.getByTestId('listing-details')).getByTestId('listing-google')).toHaveTextContent('Checked with Google, Sep 30.')
-    // Asked only under About (its own date, Oct 15), never about the
-    // kosher details.
-    expect(screen.getAllByText(/Still right|Right\?/).every((el) => screen.getByTestId('listing-about').contains(el))).toBe(true)
+    // Never asked about the kosher details. (Nor, since Nov 18, about
+    // Google's description on a place Google keeps.)
+    expect(screen.queryAllByText(/Still right|Right\?/)).toEqual([])
     expect(screen.getByTestId('listing-details')).not.toHaveTextContent(/Still right|Right\?|confirmed/i)
     expect(screen.getByTestId('listing-view').querySelector('h2')!.parentElement!.parentElement).not.toHaveTextContent(/checked|confirmed/i)
   })

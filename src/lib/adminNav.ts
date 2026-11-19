@@ -44,6 +44,7 @@ export type AdminTab =
   | 'metrics'
   | 'watches'
   | 'team'
+  | 'location'
   | 'communities'
 
 export type AdminTabLink = { tab: AdminTab; href: string; label: string }
@@ -90,14 +91,15 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
       label: 'Site',
       // Screen by screen, each tab the screen it changes (step 4). Home page
       // has the header too (Nov 4). About and Privacy is one copy for every
-      // community, so only the site owner has it.
+      // community, so only the site owner has it, and it opens the
+      // superadmin console's own screen (Nov 18: one address, in /admin).
       tabs: [
         { tab: 'home', href: `${base}/home`, label: 'Home page' },
         { tab: 'categories', href: `${base}/categories`, label: 'Category pages' },
         // Held back for now (see features.ts).
         ...(features.formsTab ? [{ tab: 'forms' as const, href: `${base}/forms`, label: 'Forms' }] : []),
         { tab: 'campaigns', href: `${base}/campaigns`, label: 'Campaigns' },
-        ...(isSuperAdmin ? [{ tab: 'pages' as const, href: `${base}/pages`, label: 'About and Privacy' }] : []),
+        ...(isSuperAdmin ? [{ tab: 'pages' as const, href: '/admin/pages', label: 'About and Privacy' }] : []),
       ],
     },
     {
@@ -115,7 +117,9 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
       label: 'Settings',
       tabs: [
         { tab: 'team', href: `${base}/team`, label: 'Team' },
-        ...(isSuperAdmin ? [{ tab: 'communities' as const, href: `${base}/communities`, label: 'Communities' }] : []),
+        // Where a visitor is taken to be until they set their own (Nov 19).
+        { tab: 'location', href: `${base}/location`, label: 'Default location' },
+        ...(isSuperAdmin ? [{ tab: 'communities' as const, href: '/admin', label: 'Communities' }] : []),
       ],
     },
   ]

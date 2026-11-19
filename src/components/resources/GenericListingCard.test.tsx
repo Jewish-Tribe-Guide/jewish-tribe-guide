@@ -10,6 +10,7 @@ import { mockRouter } from '@/test/nextNavigationMock'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import { NextMinyansContext } from './nextMinyans'
+import { placeTime } from '@/test/placeTime'
 
 // The first component test built on the CommunityProvider/ContentProvider
 // harness (renderWithProviders) — this was the specific component the
@@ -80,7 +81,6 @@ const requiredHandlers = {
   onFilterOpen: vi.fn(),
   onFilterBool: vi.fn(),
   onFilterSelect: vi.fn(),
-  onEdit: vi.fn(),
 }
 
 describe('GenericListingCard — collapsed', () => {
@@ -214,7 +214,7 @@ describe('GenericListingCard — collapsed', () => {
     vi.useFakeTimers()
     try {
       // A Friday, mid-afternoon, for a place open 09:00–17:00 that day.
-      vi.setSystemTime(new Date('2026-08-28T14:00:00'))
+      vi.setSystemTime(placeTime(2026, 7, 28, 14, 0))
       const category = makeCategory({
         detailFields: [{ key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' }],
       })
@@ -249,7 +249,7 @@ describe('GenericListingCard — collapsed', () => {
   it('shows a closure on the collapsed card, and never an Open badge with it', () => {
     vi.useFakeTimers()
     try {
-      vi.setSystemTime(new Date('2026-08-31T12:00:00')) // a Monday, midday
+      vi.setSystemTime(placeTime(2026, 7, 31, 12, 0)) // a Monday, midday
       const category = makeCategory({
         detailFields: [{ key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' }],
       })
@@ -274,7 +274,7 @@ describe('GenericListingCard — collapsed', () => {
   it('goes back to open once the status is OPERATIONAL again', () => {
     vi.useFakeTimers()
     try {
-      vi.setSystemTime(new Date('2026-08-31T12:00:00'))
+      vi.setSystemTime(placeTime(2026, 7, 31, 12, 0))
       const category = makeCategory({
         detailFields: [{ key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' }],
       })
@@ -409,43 +409,21 @@ describe('GenericListingCard — showInHeader text/textarea fields', () => {
   })
 })
 
-// The modal replaces GenericListingCard's own collapsed row entirely (the
-// card behind it is hidden under the backdrop), so a showInHeader url field
-// has to be restated somewhere in the dialog too — this is the "somewhere":
-// the same pill, next to the name, the collapsed row already used.
-// Drawn into <body>, like the phone's sheet (see BodyPortal): inside the
-// page's content, which rises into place with a transform as it appears,
-// the dialog's backdrop sat under the site header for that moment.
+// Drawn into <body> (see BodyPortal): inside the page's content, which
+// rises into place with a transform as it appears, an opened listing's
+// backdrop sat under the site header for that moment.
 describe('GenericListingCard — the opened listing sits above the page', () => {
-  it('draws the desktop dialog straight into the page body, outside the row', async () => {
+  it('draws the phone sheet straight into the page body, outside the row', async () => {
     const user = userEvent.setup()
     const { container } = renderWithProviders(
-      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
+      <ForcedViewport isMobile>
+        <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
+      </ForcedViewport>,
     )
     await user.click(screen.getByRole('button', { name: /show details for/i }))
-    const backdrop = screen.getByRole('dialog').closest('[role="presentation"]')!
-    expect(backdrop.parentElement).toBe(document.body)
-    expect(container).not.toContainElement(backdrop as HTMLElement)
-  })
-})
-
-describe('GenericListingCard — desktop modal header url field', () => {
-  it('shows a showInHeader url field as a pill next to the name in the dialog, not duplicated in the actions row', async () => {
-    const user = userEvent.setup()
-    const category = makeCategory({
-      detailFields: [{ key: 'w', label: 'Website', type: 'url', showInHeader: true }],
-    })
-    const item = makeListing({ w: 'https://example.com' })
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
-    )
-
-    await user.click(screen.getByRole('button', { name: /show details for/i }))
-
-    const dialog = screen.getByRole('dialog')
-    const websiteLinks = within(dialog).getAllByRole('link', { name: 'Website' })
-    expect(websiteLinks).toHaveLength(1)
-    expect(websiteLinks[0]).toHaveAttribute('href', 'https://example.com')
+    const sheet = screen.getByRole('dialog')
+    expect(document.body).toContainElement(sheet)
+    expect(container).not.toContainElement(sheet)
   })
 })
 
@@ -610,175 +588,51 @@ describe('GenericListingCard — items on the row', () => {
     })
     const item = makeListing({ isKosher: true, items: ['Milk', 'Bread'] })
     renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+      <ForcedViewport isMobile>
+        <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />
+      </ForcedViewport>,
     )
 
     await user.click(screen.getByRole('button', { name: /show details for/i }))
 
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
   })
 })
 
+// Opened, a listing is a sheet on a phone (below) and the list's column on
+// a computer (ListingColumn, drawn by GenericDirectory). The computer's
+// dialog (ListingDetailModal) went on Nov 19: a category page has opened
+// listings in its column since Sep 30, and nothing else draws these cards.
+// What its editor does is MapPlaceDetail's, and tested there.
 describe('GenericListingCard — expanded', () => {
-  it('shows the full address, and an Edit item in the dialog\'s own kebab, once expanded', async () => {
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing({ address: '1 Main St, Philadelphia, PA 19104' })
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
-    )
-
-    await user.click(screen.getByRole('button', { name: /show details for/i }))
-
-    expect(screen.getByText('1 Main St, Philadelphia, PA 19104')).toBeInTheDocument()
-    // The dialog carries no kebab of its own any more. It used to hold
-    // exactly one row — Edit — which is the whole reason this moved: people
-    // open a kebab looking for Share and Save, never for "I can change
-    // this." Edit is a labelled bar below the dialog now (ListingEditBar),
-    // and the only kebab left in the DOM is the collapsed row's, behind the
-    // backdrop. Scoped with `within` so this can't accidentally pass on it.
-    const dialog = screen.getByRole('dialog')
-    expect(within(dialog).queryByRole('button', { name: /more actions for/i })).not.toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
-  })
-
-  // Desktop's Edit/Report used to close this dialog and hand off to a
-  // separate ActionDialog (a 448px card replaced by a differently-sized
-  // 576px form dialog, no shared backdrop — confirmed live to read as a
-  // completely different popup appearing, not a continuation of the one
-  // already open). Swaps THIS dialog's own content in place instead, same
-  // pattern MapPlaceDetail's own formOpen already uses — see
-  // ListingDetailModal's own doc. ActionDialog still exists, just not for
-  // this entry point: only for a deep link or a search result's own
-  // Edit/Report button, which have no open dialog to morph from.
-  it('swaps the dialog\'s own content to the edit form — not a separate dialog — when the kebab\'s Edit item is clicked', async () => {
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing({ name: 'Goldi Market' })
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
-    )
-
-    const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: 'Edit listing' }))
-
-    expect(screen.getByText('ListingEditor stub — item=Goldi Market')).toBeInTheDocument()
-    // Not bubbled — this dialog handled it itself.
-    expect(requiredHandlers.onEdit).not.toHaveBeenCalled()
-    // Still the SAME dialog, not a second one stacked or swapped in.
-    expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
-  })
-
-  // Send floats under the dialog, in the spot the "Edit listing" pill
-  // held: outside the scrolling card, so a long listing can't scroll it
-  // away, but inside the dialog, so assistive tech still reaches it.
-  it('floats the editor\'s Send under the dialog, where the edit pill was', async () => {
-    const user = userEvent.setup()
-    renderWithProviders(
-      <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
-    )
-    const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: 'Edit listing' }))
-
-    const sendButton = within(dialog).getByRole('button', { name: 'stub send' })
-    const card = screen.getByText('ListingEditor stub — item=Goldi Market').closest('.dialog-in')!
-    expect(card).not.toContainElement(sendButton)
-  })
-
-  // The header band beside Back would otherwise be empty while editing;
-  // the editor's title goes there, between Back and Close.
-  it('puts the editor\'s title in the dialog header, between Back and Close', async () => {
-    const user = userEvent.setup()
-    renderWithProviders(
-      <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
-    )
-    const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: 'Edit listing' }))
-
-    // A chevron alone: the word isn't needed, and the site is text-heavy.
-    expect(within(dialog).getByRole('button', { name: 'Back' })).toHaveTextContent(/^$/)
-    const header = within(dialog).getByRole('button', { name: 'Back' }).closest('.border-b')!
-    expect(within(header as HTMLElement).getByRole('heading', { name: 'stub title' })).toBeInTheDocument()
-    expect(within(header as HTMLElement).getByRole('button', { name: 'Close' })).toBeInTheDocument()
-  })
-
-  // Removal is a step of its own, with no Cancel: Back and Escape step out
-  // of it into the edit, not out of editing. Its own history entry is what
-  // makes the browser's Back do the same.
-  it('steps back from the removal screen to the edit, with Back or Escape', async () => {
-    const user = userEvent.setup()
-    renderWithProviders(
-      <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
-    )
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit listing' }))
-    const push = vi.spyOn(window.history, 'pushState')
-    await user.click(screen.getByRole('button', { name: 'stub open removal' }))
-    expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ detailModalForm: 'edit', detailModalRemoval: true }), '')
-
-    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
-    await user.click(screen.getByRole('button', { name: 'Back' }))
-    await user.keyboard('{Escape}')
-    expect(back).toHaveBeenCalledTimes(2)
-    // What that Back delivers: the edit's own entry.
-    act(() => {
-      window.dispatchEvent(new PopStateEvent('popstate', { state: { detailModalForm: 'edit' } }))
-    })
-    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
-    expect(screen.getByText('ListingEditor stub — item=Goldi Market')).toBeInTheDocument()
-    push.mockRestore()
-    back.mockRestore()
-  })
-
-  // The dialog's accessible name follows the editor into its removal
-  // panel, reported via onRemovalOpenChange.
-  it('the dialog’s own name becomes "Request removal of {name}" once the editor reports the removal panel is open', async () => {
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing({ name: 'Goldi Market' })
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
-    )
-
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit listing' }))
-    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'stub open removal' }))
-
-    expect(screen.getByRole('dialog', { name: 'Request removal of Goldi Market' })).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: 'Edit listing' })).not.toBeInTheDocument()
-  })
-
-  // ── The edit bar ──────────────────────────────────────────────────────
-  // Repeated feedback was that the site doesn't look editable. Both of the
-  // ways in were things a visitor is trained to ignore: a kebab, which says
-  // "overflow," and FreshnessFooter's 12px grey "Suggest a correction" link,
-  // which sat at the same weight as the timestamp beside it. These assert
-  // the replacement is a real, labelled control on BOTH surfaces — the point
-  // is its prominence, so "reachable somehow" is not what's being checked.
-  it('offers a labelled "Edit listing" bar in the expanded dialog, which swaps to the edit form', async () => {
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing({ name: 'Goldi Market' })
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
-    )
-
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit listing' }))
-    expect(screen.getByText('ListingEditor stub — item=Goldi Market')).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'Edit listing' })).toBeInTheDocument()
-  })
-
-  // In place, the way the desktop dialog and the map do it: the sheet stays
-  // the same sheet and its content becomes the form, rather than closing
-  // and handing off to FindResources' separate Edit sheet.
-  it('offers the same bar in the mobile listing sheet, which swaps the sheet to the edit form', async () => {
-    const user = userEvent.setup()
+  const renderOpened = (props: Partial<Parameters<typeof GenericListingCard>[0]> = {}) =>
     renderWithProviders(
       <ForcedViewport isMobile>
-        <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />
+        <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} {...props} />
       </ForcedViewport>,
     )
+
+  // The sheet carries no kebab. It used to hold exactly one row, Edit,
+  // which is the whole reason this moved: people open a kebab looking for
+  // Share and Save, never for "I can change this." Edit is a labelled bar
+  // now (ListingEditBar). Removal is requested at the foot of the edit form
+  // (RemovalRequest), so there's no Report either.
+  it('shows the full address and the edit bar, with no kebab and no Report', () => {
+    renderOpened({ item: makeListing({ name: 'Goldi Market', address: '1 Main St, Philadelphia, PA 19104' }) })
+    const sheet = screen.getByRole('dialog', { name: 'Goldi Market' })
+    expect(within(sheet).getByText('1 Main St, Philadelphia, PA 19104')).toBeInTheDocument()
+    expect(within(sheet).queryByRole('button', { name: /more actions for/i })).not.toBeInTheDocument()
+    expect(within(sheet).getByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
+  })
+
+  // In place, the way the map does it: the sheet stays the same sheet and
+  // its content becomes the form, rather than closing and handing off to
+  // FindResources' separate Edit sheet.
+  it('swaps the sheet to the edit form from the bar, in the same sheet', async () => {
+    const user = userEvent.setup()
+    renderOpened()
     const sheet = screen.getByRole('dialog', { name: 'Goldi Market' })
     await user.click(within(sheet).getByRole('button', { name: 'Edit listing' }))
 
@@ -786,16 +640,13 @@ describe('GenericListingCard — expanded', () => {
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
   })
 
-  // The quiet link is deliberately gone from both directory surfaces now
-  // that the bar carries this job — two doors to the same form, one of them
-  // near-invisible, is the duplication the bar was built to end. (The map's
-  // place panel dropped it too once it got the bar, and FreshnessFooter no
-  // longer has the link at all. Its "Still right?" is asked beside what it's
-  // about now; see ListingView's own tests.)
-  it('drops the quiet "Suggest a correction" link from both surfaces', async () => {
-    renderWithProviders(
-      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
-    )
+  // The quiet link is deliberately gone now that the bar carries this job:
+  // two doors to the same form, one of them near-invisible, is the
+  // duplication the bar was built to end. (FreshnessFooter no longer has the
+  // link at all. Its "Still right?" is asked beside what it's about now; see
+  // ListingView's own tests.)
+  it('drops the quiet "Suggest a correction" link', () => {
+    renderOpened()
     expect(screen.queryByRole('button', { name: 'Suggest a correction' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
   })
@@ -805,82 +656,18 @@ describe('GenericListingCard — expanded', () => {
   // the bar was gated on edit wholesale, and the overflow was then the only
   // route to Pin a keyboard or screen reader could reach. Save is now the
   // bookmark at the top of the listing (Oct 14), the route a keyboard has —
-  // the card's swipe and hover-reveal — the card's swipe and hover-reveal
-  // are pointer-only precisely because this exists. Both surfaces, since
-  // they gate independently (MapPlaceDetail in the mobile sheet,
-  // ListingDetailModal on desktop).
-  for (const [surface, isMobile] of [['mobile sheet', true], ['desktop dialog', false]] as const) {
-    it(`keeps Save, without the pill, when the category cannot be edited (${surface})`, async () => {
-      const user = userEvent.setup()
-      renderWithProviders(
-        <ForcedViewport isMobile={isMobile}>
-          <GenericListingCard
-            item={makeListing({ name: 'Goldi Market' })}
-            category={makeCategory({ capabilities: { add: true, edit: false, report: true, directorySearch: true, map: true } })}
-            upvotes={false}
-            count={0}
-            defaultExpanded
-            {...requiredHandlers}
-          />
-        </ForcedViewport>,
-      )
-      await Promise.resolve()
-      expect(screen.queryByRole('button', { name: 'Edit listing' })).not.toBeInTheDocument()
-
-      const save = screen.getByRole('button', { name: 'Save Goldi Market' })
-      expect(save).toHaveAttribute('aria-pressed', 'false')
-      await user.click(save)
-      expect(screen.getByRole('button', { name: 'Save Goldi Market' })).toHaveAttribute('aria-pressed', 'true')
-    })
-  }
-
-  // Removal is requested at the foot of the edit form (RemovalRequest), not
-  // from a Report row, so nothing in the expanded dialog offers one — and
-  // the dialog has no kebab left to offer it from either.
-  it('the expanded dialog offers the edit bar, no kebab and no Report', async () => {
-    renderWithProviders(
-      <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
-    )
-    const dialog = screen.getByRole('dialog')
-    expect(within(dialog).queryByRole('button', { name: /more actions for/i })).not.toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
-  })
-
-  // Regression coverage for the actual reason this exists: with no way
-  // back, editing from here would have no way out except the Close button
-  // (which the old behavior also had, but at the cost of losing your place
-  // in the directory — this doesn't). See MapPlaceDetail's own identical
-  // Back-button coverage, same reasoning.
-  it('shows a Back button once the edit form is open, and it returns to the detail view via history.back()', async () => {
+  // the card's swipe and hover-reveal are pointer-only precisely because
+  // this exists.
+  it('keeps Save, without the pill, when the category cannot be edited', async () => {
     const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing()
-    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
-    )
+    renderOpened({ category: makeCategory({ capabilities: { add: true, edit: false, report: true, directorySearch: true, map: true } }) })
+    await Promise.resolve()
+    expect(screen.queryByRole('button', { name: 'Edit listing' })).not.toBeInTheDocument()
 
-    const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: 'Edit listing' }))
-
-    await user.click(screen.getByRole('button', { name: /^back$/i }))
-    expect(backSpy).toHaveBeenCalled()
-  })
-
-  it('pushes a history entry when Edit opens, so a swipe-back returns to the detail view instead of closing the dialog entirely', async () => {
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing()
-    const pushSpy = vi.spyOn(window.history, 'pushState')
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
-    )
-
-    const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: 'Edit listing' }))
-
-    expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ detailModalForm: 'edit' }), '')
+    const save = screen.getByRole('button', { name: 'Save Goldi Market' })
+    expect(save).toHaveAttribute('aria-pressed', 'false')
+    await user.click(save)
+    expect(screen.getByRole('button', { name: 'Save Goldi Market' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   // onExpandedChange — lets GenericDirectory keep ?item=<id> in sync with
@@ -918,106 +705,20 @@ describe('GenericListingCard — expanded', () => {
     expect(onExpandedChange).toHaveBeenLastCalledWith(false)
   })
 
-  it('calls onExpandedChange(false) when the desktop dialog is closed via its own Close button', async () => {
-    const user = userEvent.setup()
-    const onExpandedChange = vi.fn()
-    const category = makeCategory()
-    const item = makeListing()
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded onExpandedChange={onExpandedChange} {...requiredHandlers} />,
-    )
-
-    await user.click(screen.getByRole('button', { name: 'Close' }))
-
-    expect(onExpandedChange).toHaveBeenCalledWith(false)
-  })
-
-  // Desktop's ListingDetailModal — real here, not mocked, since this is
-  // exactly the wiring under test: an arrow key while the dialog is open
-  // reaches GenericDirectory's onNavigate through it.
-  it('calls onNavigate(1)/onNavigate(-1) on ArrowRight/ArrowLeft while the dialog is open', async () => {
-    const user = userEvent.setup()
-    const onNavigate = vi.fn()
-    const category = makeCategory()
-    const item = makeListing()
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} onNavigate={onNavigate} {...requiredHandlers} />,
-    )
-
-    await user.click(screen.getByRole('button', { name: /show details for/i }))
-    await user.keyboard('{ArrowRight}')
-    await user.keyboard('{ArrowLeft}')
-
-    expect(onNavigate).toHaveBeenNthCalledWith(1, 1)
-    expect(onNavigate).toHaveBeenNthCalledWith(2, -1)
-  })
-
-  // A visible arrow at either end of the list would look clickable but
-  // silently do nothing — this is what's supposed to stop that, not just
-  // the boundary check inside GenericDirectory's own navigateFromCard.
-  it('disables the Previous/Next buttons per hasPrev/hasNext, and clicking Next calls onNavigate(1)', async () => {
-    const user = userEvent.setup()
-    const onNavigate = vi.fn()
-    const category = makeCategory()
-    const item = makeListing()
-    renderWithProviders(
-      <GenericListingCard
-        item={item}
-        category={category}
-        upvotes={false}
-        count={0}
-        onNavigate={onNavigate}
-        hasPrev={false}
-        hasNext={true}
-        {...requiredHandlers}
-      />,
-    )
-
-    await user.click(screen.getByRole('button', { name: /show details for/i }))
-
-    expect(screen.getByRole('button', { name: 'Previous listing' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Next listing' })).toBeEnabled()
-
-    await user.click(screen.getByRole('button', { name: 'Next listing' }))
-    expect(onNavigate).toHaveBeenCalledWith(1)
-  })
-
-  // Was `fixed left-4`/`fixed right-4` — pinned to the viewport's own edges
-  // regardless of how far that left them from the dialog card itself (which
-  // tops out at max-w-md and sits centered, so on a wide screen the arrows
-  // ended up hundreds of pixels away). They're flex siblings of the card
-  // now, inside the same centered row, so they land right next to it at any
-  // viewport width instead.
-  it('sits as a flex sibling of the dialog card, not pinned to the viewport edge', async () => {
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing()
-    renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} onNavigate={vi.fn()} hasPrev hasNext {...requiredHandlers} />,
-    )
-
-    await user.click(screen.getByRole('button', { name: /show details for/i }))
-
-    const prevButton = screen.getByRole('button', { name: 'Previous listing' })
-    expect(prevButton).not.toHaveClass('fixed')
-    expect(prevButton.parentElement).toBe(screen.getByRole('dialog').parentElement)
-  })
-
   // GenericDirectory needs to close THIS card and open a sibling from
-  // outside it — the whole reason GenericListingCard exposes a ref handle.
-  it('opens and closes via an imperative ref handle', async () => {
-    const category = makeCategory()
-    const item = makeListing()
+  // outside it (the opened listing's ‹ ›) — the whole reason
+  // GenericListingCard exposes a ref handle.
+  it('opens and closes via an imperative ref handle', () => {
     const ref = createRef<GenericListingCardHandle>()
     renderWithProviders(
-      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+      <GenericListingCard ref={ref} item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
     act(() => ref.current!.open())
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /hide details for Goldi Market/i })).toHaveAttribute('aria-expanded', 'true')
 
     act(() => ref.current!.close())
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /show details for Goldi Market/i })).toHaveAttribute('aria-expanded', 'false')
   })
 })
 
@@ -1191,16 +892,6 @@ describe('GenericListingCard — the row', () => {
     expect(document.querySelector('img[src*="shlomo.jpg"]')).toBeNull()
   })
 
-  it('keeps upvotes off the row, and puts them in the opened listing', async () => {
-    const user = userEvent.setup()
-    renderWithProviders(
-      <GenericListingCard item={makeListing({ name: 'Acme' })} category={makeCategory({ upvotesEnabled: true })} upvotes count={7} {...requiredHandlers} />,
-    )
-
-    expect(screen.queryByText('7')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /show details for acme/i }))
-    expect(within(screen.getByRole('dialog')).getByText('7')).toBeInTheDocument()
-  })
 })
 
 // ── The collapsed row's actions ──────────────────────────────────────────

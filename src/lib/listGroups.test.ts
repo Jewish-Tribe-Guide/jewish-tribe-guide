@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { DirectoryResource } from '@/types'
 import { groupByFromKey, groupByKey, groupByOptions, groupListings, parseGroupBy } from './listGroups'
+import { placeTime } from '@/test/placeTime'
 
 // Monday, noon.
-const NOON_MONDAY = new Date(2026, 7, 31, 12, 0)
+const NOON_MONDAY = placeTime(2026, 7, 31, 12, 0)
 const MON_9_TO_5 = { mon: { open: '09:00', close: '17:00' } }
 const names = (items: readonly DirectoryResource[]) => items.map((i) => i.name)
 const summary = (g: ReturnType<typeof groupListings>) => g?.groups.map((x) => [x.label, names(x.items)])

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { answerSubmission, pickListingQuestion, pickQuestion, type PickedQuestion } from '@/lib/questionCards'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { usePersistedState } from '@/lib/usePersistedState'
 import TurnstileWidget from '@/components/TurnstileWidget'
@@ -12,7 +12,6 @@ import type { CategoryField } from '@/lib/categories'
 import { itemPhrase, itemWording, lastSeenText, pickItemToAsk, type ItemMark } from '@/lib/itemMarks'
 import { useNow } from '@/lib/useNow'
 import { useFetchOrPreview } from '@/lib/previewSend'
-import { community as communityConfig } from '@/community.config'
 import { useTurnstileActive } from './useListingSubmit'
 import type { ItemMarksApi } from './useItemMarks'
 import { recordConfirmed } from '@/lib/confirmedHere'
@@ -272,6 +271,7 @@ function ItemQuestion({
   api: ItemMarksApi
 }) {
   const clock = useNow()
+  const timezone = useCommunityTimezone()
   const titleId = useId()
   // The item answered here stays the question while its thanks shows,
   // rather than the card moving on to the next.
@@ -291,7 +291,7 @@ function ItemQuestion({
   }
   const notSure = () => markAsked()
   const button = 'h-9 cursor-pointer rounded-full border border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-ink transition-colors hover:bg-slate-50 disabled:cursor-default disabled:opacity-60'
-  const footnote = mark.sometimes ? `Listed as ${say.sometimes}.` : lastSeenText(mark, clock, communityConfig.timezone)
+  const footnote = mark.sometimes ? `Listed as ${say.sometimes}.` : lastSeenText(mark, clock, timezone)
 
   return (
     <section aria-labelledby={titleId} data-testid="listing-question" className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5">

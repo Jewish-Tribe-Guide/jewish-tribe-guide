@@ -4,6 +4,8 @@
 // add/remove, a soft cap), kept separate because a dropped pin isn't a
 // listing reference — it's its own coordinate and a label the visitor typed.
 
+import { storageGet } from './safeStorage'
+
 export type DroppedPin = {
   id: string
   lat: number
@@ -38,7 +40,7 @@ export function parseDroppedPins(raw: string | null): DroppedPin[] {
 }
 
 export function loadDroppedPins(): DroppedPin[] {
-  return parseDroppedPins(localStorage.getItem(STORAGE_KEY))
+  return parseDroppedPins(storageGet(STORAGE_KEY))
 }
 
 export function saveDroppedPins(pins: DroppedPin[]): void {

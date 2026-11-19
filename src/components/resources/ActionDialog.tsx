@@ -13,8 +13,7 @@ type Props = {
   /** Shows Back, a chevron before the title, for a step inside the dialog
    *  (the "+ Add" box's own steps). */
   onBack?: () => void
-  /** The listing-shaped layout Add shares with the listing dialog
-   *  (ListingDetailModal) in edit mode: that dialog's width, the title
+  /** The listing-shaped layout Add takes: a listing's width, the title
    *  centred between Back and Close, and the send button floating under
    *  the dialog rather than inside it. */
   listingShaped?: {
@@ -27,14 +26,13 @@ type Props = {
 
 /** Desktop's Add/Edit — layered on top of the still-visible (dimmed)
  *  directory grid instead of replacing the whole screen with the form, the
- *  same "stay in place" reasoning as ListingDetailModal (viewing a listing)
- *  and mobile's own MobileSheet. Unlike ListingDetailModal's max-w-md — sized
- *  for a listing's own facts — this holds a real form (ListingEditor, the "+ Add" box),
- *  which needs more width for address/hours/tag inputs and
- *  more height before it needs its own internal scroll.
+ *  same "stay in place" reasoning as mobile's own MobileSheet. It holds a
+ *  real form (ListingEditor, the "+ Add" box), which needs width for
+ *  address/hours/tag inputs and height before it needs its own internal
+ *  scroll.
  *
- *  Same conventions as ListingDetailModal otherwise: backdrop click and
- *  Escape both close it, body scroll locks while open. */
+ *  Backdrop click and Escape both close it, and body scroll locks while
+ *  open. */
 export default function ActionDialog({ isOpen, onClose, title, children, onBack: stepBack, listingShaped }: Props) {
   useBodyScrollLock(isOpen)
   const backdrop = useBackdropClose(onClose)

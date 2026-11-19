@@ -145,33 +145,3 @@ export async function listSubscribersForCategory(
   if (error) throw new Error(`Failed to load subscribers: ${error.message}`)
   return (data as Row[]).map(toSubscriber)
 }
-
-// Every subscriber in a community, newest first — for the admin Subscribers
-// tab (view + remove only; editing a subscriber's own preferences stays on
-// their own "Manage your subscription" link, not duplicated here).
-export async function listSubscribers(community: string): Promise<Subscriber[]> {
-  const { data, error } = await getAdminClient()
-    .from('subscriber')
-    .select('*')
-    .eq('community_id', community)
-    .order('created_at', { ascending: false })
-
-  if (error) throw new Error(`Failed to load subscribers: ${error.message}`)
-  return (data as Row[]).map(toSubscriber)
-}
-
-// Admin-initiated removal (e.g. a bounced or spam address) — scoped to the
-// community so one community's admin can't delete another's row by id.
-// Unlike deleteSubscriberByToken (the visitor's own unsubscribe link), this
-// doesn't need to prove anything beyond admin auth, already checked by the
-// route this is called from.
-export async function deleteSubscriberById(community: string, id: string): Promise<boolean> {
-  const { data, error } = await getAdminClient()
-    .from('subscriber')
-    .delete()
-    .eq('community_id', community)
-    .eq('id', id)
-    .select('id')
-  if (error) throw new Error(`Failed to remove subscriber: ${error.message}`)
-  return (data?.length ?? 0) > 0
-}

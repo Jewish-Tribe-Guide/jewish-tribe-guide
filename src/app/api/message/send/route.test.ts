@@ -14,16 +14,22 @@ const m = vi.hoisted(() => ({
   sendSubmissionNotification: vi.fn(),
   after: [] as Array<() => unknown>,
   ui: { contributions: { add: true, edit: true, report: true } },
+  communityUi: {} as Record<string, unknown>,
 }))
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => void m.after.push(fn) }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
-vi.mock('@/lib/uiConfig', () => ({ ui: m.ui }))
-vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly', name: 'Philadelphia' }) }))
+vi.mock('@/lib/uiConfig', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/uiConfig')>()
+  return { ...actual, ui: m.ui, contributionsFor: (own: unknown) => actual.contributionsFor(own, m.ui.contributions) }
+})
+vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly', name: 'Philadelphia', ui: m.communityUi }) }))
 vi.mock('@/lib/resourceStore', async (original) => ({ ...(await original<object>()), listApprovedResources: m.listApprovedResources }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate, submitListingCreate: m.submitListingCreate }))
 vi.mock('@/lib/email', () => ({ sendSubmissionNotification: m.sendSubmissionNotification }))
+
+import { SYNC_INTERNAL_FIELDS } from '@/lib/syncFields'
 
 const { POST } = await import('./route')
 
@@ -41,6 +47,7 @@ beforeEach(() => {
   m.after.length = 0
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', SUPABASE)
   m.ui.contributions.add = m.ui.contributions.edit = true
+  m.communityUi = {}
   m.enforceRateLimit.mockResolvedValue(null)
   m.verifyTurnstile.mockResolvedValue(true)
   m.listApprovedResources.mockResolvedValue([arch])
@@ -128,6 +135,17 @@ describe('POST /api/message/send', () => {
     expect(m.submitListingCreate).toHaveBeenCalledTimes(1)
   })
 
+  // The add form's place goes through the same preparation as the listing
+  // form's (/api/submissions): before Nov 18 this path dropped only the
+  // source keys, so a hand-made send could set the app's own keys (an
+  // admin's status override, sync dates), which the moderation diff hides.
+  it('strips the app’s own keys from a new place sent from the add form', async () => {
+    const forged = Object.fromEntries(SYNC_INTERNAL_FIELDS.map((k) => [k, 'CLOSED_PERMANENTLY']))
+    const form = { category: 'grocery', name: 'South Square Market', address: '2201 South St', phone: '', anchorId: 'all', distance: null, geo: null, details: { m: ['Challah'], ...forged } }
+    expect(await (await post({ text: 'x', forms: [{ submission: form }] })).json()).toMatchObject({ ok: true, filed: 1 })
+    expect(m.submitListingCreate.mock.calls[0][1].details).toEqual({ m: ['Challah'] })
+  })
+
   it('files a new place in its category, with what it carries', async () => {
     await post({ text: 'South Square Market on 22nd has challah', places: [{ category: 'grocery', place: { name: 'South Square Market', address: '22nd & South' }, items: [{ name: 'Challah', availability: 'always', doubt: null }] }] })
     const [, payload, note] = m.submitListingCreate.mock.calls[0]
@@ -148,6 +166,14 @@ describe('POST /api/message/send', () => {
     expect(await res.json()).toMatchObject({ ok: true, filed: 0 })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
     expect(m.submitListingCreate).not.toHaveBeenCalled()
+  })
+
+  // Nov 18 review, item 33: the community's own switch, not only the
+  // deployment's.
+  it('files no store’s change where this community takes no edits', async () => {
+    m.communityUi = { contributions: { edit: false } }
+    expect(await (await post({ text: 'x', stores: [{ listingId: ARCH, items }] })).json()).toMatchObject({ ok: true, filed: 0 })
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 
   it('keeps only photos the reader kept', async () => {

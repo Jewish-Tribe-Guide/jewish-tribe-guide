@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { makeCategory } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -38,8 +38,18 @@ const shul = makeCategory({
   ],
 })
 
+// The router writes the address, as Next's does: Add's moves wait for each
+// to land (useScreenHistory.ts), on one queue for the whole file.
+beforeEach(() => {
+  window.history.replaceState({}, '', '/philly/admin/places?add=synagogue')
+  mockRouter.push.mockImplementation((url: string) => window.history.pushState({}, '', url))
+  mockRouter.replace.mockImplementation((url: string) => window.history.replaceState({}, '', url))
+})
+
 afterEach(() => {
   cleanup()
+  mockRouter.push.mockClear()
+  mockRouter.replace.mockClear()
   vi.mocked(fetchJson).mockReset()
   vi.mocked(fetchJson).mockImplementation(async () => ({}))
   vi.unstubAllGlobals()
@@ -205,6 +215,42 @@ describe('Add a place', () => {
       await waitFor(() => expect(onClose).toHaveBeenCalled())
     })
 
+    // Once the listing was made, every save after it was allSettled or
+    // caught to null and never looked at: "is added" read as done while
+    // its Stop never saved (Nov 18 review).
+    it('a save after the listing that fails is said, and the screen stays', async () => {
+      const user = userEvent.setup()
+      site()
+      vi.mocked(fetchJson).mockImplementation(async (url, init) => {
+        const body = init?.body ? JSON.parse(String(init.body)) : {}
+        if (String(url).includes('/watches/google') && body.action === 'stop_field') throw new Error('Could not do that.')
+        return String(url).includes('/found') && init?.method !== 'POST' ? { found: [] } : {}
+      })
+      const onClose = renderAdd()
+      await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await user.click(screen.getByTestId('editor-row-contact:phone'))
+      await user.click(screen.getByRole('button', { name: 'Stop' }))
+      await addIt(user)
+      expect(await screen.findByRole('alert')).toHaveTextContent('Not saved: Google’s Stops')
+      expect(onClose).not.toHaveBeenCalled()
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      expect(onClose).toHaveBeenCalled()
+    })
+
+    it('Add to the listing that fails says so and stays', async () => {
+      const user = userEvent.setup()
+      site({ found: [{ id: 's1', payload: { details: { minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '07:00' }] } } }] })
+      const onClose = renderAdd()
+      await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await addIt(user)
+      await screen.findByText('Found on its website')
+      vi.mocked(fetchJson).mockRejectedValue(new Error('Could not do that.'))
+      await user.click(screen.getByRole('button', { name: 'Add to the listing' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t add it.')
+      expect(onClose).not.toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: 'Add to the listing' })).toBeEnabled()
+    })
+
     it('a page given is saved and read; if it can’t be, it’s said there (AddFailed8)', async () => {
       const user = userEvent.setup()
       site({ lastError: 'It wouldn’t open' })
@@ -309,6 +355,30 @@ describe('Add a place', () => {
       await giveEmail(user)
       await readEmail(user)
       await waitFor(() => expect(sourceWords()).toContain('office@ohev.org · Oct 30'))
+    })
+  })
+
+  // Nov 18: the form after Find was only state, so the browser's Back left
+  // Add altogether, and a reload on the form had no address to land on.
+  describe('in the address', () => {
+    it('the form is an entry: Back goes to Find, Forward to the form again', async () => {
+      const user = userEvent.setup()
+      renderAdd()
+      await user.click(screen.getByRole('button', { name: 'Fill it in yourself' }))
+      await waitFor(() => expect(window.location.search).toBe('?add=synagogue&step=finish'))
+
+      act(() => history.back())
+      expect(await screen.findByLabelText('Find the place')).toBeInTheDocument()
+      act(() => history.forward())
+      expect(await screen.findByTestId('editor-row-name')).toBeInTheDocument()
+    })
+
+    it('a reload on the form, or a source screen over it, is Find, and the address says so in place', async () => {
+      window.history.replaceState({}, '', '/philly/admin/places?add=synagogue&step=finish&row=hours&over=page.add')
+      renderAdd()
+      expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
+      await waitFor(() => expect(window.location.search).toBe('?add=synagogue'))
+      expect(mockRouter.push).not.toHaveBeenCalled()
     })
   })
 })

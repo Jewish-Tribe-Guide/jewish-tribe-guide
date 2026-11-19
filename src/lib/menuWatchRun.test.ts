@@ -237,6 +237,17 @@ describe('runMenuWatch: "Check now"', () => {
     expect(m.saveMenuReading).not.toHaveBeenCalled()
   })
 
+  // Nov 18 review: only "Check now" looked, so on the nightly run any
+  // change to the page (a price, a special) brought a skipped dish back
+  // to the Main dishes tab as new.
+  it('the nightly run doesn’t bring back a reading an admin skipped, or one already waiting, when the page changes', async () => {
+    for (const status of ['proposed', 'skipped']) {
+      m.getMenuReading.mockResolvedValue({ status, dishes: [{ name: 'shawarma' }] })
+      expect(await runMenuWatch({ ...watch, pageHash: 'old' }, newMenuReadBudget(), { apiKey: 'k' })).toMatchObject({ ok: true, filed: 0, pageHash: menuHash(page) })
+    }
+    expect(m.saveMenuReading).not.toHaveBeenCalled()
+  })
+
   it('says when the menu wouldn’t open', async () => {
     m.readMenuPage.mockResolvedValue(null)
     expect(await runMenuWatch(watch, undefined, full)).toMatchObject({ ok: false, check: { what: 'dishes', result: 'unreadable' } })
@@ -324,6 +335,14 @@ describe('runMenuWatch: dishes added since its last read', () => {
 })
 
 describe('syncMenuWatches', () => {
+  // Nov 18 review: menu watches were still added for a community that had
+  // turned menus off.
+  it('adds and takes away nothing for a community that turned menus off', async () => {
+    m.listWatches.mockResolvedValue({ watches: [{ id: 'off', url: 'https://guide.invalid/job-off/menus', resourceId: null, createdBy: 'job off', active: false }], available: true })
+    expect(await syncMenuWatches()).toEqual([])
+    expect(m.addWatch).not.toHaveBeenCalled()
+  })
+
   it('gives each food place with a menu link its watch, marked as the run’s own', async () => {
     expect(await syncMenuWatches()).toEqual([{ community: 'philly', added: 1, removed: 0 }])
     expect(m.addWatch).toHaveBeenCalledWith('philly', { kind: 'website', url: URL_, resourceId: 'r1', label: 'Menu · Judah', createdBy: MENU_WATCH_CREATOR })

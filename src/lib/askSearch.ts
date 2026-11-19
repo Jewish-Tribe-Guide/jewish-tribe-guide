@@ -3,7 +3,7 @@ import { selectValues, type CategoryConfig } from '@/lib/categories'
 import { listingSearchText } from '@/lib/searchListing'
 import { haversineMiles, type LatLng } from '@/lib/geo'
 import { findPlace, townsFrom, type Place } from '@/lib/places'
-import { DAY_KEYS, businessClosure, fmt12, getOpenStatus, hasAnyHours, isStructuredHours, type DayHours } from '@/lib/hours'
+import { DAY_KEYS, businessClosure, fmt12, placeClock, getOpenStatus, hasAnyHours, isStructuredHours, type DayHours } from '@/lib/hours'
 import { filterWords, readTaught, type AskWord, type TaughtWord } from '@/lib/askWords'
 import { itemWords } from '@/lib/itemNames'
 import { NEAR_ME, conceptCategories, initialisms, parseAsk, termMatches, termsRequired, typedWords, wordMatches, words, type AskQuery, type OpenAt, withoutOpenAt } from '@/lib/ask'
@@ -300,23 +300,36 @@ function hasHours(item: DirectoryResource, category: CategoryConfig): boolean {
  *  the two never disagree about whether a place is open. */
 function hoursToday(item: DirectoryResource, category: CategoryConfig, now: Date): HoursWindow[] {
   if (businessClosure(item as Record<string, unknown>)) return []
-  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const { dayIndex, minutes: nowMinutes } = placeClock(now)
   const out: (HoursWindow & { at: number })[] = []
   for (const f of category.detailFields) {
     const v = item[f.key]
     if (f.type !== 'hours' || !isStructuredHours(v)) continue
-    const day = (v as Record<string, DayHours>)[DAY_KEYS[now.getDay()]]
-    if (!day?.open || !day.close || nowMinutes > toMinutes(day.close)) continue
-    out.push({
-      label: f.label.replace(/\s*hours$/i, '').trim(),
-      opens: fmt12(day.open),
-      closes: fmt12(day.close),
-      openNow: nowMinutes >= toMinutes(day.open),
-      at: toMinutes(day.open),
-    })
+    const hours = v as Record<string, DayHours>
+    const label = f.label.replace(/\s*hours$/i, '').trim()
+    // Last night's hours still running past midnight, then today's still
+    // ahead or open: the first of them is this field's answer.
+    const ranges = [
+      ...periodsOf(hours[DAY_KEYS[(dayIndex + 6) % 7]]).map((p) => ({ ...p, start: toMinutes(p.open) - 1440, end: endOf(p) - 1440 })),
+      ...periodsOf(hours[DAY_KEYS[dayIndex]]).map((p) => ({ ...p, start: toMinutes(p.open), end: endOf(p) })),
+    ]
+    const next = ranges.find((r) => r.end >= nowMinutes && (r.start >= 0 || r.start <= nowMinutes))
+    if (!next || next.end < 0) continue
+    out.push({ label, opens: fmt12(next.open), closes: fmt12(next.close), openNow: nowMinutes >= next.start, at: next.start })
   }
   // What's open now first, then the rest in the order they open.
   return out.sort((a, b) => Number(b.openNow) - Number(a.openNow) || a.at - b.at).map((w) => ({ label: w.label, opens: w.opens, closes: w.closes, openNow: w.openNow }))
+}
+
+/** A day's ranges: each of its periods when it has a break, else its one. */
+const periodsOf = (day: DayHours | undefined): { open: string; close: string }[] =>
+  !day ? [] : day.periods && day.periods.length > 0 ? day.periods : day.open && day.close ? [{ open: day.open, close: day.close }] : []
+/** Where a range ends, in minutes from its own day's midnight: past 1440
+ *  when it closes after midnight. */
+const endOf = (p: { open: string; close: string }) => {
+  if (p.close === '23:59') return 1440
+  const end = toMinutes(p.close)
+  return end <= toMinutes(p.open) ? end + 1440 : end
 }
 
 /** Today's hours that answer "open after 6", "open until 10", "open at
@@ -328,18 +341,20 @@ function hoursAt(item: DirectoryResource, category: CategoryConfig, now: Date, a
   for (const f of category.detailFields) {
     const v = item[f.key]
     if (f.type !== 'hours' || !isStructuredHours(v)) continue
-    const day = (v as Record<string, DayHours>)[DAY_KEYS[now.getDay()]]
-    if (!day?.open || !day.close) continue
-    const opens = toMinutes(day.open)
-    let closes = toMinutes(day.close)
-    if (closes <= opens) closes += 1440
     const t = at.minutes
-    const fits =
-      at.how === 'after' ? closes > t
-      : at.how === 'until' ? opens < t && closes >= t
-      : at.how === 'at' ? opens <= t && closes > t
-      : opens < t
-    if (fits) out.push({ label: f.label.replace(/\s*hours$/i, '').trim(), opens: fmt12(day.open), closes: fmt12(day.close) })
+    for (const p of periodsOf((v as Record<string, DayHours>)[placeClock(now).day])) {
+      const opens = toMinutes(p.open)
+      const closes = endOf(p)
+      const fits =
+        at.how === 'after' ? closes > t
+        : at.how === 'until' ? opens < t && closes >= t
+        : at.how === 'at' ? opens <= t && closes > t
+        : opens < t
+      if (fits) {
+        out.push({ label: f.label.replace(/\s*hours$/i, '').trim(), opens: fmt12(p.open), closes: fmt12(p.close) })
+        break
+      }
+    }
   }
   return out
 }

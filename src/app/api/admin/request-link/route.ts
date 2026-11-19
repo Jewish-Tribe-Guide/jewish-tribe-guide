@@ -3,6 +3,7 @@ import { isAllowedAdminEmail, isAllowedForCommunity } from '@/lib/adminAuth'
 import { listCommunities } from '@/lib/communityStore'
 import { sendAdminMagicLink } from '@/lib/email'
 import { enforceRateLimit } from '@/lib/rateLimit'
+import { linkOrigin } from '@/lib/linkOrigin'
 
 // POST /api/admin/request-link  body: { email, community? }
 // Sends a magic sign-in link ONLY if the email administers the given
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
   // communities).
   const genericOk = Response.json({ ok: true })
 
-  const origin = request.headers.get('origin') || new URL(request.url).origin
+  const origin = linkOrigin(request)
   let redirectTo: string
   if (communitySlug) {
     // Matched against the real list rather than resolveCommunity, which falls

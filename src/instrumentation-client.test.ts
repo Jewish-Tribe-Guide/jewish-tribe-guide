@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { resetDeferredSentry } from '@/lib/deferredSentry'
 
 const sentryInitMock = vi.fn()
+const captureExceptionMock = vi.fn()
+const captureRouterTransitionStartMock = vi.fn()
 vi.mock('@sentry/nextjs', () => ({
   init: sentryInitMock,
-  captureRouterTransitionStart: vi.fn(),
+  captureException: captureExceptionMock,
+  captureRouterTransitionStart: captureRouterTransitionStartMock,
 }))
 
 const posthogInitMock = vi.fn()
@@ -22,7 +26,10 @@ describe('instrumentation-client — only reports from the real Vercel productio
 
   beforeEach(() => {
     vi.resetModules()
+    resetDeferredSentry()
     sentryInitMock.mockClear()
+    captureExceptionMock.mockClear()
+    captureRouterTransitionStartMock.mockClear()
     posthogInitMock.mockClear()
     process.env = { ...ORIGINAL_ENV }
     // PostHog now starts after load + idle (see deferredPostHog.ts), not at
@@ -83,5 +90,85 @@ describe('instrumentation-client — only reports from the real Vercel productio
       'phc_test',
       expect.objectContaining({ api_host: 'https://us.posthog.com' }),
     )
+  })
+})
+
+// Nov 18, review item 40: Sentry was ~74 KB of every page's first download.
+// It now loads after the page (deferredSentry.ts); these check nothing it
+// was there for is lost on the way.
+describe('instrumentation-client — Sentry after the page has loaded', () => {
+  const ORIGINAL_ENV = process.env
+
+  beforeEach(() => {
+    vi.resetModules()
+    resetDeferredSentry()
+    sentryInitMock.mockClear()
+    captureExceptionMock.mockClear()
+    captureRouterTransitionStartMock.mockClear()
+    process.env = { ...ORIGINAL_ENV, NEXT_PUBLIC_VERCEL_ENV: 'production' }
+  })
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV
+  })
+
+  it('sends an error thrown before Sentry had arrived', async () => {
+    await import('./instrumentation-client')
+    const early = new Error('before the SDK')
+    window.dispatchEvent(new ErrorEvent('error', { error: early }))
+
+    await vi.waitFor(() => expect(captureExceptionMock).toHaveBeenCalledWith(early))
+  })
+
+  it('sends an error an error boundary caught, once Sentry is there', async () => {
+    await import('./instrumentation-client')
+    const { reportError } = await import('@/lib/deferredSentry')
+    const caught = new Error('caught by a boundary')
+    reportError(caught)
+
+    await vi.waitFor(() => expect(captureExceptionMock).toHaveBeenCalledWith(caught))
+  })
+
+  it('traces a navigation once Sentry is there', async () => {
+    const { onRouterTransitionStart } = await import('./instrumentation-client')
+    await vi.waitFor(() => expect(sentryInitMock).toHaveBeenCalled())
+    onRouterTransitionStart('/philly/grocery', 'push')
+
+    expect(captureRouterTransitionStartMock).toHaveBeenCalledWith('/philly/grocery', 'push')
+  })
+})
+
+// Nov 18, review item 36: a page reached by a tap was never kept for a
+// visit with no signal; only pages loaded whole were.
+describe('instrumentation-client — a tapped page is kept for no signal', () => {
+  const postMessage = vi.fn()
+
+  beforeEach(() => {
+    vi.resetModules()
+    postMessage.mockClear()
+    vi.useFakeTimers()
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { controller: { postMessage } } })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    Reflect.deleteProperty(navigator, 'serviceWorker')
+  })
+
+  it('asks the service worker to keep the page, a few seconds after the tap', async () => {
+    const { onRouterTransitionStart } = await import('./instrumentation-client')
+    onRouterTransitionStart('/philly/grocery?sort=near', 'push')
+    expect(postMessage).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(postMessage).toHaveBeenCalledWith({ type: 'STORE_PAGE', path: '/philly/grocery' })
+  })
+
+  it('asks nothing for another site', async () => {
+    const { onRouterTransitionStart } = await import('./instrumentation-client')
+    onRouterTransitionStart('https://elsewhere.example/page', 'push')
+    await vi.advanceTimersByTimeAsync(3000)
+
+    expect(postMessage).not.toHaveBeenCalled()
   })
 })

@@ -1,4 +1,5 @@
 import {
+  type RequestType,
   type SubmissionPayload,
   validateSubmission,
   generateRequestId,
@@ -12,6 +13,13 @@ import { payloadTooLarge } from '@/lib/limits'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { listPublishedForms } from '@/lib/formStore'
+import { normalizeEmail } from '@/lib/activity'
+
+// The site's own request types. Anything else is an admin-made form, named by
+// its formId; its title comes from the form, never from the sender, because
+// it goes into the subject of an email the site sends.
+const BUILT_IN_TYPES: readonly RequestType[] = ['Direct Support', 'Volunteer', 'Volunteer Edit', 'Volunteer Removal', 'Feedback']
 
 export async function POST(request: Request) {
   // Sends two emails per call — throttle hard.
@@ -54,9 +62,26 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, errors }, { status: 400 })
   }
 
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+
+  // One address, as the site would write it — never a list, so the
+  // confirmation can only go to the person who filled the form in.
+  if (payload.contact?.email?.trim()) {
+    const email = normalizeEmail(payload.contact.email)
+    if (!email) return Response.json({ ok: false, errors: ['Please enter a valid email.'] }, { status: 400 })
+    payload.contact.email = email
+  }
+
+  if (!BUILT_IN_TYPES.includes(payload.requestType as RequestType)) {
+    const form = payload.formId
+      ? (await listPublishedForms(community.slug)).find((f) => f.id === payload.formId)
+      : undefined
+    if (!form) return Response.json({ ok: false, errors: ['This form is not available.'] }, { status: 400 })
+    payload.requestType = form.title
+  }
+
   const requestId = generateRequestId()
   const timestamp = easternTimestamp()
-  const community = await resolveCommunity(communitySlugFromRequest(request))
 
   // 2. Save to the database (system of record — hard failure if this fails).
   try {

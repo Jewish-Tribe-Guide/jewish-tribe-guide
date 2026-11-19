@@ -86,6 +86,10 @@ describe('each job’s run, in a line', () => {
     expect(watchesOutcome({ active: 1, ran: 1, notWorking: 0, left: 0, kinds: { philly: { eruvs: { of: 1, read: 1 } } } }).kinds).toEqual({ philly: { eruvs: { of: 1, read: 1 } } })
   })
 
+  it('watches: a step that failed is a warning', () => {
+    expect(watchesOutcome({ active: 3, ran: 3, notWorking: 0, left: 0, failedSteps: ['menu links', 'Refuah'] })).toMatchObject({ ok: true, warning: 'Didn’t work: menu links, Refuah' })
+  })
+
   it('Google hours: what it asked, and what it couldn’t', () => {
     expect(syncHoursOutcome({ ok: true, total: 140, refreshed: 20, synced: 138, failed: 2, flaggedClosed: 1, statusChanged: 1 })).toEqual({
       ok: true,

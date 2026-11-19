@@ -6,6 +6,7 @@
 // Run daily by /api/cron/watches, which first gives each eruv's website its
 // watch (syncEruvWebsiteWatches), and on demand from the Eruv status page.
 
+import { jobsOff } from '@/lib/jobOff'
 import { createHash } from 'node:crypto'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { submitEruvUpdate } from '@/lib/submissionStore'
@@ -36,6 +37,8 @@ export async function syncEruvWebsiteWatches(): Promise<{ community: string; add
   for (const { slug } of (data ?? []) as { slug: string }[]) {
     const [{ eruvim, available }, { watches, available: watching }] = await Promise.all([listEruvimForAdmin(slug), listWatches(slug)])
     if (!available || !watching) continue
+    // Eruvs turned off (jobOff.ts): no eruv website watch is added or taken away.
+    if (jobsOff(watches).includes('eruvs')) continue
     const { add, remove } = eruvWebsiteWatchChanges(eruvim, watches)
     let added = 0
     for (const w of add) {

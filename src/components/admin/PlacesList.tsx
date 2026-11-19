@@ -1,5 +1,6 @@
 'use client'
 
+import { replaceAddress } from '@/lib/replaceAddress'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -11,7 +12,7 @@ import { watchesLine } from '@/lib/todo'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { stepCount, withoutSteps } from '@/lib/stepAddress'
-import { eruvPlace, filterPlaces, isPlaceShow, placeCounts, placeLine, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
+import { eruvPlace, filterPlaces, isPlaceShow, nameKey, placeCounts, placeLine, sharedNames, streetOf, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
 import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notCheckedLine, type CheckedBy } from '@/lib/fieldCoverage'
 import AddPlace from './AddPlace'
 import { AdminBox, AdminEmpty, AdminMenu, AdminRow } from './AdminUI'
@@ -81,7 +82,7 @@ function setAddressParam(name: string, value: string, fallback: string) {
   const url = new URL(window.location.href)
   if (value === fallback) url.searchParams.delete(name)
   else url.searchParams.set(name, value)
-  window.history.replaceState(window.history.state, '', url)
+  replaceAddress(url)
 }
 
 /** "142 pages · read last night", for Watches at the top of the list. */
@@ -264,10 +265,17 @@ export default function PlacesList({ token }: { token: string }) {
   // Not checked: its main thing first, then by name as they already are.
   const rows = narrowed.filter((p) => fits(p, checked))
   if (checked === 'not-watched') rows.sort((a, b) => Number(!!coverage?.get(b.id)?.mainMissing) - Number(!!coverage?.get(a.id)?.mainMissing))
+  // Every place, not just the ones showing: a name another place has
+  // says its street even when the other is filtered out.
+  const shared = sharedNames(places)
   const lineOf = (p: AdminPlace): { text: string; warn: boolean } => {
     const c = coverage?.get(p.id)
     if (checked === 'not-watched' && c) return { text: notCheckedLine(c), warn: true }
-    return { text: placeLine(p), warn: p.status === 'approved' && !p.hasAddress }
+    return { text: placeLine(p, shared.has(nameKey(p.name))), warn: p.status === 'approved' && !p.hasAddress }
+  }
+  const labelOf = (p: AdminPlace) => {
+    const street = shared.has(nameKey(p.name)) && p.hasAddress ? streetOf(p.listing.address) : ''
+    return street ? `Open ${p.name}, ${street}` : `Open ${p.name}`
   }
   const shown = all ? rows : rows.slice(0, SHOWN)
   // Category, as Checked by: only the categories the other menus and the
@@ -365,7 +373,7 @@ export default function PlacesList({ token }: { token: string }) {
             <AdminRow
               key={p.id}
               onClick={() => openPlace(p.id)}
-              label={`Open ${p.name}`}
+              label={labelOf(p)}
               name={p.name}
               line={lineOf(p).text ? <span className={lineOf(p).warn ? 'text-amber-800' : ''}>{lineOf(p).text}</span> : undefined}
               aside={categoriesById.get(p.category)?.label}

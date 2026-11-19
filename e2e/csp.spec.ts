@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { openAddForm, categoryWithListings, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { openAddForm, categoryWithListings, defaultCommunity, ready } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The Content-Security-Policy ships in report-only mode (src/lib/csp.ts). That
@@ -61,7 +61,6 @@ test.describe('content security policy (report-only)', () => {
       await page.goto(`/${community}${path}`)
       if (path === '/map') await page.locator('main').first().waitFor({ state: 'visible' })
       else await ready(page)
-      await dismissLocationPrompt(page)
       // Third parties (analytics, the map's own scripts) load after `load`.
       await page.waitForTimeout(6_000)
 
@@ -77,7 +76,6 @@ test.describe('content security policy (report-only)', () => {
 
     await page.goto(`/${community}/${category.id}`)
     await ready(page)
-    await dismissLocationPrompt(page)
 
     // Opens the Add form, which is what loads Cloudflare's script and frame.
     await openAddForm(page)

@@ -2,13 +2,18 @@
 
 import { useEffect, useState } from 'react'
 import { useToday } from '@/lib/useNow'
-import { community } from '@/community.config'
+import { useCommunityTimezone } from '@/lib/communityContext'
 import type { ZmanimData } from '@/types'
 import { applyOffsetMinutes } from '@/lib/zmanim'
-import { roundZmanimCoord, zmanimBatchPath, zmanimPath } from '@/lib/zmanimRequest'
+import { HOURS_TIMEZONE } from '@/lib/hours'
+import { roundZmanimCoord, zmanimBatchPath, zmanimDate, zmanimPath } from '@/lib/zmanimRequest'
 import { clampTimeText, type MinyanBounds, type ZmanAnchor } from '@/lib/davening'
 
 export type AnchorTimes = {
+  /** The clock these were asked for in: the community's, which reads the
+   *  offset time back out (resolveAnchorTime). Always set by the fetch;
+   *  missing only from anchors built by hand (tests). */
+  timezone?: string
   sunsetIso?: string
   candleLightingIso?: string
   havdalahIso?: string
@@ -35,13 +40,14 @@ function geoKey({ lat, lng }: Geo): string {
 /** The cache/in-flight key. Distinct from `geoKey`, which stays the public
  *  lookup key callers index the returned record with — they shouldn't have to
  *  know the cache is date-scoped. */
-function dayScopedKey(day: string, key: string): string {
-  return `${day}|${key}`
+function dayScopedKey(timezone: string, day: string, key: string): string {
+  return `${timezone}|${day}|${key}`
 }
 
-function summarize(data: ZmanimData): AnchorTimes {
+function summarize(data: ZmanimData, timezone: string): AnchorTimes {
   const sunset = data.dailyZmanim.find((z) => z.label === 'Sunset')
   return {
+    timezone,
     sunsetIso: sunset?.iso,
     candleLightingIso: data.shabbos.candleLighting?.iso,
     havdalahIso: data.shabbos.havdalah?.iso,
@@ -55,7 +61,7 @@ type Pending = readonly [cacheKey: string, geo: Geo]
  *  spot the route will actually answer for. One spot is one plain request; two
  *  or more go in a single batch request. Failures leave a key uncached —
  *  callers just won't get a calculated time for that spot. */
-async function loadPending(pending: Pending[]): Promise<void> {
+async function loadPending(pending: Pending[], timezone: string): Promise<void> {
   const bySpot = new Map<string, { geo: Geo; cacheKeys: string[] }>()
   for (const [cacheKey, geo] of pending) {
     const spot = `${roundZmanimCoord(geo.lat)},${roundZmanimCoord(geo.lng)}`
@@ -64,19 +70,21 @@ async function loadPending(pending: Pending[]): Promise<void> {
     else bySpot.set(spot, { geo, cacheKeys: [cacheKey] })
   }
   const store = (cacheKeys: string[], data: ZmanimData) => {
-    const times = summarize(data)
+    const times = summarize(data, timezone)
     for (const k of cacheKeys) cache.set(k, times)
   }
 
   try {
     const spots = [...bySpot.values()]
     if (spots.length === 1) {
-      const res = await fetch(zmanimPath(spots[0].geo.lat, spots[0].geo.lng))
+      // The community's clock, which says which day's sunset is today's
+      // (Nov 18, item 33: it was the deployment config's).
+      const res = await fetch(zmanimPath(spots[0].geo.lat, spots[0].geo.lng, timezone, zmanimDate(Date.now(), timezone)))
       const json = (await res.json()) as { ok: boolean; data?: ZmanimData }
       if (json.ok && json.data) store(spots[0].cacheKeys, json.data)
       return
     }
-    const res = await fetch(zmanimBatchPath(spots.map((s) => s.geo)))
+    const res = await fetch(zmanimBatchPath(spots.map((s) => s.geo), timezone, zmanimDate(Date.now(), timezone)))
     const json = (await res.json()) as {
       ok: boolean
       results?: Array<{ lat: number; lng: number; ok: boolean; data?: ZmanimData }>
@@ -106,6 +114,7 @@ export function useZmanAnchors(coords: Array<Geo | null | undefined>): Record<st
   // for the new day and refetches. useToday rather than useNow so this is a
   // once-a-day change, not a once-a-minute one.
   const day = useToday()
+  const timezone = useCommunityTimezone()
 
   const keyed = coords.filter((c): c is Geo => !!c).map((c) => [geoKey(c), c] as const)
   const depKey = keyed.map(([k]) => k).sort().join('|')
@@ -118,7 +127,7 @@ export function useZmanAnchors(coords: Array<Geo | null | undefined>): Record<st
     // (starting a fresh one only when nobody else has), or this component
     // would never re-render once that shared fetch resolves.
     const pending = keyed
-      .map(([key, geo]) => [dayScopedKey(day, key), geo] as const)
+      .map(([key, geo]) => [dayScopedKey(timezone, day, key), geo] as const)
       .filter(([cacheKey]) => !cache.has(cacheKey))
     if (pending.length === 0) return
     let cancelled = false
@@ -126,7 +135,7 @@ export function useZmanAnchors(coords: Array<Geo | null | undefined>): Record<st
     // for the rest we just wait on the promise that's already out there.
     const mine = pending.filter(([cacheKey]) => !inFlight.has(cacheKey))
     if (mine.length > 0) {
-      const p = loadPending([...mine]).finally(() => {
+      const p = loadPending([...mine], timezone).finally(() => {
         for (const [cacheKey] of mine) inFlight.delete(cacheKey)
       })
       for (const [cacheKey] of mine) inFlight.set(cacheKey, p)
@@ -136,11 +145,11 @@ export function useZmanAnchors(coords: Array<Geo | null | undefined>): Record<st
     })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [depKey, day])
+  }, [depKey, day, timezone])
 
   const result: Record<string, AnchorTimes> = {}
   for (const [key] of keyed) {
-    const hit = cache.get(dayScopedKey(day, key))
+    const hit = cache.get(dayScopedKey(timezone, day, key))
     if (hit) result[key] = hit
   }
   return result
@@ -148,10 +157,16 @@ export function useZmanAnchors(coords: Array<Geo | null | undefined>): Record<st
 
 export { geoKey }
 
-/** Falls back to the community's default location when a shul has no geo of
- *  its own, so a calculated time is still shown for a same-city app. */
-export function geoOrCommunityDefault(geo: Geo | null | undefined): Geo {
-  return geo ?? community.mapCenter
+/** Where a shul with no location of its own is found in an anchors record:
+ *  its community's centre, which the hook that loads them reads and files
+ *  here (useMinyanSchedule), so the plain functions that look a shul up
+ *  needn't know where the community is. It was the deployment config's
+ *  centre, Philly's, for every community (Nov 19). */
+export const COMMUNITY_SPOT = 'community'
+
+/** The key a shul's zmanim are found under in an anchors record. */
+export function anchorKey(geo: Geo | null | undefined): string {
+  return geo ? geoKey(geo) : COMMUNITY_SPOT
 }
 
 /** Resolves a minyan's calculated clock time from its anchor + offset against
@@ -174,7 +189,7 @@ export function resolveAnchorTime(
     : row.anchor === 'candle_lighting' ? anchors.candleLightingIso
     : anchors.havdalahIso
   if (!iso) return null
-  const computed = applyOffsetMinutes(iso, row.offsetMinutes ?? 0, community.timezone)
+  const computed = applyOffsetMinutes(iso, row.offsetMinutes ?? 0, anchors.timezone ?? HOURS_TIMEZONE)
   return clampTimeText(computed, row)
 }
 

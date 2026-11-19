@@ -5,11 +5,12 @@ import { createPortal } from 'react-dom'
 import { loadGoogleMaps, MAPS_API_KEY, MAPS_MAP_ID, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { destinationQuery, directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
 import { haversineMiles } from '@/lib/geo'
-import { community } from '@/community.config'
+import { useCommunityPlace } from '@/lib/communityContext'
 import type { DirectoryResource } from '@/types'
-import { glyphElementFor, glyphTextFor } from '@/lib/categoryIcons'
+import { glyphSrcFor, glyphTextFor } from '@/lib/categoryIcons'
 import { BookmarkIcon } from '@/components/icons'
 import { clearEruvim, drawEruvim, emphasizeEruvim, eruvDrawKey, type DrawnEruv, type MapEruv } from './eruvLayer'
+import MapUnavailable from './MapUnavailable'
 
 /** One plottable place on the map. */
 export type MapPoint = {
@@ -147,8 +148,6 @@ type Props = {
    *  own zoom buttons, where its Layers button sits, wherever those land. */
   cornerControl?: ReactNode
 }
-
-const DEFAULT_CENTER = community.mapCenter
 
 // Narrows `points` to the ones the automatic "fit everything" framing should
 // actually include — see Props.zoomRadiusMiles. `radiusMiles == null` means
@@ -316,7 +315,8 @@ export const USER_PULSE_STYLE =
 // miss at a glance; the halo gives it a lasting visual difference and the
 // bounce draws the eye the instant a new pin is picked — the one visual tie
 // between "what the sheet is showing" and "where that is on the map".
-function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
+// Exported for its test.
+export function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
   if (!document.getElementById('jpc-pin-select-style')) {
     const style = document.createElement('style')
     style.id = 'jpc-pin-select-style'
@@ -326,22 +326,22 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
     document.head.appendChild(style)
   }
 
-  // A hand-built glyph (see lib/categoryIcons.tsx): a plain "H" string for
-  // hospitals, an SVG line icon Element for everything else, the plain
+  // A hand-built glyph (see lib/categoryIcons.tsx): an "H" for hospitals,
+  // the category's line icon as an image for everything else, the plain
   // four-squares one for a category with none of its own. Never the emoji.
-  const glyphIcon = glyphTextFor(p.filterId) ?? glyphElementFor(p.filterId)
+  // Not PinElement's `glyph` or `.element`: both are deprecated, and Google
+  // warned about them on every map load (Nov 18, review item 47). The pin
+  // is an element itself.
+  const text = glyphTextFor(p.filterId)
   const pin = new google.maps.marker.PinElement({
     background: p.color,
     borderColor: '#ffffff',
-    glyph: glyphIcon ?? null,
-    // Ignored once `glyph` is an SVG Element (glyphElementFor's icons color
-    // themselves white directly) — still applies to a plain-string glyph
-    // (the "H" text, or the plain-emoji fallback), where PinElement really
-    // does read it.
+    ...(text ? { glyphText: text } : { glyphSrc: glyphSrcFor(p.filterId) }),
+    // Colors the "H"; the line icon's image is white already.
     glyphColor: '#ffffff',
     scale: isSelected ? 1.6 : 1,
   })
-  if (!isSelected && !p.pinned) return pin.element
+  if (!isSelected && !p.pinned) return pin
 
   const wrap = document.createElement('div')
   wrap.style.cssText =
@@ -352,7 +352,7 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
     halo.style.cssText = pinHaloStyle(p.color)
     wrap.append(halo)
   }
-  wrap.append(pin.element)
+  wrap.append(pin)
   // A small badge over the pin's own glyph, not a swap to a different marker
   // color/icon — the category color+glyph is how a visitor already tells
   // pins apart at a glance, and a pinned place is still that same category,
@@ -500,7 +500,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, frameToken, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles, eruvim, onSelectEruv, selectedEruvId = null, frameEruvim = false, cornerControl }: Props) {
+export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, frameToken, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles, eruvim, onSelectEruv, selectedEruvId = null, frameEruvim = false, cornerControl }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -545,6 +545,12 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   const obscuredTopPxRef = useRef(obscuredTopPx)
   const onManualDragRef = useRef(onManualDrag)
   const zoomRadiusMilesRef = useRef(zoomRadiusMiles)
+  // Where the map starts, and what "everything near" is measured from: the
+  // community's centre unless told otherwise (Nov 19: it was the deployment
+  // config's, Philly's, for every community). A ref: a community doesn't
+  // change under a mounted map.
+  const { center: communityCenter } = useCommunityPlace()
+  const startCenterRef = useRef(fallbackCenter ?? communityCenter)
   useEffect(() => { onViewListingRef.current = onViewListing }, [onViewListing])
   useEffect(() => { onSelectPointRef.current = onSelectPoint }, [onSelectPoint])
   useEffect(() => { onDeselectPointRef.current = onDeselectPoint }, [onDeselectPoint])
@@ -623,7 +629,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       .then(() => {
         if (cancelled || !containerRef.current) return
         mapRef.current = new google.maps.Map(containerRef.current, {
-          center: fallbackCenter,
+          center: startCenterRef.current,
           zoom: 12,
           mapId: MAPS_MAP_ID,
           mapTypeControl: false,
@@ -672,7 +678,6 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       cancelled = true
       unsubscribe()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── One-finger pan / plain-scroll zoom, like the real Google Maps ─────────
@@ -923,7 +928,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     // framing and won: a map link to one place (a listing's map, ?place=)
     // opened on the whole city with the place lost in it (Nov 16).
     if (shouldLeaveToSelection(points, selectedIdRef.current)) return
-    const anchor = DEFAULT_CENTER
+    const anchor = startCenterRef.current
     const framed = pointsWithinZoomRadius(points, anchor, zoomRadiusMilesRef.current)
     if (framed.length === 1) {
       map.setCenter(framed[0])
@@ -1189,7 +1194,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       marker.addListener('gmp-click', () => {
         const iw = infoWindowRef.current
         if (!iw) return
-        iw.setContent('<div style="font-weight:600;color:#2563eb;font-size:13px">📍 You are here</div>')
+        iw.setContent('<div style="font-weight:600;color:#2563eb;font-size:13px">You are here</div>')
         iw.open({ map, anchor: marker })
       })
       userMarkerRef.current = marker
@@ -1239,14 +1244,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     onResumeFollow?.()
   }
 
-  if (!MAPS_API_KEY || authFailed) {
-    return (
-      <div className="flex h-full min-h-0 w-full flex-1 items-center justify-center rounded-2xl bg-slate-100 p-6 text-center text-sm text-slate-500">
-        The map couldn’t load. Check that the Google Maps API key is configured and the
-        Maps JavaScript API is enabled.
-      </div>
-    )
-  }
+  if (!MAPS_API_KEY || authFailed) return <MapUnavailable />
 
   return (
     // flex-1/min-h-0 (not a plain h-full percentage) all the way down to the

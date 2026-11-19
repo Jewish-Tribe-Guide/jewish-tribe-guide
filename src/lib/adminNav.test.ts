@@ -37,11 +37,14 @@ describe('adminTabs', () => {
     expect(tabs.find((t) => t.tab === 'communities')).toBeUndefined()
   })
 
-  it('includes the Communities tab for a superadmin', () => {
+  // Communities and About and Privacy are cross-community, so each has one
+  // address, in the superadmin console (/admin); the community's menu links
+  // there rather than keeping a second copy (the user, Nov 18).
+  it('includes the Communities tab for a superadmin, opening the superadmin console', () => {
     const tabs = adminTabs('philly', true)
     expect(tabs.find((t) => t.tab === 'communities')).toEqual({
       tab: 'communities',
-      href: '/philly/admin/communities',
+      href: '/admin',
       label: 'Communities',
     })
   })
@@ -61,7 +64,7 @@ describe('adminTabs', () => {
     expect(adminTabs('philly', false).find((t) => t.tab === 'pages')).toBeUndefined()
     expect(adminTabs('philly', true).find((t) => t.tab === 'pages')).toEqual({
       tab: 'pages',
-      href: '/philly/admin/pages',
+      href: '/admin/pages',
       label: 'About and Privacy',
     })
   })
@@ -80,9 +83,9 @@ describe('adminAreas', () => {
       ['Places', ['Places', 'Watches']],
       ['Site', ['Home page', 'Category pages', 'Campaigns', 'About and Privacy']],
       ['Reports', ['Reports']],
-      ['Settings', ['Team', 'Communities']],
+      ['Settings', ['Team', 'Default location', 'Communities']],
     ])
-    expect(shape(false).at(-1)).toEqual(['Settings', ['Team']])
+    expect(shape(false).at(-1)).toEqual(['Settings', ['Team', 'Default location']])
     expect(shape(false)[2]).toEqual(['Site', ['Home page', 'Category pages', 'Campaigns']])
   })
 
@@ -102,10 +105,13 @@ describe('adminAreas', () => {
     }
   })
 
-  it("links each area to its first tab, and every href is under the community's console", () => {
+  it("links each area to its first tab, and every href is under the community's console but the two cross-community ones", () => {
     for (const g of adminAreas('ues', true)) {
       expect(g.href).toBe(g.tabs[0].href)
-      for (const t of g.tabs) expect(t.href === '/ues/admin' || t.href.startsWith('/ues/admin/')).toBe(true)
+      for (const t of g.tabs) {
+        if (t.tab === 'pages' || t.tab === 'communities') expect(t.href.startsWith('/admin')).toBe(true)
+        else expect(t.href === '/ues/admin' || t.href.startsWith('/ues/admin/')).toBe(true)
+      }
     }
   })
 })
@@ -126,12 +132,11 @@ describe('adminNavPosition', () => {
     // No tab of its own while it's held back; its page still has a place.
     ['/philly/admin/forms', 'site', 'categories'],
     ['/philly/admin/forms/form:abc', 'site', 'categories'],
-    ['/philly/admin/pages', 'site', 'pages'],
     ['/philly/admin/metrics', 'reports', 'metrics'],
     ['/philly/admin/history/approved', 'reports', 'metrics'],
     ['/philly/admin/history/rejected', 'reports', 'metrics'],
     ['/philly/admin/team', 'settings', 'team'],
-    ['/philly/admin/communities', 'settings', 'communities'],
+    ['/philly/admin/location', 'settings', 'location'],
   ]
   it.each(cases)('%s opens %s, with %s lit', (path, area, tab) => {
     expect(adminNavPosition(path, 'philly', true)).toEqual({ area, tab })

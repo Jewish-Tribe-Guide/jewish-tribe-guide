@@ -27,11 +27,6 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial ?? seed))
   // The page as saved, for a switch turned back on to put back what it had.
   const [savedDraft] = useState<Draft>(() => toDraft(initial ?? seed))
-  // Whether the admin has directly edited the id field on a NEW category —
-  // once true, typing a name no longer overwrites whatever they chose. Only
-  // matters for isNew: an existing category's id already exists and never
-  // auto-follows the name, touched or not.
-  const [idTouched, setIdTouched] = useState(false)
   // The "Add audience group" mini-form's own draft state — separate from
   // `draft` since it's discarded on cancel and only ever produces a batch of
   // new fields, never edits an existing one.
@@ -49,31 +44,16 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
   }
 
   // One "Name" field holds the plural (card title); the singular used in
-  // "Add a …" phrasing is derived by dropping a trailing "s". id follows
-  // along too, but only for a brand-new category the admin hasn't already
-  // hand-edited the slug on — matches the "food" → "/food" example that
-  // motivated this (see CategoryEditor's id field doc) without fighting a
-  // slug someone already customized.
+  // "Add a …" phrasing is derived by dropping a trailing "s". A brand-new
+  // category's id (its address) follows the name; an existing one's never
+  // changes.
   function setName(name: string) {
     setDraft((d) => ({
       ...d,
       pluralLabel: name,
       label: singularize(name),
-      id: isNew && !idTouched ? slugify(name) : d.id,
+      id: isNew ? slugify(name) : d.id,
     }))
-  }
-
-  // Direct edits to the id field itself — always allowed (on a new category
-  // this also stops setName from overwriting it further; on an existing one
-  // it's the actual rename, cascaded on save — see renameCategoryId).
-  // Lowercased but NOT run through slugify() live: that collapses/strips
-  // hyphens on every keystroke, which eats a trailing "-" the instant it's
-  // typed (mid-way through typing "food-trucks", the "-" vanishes before the
-  // next letter lands). validateDraft (slugRejectionReason) catches anything
-  // left over at save time instead.
-  function setId(value: string) {
-    setIdTouched(true)
-    setDraft((d) => ({ ...d, id: value.toLowerCase() }))
   }
 
   function setCap(key: keyof CategoryCapabilities, value: boolean) {
@@ -399,7 +379,6 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null, seed: Ca
     setGroupForm,
     set,
     setName,
-    setId,
     setCap,
     updateField,
     addReadyField,

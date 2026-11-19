@@ -11,7 +11,6 @@ import { resolveCapabilities } from '@/lib/categories'
 import { resetMockIntersectionObserver, setAllIntersecting } from '@/test/intersectionObserverMock'
 import type { DirectoryResource } from '@/types'
 import { TellAboutContext } from './tellAbout'
-import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { ScreenHeaderProvider, useScreenHeader } from '@/lib/headerVisibility'
 import { useNextMinyan as useNextMinyanInColumn } from './nextMinyans'
@@ -21,13 +20,6 @@ vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
   usePathname: () => '/test-community',
   useSearchParams: () => new URLSearchParams(),
-}))
-
-// Defaults to "a real navigation" — see backForwardNavigation's own module
-// doc — overridden per-test (see the "arriving via browser back/forward"
-// describe block below) for the one behavior that depends on it.
-vi.mock('@/lib/backForwardNavigation', () => ({
-  didArriveViaBackForward: vi.fn(() => false),
 }))
 
 // The question reader (an AI, over the network): off unless a test reads.
@@ -49,8 +41,6 @@ vi.mock('./GenericListingCard', async () => {
     {
       item,
       defaultExpanded,
-      onEdit,
-      onNavigate,
       onExpandedChange,
       found,
       place,
@@ -61,8 +51,6 @@ vi.mock('./GenericListingCard', async () => {
     }: {
       item: DirectoryResource
       defaultExpanded?: boolean
-      onEdit: () => void
-      onNavigate?: (direction: 1 | -1) => void
       onExpandedChange?: (expanded: boolean) => void
       found?: { items: { tag: string }[]; fields: { label: string }[] } | null
       place?: string | null
@@ -99,8 +87,6 @@ vi.mock('./GenericListingCard', async () => {
         {likes !== undefined && <span>{item.name} shows {likes} likes</span>}
         <span>{item.name} looks like {look}</span>
         {found && <span>found on {item.name}: {[...found.items.map((m) => m.tag), ...found.fields.map((f) => f.label)].join(', ')}</span>}
-        <button onClick={onEdit}>Edit {item.name}</button>
-        {onNavigate && <button onClick={() => onNavigate(1)}>Next listing from {item.name}</button>}
         {onExpandedChange && (
           <>
             <button onClick={() => onExpandedChange(true)}>Expand {item.name}</button>
@@ -513,17 +499,6 @@ describe('GenericDirectory', () => {
     expect(adds[0].className).toContain('fixed')
   })
 
-  it('wires a card\'s Edit callback back to the directory\'s own props', async () => {
-    const user = userEvent.setup()
-    const onEdit = vi.fn()
-    const category = makeCategory()
-    const item = makeListing({ id: 'a', name: 'Kosher Mart' })
-    renderWithProviders(<GenericDirectory category={category} items={[item]} {...handlers} onEdit={onEdit} />)
-
-    await user.click(screen.getByRole('button', { name: 'Edit Kosher Mart' }))
-    expect(onEdit).toHaveBeenCalledWith(item)
-  })
-
   it('a filterable boolean field narrows the list when switched on in the Filters sheet', async () => {
     const user = userEvent.setup()
     const category = makeCategory({
@@ -572,61 +547,44 @@ describe('GenericDirectory', () => {
   })
 
   describe('arriving via browser back/forward', () => {
-    afterEach(() => {
-      vi.mocked(didArriveViaBackForward).mockReturnValue(false)
-    })
-
-    // Browser history keeps whatever a replaceState last set an entry's URL
-    // to, permanently — so a visitor who filtered this category, went back
-    // to (say) Home, then pressed forward, lands back on THIS SAME entry
-    // with the exact URL it was left at, filters included. See
-    // backForwardNavigation's own module doc: that's expected for a real
-    // navigation (a shared link should still show what it says), but
-    // surprising for a back/forward traversal specifically — pressing
-    // forward into a page you already left reads as "show me that page
-    // again," not "restore the exact search I'd abandoned." This is the
-    // "blank slate" behavior fixing that: same URL, but the directory
-    // itself declines to apply it, and clears it back out to match.
-    it("ignores a shared URL's search/filters and clears them from the address bar, when the page arrived via back/forward", () => {
-      vi.mocked(didArriveViaBackForward).mockReturnValue(true)
+    // The user, Nov 18 (item 4 of the public review): Forward to a search
+    // showed the category's whole list, and the search fell out of the
+    // address. Back and Forward land on what the address says, as a link
+    // does.
+    it('comes back by Back or Forward to an address with a search: that search', async () => {
+      const user = userEvent.setup()
       const onParamsChange = vi.fn()
-      const category = makeCategory({
-        detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
-      })
+      const category = makeCategory({ detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
       const items = [
-        { ...makeListing({ id: 'a', name: 'Kosher Mart' }), isKosher: true },
-        { ...makeListing({ id: 'b', name: 'Regular Mart' }), isKosher: false },
-      ] as unknown as DirectoryResource[]
-      renderWithProviders(
-        <GenericDirectory
-          category={category}
-          items={items}
-          initialSearch="kosher"
-          initialFilters={{ f_isKosher: '1' }}
-          {...handlers}
-          onParamsChange={onParamsChange}
-        />,
+        makeListing({ id: 'a', name: 'Kosher Mart', m: ['Challah'] }),
+        makeListing({ id: 'b', name: 'Regular Mart', m: ['Wine'] }),
+      ]
+      const screenAs = (mode: 'visible' | 'hidden') => (
+        <Activity mode={mode}>
+          <GenericDirectory category={category} items={items} {...handlers} onParamsChange={onParamsChange} />
+        </Activity>
       )
+      const { rerenderWithProviders } = renderWithProviders(screenAs('visible'))
+      await user.type(screen.getByRole('searchbox'), 'regular')
+      onParamsChange.mockClear()
 
-      // Blank slate: the search box is empty and BOTH listings show — the
-      // URL's own `?q=kosher&f_isKosher=1` was never applied to state.
-      expect(screen.getByRole('searchbox')).toHaveValue('')
-      expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
-      expect(screen.getByText('Regular Mart')).toBeInTheDocument()
+      const here = window.location.pathname
+      window.history.pushState(null, '', '/philly')
+      rerenderWithProviders(screenAs('hidden'))
+      window.history.replaceState(null, '', `/philly/${category.id}?q=regular`)
+      window.dispatchEvent(new PopStateEvent('popstate'))
+      rerenderWithProviders(screenAs('visible'))
 
-      // The address bar gets caught up to match what's actually on screen.
-      expect(onParamsChange).toHaveBeenCalledWith(
-        expect.objectContaining({ q: null, f_isKosher: null }),
-        { replace: true },
-      )
+      expect(screen.getByRole('searchbox')).toHaveValue('regular')
+      expect(screen.queryByText('Kosher Mart')).not.toBeInTheDocument()
+      expect(onParamsChange).not.toHaveBeenCalledWith(expect.objectContaining({ q: null }), expect.anything())
+      window.history.replaceState(null, '', here)
     })
 
     // The other half of the same behavior: a REAL navigation (a clicked
     // link, a shared URL, typing an address) is exactly the case that
     // SHOULD still hydrate from the URL — that's what makes a filtered link
-    // shareable at all. didArriveViaBackForward defaults to false (see the
-    // top-of-file mock), so this is the same setup as the test above with
-    // nothing overridden.
+    // shareable at all.
     it("still applies a shared URL's search/filters normally on a real navigation", () => {
       const category = makeCategory({
         detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
@@ -1257,10 +1215,11 @@ describe('GenericDirectory — syncing ?item with the expanded listing', () => {
   })
 })
 
-// Arrow-key/arrow-button navigation between cards (ListingDetailModal's
-// Previous/Next) closes one card's dialog and opens the next's in the same
-// moment — confirmed live: that's enough DOM mutation for Chrome to cancel
-// an in-flight 'smooth' scrollTo outright, snapping the page back to
+// Stepping between listings (the opened listing's ‹ › and the arrow keys;
+// the computer's old listing dialog's Previous/Next when this was found)
+// closes one card and opens the next's in the same moment — confirmed live:
+// that's enough DOM mutation for Chrome to cancel an in-flight 'smooth'
+// scrollTo outright, snapping the page back to
 // wherever it started instead of ever reaching the target. 'instant' isn't
 // vulnerable to being cancelled mid-flight, because there's no "mid-flight"
 // for a synchronous scroll to be in.
@@ -1274,7 +1233,9 @@ describe('GenericDirectory — scrolling to the next/previous card', () => {
       const items = [makeListing({ id: 'a', name: 'Kosher Mart' }), makeListing({ id: 'b', name: 'Trader Joe' })]
       renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
 
-      screen.getByRole('button', { name: 'Next listing from Kosher Mart' }).click()
+      act(() => screen.getByRole('button', { name: 'Expand Kosher Mart' }).click())
+      act(() => screen.getByRole('button', { name: 'Next listing' }).click())
+      expect(screen.getByText(/^Column: Trader Joe/)).toBeInTheDocument()
       vi.advanceTimersByTime(100)
 
       expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'instant' }))
@@ -1590,17 +1551,15 @@ describe('GenericDirectory — groups', () => {
     it('steps next/previous through what’s on screen, skipping closed groups', async () => {
       const user = userEvent.setup()
       const many = [...shulItems, makeListing({ id: 'd', name: 'Kol Tzedek', denomination: 'Reform', milesFromCenter: 0.1 })]
-      renderWithProviders(
-        <ForcedViewport isMobile>
-          <GenericDirectory category={shuls} items={many} {...handlers} reopenItemId="d" />
-        </ForcedViewport>,
-      )
+      renderWithProviders(<GenericDirectory category={shuls} items={many} {...handlers} reopenItemId="d" />)
       // With no location the list is by miles from the centre: Kol Tzedek,
       // Mekor, Rodeph, Vilna. Only Reform is open, so next from Kol Tzedek
       // is Rodeph, skipping Mekor in the closed Orthodox group.
-      await user.click(screen.getByRole('button', { name: 'Next listing from Kol Tzedek' }))
-      expect(screen.getByText('Expanded Rodeph')).toBeInTheDocument()
-      expect(screen.queryByText('Expanded Mekor')).not.toBeInTheDocument()
+      expect(screen.getByText(/^Column: Kol Tzedek, 1 of 2/)).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Next listing' }))
+      // Which one only: the page's address names it next, which keeps its
+      // group open (the mock's onParamsChange goes nowhere).
+      expect(screen.getByText(/^Column: Rodeph,/)).toBeInTheDocument()
     })
   })
 })
@@ -2598,6 +2557,76 @@ describe('GenericDirectory — a listing opened on desktop', () => {
     await user.click(screen.getByRole('button', { name: 'Expand Beta Cafe' }))
     expect(screen.queryByTestId('listing-column')).not.toBeInTheDocument()
     expect(screen.getByText('Alpha Grill')).toBeVisible()
+  })
+})
+
+// A phone's sheet closed (the dimmed list tapped) with its editor open
+// (Nov 19): it stepped back one entry, onto the listing's own, so the sheet
+// was shut on an address that named it, the next Back seemed to do nothing,
+// and a reload opened it again. The editor's levels are entries
+// (useEditorInAddress), so closing the sheet steps back over them too.
+describe('GenericDirectory — a phone’s listing sheet closed with its editor open', () => {
+  const food = makeCategory({ id: 'restaurant', pluralLabel: 'Food' })
+  const rows = [
+    makeListing({ id: 'a', name: 'Alpha Grill', category: 'restaurant' }),
+    makeListing({ id: 'b', name: 'Beta Cafe', category: 'restaurant' }),
+  ] as DirectoryResource[]
+  afterEach(() => {
+    vi.restoreAllMocks()
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('steps back over the editor’s entries as well as the listing’s, to the list', async () => {
+    const user = userEvent.setup()
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const onParamsChange = vi.fn()
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericDirectory category={food} items={rows} {...handlers} onParamsChange={onParamsChange} />
+      </ForcedViewport>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Expand Beta Cafe' }))
+    // Opened as a step; Edit listing and Request removal over it.
+    window.history.replaceState({ step: 'listing' }, '', '/test-community/restaurant?item=b&editing=b%7Elisting%2Fremoval')
+    onParamsChange.mockClear()
+    await user.click(screen.getByRole('button', { name: 'Collapse Beta Cafe' }))
+    expect(go).toHaveBeenCalledWith(-3)
+    expect(back).not.toHaveBeenCalled()
+    expect(onParamsChange).not.toHaveBeenCalled()
+  })
+
+  it('with no editor open, it takes the listing’s one step, as before', async () => {
+    const user = userEvent.setup()
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericDirectory category={food} items={rows} {...handlers} />
+      </ForcedViewport>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Expand Beta Cafe' }))
+    window.history.replaceState({ step: 'listing' }, '', '/test-community/restaurant?item=b')
+    await user.click(screen.getByRole('button', { name: 'Collapse Beta Cafe' }))
+    expect(back).toHaveBeenCalledTimes(1)
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  // Opened from an address naming its editor (a link copied mid-edit), there
+  // are no entries to step back over: it closes in place, and the editor
+  // goes from the address with it, or the next listing opened under that
+  // name came up as its editor.
+  it('opened from an address naming its editor, closing it takes the editor out of the address', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    window.history.replaceState(null, '', '/test-community/restaurant?item=b&editing=b%7Elisting')
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericDirectory category={food} items={rows} {...handlers} reopenItemId="b" onParamsChange={onParamsChange} />
+      </ForcedViewport>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Collapse Beta Cafe' }))
+    expect(onParamsChange).toHaveBeenLastCalledWith({ item: null, match: null, editing: null }, { replace: true })
   })
 })
 

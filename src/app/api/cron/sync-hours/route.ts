@@ -70,6 +70,10 @@ async function runSync(): Promise<SyncHoursRun> {
     .select('id,name,phone,address,details,category,community_id')
     .eq('status', 'approved')
     .not('details->>placeId', 'is', null)
+    // The longest-unasked first (never asked, then oldest), so past the cap
+    // every listing still takes its turn rather than the same 500 each night.
+    // Every successful ask stamps it (syncListing.ts).
+    .order('details->>googleStatusCheckedAt', { ascending: true, nullsFirst: true })
     // Cap the number of paid Google Place Details calls a single run can make.
     .limit(maxRecords())
 

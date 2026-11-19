@@ -1,7 +1,7 @@
 import { formatDays, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan, type MinyanDayKey, type Tefillah } from './davening'
 import type { Season } from './season'
 import { outOfSeason, seasonPartner } from './seasonPairs'
-import type { AnchorTimes } from './useZmanAnchors'
+import { resolveAnchorTime, type AnchorTimes } from './useZmanAnchors'
 import type { DayKey } from './hours'
 import { clockMinutes, clockText, noteText, partOf, PART_ORDER, timeText, type ShabbosPart } from './minyanText'
 
@@ -67,8 +67,10 @@ export type WeekdayTable = {
   columns: Tefillah[]
   rows: WeekRow[]
   /** The rules the cells use, for the card to give today's clock time:
-   *  "15 min before sunset" with the row it came from. */
-  rules: { text: string; row: Minyan }[]
+   *  "15 min before sunset" with the row it came from, and every day a
+   *  minyan with that rule is held, so the card gives today's time only on
+   *  one of them. */
+  rules: { text: string; row: Minyan; days: MinyanDayKey[] }[]
   /** Notes under the table: a minyan's own ("Sun Shacharis: followed by
    *  bagels, lox and Torah") and when it's also held ("Shacharis 6:45 AM
    *  also on Rosh Chodesh"). */
@@ -129,7 +131,13 @@ export function weekdayTable(minyanim: readonly Minyan[], season: Season | null,
   }
   for (const r of rows) r.label = formatDays(r.days as MinyanDayKey[])
 
-  const rules = [...new Map(now.filter((m) => m.anchor).map((m) => [timeText(m), m])).entries()].map(([text, row]) => ({ text, row }))
+  const ruleDays = new Map<string, Set<MinyanDayKey>>()
+  for (const m of now.filter((x) => x.anchor)) {
+    const set = ruleDays.get(timeText(m)) ?? new Set<MinyanDayKey>()
+    for (const d of m.days) set.add(d)
+    ruleDays.set(timeText(m), set)
+  }
+  const rules = [...new Map(now.filter((m) => m.anchor).map((m) => [timeText(m), m])).entries()].map(([text, row]) => ({ text, row, days: [...ruleDays.get(text)!] }))
 
   const notes: string[] = []
   for (const m of now) {
@@ -204,4 +212,16 @@ export function shabbosList(minyanim: readonly Minyan[], season: Season | null, 
     },
   )
   return { lines, otherSeason: otherLine }
+}
+
+/** Today's clock time for each rule the weekday table uses ("10 min before
+ *  sunset: 4:32 PM today."), only for a rule used today: a weekday Mincha's
+ *  time said nothing true on Friday or Shabbos (Nov 18 review, item 11). */
+export function ruleLinesToday(rules: WeekdayTable['rules'], today: DayKey | null, anchors: AnchorTimes | undefined): string[] {
+  if (!today) return []
+  return rules.flatMap((r) => {
+    if (!r.days.includes(today)) return []
+    const at = resolveAnchorTime(r.row, anchors)
+    return at ? [`${r.text.charAt(0).toUpperCase()}${r.text.slice(1)}: ${at} today.`] : []
+  })
 }

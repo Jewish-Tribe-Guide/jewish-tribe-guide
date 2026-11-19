@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { parseTimeToMinutes, TEFILLAH_LABELS, TEFILLAH_ORDER, type Tefillah } from '@/lib/davening'
 import { dateText, readSchedules, scheduleDayText, type ScheduleDay, type ScheduleMinyan, type SpecialSchedule } from '@/lib/schedules'
 import type { Festival } from '@/lib/festivals'
+import { useOptionalCommunitySlug } from '@/lib/communityContext'
 import { RELATIVE_ELIGIBLE, RelativeTimeFields, TimeModeToggle, useTimeModes } from './ZmanTimeFields'
 
 // ── A shul's special schedules, typed in (step 4, agreed Oct 1) ─────────────
@@ -45,13 +46,19 @@ const inputClass = `w-full ${fieldClass}`
 const chip = (on: boolean) =>
   `cursor-pointer rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${on ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'}`
 
-/** The festivals from now on, once (see /api/festivals). */
+/** The festivals from now on, once (see /api/festivals), on this
+ *  community's calendar days. */
+export function festivalsPath(community: string | null): string {
+  return community ? `/api/festivals?community=${encodeURIComponent(community)}` : '/api/festivals'
+}
+
 function useFestivals(wanted: boolean): Festival[] | null {
   const [festivals, setFestivals] = useState<Festival[] | null>(null)
+  const community = useOptionalCommunitySlug()
   useEffect(() => {
     if (!wanted || festivals) return
     let live = true
-    fetch('/api/festivals')
+    fetch(festivalsPath(community))
       .then((r) => r.json())
       .then((j: { ok?: boolean; festivals?: Festival[] }) => {
         if (live) setFestivals(j.ok && Array.isArray(j.festivals) ? j.festivals : [])
@@ -60,7 +67,7 @@ function useFestivals(wanted: boolean): Festival[] | null {
     return () => {
       live = false
     }
-  }, [wanted, festivals])
+  }, [wanted, festivals, community])
   return festivals
 }
 

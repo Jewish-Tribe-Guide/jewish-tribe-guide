@@ -11,7 +11,9 @@ const m = vi.hoisted(() => ({
   rpc: vi.fn(),
   recordActivity: vi.fn(),
   removeVisitorActivity: vi.fn(),
+  goneReportWaiting: vi.fn(),
 }))
+vi.mock('@/lib/itemMarkRoutes', async (orig) => ({ ...(await orig<typeof import('@/lib/itemMarkRoutes')>()), goneReportWaiting: m.goneReportWaiting }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit }))
 vi.mock('next/cache', () => ({ revalidateTag: m.revalidateTag }))
 vi.mock('@/lib/supabase/admin', () => ({ getAdminClient: () => ({ rpc: m.rpc }) }))
@@ -31,6 +33,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   m.enforceRateLimit.mockResolvedValue(null)
   m.recordActivity.mockResolvedValue([7])
+  m.goneReportWaiting.mockResolvedValue(true)
 })
 
 describe('POST /api/resource/:id/item (Still here)', () => {
@@ -87,6 +90,18 @@ describe('DELETE /api/resource/:id/item (undo)', () => {
     })
     expect(m.removeVisitorActivity).toHaveBeenCalledWith(7, ID, 'item_confirmed')
     expect(m.revalidateTag).toHaveBeenCalledWith('resources:philly', 'max')
+  })
+
+  // The warning comes back only with its report still in the queue. Before
+  // Nov 18 any clearedGone was written back, so "Still here", then an undo
+  // with a made-up clearedGone, put up "Reported gone" with nothing for an
+  // admin to review, which item/gone itself takes care never to leave.
+  it('puts no "reported gone" back without a report waiting in the queue', async () => {
+    m.goneReportWaiting.mockResolvedValue(false)
+    m.rpc.mockResolvedValue({ data: [{ out_community: 'philly', out_changed: true }], error: null })
+    await DELETE(req('DELETE', undo), ctx())
+    expect(m.goneReportWaiting).toHaveBeenCalledWith(ID, 'm', 'Challah')
+    expect(m.rpc.mock.calls[0][1]).toMatchObject({ p_restore_gone: null })
   })
 
   it('refused because someone has seen it since: nothing else changes', async () => {

@@ -44,8 +44,7 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { useNavTransitionProps } from '@/lib/navTransitions'
 import { consumeHomeReveal } from '@/lib/homeRevealSignal'
 import { useLocation } from '@/lib/locationContext'
-import { community } from '@/community.config'
-import { useActiveCommunity, useCommunitySlug } from '@/lib/communityContext'
+import { useActiveCommunity, useCommunityPlace, useCommunitySlug } from '@/lib/communityContext'
 import { countEvent } from '@/lib/countEvent'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/types'
@@ -135,7 +134,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // Same as the real Zmanim & Shabbos category page (FindResources' own
   // locationLabel) — the visitor's typed address, or the community's region,
   // never the site's own name.
-  const zmanimLocationLabel = anchor.label || community.region
+  const { center, region } = useCommunityPlace()
+  const zmanimLocationLabel = anchor.label || region
 
   // How many listings sit behind each category, for the browse index's count
   // line. Derived from the listing set this component already holds for its
@@ -344,7 +344,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           timezone={timezone}
           schedule={schedule}
           zmanim={zmanim.data}
-          from={coords ?? community.mapCenter}
+          from={coords ?? center}
           items={settings.beforeCandleItems}
           onOpenListing={openListing}
           choice={settings.rightNowCategories}
@@ -429,7 +429,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       categories={categories ?? []}
       communitySlug={communitySlug}
       timezone={timezone}
-      from={coords ?? community.mapCenter}
+      from={coords ?? center}
       schedule={schedule}
       zmanim={zmanim.data}
       items={settings.beforeCandleItems}
@@ -437,10 +437,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
       cards={todayCards}
       onOpenListing={openListing}
       searching={searching}
-      pinned={<PinnedBlock communitySlug={communitySlug} from={coords ?? community.mapCenter} now={schedule?.now ?? null} />}
+      pinned={<PinnedBlock communitySlug={communitySlug} from={coords ?? center} now={schedule?.now ?? null} />}
       hidden={settings.todayHidden}
       thisWeek={week}
-      region={community.region}
+      region={region}
     />
   )
 
@@ -676,7 +676,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                   timezone={timezone}
                   schedule={schedule}
                   zmanim={zmanim.data}
-                  from={coords ?? community.mapCenter}
+                  from={coords ?? center}
                   items={settings.beforeCandleItems}
                   onOpenListing={openListing}
                   choice={settings.rightNowCategories}
@@ -713,7 +713,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
               !isMobile &&
               zmanimCategory && (
                 <ShabbatTimesCard
-                  coords={coords ?? community.mapCenter}
+                  coords={coords ?? center}
                   locationLabel={zmanimLocationLabel}
                 />
               )

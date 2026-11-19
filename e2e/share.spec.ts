@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { shareDescription, type SiteSettings } from '../src/lib/siteSettings'
-import { defaultCommunity, defaultCommunitySlug, dismissLocationPrompt, ready, serverMarkup } from './helpers'
+import { defaultCommunity, defaultCommunitySlug, ready, serverMarkup } from './helpers'
 import { changedByTests } from './suiteRows'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,7 +60,6 @@ test('a shared question goes to the page Enter would, with the item in its box',
   await page.goto(pathFor(community, question))
   await page.waitForURL((url) => !url.pathname.includes('/ask/'))
   await ready(page)
-  await dismissLocationPrompt(page)
 
   const url = new URL(page.url())
   expect(url.searchParams.get('q')?.toLowerCase()).toBe(item.toLowerCase())
@@ -72,7 +71,6 @@ test('a link with no readable question opens the plain home page', async ({ page
   const res = await page.goto(`/${community}/ask/${'word-'.repeat(30)}`)
   expect(res?.status()).toBe(200)
   await ready(page)
-  await dismissLocationPrompt(page)
   await expect(page.getByLabel('Search resources').locator('visible=true').first()).toHaveValue('')
 })
 

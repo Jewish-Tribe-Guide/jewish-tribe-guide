@@ -8,7 +8,9 @@ const m = vi.hoisted(() => ({
   insertFormResponse: vi.fn(),
   sendNotification: vi.fn(),
   sendRequestConfirmation: vi.fn(),
+  listPublishedForms: vi.fn(),
 }))
+vi.mock('@/lib/formStore', () => ({ listPublishedForms: m.listPublishedForms }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
 vi.mock('@/lib/communityStore', () => ({
@@ -34,6 +36,7 @@ beforeEach(() => {
   m.insertFormResponse.mockResolvedValue(undefined)
   m.sendNotification.mockResolvedValue(undefined)
   m.sendRequestConfirmation.mockResolvedValue(undefined)
+  m.listPublishedForms.mockResolvedValue([{ id: 'f1', title: 'Support' }])
 })
 
 describe('POST /api/requests', () => {
@@ -87,7 +90,7 @@ describe('POST /api/requests', () => {
     expect(m.insertFormResponse).toHaveBeenCalledWith({
       community: 'ues',
       requestId: 'REQ-1',
-      requestType: 'support',
+      requestType: 'Support',
       formId: 'f1',
       contact: payload.contact,
       data: payload.formData,
@@ -115,5 +118,36 @@ describe('POST /api/requests', () => {
     m.sendRequestConfirmation.mockRejectedValue(new Error('resend down'))
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect((await post(payload)).status).toBe(200)
+  })
+
+  // The type goes into the subject of the email the site sends to the address
+  // given, so a sender must not be able to write it (Nov 18 review, item 25).
+  it("takes an admin form's type from the form, never from the sender", async () => {
+    await post({ ...payload, requestType: 'Win a prize at evil.example' }, '?community=ues')
+    expect(m.insertFormResponse).toHaveBeenCalledWith(expect.objectContaining({ requestType: 'Support' }))
+    expect(m.sendRequestConfirmation).toHaveBeenCalledWith(expect.objectContaining({ requestType: 'Support' }), 'REQ-1', 'ues')
+  })
+
+  it('400s a type of its own with no published form behind it, and emails nobody', async () => {
+    for (const body of [{ ...payload, formId: undefined }, { ...payload, formId: 'gone' }]) {
+      const res = await post({ ...body, requestType: 'Win a prize' })
+      expect(res.status).toBe(400)
+    }
+    expect(m.insertFormResponse).not.toHaveBeenCalled()
+    expect(m.sendRequestConfirmation).not.toHaveBeenCalled()
+  })
+
+  it('keeps a built-in type as sent', async () => {
+    await post({ ...payload, requestType: 'Volunteer', formId: undefined })
+    expect(m.insertFormResponse).toHaveBeenCalledWith(expect.objectContaining({ requestType: 'Volunteer' }))
+    expect(m.listPublishedForms).not.toHaveBeenCalled()
+  })
+
+  it('sends the confirmation to one address only', async () => {
+    const res = await post({ ...payload, contact: { name: 'A', email: 'a@b.co, someone@else.co' } })
+    expect(res.status).toBe(400)
+    expect(m.sendRequestConfirmation).not.toHaveBeenCalled()
+    await post({ ...payload, contact: { name: 'A', email: ' A@B.co ' } })
+    expect(m.sendRequestConfirmation).toHaveBeenCalledWith(expect.objectContaining({ contact: { name: 'A', email: 'a@b.co' } }), 'REQ-1', expect.any(String))
   })
 })

@@ -1,8 +1,7 @@
-import { validateSubmission, getResourceById } from '@/lib/resourceStore'
+import { getResourceById } from '@/lib/resourceStore'
 import { getCategoryById, listCategories } from '@/lib/categoryStore'
-import { resolveCapabilities, isCategorySyncEligible } from '@/lib/categories'
-import { submitterDetails } from '@/lib/syncFields'
-import { keepsMenuLink } from '@/lib/menuLink'
+import { resolveCapabilities } from '@/lib/categories'
+import { prepareSubmission } from '@/lib/prepareSubmission'
 import {
   submitListingCreate,
   submitListingUpdate,
@@ -19,15 +18,13 @@ import { sendSubmissionNotification } from '@/lib/email'
 import { sendSubmissionConfirmation } from '@/lib/confirmationEmail'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { payloadTooLarge } from '@/lib/limits'
-import { SERVER_ONLY_PAYLOAD_KEYS } from '@/lib/submissionSource'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
-import { normalizeUrl } from '@/lib/validation'
-import { readContacts } from '@/lib/contacts'
 import { hasListingChanged } from '@/lib/listingDiff'
-import { ui } from '@/lib/uiConfig'
+import { contributionsFor } from '@/lib/uiConfig'
 import type { ResourceSubmission, SubmissionRow } from '@/types'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { normalizeEmail } from '@/lib/activity'
 
 type Body = {
   operation?: 'create' | 'update' | 'delete'
@@ -80,8 +77,14 @@ export async function POST(request: Request) {
   }
 
   const community = await resolveCommunity(communitySlugFromRequest(request))
+  // The deployment's switches and this community's own (contributionsFor).
+  const contributions = contributionsFor(community.ui)
   const { operation, targetType = 'listing', targetId, note } = body
-  const submittedBy = body.submittedBy ?? null
+  // Only the email a visitor typed. A name is how the guide's own checks
+  // and admins sign (submissionSource, editedBy), so one sent from here
+  // would let a visitor's edit pass as Keystone-K's or Google's.
+  const email = normalizeEmail(body.submittedBy?.email)
+  const submittedBy = email ? { email } : null
 
   if (targetType === 'category') {
     return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
@@ -90,7 +93,7 @@ export async function POST(request: Request) {
   if (targetType === 'eruv' && operation === 'create') {
     const categories = await listCategories(community.slug)
     const page = categories.find((c) => c.kind === 'eruv')
-    if (!ui.contributions.add || !page || !resolveCapabilities(page.capabilities).add) return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
+    if (!contributions.add || !page || !resolveCapabilities(page.capabilities).add) return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
     // Hidden ones too: adding one by the same name would fail at approval.
     const listed = await listEruvimForAdmin(community.slug)
     if (!listed.available) return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
@@ -108,7 +111,7 @@ export async function POST(request: Request) {
   }
 
   if (targetType === 'eruv') {
-    if (!ui.contributions.edit) return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
+    if (!contributions.edit) return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
     if (operation !== 'update' || !targetId) return Response.json({ ok: false, errors: ['Unknown operation.'] }, { status: 400 })
     const eruv = (await listEruvim(community.slug)).eruvim.find((e) => e.id === targetId)
     if (!eruv) return Response.json({ ok: false, errors: ['Eruv not found.'] }, { status: 404 })
@@ -126,15 +129,15 @@ export async function POST(request: Request) {
   }
 
   // Curated-directory gate: refuse whichever contribution paths the community
-  // turned off in community.config (ui.contributions), so hiding a button can't
+  // turned off (contributionsFor: the deployment's config and its own row), so hiding a button can't
   // be bypassed by posting directly.
   const allowed =
     operation === 'create'
-      ? ui.contributions.add
+      ? contributions.add
       : operation === 'update'
-        ? ui.contributions.edit
+        ? contributions.edit
         : operation === 'delete'
-          ? ui.contributions.report
+          ? contributions.report
           : true // unknown operations fall through to the 400 below
   if (!allowed) {
     return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
@@ -149,10 +152,7 @@ export async function POST(request: Request) {
 
   const payload = body.payload as ResourceSubmission | undefined
   // Where a suggestion came from ("Read by AI") and an admin's fixes are
-  // the site's own to say, never a visitor's (submissionSource.ts).
-  if (payload && typeof payload === 'object') {
-    for (const k of SERVER_ONLY_PAYLOAD_KEYS) delete (payload as Record<string, unknown>)[k]
-  }
+  // the site's own to say, never a visitor's: prepareSubmission strips them.
   if ((operation === 'create' || operation === 'update') && !payload) {
     return Response.json({ ok: false, errors: ['Missing listing details.'] }, { status: 400 })
   }
@@ -170,11 +170,17 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, errors: ['Listing not found.'] }, { status: 404 })
   }
 
-  // Per-category gate: on top of the global `ui.contributions` check above, the
+  // Per-category gate: on top of the community’s contributions check above, the
   // target category can independently turn add/edit/report off. Resolve the
   // category from the payload (create) or the existing listing (update/delete),
   // so a disabled per-category button can't be bypassed by posting directly.
   const categoryId = operation === 'create' ? payload?.category : existingResource?.category
+  // A new place only in a category on the site: getCategoryById reads
+  // hidden ones too, and a hidden page has no Add for a visitor to reach.
+  // listCategories counts one a campaign has revealed as on the site.
+  if (operation === 'create' && !(await listCategories(community.slug)).some((c) => c.id === categoryId)) {
+    return Response.json({ ok: false, errors: ['This action is not available for this category.'] }, { status: 403 })
+  }
   if (categoryId) {
     const cat = await getCategoryById(community.slug, categoryId)
     if (cat) {
@@ -192,35 +198,10 @@ export async function POST(request: Request) {
 
   if (payload) {
     const category = await getCategoryById(community.slug, payload.category)
-    // The app's own keys (sync state, an admin's status override, item dates)
-    // come off before anything else looks at the payload: nothing downstream
-    // would refuse them, and the moderation diff hides them.
-    if (payload.details && typeof payload.details === 'object') {
-      payload.details = submitterDetails(payload.details, {
-        operation: operation === 'create' ? 'create' : 'update',
-        fieldKeys: category?.detailFields.map((f) => f.key) ?? [],
-        syncEligible: category ? isCategorySyncEligible(category) : false,
-        storedPlaceId: existingResource?.placeId,
-        keepsMenuLink: keepsMenuLink(category),
-      })
-    }
-    // Nobody types the "https://" scheme by hand for a website field — add it
-    // before validating (so a bare "example.com" isn't rejected) and before
-    // storing (so the saved value is still a real, working link — the card
-    // renderer uses it as-is for the href). The listing form already does
-    // this client-side on blur; normalizing again here covers any submission
-    // that skips that path (e.g. a stale client, direct API use).
-    if (payload.details) {
-      for (const field of category?.detailFields ?? []) {
-        // A list of contacts as it was typed in the editor ("215-805-8668, "),
-        // stored tidied: each entry checked, the blank ones gone.
-        if (field.type === 'contacts' && field.key in payload.details) payload.details[field.key] = readContacts(payload.details[field.key])
-        if (field.type !== 'url') continue
-        const raw = payload.details[field.key]
-        if (typeof raw === 'string' && raw.trim()) payload.details[field.key] = normalizeUrl(raw)
-      }
-    }
-    const errors = validateSubmission(payload, category)
+    const errors = prepareSubmission(payload, category, {
+      operation: operation === 'create' ? 'create' : 'update',
+      storedPlaceId: existingResource?.placeId,
+    })
     // The authoritative version of the guard the editors already apply
     // client-side (ListingEditor and BoxEditor keep Send off until something
     // changed) — this one can't be bypassed by posting directly.

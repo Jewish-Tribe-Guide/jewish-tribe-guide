@@ -14,6 +14,8 @@ const m = vi.hoisted(() => ({
   fetchDatesInfo: vi.fn(),
   upload: vi.fn(),
   ui: { contributions: { add: true, edit: true, report: true } },
+  communityUi: {} as Record<string, unknown>,
+  timezone: 'America/New_York',
 }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
 vi.mock('@/lib/supabase/admin', () => ({
@@ -26,7 +28,14 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }))
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
-vi.mock('@/lib/uiConfig', () => ({ ui: m.ui }))
+vi.mock('@/lib/uiConfig', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/uiConfig')>()
+  return { ...actual, ui: m.ui, contributionsFor: (own: unknown) => actual.contributionsFor(own, m.ui.contributions) }
+})
+// The listing's own community: its clock, and its own switches (m.communityUi).
+vi.mock('@/lib/communityStore', () => ({
+  resolveCommunity: async (slug: string) => ({ slug, timezone: m.timezone, mapCenter: { lat: 39.95, lng: -75.16 }, ui: m.communityUi }),
+}))
 vi.mock('@/lib/resourceStore', () => ({ getResourceById: m.getResourceById }))
 vi.mock('@/lib/festivals', () => ({ fetchFestivals: m.fetchFestivals }))
 vi.mock('@/lib/scheduleReader', () => ({ readSchedule: m.readSchedule, readRegular: m.readRegular }))
@@ -47,6 +56,8 @@ beforeEach(() => {
   vi.resetAllMocks()
   vi.stubEnv('OPENAI_API_KEY', 'test-key')
   m.ui.contributions.edit = true
+  m.communityUi = {}
+  m.timezone = 'America/New_York'
   m.enforceRateLimit.mockResolvedValue(null)
   m.verifyTurnstile.mockResolvedValue(true)
   m.row.mockResolvedValue({ data: { community_id: 'philly' } })
@@ -79,6 +90,18 @@ describe('POST /api/schedule/read', () => {
     expect((await POST(req({ text: 'hi' }))).status).toBe(400)
     expect((await POST(req({ text: 'Shacharis 9:00', festival: 'Purim' }))).status).toBe(400)
     expect((await POST(req({ file: new File(['x'], 'a.txt', { type: 'text/plain' }) }))).status).toBe(400)
+    expect(m.readSchedule).not.toHaveBeenCalled()
+  })
+
+  // Nov 18 review, item 33: the calendar was read on the deployment
+  // config's clock, and only the deployment's switch was asked.
+  it('reads the calendar on the listing’s own community’s clock, and keeps to its switch', async () => {
+    m.timezone = 'Asia/Jerusalem'
+    await POST(req({ text: 'Shacharis 9:00, Mincha 6:35' }))
+    expect(m.fetchFestivals).toHaveBeenCalledWith('Asia/Jerusalem')
+    m.readSchedule.mockClear()
+    m.communityUi = { contributions: { edit: false } }
+    expect((await POST(req({ text: 'Shacharis 9:00, Mincha 6:35' }))).status).toBe(403)
     expect(m.readSchedule).not.toHaveBeenCalled()
   })
 

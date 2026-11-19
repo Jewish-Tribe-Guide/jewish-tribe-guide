@@ -13,6 +13,7 @@ const m = vi.hoisted(() => ({
   submitListingUpdate: vi.fn(),
   notify: vi.fn(),
   ui: { contributions: { add: true, edit: true, report: true } },
+  communityUi: {} as Record<string, unknown>,
 }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => fn() }))
@@ -32,7 +33,14 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }))
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
-vi.mock('@/lib/uiConfig', () => ({ ui: m.ui }))
+vi.mock('@/lib/uiConfig', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/uiConfig')>()
+  return { ...actual, ui: m.ui, contributionsFor: (own: unknown) => actual.contributionsFor(own, m.ui.contributions) }
+})
+// The listing's own community: its clock, and its own switches (m.communityUi).
+vi.mock('@/lib/communityStore', () => ({
+  resolveCommunity: async (slug: string) => ({ slug, timezone: 'America/New_York', mapCenter: { lat: 39.95, lng: -75.16 }, ui: m.communityUi }),
+}))
 vi.mock('@/lib/resourceStore', () => ({ getResourceById: m.getResourceById }))
 vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
@@ -50,6 +58,7 @@ const listing = { id: ID, category: 'grocery', name: 'Trader Joe’s', anchorId:
 beforeEach(() => {
   vi.resetAllMocks()
   m.ui.contributions.edit = true
+  m.communityUi = {}
   m.enforceRateLimit.mockResolvedValue(null)
   m.verifyTurnstile.mockResolvedValue(true)
   m.row.mockResolvedValue({ data: { community_id: 'philly' }, error: null })
@@ -105,6 +114,13 @@ describe('POST /api/resource/:id/item/add', () => {
     m.ui.contributions.edit = true
     m.getCategoryById.mockResolvedValue({ ...grocery, capabilities: { edit: false } })
     expect((await POST(req('POST', { item: 'Rugelach' }), ctx())).status).toBe(403)
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
+  // Nov 18 review, item 33: the listing's own community's switch.
+  it('refuses where the listing’s own community has edits off', async () => {
+    m.communityUi = { contributions: { edit: false } }
+    expect((await POST(req('POST', { item: 'Rugelach', turnstileToken: 't' }), ctx())).status).toBe(403)
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 

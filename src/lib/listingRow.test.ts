@@ -3,6 +3,7 @@ import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { CategoryField } from './categories'
 import { candlesToday, initialsOf, isVouchedFor, listingRowFacts, listingRowNote, rowItems } from './listingRow'
 import type { ZmanimData } from '@/types'
+import { placeTime } from '@/test/placeTime'
 
 const hours: CategoryField = { key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' }
 const type: CategoryField = {
@@ -35,7 +36,7 @@ const items: CategoryField = {
 const kosher: CategoryField = { key: 'kosher', label: 'Kosher items', type: 'boolean', filterable: true }
 
 // A Friday at 2 PM, local time.
-const FRIDAY_2PM = new Date(2026, 9, 2, 14, 0)
+const FRIDAY_2PM = placeTime(2026, 9, 2, 14, 0)
 const openFriday = (open: string, close: string) => ({ fri: { open, close } })
 const texts = (facts: { text: string }[]) => facts.map((f) => f.text)
 
@@ -327,15 +328,15 @@ describe('listingRowNote: a third line only for an exception', () => {
 describe('candlesToday', () => {
   const zmanim = (over: Partial<ZmanimData>): ZmanimData =>
     ({ shabbos: { candleLighting: null, havdalah: null }, holidayPeriod: null, ...over }) as unknown as ZmanimData
-  const friday = new Date(2026, 9, 2, 14, 0)
-  const local = (h: number, m: number, day = 2) => new Date(2026, 9, day, h, m).toISOString()
+  const friday = placeTime(2026, 9, 2, 14, 0)
+  const local = (h: number, m: number, day = 2) => placeTime(2026, 9, day, h, m).toISOString()
 
   it('is tonight’s candle lighting on a Friday', () => {
     expect(candlesToday(zmanim({ shabbos: { candleLighting: { label: 'Friday', time: '6:10 PM', iso: local(18, 10) }, havdalah: null } }), friday)).toBe(18 * 60 + 10)
   })
 
   it('is erev Yom Tov’s, from the holiday’s own candle lightings', () => {
-    const erev = new Date(2026, 9, 1, 14, 0)
+    const erev = placeTime(2026, 9, 1, 14, 0)
     const yt = zmanim({
       shabbos: { candleLighting: { label: 'Friday', time: '6:10 PM', iso: local(18, 10) }, havdalah: null },
       holidayPeriod: {
@@ -349,7 +350,7 @@ describe('candlesToday', () => {
   })
 
   it('is nothing on another day, or before the zmanim arrive', () => {
-    const thursday = new Date(2026, 9, 1, 14, 0)
+    const thursday = placeTime(2026, 9, 1, 14, 0)
     expect(candlesToday(zmanim({ shabbos: { candleLighting: { label: 'Friday', time: '6:10 PM', iso: local(18, 10) }, havdalah: null } }), thursday)).toBeNull()
     expect(candlesToday(null, friday)).toBeNull()
   })

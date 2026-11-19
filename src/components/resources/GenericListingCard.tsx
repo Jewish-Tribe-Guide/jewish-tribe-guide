@@ -1,17 +1,15 @@
 'use client'
 
 import { forwardRef, Suspense, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import dynamic from 'next/dynamic'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
-import { PHOTO_FIELD_KEY, resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { PHOTO_FIELD_KEY, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { useNow } from '@/lib/useNow'
 import { itemDateFor, itemDateText } from '@/lib/itemMarks'
 import { isMinyanOnly, isStale } from '@/lib/listingView'
-import { community as communityConfig } from '@/community.config'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
@@ -29,17 +27,11 @@ import Chip from './Chip'
 import { initialsOf, listingRowFacts, listingRowNote, type RowNote } from '@/lib/listingRow'
 import { photoOnCard, thirdLineFields } from '@/lib/cardLines'
 import { FACT_TONE } from './rowFactTone'
-import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { usePinned } from '@/lib/pinnedContext'
 import { countEvent } from '@/lib/countEvent'
 import { preloadable, whenLoadedAndIdle } from '@/lib/preloadable'
 
-// The opened listing (its view, editor, Still right, the anti-spam check,
-// the map) loads when a listing is first opened, not with every list of
-// cards: the home draws these cards for its search answers, and loading all
-// that with the home put it over its 400 KB budget (Oct 2).
-const ListingDetailModal = dynamic(() => import('./ListingDetailModal'), { loading: () => null })
 // On a phone the place opens in a sheet. Its code is loaded ahead on a
 // category page (below), so the first tap fills the sheet at once instead of
 // sliding it up empty for ~0.3s (see preloadable.tsx). Not on the home: its
@@ -75,8 +67,8 @@ function shortAddress(addr: string): string {
 }
 
 /** Imperative handle for opening/closing this card's detail from OUTSIDE it —
- *  specifically GenericDirectory's arrow-key next/prev (see ListingDetailModal's
- *  onNavigate), which needs to close THIS card and open a SIBLING one it has
+ *  specifically GenericDirectory's next/prev (the opened listing's ‹ ›, and
+ *  the arrow keys), which needs to close THIS card and open a SIBLING one it has
  *  no other way to reach: `expanded` is local state, and there's no shared
  *  "currently open" state to lift without every card re-rendering on every
  *  other card's open/close. */
@@ -104,9 +96,8 @@ type Props = {
    *  unset so a name click still just expands, matching every other tap on
    *  the row. */
   onNameClick?: () => void
-  onEdit: () => void
   /** Fired synchronously alongside every `setExpanded` call (the row's own
-   *  toggle, ListingDetailModal's onClose, and the imperative open()/
+   *  toggle, the phone sheet's onClose, and the imperative open()/
    *  close() below) — lets GenericDirectory keep `?item=<id>` in sync with
    *  whichever card is actually open. Deliberately NOT a `useEffect`
    *  watching `expanded`: `navigateFromCard`'s close-then-open pair runs on
@@ -116,16 +107,6 @@ type Props = {
    *  clobbering the URL back to the wrong value. Calling this directly at
    *  each call site preserves the actual close-then-open sequence instead. */
   onExpandedChange?: (expanded: boolean) => void
-  /** Desktop only (see ListingDetailModal's own doc comment) — arrow-key
-   *  next/prev while this card's dialog is open. Wired by GenericDirectory,
-   *  which is the only thing that knows the current filtered/sorted order
-   *  and every sibling card's GenericListingCardHandle. */
-  onNavigate?: (direction: 1 | -1) => void
-  /** Whether onNavigate actually has somewhere to go — see
-   *  ListingDetailModal's own doc comment on why this draws a dimmed,
-   *  inert arrow at either end instead of no arrow at all. */
-  hasPrev?: boolean
-  hasNext?: boolean
   /** What a search matched on this listing (see SearchFound). Its items
    *  show as chips on the collapsed card, so a search result says why it's
    *  there ("Wine", "Challah · sometimes") instead of only "6 kosher
@@ -155,7 +136,7 @@ type Props = {
   look?: RowLook
   /** The page shows this listing itself (ListingColumn): in the list's
    *  column on desktop, or as the page on a phone that arrived from a link.
-   *  The card then opens no dialog or sheet of its own. */
+   *  The card then opens no sheet of its own. */
   inColumn?: boolean
 }
 
@@ -168,12 +149,8 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   count,
   defaultExpanded,
   onVote,
-  onEdit,
   showCategoryLabel = true,
   onNameClick,
-  onNavigate,
-  hasPrev,
-  hasNext,
   found = null,
   onExpandedChange,
   place,
@@ -201,13 +178,12 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   }))
   const categories = useCategories()
   const community = useCommunitySlug()
-  // Which UI opens on click: a sheet on a phone (MobileSheet, like Add and
-  // Edit), a centered dialog on desktop (ListingDetailModal). Same
-  // `expanded` state either way — just where it renders. `useIsMobile`
-  // starts `false` until mount (see its own SSR-safe note), so a listing
-  // reopened via `defaultExpanded` can flash as "modal open" on a phone for
-  // one tick before settling into the sheet — accepted the same way the
-  // other isMobile-gated layout branches in this app already are.
+  // Where an opened listing shows: a sheet on a phone (MobileSheet, like Add
+  // and Edit), the list's column on a computer (ListingColumn, drawn by
+  // GenericDirectory) and for a phone's listing arrived at from a link.
+  // `useIsMobile` starts `false` until mount (see its own SSR-safe note),
+  // and GenericDirectory reads the same hook, so until then every card is
+  // in the column and draws no sheet.
   const isMobile = useIsMobile()
   // The Share path the card's own swipe actions need.
   const listingPath = routes.listing(community, category.id, listingSlug(item))
@@ -231,9 +207,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   })
 
   const fields = category.detailFields
-  // Per-category capabilities layered under the global `ui.contributions` switches.
-  const caps = resolveCapabilities(category.capabilities)
-  const canEdit = ui.contributions.edit && caps.edit
 
   // A listing is "Open" if ANY of its hours fields say so — see getOpenStatus.
   // Against useNow rather than the render's own clock: open/closed is the
@@ -242,6 +215,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // built. Before the page has hydrated there's no time (see useNow), so no
   // Open badge and no opening or closing time yet.
   const clock = useNow()
+  const timezone = useCommunityTimezone()
   const now = clock === null ? null : new Date(clock)
   // The row's second line: open status, distance, what kind of place, how
   // many items. See lib/listingRow.ts. No davening line on a shul's row
@@ -262,7 +236,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // Upvotes live in the opened listing now (the sheet on a phone, the dialog
   // on desktop), not on every row: a column of "👍 0" said nothing while a
   // list was being scanned. Popularity still orders the list.
-  const upvote = upvotes ? <UpvoteButton variant="recommend" name={item.name} resourceId={item.id} count={count} onCountChange={onVote} /> : null
+  const upvote = upvotes ? <UpvoteButton name={item.name} resourceId={item.id} count={count} onCountChange={onVote} /> : null
   // The opened listing's last part: the places near it in this list, then
   // the whole list. Opening one closes this listing first.
   const onwardSource = useListingOnward()
@@ -551,7 +525,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                     <Chip key={m.tag} tone={m.sometimes || (date && isStale(date.at, clock)) ? 'amber' : 'slate'}>
                       {m.tag}
                       {m.sometimes ? ' · sometimes' : ''}
-                      {date ? ` · ${itemDateText(date, clock, communityConfig.timezone)}` : ''}
+                      {date ? ` · ${itemDateText(date, clock, timezone)}` : ''}
                     </Chip>
                   )
                 })}
@@ -725,28 +699,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         </MobileSheet>
       )}
 
-      {/* Desktop: a dialog, where nothing hosts the listing itself. A
-          category page does: it opens in the list's column (ListingColumn). */}
-      {/* It draws nothing while closed, so it's only there once opened. */}
-      {/* Its own boundary too, for the same reason. */}
-      {!isMobile && !inColumn && opened && (
-        <Suspense fallback={null}>
-        <ListingDetailModal
-          isOpen={expanded}
-          onClose={close}
-          item={item}
-          category={category}
-          color={color}
-          name={item.name}
-          canEdit={canEdit}
-          onNavigate={onNavigate}
-          hasPrev={hasPrev}
-          hasNext={hasNext}
-          found={found}
-          upvote={upvote}
-        />
-        </Suspense>
-      )}
     </div>
   )
 })

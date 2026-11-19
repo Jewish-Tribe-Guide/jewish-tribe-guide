@@ -17,10 +17,9 @@ import { minyanWriting, timeText } from '@/lib/minyanText'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import { initialsOf } from '@/lib/listingRow'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunitySlug, useContributions } from '@/lib/communityContext'
 import { usePreviewSend } from '@/lib/previewSend'
 import { formatPhone } from '@/lib/validation'
-import { ui } from '@/lib/uiConfig'
 import { scrollingAncestor } from '@/lib/scrollingAncestor'
 import CategoryIcon from '@/components/CategoryIcon'
 import ImageUploadField from '@/components/ImageUploadField'
@@ -294,6 +293,8 @@ export default function ListingEditor({
   startOpen,
   hosted,
 }: Props) {
+  // Hooks first: the editor returns early further down.
+  const contributions = useContributions()
   // Adding: a blank listing stands in for `item`, so the reads below don't
   // each need a guard; `creating` switches off what only makes sense for an
   // edit (Changed marks).
@@ -608,7 +609,7 @@ export default function ListingEditor({
     </ul>
   )
 
-  const canRequestRemoval = !creating && ui.contributions.report && resolveCapabilities(category.capabilities).report
+  const canRequestRemoval = !creating && contributions.report && resolveCapabilities(category.capabilities).report
   const setRemovalOpen = (open: boolean) => {
     setRemovalOpenState(open)
     onRemovalOpenChange?.(open)
@@ -761,7 +762,7 @@ export default function ListingEditor({
             f.type === 'image' ? (
               <div key={f.key}>
                 <p className={fieldLabel}>{f.label}</p>
-                <ImageUploadField value={photo} onChange={(v) => setDetail(f.key, v)} uploadUrl="/api/submissions/photo" shape="circle" showRepositionHint={false} collapseUrlInput />
+                <ImageUploadField value={photo} onChange={(v) => setDetail(f.key, v)} uploadUrl="/api/submissions/photo" challenge shape="circle" showRepositionHint={false} collapseUrlInput />
               </div>
             ) : (
               fieldInput(f)
