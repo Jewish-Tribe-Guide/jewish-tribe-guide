@@ -1320,7 +1320,7 @@ function ItemsCard({
       </ul>
       {rows.length + api.added.length === 0 &&
         (add ? (
-          // Plain, as "+ Add their Shabbos times" is (the user, Oct 10: the
+          // Plain, as "+ Add their times" is (the user, Oct 10: the
           // outlined pill was louder than anything else in a box).
           <button type="button" onClick={add.run} className="mt-0.5 inline-flex cursor-pointer items-center gap-1.5 py-1 text-[14.5px] font-bold text-primary" data-testid="items-add">
             <PlusIcon className="h-4 w-4" />

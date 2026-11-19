@@ -1073,6 +1073,13 @@ Done:
   saved rather than in a holding folder (a move would mean rewriting the
   address everywhere a save puts one). Its dry run on live found nothing
   to clear; on the test project it cleared 30 old test uploads.
+  **Dev links to live's files** (130 of them, copied over by syncs), and
+  live's clean-up checks only live's rows. So the Nov 19 one took the old
+  logo dev's Philly still used, and the icon e2e tests failed on the test
+  project (CI's too). Fixed on dev the same day: the file, from the
+  backup, now in dev's own storage and dev's logo pointed at it. Live's
+  weekly sweep can do it again to any other of those 130 once live stops
+  using it; the lasting fix is a sync that copies files instead of links.
 - Public reads: a form's unpublished draft no longer goes out with the
   published form, and `/api/eruv` says a read failed and when, not the
   error's text.
@@ -2080,8 +2087,12 @@ for that exact change, in the same conversation. Show the dry run first.
 
 0. ~~Migrations 095 and 096~~ Both on live (checked Nov 19: the map card's
    photo column holds City Hall, and `night_note` exists).
-1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
-   category "Shuls & minyanim".
+1. ~~Philly Synagogues' "Minyan" field and rename~~ Dropped (Nov 19, the
+   user: "that just feels like an extra question"). No listing asks for
+   missing weekday or Shabbos times any more, shul or not, so nothing has
+   to say which places are shuls; the `minyanOnly` field setting is gone.
+   Later, if a minyan that isn't a shul ever comes in: where it shows (the
+   user could hear it not being on the Synagogues tab at all).
 1a. **Watches on shuls' and mikvahs' own pages** are on the live site
    (checked Oct 23): Mekor, B'nai Abraham, Society Hill, Kol Tzedek,
    Rodeph Shalom, Leyv Ha-Ir, the Little Shul, Mikveh Israel, Sons of

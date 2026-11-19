@@ -9,7 +9,7 @@ import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly,
 import { isShabbosRow } from '@/lib/minyanText'
 import { clockMinutes, noteText, SHABBOS_PART_LABELS, ruleLinesToday, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
 import { DAY_KEYS, type DayKey } from '@/lib/hours'
-import { boxDate, isMinyanOnly } from '@/lib/listingView'
+import { boxDate } from '@/lib/listingView'
 import { THIS_WEEK_SECTION } from '@/lib/boxDates'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { useContributions } from '@/lib/communityContext'
@@ -100,9 +100,6 @@ export default function DaveningCard({
   // Every minyan here only runs when enough sign up: the box speaks for the
   // place, with no "other times" to call regular.
   const allSignUp = rows.length > 0 && rows.every((m) => m.signUp)
-  // A minyan that meets somewhere, not a shul (Oct 16): its times and
-  // nothing else; no asking for the Shabbos or weekday times it won't have.
-  const minyanOnly = !!category && isMinyanOnly(item, category)
   const season = schedule?.season ?? null
   const anchors = schedule?.anchors[anchorKey(item.geo)]
   // A summer/winter pair goes by its zman (seasonPairs.ts).
@@ -294,19 +291,11 @@ export default function DaveningCard({
           {updateIn('week')}
         </Card>,
       )
-    : shab && !minyanOnly && (
-        <div key="week" className="px-1" data-testid="davening-no-weekday">
-          <p className="text-[13.5px] text-muted">
-            No weekday minyan listed.{' '}
-            {canAdd && updatingIn !== 'no-weekday' && (
-              <button type="button" onClick={() => open('no-weekday')} className="cursor-pointer font-bold text-primary hover:underline">
-                Add one
-              </button>
-            )}
-          </p>
-          {updateIn('no-weekday')}
-        </div>
-      )
+    : // No weekday times: nothing asks for them (Nov 19, the user: "can't
+      // we just not nag"). A place may have none, a minyan that meets
+      // only on Shabbos, and a shul's are added the way anything is: Edit
+      // or "+ Add". Shabbos below, the same.
+      null
 
   const shabbosBox = shab
     ? folded(
@@ -324,18 +313,7 @@ export default function DaveningCard({
           {updateIn('shabbos-usual')}
         </Card>,
       )
-    : week && !minyanOnly && (
-        <Card key="shabbos" title="Usual Shabbos times" testId="davening-shabbos">
-          <p className="pt-0.5 text-[14.5px] leading-relaxed text-slate-700">Their Shabbos times aren’t listed yet.{canAdd ? ' If you’ve davened there, add them.' : ''}</p>
-          {canAdd && updatingIn !== 'shabbos' && (
-            <button type="button" onClick={() => open('shabbos')} className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 py-1 text-[14.5px] font-bold text-primary">
-              <PlusIcon className="h-4 w-4" />
-              Add their Shabbos times
-            </button>
-          )}
-          {updateIn('shabbos')}
-        </Card>
-      )
+    : null
 
   // The week's own line, the same as every box's (the user, Oct 19): who
   // confirmed it and when, Edit at its end, opening its own times. The

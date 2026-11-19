@@ -381,7 +381,6 @@ export const FIELD_FLAG_MEANS: Record<FieldFlag, (f: CategoryField) => boolean> 
   coreSection: (f) => !!f.coreSection,
   invertDisplay: (f) => !!f.invertDisplay,
   entryFrom: (f) => !!f.entryFrom,
-  minyanOnly: (f) => !!f.minyanOnly,
 }
 
 /** A field as what it does: normalized, every yes/no spelled out. */

@@ -147,7 +147,9 @@ describe('a shul’s usual times, two boxes (Oct 6)', () => {
   }
   const boxes = () => [...screen.getByTestId('listing-davening').querySelectorAll('[data-testid="davening-weekday"], [data-testid="davening-shabbos"]')].map((e) => e.getAttribute('data-testid'))
 
-  it('the week as one table, days with the same times on one row, today marked; Shabbos not listed, said so, with Add', () => {
+  // Nov 19: a box missing its times isn't drawn to ask for them (the user:
+  // "can't we just not nag"). Adding them is Edit or "+ Add", as anything.
+  it('the week as one table, days with the same times on one row, today marked; no Shabbos box asking for Shabbos times', () => {
     at('2026-10-06T17:30:00-04:00') // Tue
     show(lowerMerion)
     const table = screen.getByTestId('davening-week-table')
@@ -160,10 +162,8 @@ describe('a shul’s usual times, two boxes (Oct 6)', () => {
     expect(table.querySelector('[data-today]')).toHaveTextContent(/^Tue, Wed/)
     // No more switching between today-and-tomorrow and the week.
     expect(screen.queryByRole('button', { name: /The whole week|Today and tomorrow/ })).not.toBeInTheDocument()
-    const shabbos = screen.getByTestId('davening-shabbos')
-    expect(shabbos).toHaveTextContent('Usual Shabbos timesTheir Shabbos times aren’t listed yet. If you’ve davened there, add them.')
-    fireEvent.click(within(shabbos).getByRole('button', { name: 'Add their Shabbos times' }))
-    expect(screen.getByTestId('update-times')).toBeInTheDocument()
+    expect(boxes()).toEqual(['davening-weekday'])
+    expect(screen.getByTestId('listing-davening')).not.toHaveTextContent(/Shabbos times aren’t listed|Add their Shabbos times/)
   })
 
   it('Shabbos in the order it happens, written as the shul gives it, this season’s; first once the week’s last weekday minyan has started', () => {
@@ -210,12 +210,12 @@ describe('a shul’s usual times, two boxes (Oct 6)', () => {
     expect(boxes()).toEqual(['davening-weekday', 'davening-shabbos'])
   })
 
-  it('a Shabbos-only shul: one box, notes as “Until”, and “No weekday minyan listed”', () => {
+  it('a Shabbos-only shul: one box, notes as “Until”, and nothing asking for weekday times', () => {
     at('2026-10-06T17:30:00-04:00')
     show(rodeph)
     expect(screen.queryByTestId('davening-weekday')).not.toBeInTheDocument()
     expect(screen.getByTestId('davening-shabbos-lines')).toHaveTextContent('Friday nightKabbalas Shabbos 6 PMUntil 7:30 PMShabbos morningShacharis 10:45 AMUntil 12:15 PM')
-    expect(screen.getByTestId('davening-no-weekday')).toHaveTextContent('No weekday minyan listed. Add one')
+    expect(screen.getByTestId('listing-davening')).not.toHaveTextContent(/No weekday minyan|Add one/)
   })
 
   // Oct 15, second pass: an empty box keeps its Add (the "+ Add" box, its
@@ -234,27 +234,6 @@ describe('a shul’s usual times, two boxes (Oct 6)', () => {
       )
       return { onEditBox, tell, shul }
     }
-
-    it('Shabbos not listed', () => {
-      at('2026-10-06T17:30:00-04:00')
-      const { onEditBox, tell, shul } = withEditor(lowerMerion)
-      const shabbos = screen.getByTestId('davening-shabbos')
-      expect(within(shabbos).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
-      fireEvent.click(within(shabbos).getByRole('button', { name: 'Add their Shabbos times' }))
-      expect(tell).toHaveBeenCalledWith(shul, undefined, { times: true })
-      expect(onEditBox).not.toHaveBeenCalled()
-      // The full box beside it has Edit.
-      expect(within(screen.getByTestId('davening-weekday')).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
-    })
-
-    it('no weekday minyan', () => {
-      at('2026-10-06T17:30:00-04:00')
-      const { tell } = withEditor(rodeph)
-      const line = screen.getByTestId('davening-no-weekday')
-      expect(within(line).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
-      fireEvent.click(within(line).getByRole('button', { name: 'Add one' }))
-      expect(tell).toHaveBeenCalledTimes(1)
-    })
 
     it('no times at all', () => {
       at('2026-10-06T17:30:00-04:00')
@@ -870,32 +849,6 @@ describe('a minyan that only runs when enough sign up (Oct 16)', () => {
       { id: 'c', tefillah: 'shacharis', days: ['sat'], time: '9:00am' },
     ])
     expect(screen.getAllByTestId('sign-up-box').map((b) => b.querySelector('p')!.textContent)).toEqual(['Shacharis 7 AM: check the group first', 'Maariv 7:45 PM: check the group first'])
-  })
-})
-
-// Oct 16: a minyan that meets somewhere, not a shul, is its times and
-// nothing else: no asking for Shabbos times an office Mincha won't have.
-describe('a minyan that isn’t a shul', () => {
-  beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date'] })
-    vi.setSystemTime(new Date('2026-10-06T09:00:00-04:00'))
-  })
-  afterEach(() => vi.useRealTimers())
-  const kind = { key: 'minyanOnly', label: 'Minyan', type: 'boolean' as const, renderAs: 'badge' as const, minyanOnly: true }
-  const withKind = makeCategory({ ...shuls, detailFields: [...shuls.detailFields, kind] })
-  const mincha = [{ id: 'm', tefillah: 'mincha', days: ['mon', 'tue', 'wed', 'thu'], time: '1:15pm' }]
-
-  it('has no Shabbos box asking for its Shabbos times', () => {
-    const office = makeListing({ id: 'mkt', name: 'Market Street Mincha', category: 'synagogue', minyanim: mincha, minyanOnly: true })
-    renderWithProviders(<DaveningCard item={office} minyanim={mincha} category={withKind} />, { content: { categories: [withKind] } })
-    expect(screen.getByTestId('davening-weekday')).toHaveTextContent('1:15 PM')
-    expect(screen.queryByTestId('davening-shabbos')).not.toBeInTheDocument()
-  })
-
-  it('a shul with the same times still asks', () => {
-    const shul = makeListing({ id: 'beth', name: 'Center City Beth Am', category: 'synagogue', minyanim: mincha })
-    renderWithProviders(<DaveningCard item={shul} minyanim={mincha} category={withKind} />, { content: { categories: [withKind] } })
-    expect(screen.getByTestId('davening-shabbos')).toHaveTextContent('Their Shabbos times aren’t listed yet.')
   })
 })
 
