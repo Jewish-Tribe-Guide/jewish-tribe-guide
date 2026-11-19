@@ -1059,9 +1059,12 @@ Done:
 - Back, Forward and reload (items 1–7):
   - Coming back to the tab after an admin's change no longer drops the
     search, Filters, an open listing or the Minyan view from the address
-    (the refresh wrote back the router's older address). The refresh now
-    tells the router the address first. If the Minyan view was opened
-    from the page, it redraws once then, losing its scroll.
+    (the refresh wrote back the router's older address, and dropped the
+    page's own Back step with it). Both are put back once the refresh
+    lands, still behind the router. The first fix told the router the
+    address before refreshing, and Next then replayed the page's older
+    cached copy over the fresh one, so the admin's change never arrived
+    (CI's cache suite, "regains focus", 3 of 3 on Nov 18).
   - Back and Forward onto a category show the search its address carries,
     as a link does; before, they blanked it, and after a reload Back threw
     a hydration error. `backForwardNavigation.ts` is gone.

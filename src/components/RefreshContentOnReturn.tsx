@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { replaceAddress } from '@/lib/replaceAddress'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Asks the server for the community layout's content again on the moments it
@@ -96,8 +95,6 @@ export const QUIET_MS = 1_500
 
 export default function RefreshContentOnReturn({ community, version }: { community: string; version: string }) {
   const router = useRouter()
-  // The fingerprint of what's on screen, kept current as a refresh brings a
-  // new one down with the layout.
   // The version on screen, kept current as a refresh brings a new one, and
   // how many refreshes each newer version has had.
   const shown = useRef(version)
@@ -112,6 +109,32 @@ export default function RefreshContentOnReturn({ community, version }: { communi
   // The production build catches it; `next dev` does not. useNow.ts seeds its
   // own clock the same way, at subscribe time, for the same reason.
   const lastRefreshedAt = useRef(0)
+
+  // The category page and the map write their search, filters and the
+  // Minyan view into the address behind Next's router, so a re-render
+  // doesn't follow every keystroke, and their steps into the history entry.
+  // A refresh's commit writes back the address the router last knew, with
+  // none of the page's own keys: a reload then showed another screen and
+  // the page's Back lost its step (Nov 18, `?davening=1` gone on coming
+  // back). So they're put back once it lands, behind the router as they
+  // were written. Telling the router the address before the refresh
+  // instead (a replaceState without `__NA`) made it replay the page's older
+  // cached copy over the fresh one, so a renamed category never arrived
+  // (e2e-cache, "regains focus").
+  // `refreshing` turns false in the commit the refresh lands in: Next's
+  // refresh is a transition, and started inside this one it shares its lane.
+  const [refreshing, startTransition] = useTransition()
+  const kept = useRef<{ href: string; state: unknown } | null>(null)
+  useEffect(() => {
+    if (refreshing || !kept.current) return
+    const { href, state } = kept.current
+    kept.current = null
+    // Gone to another page meanwhile: that page's address stands.
+    if (new URL(href).pathname !== window.location.pathname) return
+    // Next's keys (`__NA` among them) over the page's: with `__NA`, Next
+    // passes the write straight through and its router isn't told.
+    window.history.replaceState({ ...(state as object | null), ...window.history.state }, '', href)
+  }, [refreshing])
 
   useEffect(() => {
     // Mount time, not 0: the content is fresh as of this render, so the
@@ -150,15 +173,8 @@ export default function RefreshContentOnReturn({ community, version }: { communi
       clearTimeout(quiet)
       quiet = setTimeout(() => {
         stopWaiting()
-        // The category page and the map write their search, filters, an
-        // open listing and the Minyan view into the address behind Next's
-        // router, so a re-render doesn't follow every keystroke. The
-        // refresh's commit writes back the address the router last knew,
-        // which dropped them all: a reload then showed another screen
-        // (Nov 18, `?davening=1` gone on coming back). Told first, the
-        // router refreshes the address as it is.
-        replaceAddress(window.location.href)
-        router.refresh()
+        kept.current = { href: window.location.href, state: window.history.state }
+        startTransition(() => router.refresh())
       }, QUIET_MS)
     }
     function refreshWhenStill() {
