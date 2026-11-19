@@ -25,6 +25,11 @@
 // real visitor actually sees — a pending or rejected submission might carry
 // address/phone info nobody ever vetted.
 //
+// Photos come with their rows (Nov 19): each live file a row names is
+// copied into the test project's own storage and the row pointed at the
+// copy (storedFileCopy.mjs). Before, rows kept live's addresses, and live's
+// clean-up, which only knows live's rows, broke dev's logo.
+//
 // Upsert-only, never deletes — a category (or listing) removed in prod will
 // still linger here until you delete it by hand. Safer than a full mirror: a
 // delete pass scoped to this project would risk wiping rows the write-test
@@ -41,6 +46,7 @@
 // ever overwriting prod with itself.
 
 import { createClient } from '@supabase/supabase-js'
+import { withOwnFiles } from './storedFileCopy.mjs'
 
 const sourceUrl = process.env.PROD_SUPABASE_URL
 const sourceKey = process.env.PROD_SUPABASE_SERVICE_ROLE_KEY
@@ -74,6 +80,15 @@ if (destUrl !== testUrl) {
 const source = createClient(sourceUrl, sourceKey, { auth: { persistSession: false } })
 const dest = createClient(destUrl, destKey, { auth: { persistSession: false } })
 
+// Files copied so far this run, and any that couldn't be.
+const copied = new Set()
+const notCopied = []
+async function ownFiles(rows) {
+  const out = await withOwnFiles(rows, sourceUrl, destUrl, dest, copied)
+  notCopied.push(...out.failed)
+  return out.rows
+}
+
 // [table, onConflict columns] — matches the composite/community-scoped keys
 // added in supabase/migrations/20240101000027_communities.sql.
 const TABLES = [
@@ -99,7 +114,8 @@ async function syncTable(table, onConflict) {
     console.log(`  ${table}: 0 rows in prod, nothing to copy`)
     return
   }
-  const { error: writeError } = await dest.from(table).upsert(data, { onConflict })
+  const rows = await ownFiles(data)
+  const { error: writeError } = await dest.from(table).upsert(rows, { onConflict })
   if (writeError) throw new Error(`Writing ${table} to the test project failed: ${writeError.message}`)
   console.log(`  ${table}: synced ${data.length} row(s)`)
 }
@@ -119,7 +135,7 @@ async function syncResources() {
     console.log('  resource: 0 approved rows in prod, nothing to copy')
     return
   }
-  const scrubbed = data.map((row) => ({ ...row, submitted_by: null }))
+  const scrubbed = await ownFiles(data.map((row) => ({ ...row, submitted_by: null })))
   const { error: writeError } = await dest.from('resource').upsert(scrubbed, { onConflict: 'id' })
   if (writeError) throw new Error(`Writing resource to the test project failed: ${writeError.message}`)
   console.log(`  resource: synced ${data.length} row(s) (approved only, submitted_by scrubbed)`)
@@ -130,6 +146,8 @@ for (const [table, onConflict] of TABLES) {
   await syncTable(table, onConflict)
 }
 await syncResources()
+console.log(`\n  photos: ${copied.size} live file(s) the rows show, in the test project's own storage`)
+for (const f of notCopied) console.log(`  ⚠ not copied, left on live: ${f}`)
 console.log('\n✓ Done. Never touched: submission, form_response, vote (private, not public content).')
 
 // Same caveat as every direct-to-database write in this repo: the running app

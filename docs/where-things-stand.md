@@ -47,7 +47,7 @@ visible response, ≤1s to the answer on a phone, Core Web Vitals at p75).
 The first tap on a place on a phone no longer slides up an empty sheet:
 its code loads once a category page is idle (`src/lib/preloadable.tsx`),
 checked by `e2e/first-tap.spec.ts`. Still open: make PR builds faster
-(~12 min now). The e2e shards wait for cache-roundtrip and admin-write and
+(10–13 min, checked Nov 19 on that day's green PR runs). The e2e shards wait for cache-roundtrip and admin-write and
 are unbalanced; about 6–7 min looks reachable.
 
 **Nov 16, the user's notes after the release:**
@@ -1077,9 +1077,11 @@ Done:
   live's clean-up checks only live's rows. So the Nov 19 one took the old
   logo dev's Philly still used, and the icon e2e tests failed on the test
   project (CI's too). Fixed on dev the same day: the file, from the
-  backup, now in dev's own storage and dev's logo pointed at it. Live's
-  weekly sweep can do it again to any other of those 130 once live stops
-  using it; the lasting fix is a sync that copies files instead of links.
+  backup, now in dev's own storage and dev's logo pointed at it. Then
+  (the user: "dev should not be linking to live photos") the other 129
+  were copied into dev's storage and dev's 211 rows pointed at them; dev
+  links to no live file now. `sync-dev-from-prod` copies a row's files
+  with it from now on (`scripts/storedFileCopy.mjs`).
 - Public reads: a form's unpublished draft no longer goes out with the
   published form, and `/api/eruv` says a read failed and when, not the
   error's text.
@@ -2188,9 +2190,13 @@ for that exact change, in the same conversation. Show the dry run first.
      dishes the last read never looked for, from the run's 3 AI reads
      (`dishesToLookFor`). One it names gets its menu date; one it doesn't
      waits on the kind page.
-   - Still open: two of the Dottie's branches share dotties.com with the
-     first branch's watch (one watch per page), so the daily run never
-     looks for theirs. Read it now on each does.
+   - Still open (checked Nov 19): branches that share a menu page share
+     one watch, on the first branch. Since Oct 28 a read dates every
+     branch's dishes (`dateFromMenu`), but what the daily run looks for
+     again on an unchanged menu (`dishesToLookFor`) is only that first
+     branch's dishes. A dish added by hand to another branch alone is
+     never looked for. On live: Dottie's (4), Rita's (4), PLNT Burger,
+     Playa Bowls, LUHV and Insomnia (2 each). Read now on each does.
    **Oct 26, "why does HipCityVeg say Oct 17, and Goldie?"** Two causes,
    both fixed on `redesign/oct18-fixes` (not live until it deploys):
    - Menus are checked last each night, and the shul and mikvah pages
@@ -3030,12 +3036,8 @@ after the deploy, dry run first, and needs its own go-ahead.
 ## Small open decisions
 
 7. The "+" button covers part of the third tile in a row on the phone home.
-8. Counts on the admin's To do tabs (how many are waiting in the queue,
-   Watches, Read questions, Responses). Not shown: no count is loaded
-   anywhere the nav can read it, and the agreement was no new requests just
-   for these. Showing them would mean the sign-in check (or one new small
-   request) returning the four counts on every admin page load.
-   (Folds into the admin redesign below.)
+8. ~~Counts on the admin's To do tabs~~ Done with the admin redesign
+   (Oct 29): To do is one list, and the nav shows its count.
 
 ## Planned: the admin redesign (started Oct 28, brief agreed Oct 28)
 
