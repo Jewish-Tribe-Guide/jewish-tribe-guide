@@ -209,10 +209,22 @@ export async function runMenuWatch(
   const field = itemsField(category)
   // Unchanged, but with dishes its last read never looked for (added since,
   // by hand): read again for them, from the run's AI reads (the user, Oct 26).
+  // Branches sharing this page share its watch (wantedMenuWatches), so
+  // their dishes are looked for here too: until Nov 19 only the first
+  // branch's were, and a dish added by hand to another branch alone
+  // (Dottie's, Rita's) was never looked for. Each by its own reading, or
+  // the first branch's when it has none yet: what this page was read for.
+  const branches = await branchesOn(watch, listing, category)
   let lookingFor: string[] = []
   if (!opts.full && !changed) {
     const kept = watch.pageHash && field ? await getMenuReading(watch.communityId, listing.id) : null
     lookingFor = dishesToLookFor({ dishes: listedDishes(listing, category), menuDated: menuDated(listing) }, kept)
+    if (kept) {
+      for (const branch of branches) {
+        const own = (await getMenuReading(watch.communityId, branch.id)) ?? kept
+        lookingFor = unionNames(lookingFor, dishesToLookFor({ dishes: listedDishes(branch, category), menuDated: menuDated(branch) }, own))
+      }
+    }
     if (!lookingFor.length) {
       // Only after a kept reading found dishes on it: dishes dated before
       // readings were kept, on a page no read has named them from, aren't
@@ -223,7 +235,7 @@ export async function runMenuWatch(
       if (watch.pageHash && field && kept?.dishes.length) {
         const missing = new Set((kept?.missing ?? []).map((n) => n.trim().toLowerCase()))
         const named = [...new Set([...menuDated(listing), ...kept.dishes.map((d) => d.name)])].filter((n) => !missing.has(n.trim().toLowerCase()))
-        await dateFromMenu(watch, listing, category, field.key, named)
+        await dateFromMenu(watch, listing, category, field.key, named, branches)
       }
       return { ok: true, filed: 0, pageHash }
     }
@@ -237,7 +249,10 @@ export async function runMenuWatch(
     return { ok: true, filed: 0, check: { what: 'dishes', from: checkFrom(source), result: 'nothing', read: [], differences: [], queue: null, note: 'The AI isn’t set up here, so the menu wasn’t read.' } }
   }
   if (budget && !opts.full && !takeMenuReads(budget, 1)) return { ok: true, filed: 0, skipped: true }
-  const listed = listedDishes(listing, category)
+  // A dish any branch on this page lists is asked about, and isn't news
+  // to the first branch; one missing is said on the branch that lists it.
+  const ownListed = listedDishes(listing, category)
+  const listed = branches.reduce((all, b) => unionNames(all, listedDishes(b, category)), ownListed)
   let read
   try {
     // With the rest of its menu on the website (menuPages), so a dish
@@ -250,7 +265,11 @@ export async function runMenuWatch(
     return { ok: false, error: `${changed ? 'The menu changed, and the AI' : 'The AI'} couldn’t read it (${err instanceof Error ? err.message : String(err)})` }
   }
   const found = newDishes(read.dishes, listed)
-  const missing = read.missing ?? []
+  const missingFrom = (names: readonly string[]) => {
+    const on = new Set(names.map((n) => n.trim().toLowerCase()))
+    return (read.missing ?? []).filter((n) => on.has(n.trim().toLowerCase()))
+  }
+  const missing = missingFrom(ownListed)
   const check = (queue: WatchCheck['queue']) =>
     pageCheck('dishes', checkFrom(source, { pictures: read.fromPictures }), read.dishes.length ? [read.dishes.map((d) => d.name).join(', ')] : [], {
       differences: [
@@ -262,13 +281,33 @@ export async function runMenuWatch(
   // Every listed dish it named is dated from it, whatever else waits for
   // an admin: it was on the menu today (the user, Oct 28). One it found
   // missing isn't among them.
-  if (field) await dateFromMenu(watch, listing, category, field.key, read.dishes.map((d) => d.name))
-  if (found.length === 0 && missing.length === 0) return { ok: true, filed: 0, pageHash, check: check(null) }
-  // Nothing it hasn't said before: a reading waiting or skipped stands, on
-  // "Check now" and the nightly run alike. Until Nov 18 only "Check now"
-  // looked, so any change to the page (a price, a special) brought dishes
-  // an admin skipped back as new.
-  const kept = await getMenuReading(watch.communityId, listing.id)
+  if (field) await dateFromMenu(watch, listing, category, field.key, read.dishes.map((d) => d.name), branches)
+  // A branch's own missing dishes wait on that branch's Main dishes tab.
+  let branchFiled = 0
+  for (const branch of branches) {
+    const gone = missingFrom(listedDishes(branch, category))
+    if (gone.length && (await fileReading(watch, branch.id, read, [], gone, changed || !lookingFor.length))) branchFiled++
+  }
+  if (found.length === 0 && missing.length === 0) return { ok: true, filed: branchFiled, pageHash, check: check(branchFiled ? 'filed' : null) }
+  if (!(await fileReading(watch, listing.id, read, found, missing, changed || !lookingFor.length))) {
+    return { ok: true, filed: branchFiled, pageHash, check: check(branchFiled ? 'filed' : 'before') }
+  }
+  return { ok: true, filed: 1 + branchFiled, pageHash, check: check('filed') }
+}
+
+/** Saves a reading for one listing, waiting on its Main dishes tab, unless
+ *  it says nothing its reading waiting or skipped hasn't said. Until Nov 18
+ *  only "Check now" looked, so any change to the page (a price, a special)
+ *  brought dishes an admin skipped back as new. Whether it saved. */
+async function fileReading(
+  watch: Pick<Watch, 'communityId' | 'url'>,
+  id: string,
+  read: Awaited<ReturnType<typeof readMenu>>,
+  found: ReturnType<typeof newDishes>,
+  missing: string[],
+  changed: boolean,
+): Promise<boolean> {
+  const kept = await getMenuReading(watch.communityId, id)
   const lower = (n: string) => n.trim().toLowerCase()
   const had = new Set((kept?.dishes ?? []).map((d) => lower(d.name)))
   const hadMissing = new Set((kept?.missing ?? []).map(lower))
@@ -278,17 +317,23 @@ export async function runMenuWatch(
     found.every((d) => had.has(lower(d.name))) &&
     missing.every((n) => hadMissing.has(lower(n)))
   ) {
-    return { ok: true, filed: 0, pageHash, check: check('before') }
+    return false
   }
-  await saveMenuReading(watch.communityId, listing.id, {
+  await saveMenuReading(watch.communityId, id, {
     status: 'proposed',
     sourceUrl: read.sourceUrl ?? watch.url,
     dishes: read.dishes,
     missing,
-    note: changedMenuNote(found, missing, changed || !lookingFor.length),
+    note: changedMenuNote(found, missing, changed),
     model: read.model,
   })
-  return { ok: true, filed: 1, pageHash, check: check('filed') }
+  return true
+}
+
+/** Names from both, once each, ignoring case. */
+function unionNames(a: readonly string[], b: readonly string[]): string[] {
+  const seen = new Set(a.map((n) => n.trim().toLowerCase()))
+  return [...a, ...b.filter((n) => !seen.has(n.trim().toLowerCase()) && seen.add(n.trim().toLowerCase()))]
 }
 
 /** A watched menu page that stopped opening (the user, Oct 21): its website
@@ -342,10 +387,10 @@ async function lookElsewhere(
  *  menu share one watch (wantedMenuWatches), which dated only its own
  *  listing, so Playa Bowls' second branch kept Oct 18 (the user, Oct 28).
  *  Each branch by its own names for them (namedOnListing). */
-async function dateFromMenu(watch: Pick<Watch, 'communityId' | 'url'>, listing: DirectoryResource, category: CategoryConfig, fieldKey: string, names: readonly string[]): Promise<void> {
+async function dateFromMenu(watch: Pick<Watch, 'communityId' | 'url'>, listing: DirectoryResource, category: CategoryConfig, fieldKey: string, names: readonly string[], branches?: DirectoryResource[]): Promise<void> {
   if (!names.length) return
   await dateMenuDishes(watch.communityId, listing.id, fieldKey, names)
-  for (const branch of await branchesOn(watch, listing, category)) {
+  for (const branch of branches ?? (await branchesOn(watch, listing, category))) {
     await dateMenuDishes(watch.communityId, branch.id, fieldKey, namedOnListing(listedDishes(branch, category), names))
   }
 }

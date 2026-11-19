@@ -2190,13 +2190,16 @@ for that exact change, in the same conversation. Show the dry run first.
      dishes the last read never looked for, from the run's 3 AI reads
      (`dishesToLookFor`). One it names gets its menu date; one it doesn't
      waits on the kind page.
-   - Still open (checked Nov 19): branches that share a menu page share
-     one watch, on the first branch. Since Oct 28 a read dates every
-     branch's dishes (`dateFromMenu`), but what the daily run looks for
-     again on an unchanged menu (`dishesToLookFor`) is only that first
-     branch's dishes. A dish added by hand to another branch alone is
-     never looked for. On live: Dottie's (4), Rita's (4), PLNT Burger,
-     Playa Bowls, LUHV and Insomnia (2 each). Read now on each does.
+   - Fixed Nov 19 (`claude/next-round`, not live until it deploys):
+     branches that share a menu page share one watch, on the first
+     branch, and an unchanged menu was read again only for that branch's
+     dishes, so a dish added by hand to another branch alone was never
+     looked for (Dottie's (4), Rita's (4), PLNT Burger, Playa Bowls, LUHV,
+     Insomnia on live). Now every branch's unlooked-for dishes are looked
+     for, each by its own reading (or the first branch's, if it has
+     none). A dish any branch lists is asked about and isn't proposed as
+     new to the others; one the menu lacks waits on the branch that lists
+     it, and isn't looked for again.
    **Oct 26, "why does HipCityVeg say Oct 17, and Goldie?"** Two causes,
    both fixed on `redesign/oct18-fixes` (not live until it deploys):
    - Menus are checked last each night, and the shul and mikvah pages
