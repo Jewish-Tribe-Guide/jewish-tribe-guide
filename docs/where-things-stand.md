@@ -2092,9 +2092,12 @@ for that exact change, in the same conversation. Show the dry run first.
    (the user, Oct 19). Northeast's address on live is still to set: a yes,
    once the branch is deployed. Elkins Park's sender is still unknown.
 1c. **"Candle Lighting & Zmanim"** (decided Oct 20): the user renamed it
-   on live Oct 20 (label and plural). Its description there is still
-   empty; dev has "Candle lighting, Havdalah and daily zmanim", which
-   category search reads ("havdalah" finds it). Until the three-line tiles are
+   on live Oct 20 (label and plural). Its description there is empty,
+   and nothing waits on it (Nov 19): search finds the page by its built-in
+   words ("havdalah" included), the admin has no description field, and
+   the only thing it fills is a shared link's preview line. Idea for later,
+   not now (the user): the site writes that line itself from what the page
+   is, and stops storing a description. Until the three-line tiles are
    live, the phone home cuts the name to "Candle Lighting &…".
 
 1d. **Migration 085 (`watch.last_check`)** is run on both databases
