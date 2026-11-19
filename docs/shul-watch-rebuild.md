@@ -32,23 +32,48 @@ not highlights" and "Shul watches, in short").
 
 ## To find out before building: newsletters
 
-Read from live (Oct 15 to Nov 19), what each shul's newsletter gives:
+Read Nov 19 in the guide's Gmail: every email from each shul, Oct 15 to
+Nov 19, set against the usual times we hold for it. Only one email a week
+from each is the schedule; the rest are events and appeals, and say
+nothing about services.
 
-- **BZBI:** every weekday Shacharis, Wednesday Maariv and Shabbos
-  morning: looks like the whole week.
-- **Mekor Habracha:** a Shabbat schedule and its weekday services ("Weekday
-  Services: November 1 to November 6"): looks like the whole week.
-- **Society Hill:** not a schedule. It features Friday night's TGIShabbat
-  and events, and never its usual Monday Maariv (7:00 PM, Zoom). Under
-  the rule, ignored.
-- **Kol Tzedek, South Philadelphia Shtiebel, Sons of Israel (turned
-  off):** not checked yet. The Shtiebel's that filed was an events email
-  ("Tonight! Midrash Class").
+- **Society Hill: gives the week** (5 of 5 "This Week at Society Hill"
+  emails). Friday's TGIShabbat, Shabbos morning, and the Monday Zoom
+  Maariv under "Weekly Reminders" near the end, which is all the shul
+  has. The end of the email is past Gmail's clip, so the reader must get
+  the whole email, not the clipped one. Changes come in prose
+  (Thanksgiving week: Friday and Shabbos on Zoom only). The earlier note
+  here, that it never gives the Maariv, was wrong: it was read from the
+  emails that had filed something, not from the inbox.
+- **BZBI: gives the week** (5 of 5 "This Week at BZBI"). Shabbos's
+  services; "Regular Minyan Times" for every weekday, the same each week;
+  the Wednesday 7:00 PM Maariv; and that week's exceptions in prose
+  ("Thanksgiving Day … 9:00 AM in person", Rosh Chodesh in person). Some
+  weeks have a Friday night service (First Fridays, young professionals),
+  most don't.
+- **Mekor Habracha: gives the week** (4 of 4 Friday newsletters, plus one
+  "Corrected" resend). Shabbos's times and a "Weekday Services" table,
+  every day, every minyan. The table's date heading can be stale: the
+  Nov 6 email's says "November 1 to November 6" over that week's new
+  times. So which week it means comes from the email's date, not the
+  heading.
+- **Kol Tzedek: gives the week** (5 of 5 Wednesday emails). Friday night
+  and Shabbos morning, which is all the shul has, each marked hybrid,
+  online-only or in person. One week says "No Shabbat Services!" on
+  Friday: a week with no minyan that night.
+- **South Philadelphia Shtiebel: Shabbos only** (5 of 5 "Shabbat …"
+  emails). Friday's Kabbalat Shabbat and all of Shabbos (Shacharis,
+  Mincha, Maariv), but never the weekday Shacharis the shul has every
+  morning. The Monday "This Week at the Shtiebel" email is classes.
+- **Sons of Israel:** nothing but the sign-up confirmation (Oct 20).
 
-Before building: read a month of each shul's newsletters and mark each
-as "gives the week" or not, for the user. Whether a newsletter gives the
-week is then a fact about that shul's newsletter, confirmed once, as a
-calendar page is; not guessed each email.
+So four give the week and one gives only Shabbos. Whether a newsletter
+gives the week is a fact about that shul's newsletter, confirmed once, as
+a calendar page is; not guessed each email.
+
+**For the user:** the Shtiebel's gives all of Shabbos but no weekdays.
+Under "the week is the unit" it would be ignored, so its Shabbos times
+come only from the usual times.
 
 ## What stays as it is
 
@@ -95,13 +120,15 @@ Mikvah hours and contact details stay in `listingPageRun.ts`.
 Each is tested, committed and pushed before the next.
 
 1. **Newsletters:** a month of each shul's, marked "gives the week" or
-   not, for the user.
+   not, for the user. Done Nov 19 (above); the Shtiebel's is the user's
+   call.
 2. **Draw the "Their calendar / Their usual times / Their newsletter
    gives the week" rows** on a shul's Places page, for the user's OK.
 3. **`shulTimes.ts` and its tests**, written from the rule. Each real case
    is a test: Lower Merion's late Maariv on its homepage ignored and its
    calendar's week taken whole; Mekor's homepage Friday ignored; Society
-   Hill's newsletter ignored; the Little Shul's empty calendar week as no
+   Hill's week read from the whole email, Monday Maariv included; Mekor's
+   week dated by the email, not its stale heading; the Little Shul's empty calendar week as no
    minyan; a newsletter and a calendar disagreeing about the week.
 4. **The page search prefers a calendar**, and the confirm rows are built.
 5. **A read-only dry run on the 14 live shuls**: what the new code would

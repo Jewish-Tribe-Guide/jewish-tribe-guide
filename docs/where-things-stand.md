@@ -980,7 +980,10 @@ Still open:
   minyan every day) is never read; the watch reads its homepage. Mekor's
   site has no calendar, so its week is the newsletter's. Approvals (about
   40 a week for 14 shuls) left alone for now, to see if this brings
-  them down.
+  them down. Newsletters read Nov 19 (a month of each, in the guide's
+  Gmail): Society Hill, BZBI, Mekor and Kol Tzedek give the week; the
+  Shtiebel's gives Shabbos only, waiting on the user; Sons of Israel
+  has sent nothing. Details in the plan.
 - A listing list's scroll-to-a-row wait gives up after about 3 seconds
   and stops when the list goes away (`whenSettled`, Nov 19). It used to
   poll every 32ms forever for a row that never appeared, and one timer
