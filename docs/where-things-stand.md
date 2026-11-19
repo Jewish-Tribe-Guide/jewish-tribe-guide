@@ -1143,10 +1143,25 @@ Done:
     share one start (`listingWrite.ts`). The photo check had drifted: a
     week read from the "+ Add" box's photo was refused by one of them.
   - The map's search suggestions are one list for the phone and the
-    computer, and the listing editor's history entries one hook
-    (`useEditFormHistory`) for the computer's dialog and the map's sheet.
-    Those entries are still written with `history.pushState`, not Next's
-    router; moving them is a change of its own.
+    computer.
+  - A listing's editor and its Request removal are addresses of their own
+    (Nov 19): `?editing=<id>~listing`, `<id>~listing/removal` and
+    `<id>~removal` (`useEditorInAddress`), written through Next's router.
+    A reload comes back to them, Back from one is the listing, and Back to
+    one from another page draws it. Everywhere a listing opens: the
+    computer's column, a phone's sheet and a listing's own page, the Map's
+    sidebar and phone sheet, and an eruv. Under the listing's id, so the
+    next listing a phone or the Map opens doesn't come up in the editor of
+    the one before. `?editing=` rather than `?form=edit`, which already
+    means the box over the list. A row opened inside the editor is still
+    a step of the screen alone (its ‹ closes it). A phone's sheet closed
+    with its editor open (the dimmed list tapped) now goes back to the
+    list; it used to stop on the listing's address with the sheet shut, so
+    the next Back did nothing and a reload reopened it (already so before
+    the editor had an address).
+  - The computer's Edit dialog (`ListingDetailModal`) is gone: a computer
+    has opened listings in the list's column since Sep 30, so nothing
+    reached it.
   - Dead code out: the upvote button's two looks no screen used (both
     drew a 👍), `formatWeekHours`, `syncedLabel`, the map's unused `onUp`
     and its re-export of the hospital colour. Five public reads no screen

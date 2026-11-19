@@ -7,7 +7,7 @@ import ListingView, { type Onward } from '@/components/resources/ListingView'
 import type { SearchFound } from '@/lib/askSearch'
 import { scrollingAncestor } from '@/lib/scrollingAncestor'
 import ListingEditBar from '@/components/resources/ListingEditBar'
-import { useEditFormHistory } from '@/components/resources/useEditFormHistory'
+import { useEditorInAddress } from '@/components/resources/useEditorInAddress'
 import dynamic from 'next/dynamic'
 import { ui } from '@/lib/uiConfig'
 import { routes } from '@/lib/routes'
@@ -85,16 +85,13 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
   // detail (not the list) on cancel or submit. Requesting a removal is part
   // of that form (see RemovalRequest), so there's no separate Report view.
   //
-  // It gets its own history entry, nested on top of the one
-  // MobileNearbySheet's selectPlace already pushed for this place — so a
-  // swipe-back/browser-back out of the form lands on this place's detail,
-  // not the list underneath it or off the map entirely. Same pattern as
-  // that one; see its own comment for why (and CategoryEditor's
-  // openPreview/closePreview, the precedent both follow).
-  // The editor's Request removal screen is a step of its own too, one more
-  // entry on top of the form's. Shared with the desktop dialog
-  // (useEditFormHistory).
-  const formHistory = useEditFormHistory('mapSheet')
+  // It has an address and an entry of its own (?editing=<id>~listing), on top of
+  // the listing's — so a swipe-back/browser-back out of the form lands on
+  // this place's detail, not the list underneath it or off the map
+  // entirely, and a reload lands on the form. Its Request removal screen is
+  // a step of its own too, one more entry on top of the form's
+  // (useEditorInAddress).
+  const formHistory = useEditorInAddress(true, item.id)
   const { formOpen, removalOpen, stepBack, closeForm, changeRemovalOpen } = formHistory
   const [titleSlot, setTitleSlot] = useState<HTMLElement | null>(null)
   // Whether the editor holds anything typed and not yet sent.

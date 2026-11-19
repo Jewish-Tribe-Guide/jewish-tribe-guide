@@ -10,7 +10,6 @@ const OVERLAYS: Array<[string, string]> = [
   ['src/components/ImageCropModal.tsx', 'overlay-in'],
   ['src/components/home/ContributePicker.tsx', 'overlay-in'],
   ['src/components/resources/ActionDialog.tsx', 'overlay-in'],
-  ['src/components/resources/ListingDetailModal.tsx', 'overlay-in'],
   ['src/components/CommunitySwitcher.tsx', 'overlay-in'],
   ['src/components/home/LocationControl.tsx', 'menuIn'],
   ['src/components/CommunitySwitcher.tsx', 'menuIn'],

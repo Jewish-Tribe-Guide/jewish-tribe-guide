@@ -17,7 +17,7 @@ import type { LocationControls } from '@/components/home/LocationControl'
 import type { CampaignBanner } from '@/lib/campaignBanner'
 import type { DirectoryResource } from '@/types'
 import { track } from '@vercel/analytics'
-import { mockRouter } from '@/test/nextNavigationMock'
+import { historyRouter } from '@/test/nextNavigationMock'
 import type { MapPoint } from './ResourceMap'
 import ResourceMapView from './ResourceMapView'
 
@@ -41,10 +41,10 @@ vi.mock('@/lib/useEruvStatuses', () => ({
 
 // NearbyList's row-level Share action calls useCommunitySlug(), which pulls
 // in next/navigation's useRouter() unconditionally (see nextNavigationMock's
-// own comment) — required here even though this suite never asserts on
-// routing itself.
+// own comment). One that writes the history as Next's does: a place's
+// editor is an address of its own (useEditorInAddress).
 vi.mock('next/navigation', () => ({
-  useRouter: () => mockRouter,
+  useRouter: () => historyRouter,
   usePathname: () => '/test-community',
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -1557,7 +1557,7 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
         [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [HOURS] }), makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })],
       )
     }
-    const formState = () => (window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm
+    const editing = () => new URLSearchParams(window.location.search).get('editing')
     async function editWithChange(user: ReturnType<typeof userEvent.setup>) {
       await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
       await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
@@ -1581,7 +1581,7 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
 
       expect(confirm).toHaveBeenCalledWith('Discard your changes?')
       expect(screen.getByTestId('editor-open-name')).toBeInTheDocument()
-      expect(formState()).toBe('edit')
+      expect(editing()).toBe('a1~listing')
     })
 
     it('another pin, with something typed: Yes drops the edit and opens the pin, its history unwound', async () => {
@@ -1589,13 +1589,15 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
       const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
       renderTwo()
       await editWithChange(user)
+      const go = vi.spyOn(window.history, 'go')
 
       await user.click(screen.getByRole('button', { name: 'Select Best Grocery' }))
 
       expect(confirm).toHaveBeenCalledTimes(1)
       await waitFor(() => expect(screen.getByRole('link', { name: 'Best Grocery' })).toBeInTheDocument())
       expect(screen.queryByTestId('editor-list')).not.toBeInTheDocument()
-      expect(formState()).toBeUndefined()
+      expect(go).toHaveBeenCalledWith(-1)
+      await waitFor(() => expect(editing()).toBeNull())
     })
 
     it('a search, with something typed: asks, and No keeps the edit', async () => {
@@ -1616,13 +1618,15 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
       renderTwo()
       await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
       await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
-      expect(formState()).toBe('edit')
+      await waitFor(() => expect(editing()).toBe('a1~listing'))
+      const go = vi.spyOn(window.history, 'go')
 
       await user.click(screen.getByRole('button', { name: 'Select Best Grocery' }))
 
       expect(confirm).not.toHaveBeenCalled()
       await waitFor(() => expect(screen.getByRole('link', { name: 'Best Grocery' })).toBeInTheDocument())
-      expect(formState()).toBeUndefined()
+      expect(go).toHaveBeenCalledWith(-1)
+      await waitFor(() => expect(editing()).toBeNull())
     })
 
     it('the ← with something typed: no question, it\u2019s a step back, not something else', async () => {
@@ -1638,6 +1642,57 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
       expect(await screen.findByRole('button', { name: 'Edit listing' })).toBeInTheDocument()
     })
 
+    // The edit's own entry is a navigation (useEditorInAddress), so MapScreen
+    // hears of the place for the first time once it lands, and hands it in
+    // as initialPlaceId; a reload hands in both. The restore picking the
+    // place again unwound the edit it had just opened (Nov 19, in Chrome).
+    describe('the place its edit is open on, named by the address', () => {
+      const listings = [listingWithGeo({ id: 'a1', category: 'grocery', name: 'Acme Grocery' }), listingWithGeo({ id: 'b2', category: 'grocery', name: 'Best Grocery' })]
+      const tree = (placeId: string | undefined, isMobile = false) => (
+        <PinnedProvider>
+          <DroppedPinsProvider>
+            <ListingsProvider listings={listings}>
+              <ForcedViewport isMobile={isMobile}>
+                <HeaderCollapseProvider>
+                  <ResourceMapView standalone visible initialPlaceId={placeId} />
+                </HeaderCollapseProvider>
+              </ForcedViewport>
+            </ListingsProvider>
+          </DroppedPinsProvider>
+        </PinnedProvider>
+      )
+      const content = { content: { categories: [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', detailFields: [HOURS] })] } }
+
+      it('computer: once the edit’s entry lands, the edit stays', async () => {
+        const user = userEvent.setup()
+        window.history.replaceState(null, '', '/test-community/map')
+        const { rerenderWithProviders } = renderWithProviders(tree(undefined), content)
+        await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
+        await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
+        await waitFor(() => expect(editing()).toBe('a1~listing'))
+        const go = vi.spyOn(window.history, 'go')
+
+        rerenderWithProviders(tree('a1'))
+
+        await new Promise((r) => setTimeout(r, 50))
+        expect(screen.getByTestId('editor-list')).toBeInTheDocument()
+        expect(go).not.toHaveBeenCalled()
+        expect(editing()).toBe('a1~listing')
+      })
+
+      it('phone: a reload with the edit open comes back to it', async () => {
+        window.history.replaceState({ mapSheetOpen: true }, '', '/test-community/map?place=a1&editing=a1%7Elisting')
+        const go = vi.spyOn(window.history, 'go')
+        renderWithProviders(tree('a1', true), content)
+
+        expect(await screen.findByTestId('editor-list')).toBeInTheDocument()
+        await new Promise((r) => setTimeout(r, 50))
+        expect(screen.getByTestId('editor-list')).toBeInTheDocument()
+        expect(go).not.toHaveBeenCalled()
+        expect(editing()).toBe('a1~listing')
+      })
+    })
+
     // A filter is a commit, which on desktop closes the open place to show
     // the results; mid-edit it leaves the edit be (Oct 15).
     it('a filter switched on mid-edit leaves the edit open', async () => {
@@ -1650,7 +1705,11 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
       expect(screen.getByTestId('map-filters-button')).toHaveAccessibleName('Filters, 1 on')
 
       expect(screen.getByTestId('editor-open-name')).toBeInTheDocument()
-      expect(formState()).toBe('edit')
+      // The map writes its filters over the address, and the editor's place
+      // in it stays.
+      await new Promise((r) => setTimeout(r, 50))
+      expect(editing()).toBe('a1~listing')
+      expect(new URLSearchParams(window.location.search).get('open')).not.toBeNull()
     })
   })
 
@@ -1659,21 +1718,21 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
   // map. ✕ now unwinds the editor's entries first and then leaves.
   it('✕ mid-edit leaves the map, not just the edit', async () => {
     const user = userEvent.setup()
-    let stateAtExit: unknown = 'not called'
+    let addressAtExit = 'not called'
     const onExit = vi.fn(() => {
-      stateAtExit = window.history.state
+      addressAtExit = window.location.search
     })
     renderStandalone(onExit)
     await user.click(screen.getByRole('button', { name: /^Select / }))
     await user.click(await screen.findByRole('button', { name: 'Edit listing' }))
-    expect((window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm).toBe('edit')
+    await waitFor(() => expect(window.location.search).toContain('editing='))
 
     await user.click(screen.getByRole('button', { name: 'Close map' }))
 
     await waitFor(() => expect(onExit).toHaveBeenCalledTimes(1))
     // Leaving from the map's own entry, so the caller's router.back() goes
     // where the map was opened from rather than into the edit's listing.
-    expect((stateAtExit as { mapSheetForm?: string } | null)?.mapSheetForm).toBeUndefined()
+    expect(addressAtExit).not.toContain('editing=')
   })
 
   // Escape mid-edit is one step back inside the editor, like its ‹, not a

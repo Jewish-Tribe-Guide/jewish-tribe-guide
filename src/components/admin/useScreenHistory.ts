@@ -76,13 +76,39 @@ function addressBack(steps: number): string | null | undefined {
 
 type Router = ReturnType<typeof useRouter>
 
+// Next's own keys in an entry's state. Everything else is the page's.
+const NEXT_KEYS = new Set(['__NA', '__N', '__PRIVATE_NEXTJS_INTERNALS_TREE'])
+
+/** `keepState`: the entry written keeps the page's own keys of the one it
+ *  was written from. Next's router writes only its own, and a public page
+ *  still reads its places from there (a listing's `step`, the map's
+ *  `mapSheetOpen`): an editor's entry without them was a listing closed to
+ *  its Back and Forward. Put back with Next's keys on top, which tells
+ *  Next the write is its own (AGENTS.md), so its router isn't told. */
+type MoveOptions = { keepState?: boolean }
+
+function pageState(): Record<string, unknown> | null {
+  const state = window.history.state as Record<string, unknown> | null
+  if (!state || typeof state !== 'object') return null
+  const own = Object.fromEntries(Object.entries(state).filter(([k]) => !NEXT_KEYS.has(k)))
+  return Object.keys(own).length ? own : null
+}
+
+function landedKeeping(href: string, kept: Record<string, unknown> | null): Promise<void> {
+  return landedOn(href).then(() => {
+    if (!kept || typeof window === 'undefined' || here() !== href) return
+    window.history.replaceState({ ...kept, ...(window.history.state as object | null) }, '', window.location.href)
+  })
+}
+
 /** Writes `href` (worked out when the move runs, after those before it). */
-export function moveTo(router: Router, how: 'push' | 'replace', href: () => string): Promise<void> {
+export function moveTo(router: Router, how: 'push' | 'replace', href: () => string, { keepState = false }: MoveOptions = {}): Promise<void> {
   return next(() => {
     const to = href()
     if (to === here()) return Promise.resolve()
+    const kept = keepState ? pageState() : null
     router[how](to, { scroll: false })
-    return landedOn(to)
+    return landedKeeping(to, kept)
   })
 }
 
@@ -95,15 +121,16 @@ export function moveBack(steps: number): Promise<void> {
  *  a link or a reload, the screens behind it were never entries in this
  *  history (or are someone else's page): it's put in this entry's place
  *  instead, so Back never leaves the admin from a screen inside it. */
-export function moveBackTo(router: Router, stepsNow: number | (() => number), to: () => string): Promise<void> {
+export function moveBackTo(router: Router, stepsNow: number | (() => number), to: () => string, { keepState = false }: MoveOptions = {}): Promise<void> {
   return next(() => {
     const steps = typeof stepsNow === 'number' ? stepsNow : stepsNow()
     const href = to()
     const behind = addressBack(steps)
     if (steps > 0 && (behind === undefined || behind === href)) return steppedBack(steps)
     if (href === here()) return Promise.resolve()
+    const kept = keepState ? pageState() : null
     router.replace(href, { scroll: false })
-    return landedOn(href)
+    return landedKeeping(href, kept)
   })
 }
 

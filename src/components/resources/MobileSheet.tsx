@@ -623,7 +623,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
               visual noise once every caller here had the drag (see close()'s
               own callers for the non-pointer paths). Non-draggable (a plain
               header WITH a real close button, same affordance
-              ListingDetailModal and ActionDialog give desktop — it has no
+              ActionDialog gives desktop — it has no
               drag to fall back on) gets none of this — nothing here to
               grab, and it keeps its own X below. */}
           {!(draggable && titleHidden) && (

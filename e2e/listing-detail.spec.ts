@@ -566,6 +566,115 @@ test('Request removal, beside Edit, is its own screen, and Back returns to the l
   await expect(name).toBeVisible()
 })
 
+// Nov 19: the editor and its Request removal are addresses of their own
+// (?editing=<id>~listing, useEditorInAddress), written through Next's
+// router. They were entries pushed behind it with nothing in the address:
+// a reload went back to the listing with the editor still in the history,
+// so the next Back seemed to do nothing, and Back to one from another page
+// changed the address and drew nothing. Opens nothing that writes.
+test('the editor is an address of its own: a reload, Back, Forward, and Back from another page', async ({ page, request, isMobile }) => {
+  const community = await defaultCommunity(page)
+  const { category, item } = await categoryWithHoursField(request, community)
+
+  await page.goto(`/${community}/${category.id}`)
+  await ready(page)
+  await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
+  const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
+  const name = listing.getByRole('heading', { name: item.name, exact: true })
+  await expect(name).toBeVisible()
+  test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
+  const editing = () => new URL(page.url()).searchParams.get('editing')
+  const editor = page.getByTestId('editor-list')
+
+  await openListingEditor(page, listing)
+  await expect(editor).toBeVisible()
+  await expect.poll(editing).toBe(`${item.id}~listing`)
+
+  // A reload is the editor, and Back from there is the listing.
+  await page.reload()
+  await ready(page)
+  await expect(editor).toBeVisible()
+  await page.goBack()
+  await expect(name).toBeVisible()
+  await expect(editor).toHaveCount(0)
+  expect(editing()).toBeNull()
+  expect(new URL(page.url()).searchParams.get('item')).toBe(item.id)
+  await page.goForward()
+  await expect(editor).toBeVisible()
+
+  // Away to another page, and Back: the editor, drawn.
+  await page.goto(`/${community}`)
+  await ready(page)
+  await page.goBack()
+  await ready(page)
+  await expect(editor).toBeVisible()
+  expect(editing()).toBe(`${item.id}~listing`)
+  // And Back from it, the listing.
+  await page.goBack()
+  await expect(name).toBeVisible()
+  await expect(editor).toHaveCount(0)
+})
+
+test('Request removal from the bar is an address of its own: a reload, and Back to the listing', async ({ page, request, isMobile }) => {
+  const community = await defaultCommunity(page)
+  const { category, item } = await categoryWithHoursField(request, community)
+
+  await page.goto(`/${community}/${category.id}`)
+  await ready(page)
+  await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
+  const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
+  const name = listing.getByRole('heading', { name: item.name, exact: true })
+  await expect(name).toBeVisible()
+  test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
+  const editing = () => new URL(page.url()).searchParams.get('editing')
+  const removal = page.getByRole('heading', { name: 'Request removal' })
+
+  const button = listing.getByRole('button', { name: 'Request removal' })
+  await button.scrollIntoViewIfNeeded()
+  await button.click()
+  await expect(removal).toBeVisible()
+  await expect.poll(editing).toBe(`${item.id}~removal`)
+
+  await page.reload()
+  await ready(page)
+  await expect(removal).toBeVisible()
+  await page.goBack()
+  await expect(name).toBeVisible()
+  await expect(removal).toHaveCount(0)
+  expect(editing()).toBeNull()
+})
+
+// Nov 19: the sheet closed (the dimmed list tapped) with its editor open
+// stepped back one entry, onto the listing's own: the sheet shut on an
+// address naming it, so the next Back did nothing anyone could see and a
+// reload opened the listing again.
+test('phone: closing the sheet with its editor open goes back to the list, address and all', async ({ page, request, isMobile }) => {
+  test.skip(!isMobile, 'the sheet is the phone’s')
+  const community = await defaultCommunity(page)
+  const { category, item } = await categoryWithHoursField(request, community)
+
+  await page.goto(`/${community}/${category.id}`)
+  await ready(page)
+  const listAddress = page.url()
+  await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
+  const listing = page.getByRole('dialog', { name: item.name })
+  await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
+  test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
+  await openListingEditor(page, listing)
+  await expect(page.getByTestId('editor-list')).toBeVisible()
+  await expect.poll(() => new URL(page.url()).searchParams.get('editing')).toBe(`${item.id}~listing`)
+
+  await page.mouse.click(page.viewportSize()!.width / 2, 40)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect.poll(() => page.url()).toBe(listAddress)
+
+  // A reload is the list, with no sheet over it.
+  await page.reload()
+  await ready(page)
+  await expect(page.getByRole('button', { name: `Show details for ${item.name}` }).first()).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+
 // A row of the editor (Oct 11) is a step inside it: the header's Back
 // closes the row, not the editor.
 test('Back steps out of an open row of the editor, not out of editing', async ({ page, request, isMobile }) => {
@@ -683,4 +792,38 @@ test('a long note grows its box rather than scrolling inside it', async ({ page,
   test.skip((await box.count()) === 0, `${category.id} has no note opening in place`)
   await box.fill(Array.from({ length: 10 }, (_, i) => `Line ${i + 1} of a long note`).join('\n'))
   await expect.poll(() => box.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1)
+})
+
+// An eruv's editor (EruvListing), the same way: its own address, so a
+// reload comes back to it and Back is the eruv (Nov 19). Opens nothing
+// that writes.
+test('an eruv’s editor is an address of its own: a reload, Back and Forward', async ({ page, isMobile }) => {
+  const community = await defaultCommunity(page)
+  await page.goto(`/${community}/eruv`)
+  await ready(page)
+  const row = page.getByTestId('eruv-row').first()
+  await expect(row.or(page.getByTestId('eruv-none'))).toBeVisible()
+  test.skip((await row.count()) === 0, 'no eruvim listed')
+  await row.click()
+  const opened = isMobile ? page.getByRole('dialog') : page.getByTestId('eruv-column')
+  await expect(opened).toBeVisible()
+  const edit = opened.getByRole('button', { name: 'Edit listing' })
+  test.skip((await edit.count()) === 0, 'the eruv can’t be edited')
+  const item = new URL(page.url()).searchParams.get('item')
+  const editing = () => new URL(page.url()).searchParams.get('editing')
+  const editor = page.getByTestId('eruv-editing')
+
+  await edit.click()
+  await expect(editor).toBeVisible()
+  await expect.poll(editing).toBe(`${item}~listing`)
+
+  await page.reload()
+  await ready(page)
+  await expect(editor).toBeVisible()
+  await page.goBack()
+  await expect(editor).toHaveCount(0)
+  await expect(edit).toBeVisible()
+  expect(editing()).toBeNull()
+  await page.goForward()
+  await expect(editor).toBeVisible()
 })

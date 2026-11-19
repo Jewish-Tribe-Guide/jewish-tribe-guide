@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { HostedEditor } from './ListingEditor'
 import dynamic from 'next/dynamic'
 import { GlobeIcon, MailIcon, PencilIcon, PhoneIcon } from '@/components/icons'
@@ -18,6 +18,7 @@ import { Card } from './listingParts'
 import { FieldsBox, fieldText } from './FieldsBox'
 import { eruvValues, withEruvFields } from '@/lib/eruvFields'
 import { fieldBoxes } from '@/lib/fieldBoxes'
+import { useEditorInAddress } from './useEditorInAddress'
 import { underName } from '@/lib/cardLines'
 import { parseListingParts } from '@/lib/listingParts'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
@@ -63,8 +64,9 @@ const siteLabel = (url: string) => url.replace(/^https?:\/\//i, '').replace(/^ww
  *  listing, so You and Today say whether it's up; under it, "Suggest an edit" (Oct 13), which
  *  turns the listing into its edit form (EruvEditor), hosted
  *  as MapPlaceDetail hosts a listing's: a ‹ and "Suggest an edit" over it,
- *  and its own step in the history, so Back (and a phone's back swipe)
- *  returns to the listing. On the desktop map (onEditor) the ‹ is the
+ *  and its own step in the history and the address (?editing=<id>~listing,
+ *  useEditorInAddress), so Back (and a phone's back swipe) returns to the
+ *  listing and a reload to the form. On the desktop map (onEditor) the ‹ is the
  *  sidebar's: the ← in its search box, which steps back the same way. */
 export function EruvListing(props: {
   eruv: Eruv
@@ -78,43 +80,37 @@ export function EruvListing(props: {
   startEditing?: boolean
 }) {
   const { onEditingChange, onEditor, startEditing = false, ...listing } = props
-  const [editing, setEditing] = useState(startEditing)
-  // Opened by Edit listing, the editor is a step in the history and Back
-  // closes it; opened on it (startEditing), there's no step to go back
-  // over, and Back would leave the page it's in.
-  const [stepped, setStepped] = useState(false)
+  // Opened by Edit listing, the editor is a step in the history and the
+  // address, and Back closes it. Opened on it (startEditing), there's no
+  // listing under it to step back to, and Back would leave the page it's
+  // in: it's state alone then.
+  const address = useEditorInAddress(!startEditing, props.eruv.id)
+  const [openedOn, setOpenedOn] = useState(startEditing)
+  const editing = startEditing ? openedOn : address.formOpen !== null
   const [changed, setChanged] = useState(false)
-  // Another eruv opened in its place starts as its listing.
+  // Another eruv opened in its place starts as its listing. (Its editor's
+  // step in the address is under its own id, so the address reads as none
+  // for it.)
   const [shownId, setShownId] = useState(props.eruv.id)
   if (shownId !== props.eruv.id) {
     setShownId(props.eruv.id)
-    setEditing(startEditing)
-    setStepped(false)
+    setOpenedOn(startEditing)
   }
-  useEffect(() => {
-    const onPop = (e: PopStateEvent) => setEditing((e.state as { mapSheetForm?: string } | null)?.mapSheetForm === 'edit')
-    window.addEventListener('popstate', onPop)
-    return () => window.removeEventListener('popstate', onPop)
-  }, [])
   useEffect(() => {
     onEditingChange?.(editing)
   }, [editing, onEditingChange])
   const eruvPage = useCategories()?.find((c) => c.kind === 'eruv') ?? null
   const openEditor = () => {
-    window.history.pushState({ ...(window.history.state ?? {}), mapSheetForm: 'edit' }, '')
     setChanged(false)
-    setStepped(true)
-    setEditing(true)
+    if (startEditing) setOpenedOn(true)
+    else address.openForm('edit')
   }
-  const closeEditor = () => {
-    if (!stepped) return setEditing(false)
-    setStepped(false)
-    window.history.back()
-  }
+  const { closeForm } = address
+  const closeEditor = useCallback(() => (startEditing ? setOpenedOn(false) : closeForm()), [startEditing, closeForm])
   useEffect(() => {
     if (!onEditor) return
-    onEditor(editing ? { back: stepped ? () => window.history.back() : () => setEditing(false), label: 'Back to listing', changed } : null)
-  }, [onEditor, editing, changed, stepped])
+    onEditor(editing ? { back: closeEditor, label: 'Back to listing', changed } : null)
+  }, [onEditor, editing, changed, closeEditor])
   useEffect(() => () => onEditor?.(null), [onEditor])
   if (editing) {
     return (

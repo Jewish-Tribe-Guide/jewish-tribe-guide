@@ -51,7 +51,7 @@ describe('useBodyScrollLock', () => {
     expect(document.documentElement.style.overscrollBehaviorX).toBe('')
   })
 
-  // The actual bug (ListingDetailModal, arrow-key next/prev): closing one
+  // The actual bug (the computer's old listing dialog, arrow-key next/prev): closing one
   // card's dialog and opening a sibling's happens as two setState calls in
   // the same event handler (GenericDirectory's navigateFromCard), which
   // React batches into ONE commit — both Lockers below re-render together,

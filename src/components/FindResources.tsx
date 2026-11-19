@@ -279,9 +279,9 @@ export default function FindResources({
         // expand its card. GenericDirectory's own reopenItemId effect can't
         // tell those two reasons apart, though: it opens whatever `?item=`
         // names unconditionally. Reached only from a COLLAPSED row's kebab or
-        // a deep link now (an already-expanded card's own Edit morphs
-        // its dialog in place instead — see ListingDetailModal's doc — and
-        // never calls this), so the card was never genuinely open before
+        // a deep link now (an opened listing's own Edit swaps the listing
+        // for its editor in place instead — see MapPlaceDetail — and never
+        // calls this), so the card was never genuinely open before
         // this ran; goToCategoryList clears `item` back out on close so it
         // doesn't linger as a false "reopen this" signal once the reason it
         // was there (this form) is gone. Confirmed live: without that, a

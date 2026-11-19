@@ -65,6 +65,7 @@ import dynamic from 'next/dynamic'
 import { tellUsPlaceholder } from '@/lib/tellUs'
 import { pointerHover } from '@/lib/pointerHover'
 import { TappedMinyanContext, type TappedMinyan } from './TappedMinyan'
+import { stepsIn } from '@/lib/stepAddress'
 
 /** How a change to the address is recorded. `replace`: in place, no step.
  *  `step`: a step the browser's Back undoes, named in history.state so the
@@ -1063,8 +1064,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           travelCompare(a, b, { fromCenter: !byPopular })
     })
 
-  // fromId is the card issuing the request (arrow key pressed while ITS
-  // dialog is open) — direction moves through `filtered`, the same order
+  // fromId is the listing open in the column (its ‹ ›, or an arrow key) —
+  // direction moves through `filtered`, the same order
   // rendered below, so "next" always matches what's actually next on
   // screen. A no-op past either end rather than wrapping: looping from the
   // last listing back to the first (or vice versa) reads as the arrow key
@@ -1084,8 +1085,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     // than where this scrolled to, with the top of it — often most of it —
     // above the viewport instead of visible.
     //
-    // 'instant', not 'smooth' — confirmed live: closing one card's dialog
-    // and opening the next's mutates enough DOM in the same moment that
+    // 'instant', not 'smooth' — confirmed live (with the computer's old
+    // listing dialog): closing one card and opening the next's mutates enough DOM in the same moment that
     // Chrome cancels an in-flight 'smooth' scrollTo outright, snapping the
     // page back to wherever it started (scrollY 0 in testing) rather than
     // reaching the target at all. An animated scroll can't survive a
@@ -2029,9 +2030,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             <GenericListingCard
               ref={setCardRef(item.id)}
               inColumn={!isMobile || item.id === pagedItemId}
-              onNavigate={(direction) => navigateFromCard(item.id, direction)}
-              hasPrev={(shownIndex.get(item.id) ?? 0) > 0}
-              hasNext={(shownIndex.get(item.id) ?? Infinity) < shownItems.length - 1}
               item={item}
               category={category}
               showCategoryLabel={false}
@@ -2063,18 +2061,26 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 const address = new URLSearchParams(window.location.search)
                 // A phone's sheet opened from the list is a step too (Nov
                 // 18: Back left the page under it). Closed on the screen, it
-                // takes that step back, so Forward doesn't reopen it.
+                // takes that step back, so Forward doesn't reopen it. Closed
+                // with its editor open, the editor's levels too (Nov 19):
+                // they're entries (useEditorInAddress), and one step landed
+                // on the listing's own, shut, the next Back doing nothing.
                 const stepBack =
                   !expanded &&
                   isMobile &&
                   address.get('item') === item.id &&
                   (window.history.state as { step?: string } | null)?.step === LISTING_STEP
-                if (stepBack) window.history.back()
+                const editorSteps = stepsIn(window.location.search, 'editing', item.id).length
+                if (stepBack && editorSteps > 0) window.history.go(-(1 + editorSteps))
+                else if (stepBack) window.history.back()
                 // The listing's own link names it already: `?item=` on top
                 // made a reload on a phone the list with a sheet (Nov 18).
                 else if (!(expanded && item.id === linkedItemId && window.location.pathname !== routes.slug(activeCommunity.slug, category.id))) {
                   onParamsChange?.(
-                    { item: expanded ? item.id : null, ...(expanded ? {} : { match: null }) },
+                    // Closed in place, its editor goes from the address
+                    // with it: left there, the next listing opened under
+                    // that name came up as its editor.
+                    { item: expanded ? item.id : null, ...(expanded ? {} : { match: null, ...(editorSteps > 0 ? { editing: null } : {}) }) },
                     // Not when the address already names it: a link, or
                     // Forward, reopening it. (On a phone arriving from its
                     // link, the first render still thinks it's a computer.)
@@ -2101,7 +2107,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 setOpenDialogItemId((prev) => (expanded ? item.id : prev === item.id ? null : prev))
               }}
               onVote={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
-              onEdit={() => onEdit(item)}
             />
             </div>
             {questionSpot !== 'end' && questionSpot?.section === section.key && questionSpot.id === item.id && (

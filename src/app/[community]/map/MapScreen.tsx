@@ -46,7 +46,7 @@ export default function MapScreen() {
           // Past the map's own entries (a place's sheet, its edit form):
           // ‹ goes back to where the map was opened from, not to the map's
           // list (Nov 17, from a listing's map tile).
-          const steps = mapBackSteps(window.history.state)
+          const steps = mapBackSteps(window.history.state, window.location.search)
           if (window.history.length > steps) {
             if (steps === 1) router.back()
             else window.history.go(-steps)

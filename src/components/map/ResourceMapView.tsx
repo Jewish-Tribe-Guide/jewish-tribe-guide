@@ -63,6 +63,9 @@ import { useLearnAfterPause } from '@/lib/useLearnAfterPause'
 import AskTheGroup from '@/components/home/AskTheGroup'
 import type { DirectoryResource, MapFilters } from '@/types'
 import { useKeptListScroll } from './useKeptListScroll'
+import { useRouter } from 'next/navigation'
+import { moveBackTo } from '@/components/admin/useScreenHistory'
+import { stepCount, stepsIn, withoutSteps } from '@/lib/stepAddress'
 
 // Shared by the initial useState below and the resync effect further down
 // (see its own comment) — one place for the initialSelectedCategories-vs-
@@ -448,15 +451,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // "small map" on Escape (or the fullscreen-toggle button) that a real user
   // reported seeing. Leaving `fullscreen` true keeps this screen showing its
   // real layout right up until it's replaced.
-  // Mid-edit, the place's editor has pushed history entries of its own
-  // (mapSheetForm, and mapSheetRemoval on top), so a router.back() would
-  // only pop one of those: ✕ took you out of editing and left you on the
-  // map. Unwind them first, one popstate at a time, then leave. Nothing
-  // asks "discard?", the same as closing the listing dialog mid-edit.
+  // Mid-edit, the place's editor has entries of its own (?editing=<id>~listing,
+  // and its Request removal on top; useEditorInAddress), so a router.back()
+  // would only go back over one of those: ✕ took you out of editing and
+  // left you on the map. Go back over them first, then leave. Nothing asks
+  // "discard?", the same as closing the listing dialog mid-edit.
+  const router = useRouter()
   const unwindEditorHistory = (then: () => void) => {
-    if (!(window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm) return then()
-    window.addEventListener('popstate', () => unwindEditorHistory(then), { once: true })
-    window.history.back()
+    const editing = () => stepCount(window.location.search, ['editing'])
+    if (editing() === 0) return then()
+    void moveBackTo(router, editing, () => withoutSteps(window.location.pathname, window.location.search, ['editing']), { keepState: true }).then(then)
   }
   const exitFullscreen = () => {
     const leave = () => {
@@ -471,10 +475,20 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // unwinds the editor's history entries — left behind, Back would land in
   // an edit of whatever's showing by then — and only then does it. The ←
   // and Escape step back without asking, as the editor's own ‹ always has;
-  // so does ✕ (exitFullscreen).
-  const leaveEditThen = (then: () => void) => {
+  // so does ✕ (exitFullscreen). A phone's sheet hosts its editor itself,
+  // telling nobody, so there it's the address that says one is open: a pin
+  // tapped then swaps the place in the same entry, and the editor's entries
+  // would have stayed on top of the next place (Nov 19).
+  //
+  // `to`: the place being opened, by the id its editor goes by. The one
+  // whose editor the address names is no leaving: the restore below picks
+  // it again once the editor's own entry lands (a navigation, so the map
+  // hears of the place for the first time) and after a reload, and
+  // unwinding there closed the editor it had just opened.
+  const leaveEditThen = (then: () => void, to?: string) => {
+    if (to !== undefined && stepsIn(window.location.search, 'editing', to).length > 0) return then()
     const open = editorRef.current
-    if (!open) return then()
+    if (!open) return unwindEditorHistory(then)
     if (open.changed && !window.confirm('Discard your changes?')) return
     editorRef.current = null
     setEditor(null)
@@ -563,15 +577,19 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // the pin-tap handler passed to ResourceMap below, which is the one place
   // that does.
   const selectPlace = (p: SelectablePoint, frame = true) =>
-    leaveEditThen(() => {
-      if (p.raw?.id && countCommunity) countEvent(countCommunity, 'listing_view', p.raw.id)
-      if (isMobile) nearbySheetRef.current?.selectPoint(p, frame)
-      else {
-        setDesktopSelected(p)
-        setSidebarCollapsed(false)
-        if (frame) setFrameToken((t) => t + 1)
-      }
-    })
+    leaveEditThen(
+      () => {
+        if (p.raw?.id && countCommunity) countEvent(countCommunity, 'listing_view', p.raw.id)
+        if (isMobile) nearbySheetRef.current?.selectPoint(p, frame)
+        else {
+          setDesktopSelected(p)
+          setSidebarCollapsed(false)
+          if (frame) setFrameToken((t) => t + 1)
+        }
+      },
+      // An eruv's editor goes by the eruv's own id, a listing's by its.
+      p.id.startsWith(ERUV_PREFIX) ? p.id.slice(ERUV_PREFIX.length) : (p.raw?.id ?? p.id),
+    )
   const deselectPlace = () => {
     if (isMobile) nearbySheetRef.current?.deselectPoint()
     else leaveEditThen(() => setDesktopSelected(null))
@@ -1147,10 +1165,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       // the ‹ back is still there after a chip or a pin.
       from: new URLSearchParams(window.location.search).get('from'),
     })
-    const url = `${window.location.pathname}${qs}`
+    // A place's editor open over it keeps its own step (useEditorInAddress).
+    const params = new URLSearchParams(qs)
+    const editing = new URLSearchParams(window.location.search).get('editing')
+    if (editing) params.set('editing', editing)
+    const search = params.toString()
+    const url = `${window.location.pathname}${search ? `?${search}` : ''}`
     if (url === `${window.location.pathname}${window.location.search}`) return
     window.history.replaceState(window.history.state, '', url)
-    ownWritesRef.current = [...ownWritesRef.current, normalizeSearch(qs)].slice(-20)
+    ownWritesRef.current = [...ownWritesRef.current, normalizeSearch(new URL(url, window.location.origin).search)].slice(-20)
     // The view is the visitor's now, no link's: the same link again is a
     // new navigation, even if this write never comes back as props (Next
     // doesn't always echo one).
@@ -1733,7 +1756,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       leaveEditThen(() => {
         setDesktopSelected(p)
         setSidebarCollapsed(false)
-      })
+      }, id)
   }
   // A link to an open eruv (?place=eruv:center-city) opens it again, with
   // the layer on, once the eruvim have arrived (their fetch outlasts the

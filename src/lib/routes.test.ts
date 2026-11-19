@@ -238,11 +238,13 @@ describe('parseMapQuery', () => {
 
 describe('mapBackSteps', () => {
   it('goes back past the map’s own entries to where it was opened from', () => {
-    expect(mapBackSteps(null)).toBe(1)
-    expect(mapBackSteps({ __NA: true })).toBe(1)
+    expect(mapBackSteps(null, '')).toBe(1)
+    expect(mapBackSteps({ __NA: true }, '?cat=food')).toBe(1)
     // A place's sheet open: ‹ used to close only the sheet.
-    expect(mapBackSteps({ mapSheetOpen: true })).toBe(2)
-    expect(mapBackSteps({ mapSheetOpen: true, mapSheetForm: 'edit' })).toBe(3)
-    expect(mapBackSteps({ mapSheetOpen: true, mapSheetForm: 'edit', mapSheetRemoval: true })).toBe(4)
+    expect(mapBackSteps({ mapSheetOpen: true }, '?place=a')).toBe(2)
+    // Its editor's steps are in the address, under the listing's id.
+    expect(mapBackSteps({ mapSheetOpen: true }, '?place=a&editing=r1~listing')).toBe(3)
+    expect(mapBackSteps({ mapSheetOpen: true }, '?place=a&editing=r1%7Elisting%2Fremoval')).toBe(4)
+    expect(mapBackSteps({ mapSheetOpen: true }, '?place=a&editing=r1~removal')).toBe(3)
   })
 })

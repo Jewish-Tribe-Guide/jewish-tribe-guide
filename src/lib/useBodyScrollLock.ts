@@ -5,8 +5,9 @@ import { useEffect } from 'react'
 // A plain `document.body.style.overflow = active ? 'hidden' : ''` (what this
 // replaced) works fine for exactly one thing locking the page at a time, but
 // breaks the moment two instances can be mid-transition in the same commit —
-// arrow-key next/prev in ListingDetailModal closes one card's dialog and
-// opens a sibling's in the same batch, and `document.body.style.overflow` is
+// arrow-key next/prev in the computer's old listing dialog (ListingDetailModal,
+// gone since Nov 19) closed one card's dialog and opened a sibling's in the
+// same batch, and `document.body.style.overflow` is
 // one global property: whichever instance's effect happens to run last wins,
 // with no guarantee that's the one that should. Reference-counted instead: a
 // closing instance's cleanup only ever ends the lock when NOTHING else still

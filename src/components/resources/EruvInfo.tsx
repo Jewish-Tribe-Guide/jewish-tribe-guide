@@ -187,9 +187,10 @@ export default function EruvInfo({ onUp, title = 'Eruv', color = '#64748b', band
   useEffect(() => {
     if (!column) return
     const onKey = (e: KeyboardEvent) => {
-      // While editing, Escape steps back out of the edit; the arrows are
-      // the form's.
-      if ((window.history.state as { mapSheetForm?: string } | null)?.mapSheetForm) {
+      // While editing, Escape steps back out of the edit, an entry of its
+      // own (useEditorInAddress); the arrows are the form's. Opened on the
+      // editor (the admin preview's), there's no entry to step back over.
+      if (editing && !startEditing) {
         if (e.key === 'Escape') window.history.back()
         return
       }

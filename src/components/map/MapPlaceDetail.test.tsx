@@ -1,15 +1,25 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
-import { mockRouter } from '@/test/nextNavigationMock'
+import { moveTo } from '@/components/admin/useScreenHistory'
 import { PinnedProvider } from '@/lib/pinnedContext'
 import { CATEGORY_CAPABILITY_DEFAULTS } from '@/lib/categories'
 import MapPlaceDetail from './MapPlaceDetail'
 
+// Next's router as it behaves here: an entry is written once the navigation
+// lands, holding Next's own keys and none of the page's.
+const { router } = vi.hoisted(() => {
+  const NEXT_STATE = { __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: 'tree' }
+  const write = (how: 'pushState' | 'replaceState') => (url: string) => {
+    setTimeout(() => window.history[how](NEXT_STATE, '', url), 10)
+  }
+  return { router: { push: vi.fn(write('pushState')), replace: vi.fn(write('replaceState')), back: vi.fn(), forward: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() } }
+})
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => mockRouter,
+  useRouter: () => router,
   usePathname: () => '/test-community/map',
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -58,14 +68,29 @@ vi.mock('@/components/resources/ListingEditor', async () => {
     ),
   }
 })
-afterEach(() => {
-  cleanup()
-  // The push/pop history tests leave real entries behind (jsdom's History
-  // is a live, module-level object, not reset between tests) — back to a
-  // clean slate so one test's pushState can't leak into the next one's
-  // "was anything pushed" assertions.
-  window.history.replaceState(null, '')
+// The phone map's sheet, open on a place: the entry the map marks as its own.
+const PLACE = '/test-community/map?place=listing-1'
+const EDITING = `${PLACE}&editing=listing-1%7Elisting`
+const REMOVAL_IN_EDIT = `${PLACE}&editing=listing-1%7Elisting%2Fremoval`
+const here = () => window.location.pathname + window.location.search
+
+beforeEach(() => {
+  window.history.replaceState({ mapSheetOpen: true }, '', PLACE)
 })
+afterEach(async () => {
+  cleanup()
+  // Moves still on their way land before the next test starts: jsdom's
+  // History is one live object for the whole file.
+  await moveTo(router as never, 'replace', here)
+  window.history.replaceState(null, '')
+  vi.clearAllMocks()
+})
+
+/** Waits for the editor's entry to land, the map's own mark kept on it. */
+async function landedOn(address: string) {
+  await waitFor(() => expect(here()).toBe(address))
+  await waitFor(() => expect(window.history.state).toMatchObject({ mapSheetOpen: true }))
+}
 
 describe('MapPlaceDetail', () => {
   it('links the name to the listing\'s own canonical category-page URL', () => {
@@ -106,71 +131,91 @@ describe('MapPlaceDetail', () => {
 
 
 
-  it('pushes a history entry when Edit opens, so a swipe-back returns here instead of leaving the map', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing({ name: 'Goldi Market' })
-    const pushSpy = vi.spyOn(window.history, 'pushState')
-
+  it('opens the editor at an address of its own, the map’s sheet kept under it', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
     renderWithProviders(
       <PinnedProvider>
-        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
       </PinnedProvider>,
     )
 
     await user.click(screen.getByRole('button', { name: 'Edit listing' }))
 
-    expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ mapSheetForm: 'edit' }), '')
-  })
-
-  it('returns to the place detail (not the list, not off the map) when a swipe-back fires while the edit form is open', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing({ name: 'Goldi Market' })
-
-    renderWithProviders(
-      <PinnedProvider>
-        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
-      </PinnedProvider>,
-    )
-
-    await user.click(screen.getByRole('button', { name: 'Edit listing' }))
     expect(screen.getByText(/ListingEditor stub/)).toBeInTheDocument()
-
-    // Simulates what a real swipe-back/browser-back delivers: a popstate
-    // whose state no longer carries mapSheetForm, because history.back()
-    // popped past the entry openEdit pushed.
-    act(() => {
-      window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
-    })
-
-    expect(screen.queryByText(/ListingEditor stub/)).not.toBeInTheDocument()
-    expect(screen.getByTestId('listing-view')).toBeInTheDocument()
+    await landedOn(EDITING)
+    expect(router.push).toHaveBeenCalledTimes(1)
+    expect(window.history.state).toMatchObject({ __NA: true })
   })
 
-  it('closes the edit form via history.back(), not a direct state reset, so cancelling and swiping back behave identically', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing({ name: 'Goldi Market' })
-    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
-
+  it('returns to the place (not the list, not off the map) on a swipe-back, and Forward opens the editor again', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
     renderWithProviders(
       <PinnedProvider>
-        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
       </PinnedProvider>,
     )
-
     await user.click(screen.getByRole('button', { name: 'Edit listing' }))
+    await landedOn(EDITING)
+
+    act(() => window.history.back())
+    await waitFor(() => expect(screen.queryByText(/ListingEditor stub/)).not.toBeInTheDocument())
+    expect(screen.getByTestId('listing-view')).toBeInTheDocument()
+    expect(here()).toBe(PLACE)
+
+    act(() => window.history.forward())
+    expect(await screen.findByText(/ListingEditor stub/)).toBeInTheDocument()
+  })
+
+  it('opens in its editor when the address names it, as a reload does', () => {
+    window.history.replaceState({ mapSheetOpen: true }, '', REMOVAL_IN_EDIT)
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+    expect(screen.getByText(/ListingEditor stub/)).toBeInTheDocument()
+    expect(screen.getByText('stub editor: removal')).toBeInTheDocument()
+  })
+
+  // The Map draws the next place it shows in a view of its own, and a
+  // phone's category page keeps every listing's sheet it has opened: the
+  // next one came up in the editor of the one before (Nov 19).
+  it('shows the next place as itself, not in the editor of the one before', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    const { rerenderWithProviders } = renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail key="listing-1" item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Edit listing' }))
+    await waitFor(() => expect(here()).toContain('editing='))
+
+    rerenderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail key="listing-2" item={makeListing({ id: 'listing-2', name: 'Kosher Mart' })} category={makeCategory()} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+    expect(screen.queryByText(/ListingEditor stub/)).not.toBeInTheDocument()
+    expect(screen.getByTestId('listing-view')).toHaveTextContent('Kosher Mart')
+  })
+
+  it('closes the editor by stepping back over its entry, as a swipe-back does', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Edit listing' }))
+    await landedOn(EDITING)
+
     await user.click(screen.getByRole('button', { name: 'stub cancel' }))
 
-    expect(backSpy).toHaveBeenCalled()
-    // Mocked no-op above, so no popstate actually fired — the form staying
-    // put confirms the component didn't ALSO reset its own state directly,
-    // only delegated to the browser.
-    expect(screen.getByText(/ListingEditor stub/)).toBeInTheDocument()
+    expect(screen.queryByText(/ListingEditor stub/)).not.toBeInTheDocument()
+    await waitFor(() => expect(here()).toBe(PLACE))
+    // The entry the map wrote, not one written over the editor's.
+    expect(window.history.state).toEqual({ mapSheetOpen: true })
+    expect(router.replace).not.toHaveBeenCalled()
   })
 
   // ── The edit bar ───────────────────────────────────────────────────────
@@ -248,13 +293,11 @@ describe('MapPlaceDetail', () => {
 
     await user.click(screen.getByRole('button', { name: 'Edit listing' }))
     expect(writes.at(-1)).toBe(0)
+    await landedOn(EDITING)
 
     screen.getByTestId('region').scrollTop = 480
-    // What a swipe-back or the form's own Back delivers (see above).
-    act(() => {
-      window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
-    })
-    expect(screen.queryByRole('heading', { name: 'Edit listing' })).not.toBeInTheDocument()
+    act(() => window.history.back())
+    await waitFor(() => expect(screen.queryByText(/ListingEditor stub/)).not.toBeInTheDocument())
     expect(writes.at(-1)).toBe(0)
   })
 
@@ -294,59 +337,59 @@ describe('MapPlaceDetail', () => {
   })
 
   // Removal has no Cancel, so Back has to step out of it into the edit —
-  // and a history entry of its own makes the phone's back swipe do the same.
+  // and an entry of its own makes the phone's back swipe do the same.
   it('steps back from the removal screen to the edit, not out of editing', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default
-    const user = userEvent.setup()
+    const user = (await import('@testing-library/user-event')).default.setup()
     renderWithProviders(
       <PinnedProvider>
         <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" />
       </PinnedProvider>,
     )
     await user.click(screen.getByRole('button', { name: 'Edit listing' }))
-    const push = vi.spyOn(window.history, 'pushState')
+    await landedOn(EDITING)
     await user.click(screen.getByRole('button', { name: 'stub open removal' }))
-    expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ mapSheetForm: 'edit', mapSheetRemoval: true }), '')
+    await landedOn(REMOVAL_IN_EDIT)
 
-    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
     await user.click(screen.getByRole('button', { name: 'Back' }))
-    expect(back).toHaveBeenCalledTimes(1)
-    act(() => {
-      window.dispatchEvent(new PopStateEvent('popstate', { state: { mapSheetForm: 'edit' } }))
-    })
+    expect(screen.queryByText('stub editor: removal')).not.toBeInTheDocument()
     expect(screen.getByText(/ListingEditor stub/)).toBeInTheDocument()
-    push.mockRestore()
-    back.mockRestore()
+    await waitFor(() => expect(here()).toBe(EDITING))
+
+    // The browser's own Back, the same.
+    await user.click(screen.getByRole('button', { name: 'stub open removal' }))
+    await landedOn(REMOVAL_IN_EDIT)
+    act(() => window.history.back())
+    await waitFor(() => expect(screen.queryByText('stub editor: removal')).not.toBeInTheDocument())
+    expect(screen.getByText(/ListingEditor stub/)).toBeInTheDocument()
   })
 
   // A row of the editor open (Oct 11): Back closes the row, and the editor
-  // stays; it doesn't step out of editing or touch the history.
+  // stays; it doesn't step out of editing or move the address.
   it('steps back out of an open row of the editor, not out of editing', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default
-    const user = userEvent.setup()
+    const user = (await import('@testing-library/user-event')).default.setup()
     renderWithProviders(
       <PinnedProvider>
         <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" />
       </PinnedProvider>,
     )
     await user.click(screen.getByRole('button', { name: 'Edit listing' }))
+    await landedOn(EDITING)
     await user.click(screen.getByRole('button', { name: 'stub open row' }))
-    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
     await user.click(screen.getByRole('button', { name: 'Back' }))
-    expect(back).not.toHaveBeenCalled()
     expect(screen.getByText(/ListingEditor stub/)).toBeInTheDocument()
+    await new Promise((r) => setTimeout(r, 50))
+    expect(here()).toBe(EDITING)
     // The row closed, so the next Back leaves the editor.
     await user.click(screen.getByRole('button', { name: 'Back' }))
-    expect(back).toHaveBeenCalledTimes(1)
-    back.mockRestore()
+    expect(screen.queryByText(/ListingEditor stub/)).not.toBeInTheDocument()
+    await waitFor(() => expect(here()).toBe(PLACE))
   })
 
   // The desktop map's sidebar (Oct 15): its search box's ← is the editor's
   // way back, so the editor's own ‹ is left out, and the host hears how to
   // step back, what to call it, and whether anything typed would be lost.
   it('hands its way back to a host that draws it (onEditor), and leaves out its own ‹', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default
-    const user = userEvent.setup()
+    const user = (await import('@testing-library/user-event')).default.setup()
     const onEditor = vi.fn()
     const last = () => onEditor.mock.calls.at(-1)?.[0] as { back: () => void; label: string; changed: boolean } | null
     renderWithProviders(
@@ -359,6 +402,7 @@ describe('MapPlaceDetail', () => {
     await user.click(screen.getByRole('button', { name: 'Edit listing' }))
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
     expect(last()).toMatchObject({ label: 'Back to listing', changed: false })
+    await landedOn(EDITING)
 
     await user.click(screen.getByRole('button', { name: 'stub type' }))
     expect(last()).toMatchObject({ changed: true })
@@ -366,15 +410,15 @@ describe('MapPlaceDetail', () => {
     // A row open, it's a step inside the edit; back closes the row.
     await user.click(screen.getByRole('button', { name: 'stub open row' }))
     expect(last()).toMatchObject({ label: 'Back' })
-    const historyBack = vi.spyOn(window.history, 'back').mockImplementation(() => {})
     act(() => last()!.back())
-    expect(historyBack).not.toHaveBeenCalled()
     expect(last()).toMatchObject({ label: 'Back to listing' })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(here()).toBe(EDITING)
 
     // From the edit itself, out to the listing.
     act(() => last()!.back())
-    expect(historyBack).toHaveBeenCalledTimes(1)
-    historyBack.mockRestore()
+    await waitFor(() => expect(here()).toBe(PLACE))
+    expect(last()).toBeNull()
   })
 
   // Save, Share and Set as location aren't contributions — so a category
