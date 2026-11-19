@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categories, defaultCommunity } from './helpers'
+import { categories, defaultCommunity, ready } from './helpers'
 
 // The Minyanim view, reached from Synagogues' "Synagogue | Minyan"
 // switch (Nov 11; the green "Minyanim by time" row before), is a step Back
@@ -16,6 +16,7 @@ test('the Minyanim view is a step: Back returns to the shuls, Forward and a relo
   let shuls: (typeof candidates)[number] | undefined
   for (const c of candidates) {
     await page.goto(`/${community}/${c.id}`)
+    await ready(page)
     // The switch takes the count heading's place; wait for one or the other.
     await expect(switchEl.or(page.getByRole('heading', { level: 2 })).first()).toBeVisible()
     if ((await switchEl.count()) > 0) {
@@ -41,6 +42,7 @@ test('the Minyanim view is a step: Back returns to the shuls, Forward and a relo
   expect(new URL(page.url()).searchParams.get('davening')).toBe('1')
 
   await page.reload()
+  await ready(page)
   await expect(view).toBeVisible()
   await expect(byTime).toHaveAttribute('aria-pressed', 'true')
 

@@ -42,6 +42,7 @@ test('computer: with a row swiped open, a click on another row or a scroll only 
   test.skip(isMobile, 'the computer’s sidebar')
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
+  await ready(page)
   const show = page.getByRole('button', { name: 'Show sidebar' })
   if (await show.isVisible()) await show.click()
   const list = page.getByTestId('sidebar-scroll')

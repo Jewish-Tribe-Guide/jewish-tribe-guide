@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, listingWithFourActions, openListingEditor } from './helpers'
+import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, listingWithFourActions, openListingEditor, ready } from './helpers'
 import { changedByTests } from './suiteRows'
 
 // Desktop opens a listing in the list's own column, the map staying beside
@@ -14,6 +14,7 @@ test.describe('listing detail — desktop', () => {
     const { category } = await categoryWithListings(request, community)
 
     await page.goto(`/${community}/${category.id}`)
+    await ready(page)
 
     const trigger = page.getByRole('button', { name: /^Show details for / }).first()
     const name = (await trigger.getAttribute('aria-label'))!.replace(/^Show details for /, '')
@@ -41,6 +42,7 @@ test.describe('listing detail — desktop', () => {
     const { category, item } = await listingWithFourActions(request, community)
 
     await page.goto(`/${community}/${category.id}/${item.id}`)
+    await ready(page)
 
     const column = page.getByTestId('listing-column').filter({ visible: true })
     const actions = column.getByTestId('listing-actions').locator(':scope > a, :scope > button')
@@ -59,6 +61,7 @@ test.describe('listing detail — desktop', () => {
     const { category } = await largestCategory(request, community)
 
     await page.goto(`/${community}/${category.id}`)
+    await ready(page)
 
     // The visible one: a hidden streamed copy of the page can be in the DOM too.
     const map = page.getByTestId('category-map').filter({ visible: true })
@@ -109,6 +112,7 @@ test.describe('listing detail — desktop', () => {
     const { category } = await largestCategory(request, community)
     await page.setViewportSize({ width: 1100, height: 800 })
     await page.goto(`/${community}/${category.id}`)
+    await ready(page)
 
     const line = page.getByRole('separator', { name: 'Resize the list and the map' })
     await expect(line).toBeVisible()
@@ -149,6 +153,7 @@ test.describe('listing detail — desktop', () => {
     }
 
     await page.goto(`/${community}/${category.id}`)
+    await ready(page)
     await page.getByTestId('category-map').getByRole('button', { name: 'Hide map' }).click()
 
     expect(await columnsAt(1920)).toBe(2)
@@ -165,6 +170,7 @@ test.describe('listing detail — desktop', () => {
     const { category } = await largestCategory(request, community)
 
     await page.goto(`/${community}/${category.id}`)
+    await ready(page)
 
     const triggers = page.getByRole('button', { name: /^Show details for / })
     const row = triggers.nth(8)
@@ -192,6 +198,9 @@ test.describe('listing detail — desktop', () => {
     const { category } = await categoryWithListings(request, community)
 
     await page.goto(`/${community}/${category.id}`)
+    // Measured with the page settled: mid-stream it has two copies of the
+    // top, and the search's place moves when one goes (CI, Nov 18).
+    await ready(page)
     const search = page.getByRole('searchbox', { name: `Search ${category.pluralLabel}` })
     await expect(search).toBeVisible()
     const before = (await search.boundingBox())!
@@ -225,8 +234,12 @@ test.describe('listing detail — desktop', () => {
     const { category } = await largestCategory(request, community)
 
     await page.goto(`/${community}/${category.id}`)
+    await ready(page)
 
     const triggers = page.getByRole('button', { name: /^Show details for / })
+    // A one-shot read: the seventh row must be there first (CI read fewer
+    // and compared with undefined, Nov 18).
+    await expect(triggers.nth(6)).toBeAttached()
     const names = await triggers.evaluateAll((els) => els.slice(0, 7).map((el) => el.getAttribute('aria-label')!.replace(/^Show details for /, '')))
     await triggers.first().click()
     const column = page.getByTestId('listing-column')
@@ -248,6 +261,7 @@ test.describe('listing detail — desktop', () => {
       let found = false
       for (const category of grouped) {
         await page.goto(`/${community}/${category.id}`)
+        await ready(page)
         if ((await page.locator('button[aria-expanded="false"][aria-controls]').count()) > 0) {
           found = true
           break
@@ -279,6 +293,7 @@ test.describe('listing detail — desktop', () => {
     const { category, item } = await categoryWithHoursField(request, community)
 
     await page.goto(`/${community}/${category.id}`)
+    await ready(page)
     await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
     const column = page.getByTestId('listing-column')
     await expect(column.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
@@ -309,6 +324,7 @@ test.describe('listing detail — mobile', () => {
     const { category } = await categoryWithListings(request, community)
 
     await page.goto(`/${community}/${category.id}`)
+    await ready(page)
 
     const trigger = page.getByRole('button', { name: /^Show details for / }).first()
     const name = (await trigger.getAttribute('aria-label'))!.replace(/^Show details for /, '')
@@ -346,6 +362,7 @@ test.describe('listing detail — mobile', () => {
     const item = (await res.json()).resources[0] as { id: string; name: string }
 
     await page.goto(`/${community}/${category.id}?item=${item.id}`)
+    await ready(page)
 
     const sheet = page.getByRole('dialog', { name: item.name })
     await expect(sheet).toBeVisible()
@@ -367,6 +384,7 @@ test.describe('listing detail — mobile', () => {
     const item = (await res.json()).resources[0] as { id: string; name: string }
 
     await page.goto(`/${community}/${category.id}/${item.id}`)
+    await ready(page)
 
     const listing = page.getByTestId('listing-page')
     await expect(listing).toBeVisible()
@@ -392,12 +410,14 @@ test.describe('listing detail — mobile', () => {
     const item = (await res.json()).resources[0] as { id: string; name: string }
 
     await page.goto(`/${community}/${category.id}/${item.id}`)
+    await ready(page)
     const listing = page.getByTestId('listing-page')
     await expect(listing).toBeVisible()
     await page.waitForTimeout(1_000)
     expect(new URL(page.url()).searchParams.get('item')).toBeNull()
 
     await page.reload()
+    await ready(page)
     await expect(listing).toBeVisible()
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })
@@ -410,6 +430,7 @@ test.describe('listing detail — mobile', () => {
     const { category } = await categoryWithListings(request, community)
 
     await page.goto(`/${community}/${category.id}`)
+    await ready(page)
     const trigger = page.getByRole('button', { name: /^Show details for / }).first()
     const name = (await trigger.getAttribute('aria-label'))!.replace(/^Show details for /, '')
     await trigger.click()
@@ -447,6 +468,7 @@ test.describe('listing detail — mobile', () => {
     )
 
     await page.goto(`/${community}/${category.id}/${item.id}`)
+    await ready(page)
     const listing = page.getByTestId('listing-page')
     await expect(listing).toBeVisible()
     await page.locator('header').getByRole('button', { name: category.pluralLabel }).click()
@@ -486,6 +508,7 @@ test.describe('listing detail — mobile', () => {
     const item = (await res.json()).resources[0] as { id: string; name: string }
 
     await page.goto(`/${community}/${category.id}?item=${item.id}`)
+    await ready(page)
     await expect(page.getByRole('dialog', { name: item.name })).toBeVisible()
     await page.evaluate(() => window.scrollTo(0, 0))
     await page.locator('main').evaluate((main) => {
@@ -511,6 +534,7 @@ test('Request removal, beside Edit, is its own screen, and Back returns to the l
   const { category, item } = await categoryWithHoursField(request, community)
 
   await page.goto(`/${community}/${category.id}`)
+  await ready(page)
   await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
   // A sheet on a phone; the list's column on desktop.
   const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
@@ -550,6 +574,7 @@ test('Back steps out of an open row of the editor, not out of editing', async ({
   const { category, item } = await categoryWithHoursField(request, community, { longest: true })
 
   await page.goto(`/${community}/${category.id}`)
+  await ready(page)
   await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
   const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
   await expect(listing).toBeVisible()
@@ -590,6 +615,7 @@ test('a row’s own screen starts at its top, and Back returns to the row', asyn
     const { category, item } = await categoryWithHoursField(request, community, { longest: true })
 
     await page.goto(`/${community}/${category.id}`)
+    await ready(page)
     await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
     const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
     await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
@@ -637,6 +663,7 @@ test('a long note grows its box rather than scrolling inside it', async ({ page,
   const { category, item } = await categoryWithHoursField(request, community, { also: 'textarea' })
 
   await page.goto(`/${community}/${category.id}`)
+  await ready(page)
   await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
   const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
   await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()

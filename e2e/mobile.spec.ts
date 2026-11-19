@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithGeocodedListings, categoryWithHoursField, defaultCommunity, largestCategory, openListingEditor } from './helpers'
+import { categoryWithGeocodedListings, categoryWithHoursField, defaultCommunity, largestCategory, openListingEditor, ready } from './helpers'
 
 // The mobile tab bar and the inline card grid only exist below the `sm`
 // breakpoint, so the desktop project can't cover them at all. Mobile is also
@@ -11,6 +11,7 @@ test.describe('mobile', () => {
   test('the tab bar is present and navigates', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)
+    await ready(page)
 
     const bar = page.getByRole('navigation', { name: 'Primary' })
     await expect(bar).toBeVisible()
@@ -23,6 +24,7 @@ test.describe('mobile', () => {
     const community = await defaultCommunity(page)
 
     await page.goto(`/${community}/map`)
+    await ready(page)
     const bar = page.getByRole('navigation', { name: 'Primary' })
 
     // aria-current is how the bar marks the current screen; it's derived from
@@ -33,6 +35,7 @@ test.describe('mobile', () => {
   test('the tab bar survives navigating between screens', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)
+    await ready(page)
 
     const bar = page.getByRole('navigation', { name: 'Primary' })
     await bar.getByRole('button', { name: 'Map' }).click()
@@ -63,6 +66,7 @@ test.describe('mobile', () => {
   test('the body is not a scroll container, but the page still clips sideways', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)
+    await ready(page)
 
     const overflow = await page.evaluate(() => {
       const body = getComputedStyle(document.body)
@@ -91,6 +95,7 @@ test.describe('mobile', () => {
   test('a line with nowhere to wrap keeps the Activity page phone-wide', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}/changes`)
+    await ready(page)
     const row = page.getByTestId('change').first()
     await expect(row).toBeVisible()
     await row.getByRole('link').first().evaluate((link) => {
@@ -110,6 +115,7 @@ test.describe('mobile', () => {
   test('the home screen renders its card grid inline', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)
+    await ready(page)
 
     // Mobile has no "All categories" page — its home screen IS the index.
     await expect(page.getByRole('button').filter({ hasText: /\w/ }).first()).toBeVisible()
@@ -124,6 +130,7 @@ test.describe('mobile', () => {
   test('Feedback, About and Privacy are each a full tap target, near the tab bar but not crowded by it', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)
+    await ready(page)
 
     const links = page.getByRole('navigation', { name: 'About the guide' }).getByRole('link')
     await expect(links.first()).toBeVisible()
@@ -170,6 +177,7 @@ test.describe('mobile', () => {
     const { category } = await largestCategory(request, community)
 
     await page.goto(`/${community}/${category.id}`)
+    await ready(page)
 
     const header = page.locator('header').first()
     await expect(header).toBeVisible()
@@ -179,8 +187,8 @@ test.describe('mobile', () => {
     // assertion below would still "pass" against a header that simply never
     // had reason to move — and the listings are client-rendered, so a single
     // read right after navigation measures the empty shell and gets 0.
-    // Waiting for real height also means React has hydrated, so the scroll
-    // listener under test is actually installed by the time we scroll.
+    // (Real height no longer means React has hydrated: the listings arrive
+    // with the HTML now. `ready()` after the goto is what waits for that.)
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight))
       .toBeGreaterThan(1400)
@@ -243,6 +251,7 @@ test.describe('mobile', () => {
     const { category, item } = await categoryWithHoursField(request, community)
 
     await page.goto(`/${community}/${category.id}/${item.id}`)
+    await ready(page)
 
     // Edit is its own labelled bar below the opened listing (ListingEditBar)
     // — it used to be a row inside the kebab menu, and before that a quiet
@@ -295,6 +304,7 @@ test.describe('mobile', () => {
     const { category } = await categoryWithGeocodedListings(request, community)
 
     await page.goto(`/${community}/${category.id}`)
+    await ready(page)
 
     // The desktop copy under the title is in the page too, hidden.
     await expect(page.getByText(/^Distances from central /).locator('visible=true')).toBeVisible()

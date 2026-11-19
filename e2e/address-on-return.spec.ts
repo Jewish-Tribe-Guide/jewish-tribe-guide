@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { categoryWithListings, defaultCommunity } from './helpers'
+import { categoryWithListings, defaultCommunity, ready } from './helpers'
 
 // A category page writes its search into the address behind Next's router
 // (FindResourcesConnected), so typing doesn't re-render the page. Coming
@@ -43,6 +43,7 @@ test('a refresh on coming back keeps an open listing in the address', async ({ p
   const { category } = await categoryWithListings(request, community)
 
   await page.goto(`/${community}/${category.id}`)
+  await ready(page)
   await page.getByRole('button', { name: /^Show details for / }).first().click()
   await expect.poll(() => new URL(page.url()).searchParams.get('item')).not.toBeNull()
   const item = new URL(page.url()).searchParams.get('item')
@@ -65,6 +66,7 @@ test('Forward to a search shows the search', async ({ page, request }) => {
   const { category } = await categoryWithListings(request, community)
 
   await page.goto(`/${community}`)
+  await ready(page)
   await push(page, `/${community}/${category.id}?q=open`)
   await expect(searchbox(page, category.pluralLabel)).toHaveValue('open')
 
@@ -87,6 +89,7 @@ test('Back to a search after a reload shows the search, without a hydration erro
   page.on('pageerror', (e) => errors.push(e.message))
 
   await page.goto(`/${community}/${category.id}?q=open`)
+  await ready(page)
   await expect(searchbox(page, category.pluralLabel)).toHaveValue('open')
 
   await push(page, `/${community}`)
@@ -94,6 +97,7 @@ test('Back to a search after a reload shows the search, without a hydration erro
   await page.reload()
   await page.goBack()
   await expect.poll(() => new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
+  await ready(page)
 
   await expect(searchbox(page, category.pluralLabel)).toHaveValue('open')
   await page.waitForTimeout(1_000)

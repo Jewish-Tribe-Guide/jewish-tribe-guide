@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
-import { categories, categoryWithListings, defaultCommunity, minyanimCategory } from './helpers'
+import { categories, categoryWithListings, defaultCommunity, minyanimCategory, ready } from './helpers'
 import { fixedViewSlug } from '../src/lib/routes'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -14,6 +14,7 @@ type Cat = Awaited<ReturnType<typeof categories>>[number] & { detailFields?: Fie
 
 async function homeBox(page: Page, community: string) {
   await page.goto(`/${community}`)
+  await ready(page)
   return page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true })
 }
 
@@ -229,6 +230,7 @@ test('a category’s box: “in Food” only where there’s room, and the whole
   const community = await defaultCommunity(page)
   const { category } = await categoryWithListings(request, community)
   await page.goto(`/${community}/${category.id}`)
+  await ready(page)
   const box = page.getByRole('searchbox', { name: `Search ${category.pluralLabel}` }).filter({ visible: true })
   await expect(box).toBeVisible()
 

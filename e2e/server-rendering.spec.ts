@@ -161,6 +161,7 @@ test.describe('content is server-rendered', () => {
       // response — which meant it passed on names found only in the RSC
       // payload, a completely unrelated reason from what this test claims to
       // check.
+      await ready(page)
       const names: string[] = (await (
         await request.get(`/api/resources?category=${category.id}&community=${community}`)
       ).json()).resources.map((r: { name: string }) => r.name as string)

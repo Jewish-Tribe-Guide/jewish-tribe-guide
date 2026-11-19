@@ -45,6 +45,7 @@ async function listingWithPhoneAndWebsite(request: APIRequestContext, community:
     const item = body.resources?.find((r) => r.phone && r.website)
     if (!item) continue
     await page.goto(`/${community}/${category.id}/${item.id}`)
+    await ready(page)
     const details = page.getByTestId('listing-details').first()
     if ((await details.locator('a[href^="tel:"]').count()) === 0) continue
     return details
@@ -71,6 +72,7 @@ test('a listing’s phone number and website take a fingertip', async ({ page, r
 test('the map’s chips take a fingertip', async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
+  await ready(page)
   const all = page.getByRole('button', { name: 'All', exact: true }).locator('visible=true').first()
   await expectFingerSized(all, 'the All chip')
 })

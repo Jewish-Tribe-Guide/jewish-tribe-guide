@@ -17,8 +17,13 @@ const LANDING_LIMIT_MS = 4000
 
 let queue: Promise<void> = Promise.resolve()
 function next(move: () => Promise<void>): Promise<void> {
-  queue = queue.then(move)
-  return queue
+  // The page gone (a test torn down mid-move): nothing left to move, and
+  // working out an address would throw after the file had passed.
+  const run = queue.then(() => (typeof window === 'undefined' ? undefined : move()))
+  // A move that fails is its caller's to hear about; the ones after it
+  // still run.
+  queue = run.catch(() => undefined)
+  return run
 }
 
 // Set while a step back of ours is on its way, so the screens listening for

@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
-import { categoryWithListings, categoryWithMapPoints, defaultCommunity, defaultCommunitySlug, largestCategory } from './helpers'
+import { categoryWithListings, categoryWithMapPoints, defaultCommunity, defaultCommunitySlug, largestCategory, ready } from './helpers'
 
 // Saving (Pin until Oct 14) is entirely client-side (localStorage — see
 // src/lib/pinned.ts, whose key keeps the old name), no database, no accounts.
@@ -60,6 +60,7 @@ test.describe('saved places', () => {
     const item = ((await res.json()).resources as { id: string; name: string }[])[0]
 
     await page.goto(`/${community}/${category.id}/${item.id}`)
+    await ready(page)
 
     const save = page.getByRole('button', { name: `Save ${item.name}`, exact: true }).and(page.locator(':visible'))
     await expect(save).toHaveAttribute('aria-pressed', 'false')
@@ -69,6 +70,7 @@ test.describe('saved places', () => {
     await expect(toast).toContainText('Saved to You')
 
     await page.reload()
+    await ready(page)
     await expect(save).toHaveAttribute('aria-pressed', 'true')
 
     await save.click()
@@ -87,6 +89,7 @@ test.describe('saved places', () => {
     await page.goto(`/${community}/map`)
     const searchInput = page.getByPlaceholder(/Search name, address/)
     await searchInput.waitFor({ state: 'visible' })
+    await ready(page)
 
     // The count is its own text node right after "Saved" with no space in
     // between (see the chip's own JSX) — matching on the accessible name via
@@ -97,6 +100,7 @@ test.describe('saved places', () => {
 
     await page.reload()
     await searchInput.waitFor({ state: 'visible' })
+    await ready(page)
 
     // Still there after a reload, same as a real visitor's localStorage would be.
     await expect(pinnedChip).toBeVisible()
@@ -111,11 +115,13 @@ test.describe('saved places', () => {
     await page.goto(`/${community}/map`)
     const searchInput = page.getByPlaceholder(/Search name, address/)
     await searchInput.waitFor({ state: 'visible' })
+    await ready(page)
     await expect(page.getByRole('button', { name: /^Saved\s*\d+$/ })).toHaveCount(0)
 
     await seedPinned(page, { id: listing.id, categoryId: listing.category })
     await page.reload()
     await searchInput.waitFor({ state: 'visible' })
+    await ready(page)
 
     const pinnedChip = page.getByRole('button', { name: /^Saved\s*1$/ }).and(page.locator(':visible'))
     await expect(pinnedChip).toBeVisible()
@@ -130,12 +136,14 @@ test.describe('saved places', () => {
     const { category } = await largestCategory(request, community)
 
     await page.goto(`/${community}`)
+    await ready(page)
     await page.getByRole('textbox', { name: 'Search resources' }).fill(category.pluralLabel)
     const save = page.getByRole('button', { name: new RegExp(`^Save “.+” in ${category.pluralLabel}$`) }).first()
     await save.click()
     await expect(save).toHaveAttribute('aria-pressed', 'true')
 
     await page.goto(`/${community}/you`)
+    await ready(page)
     const searches = page.getByTestId('you-searches')
     await expect(searches).toContainText(category.pluralLabel)
     await searches.getByRole('link').first().click()
@@ -152,6 +160,7 @@ test.describe('saved places', () => {
     const listing = await mappableListing(request, community)
     await seedPinned(page, { id: listing.id, categoryId: listing.category })
     await page.goto(`/${community}/you`)
+    await ready(page)
     const heading = page.getByTestId('you-places').getByRole('heading', { name: 'Places' })
     await expect(heading).toBeVisible()
     const photo = await page.getByTestId('category-hero').locator('> div').first().boundingBox()

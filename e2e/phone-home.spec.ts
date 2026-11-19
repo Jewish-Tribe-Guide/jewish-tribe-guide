@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { categories, defaultCommunity, listingCounts } from './helpers'
+import { categories, defaultCommunity, listingCounts, ready } from './helpers'
 
 // The phone home (the user, Oct 17), on a real build, at a fixed moment for
 // each kind of day: who keeps the guide right at the top (and the sheet it
@@ -48,9 +48,10 @@ async function openHome(page: Page, day: keyof typeof DAYS) {
   )
   await page.clock.setFixedTime(new Date(DAYS[day].at))
   await page.goto(`/${community}`)
+  await ready(page)
   // A phone's first render is the computer's layout, with the computer's
-  // copy of Right now, until the screen is measured (useIsMobile, Oct 16).
-  // The location box's "Not now" used to buy that wait; it's gone (Nov 18).
+  // copy of Right now, until the screen is measured (useIsMobile, Oct 16),
+  // which is a render after React has the page.
   const phone = await page.evaluate(() => matchMedia('(max-width: 639px), (max-height: 639px)').matches)
   if (phone) await expect(page.locator('[data-testid="right-now"][data-wide]')).toHaveCount(0)
   return community

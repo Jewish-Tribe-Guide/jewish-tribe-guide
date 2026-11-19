@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { defaultCommunity } from './helpers'
+import { defaultCommunity, ready } from './helpers'
 
 // The browser's Back on the Map page (Nov 18, items 5 and 6 of the public
 // review). A computer's Back with a place open left the map and its search
@@ -10,9 +10,13 @@ test('computer: Back closes the place open in the sidebar and stays on the map',
   test.skip(isMobile, 'the computer’s sidebar')
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
+  await ready(page)
   const show = page.getByRole('button', { name: 'Show sidebar' })
-  if (await show.isVisible()) await show.click()
   const list = page.getByTestId('sidebar-scroll')
+  // One or the other, before the one-shot look at which (CI looked too
+  // soon, saw neither and never opened the sidebar, Nov 18).
+  await expect(show.or(list.getByTestId('nearby-name').first())).toBeVisible()
+  if (await show.isVisible()) await show.click()
   await list.getByTestId('nearby-name').first().click()
   const back = page.getByRole('button', { name: 'Back to results' }).filter({ visible: true })
   await expect(back).toBeVisible()
@@ -37,6 +41,7 @@ test('phone: after a reload with a place open, one Back closes it', async ({ pag
   test.skip(!isMobile, 'the phone’s sheet')
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
+  await ready(page)
   await page.getByRole('button', { name: 'Expand nearby list' }).click()
   const list = page.getByTestId('sheet-scroll')
   await list.getByTestId('nearby-name').first().click()
@@ -45,6 +50,7 @@ test('phone: after a reload with a place open, one Back closes it', async ({ pag
   await expect.poll(() => new URL(page.url()).searchParams.get('place')).not.toBeNull()
 
   await page.reload()
+  await ready(page)
   await expect(backToList).toBeVisible()
 
   await page.goBack()

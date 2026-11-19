@@ -177,6 +177,7 @@ test.describe('the phone list row with Map', () => {
   test('the Map tab opened as a tab has no ‹', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}/map`)
+    await ready(page)
     await expect(page.getByPlaceholder(/Search name, address/)).toBeVisible()
     await expect(page.getByTestId('map-back')).toHaveCount(0)
   })

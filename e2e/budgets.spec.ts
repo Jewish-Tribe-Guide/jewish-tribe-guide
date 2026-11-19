@@ -88,6 +88,7 @@ async function load(page: Page, path: string, shown: (page: Page) => Promise<voi
   )
 
   await page.goto(path)
+  await ready(page)
   await shown(page)
 
   const deadline = Date.now() + 8_000

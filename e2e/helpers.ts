@@ -333,10 +333,28 @@ export async function openAddForm(page: Page): Promise<void> {
  *  Deliberately not `networkidle`: the map, the zmanim strip and geolocation
  *  keep connections open, so it never settles on some screens and the test
  *  times out having proved nothing. Playwright discourages it for this reason.
- *  Waiting for the app's own chrome is both faster and a real signal. */
+ *  Waiting for the app's own chrome is both faster and a real signal.
+ *
+ *  The chrome alone isn't the page, though. Until React has it, the streamed
+ *  parts sit beside their placeholders (a category page has two `<main>`s
+ *  and two counts for a few hundred milliseconds), and a click on a button
+ *  that isn't hydrated yet does nothing. The location box's "Not now" used to
+ *  buy most specs that wait, as it appeared only once React had the page;
+ *  it went on Nov 18 and five tests failed in CI on the next run. So this
+ *  waits for the placeholders to go and for React to own the header, the
+ *  main and every button outside the map (Google draws its own).
+ *
+ *  The header there, not shown: a phone's Map folds it away over the map
+ *  (`invisible h-0`), and a wait for it to show never ended there. */
 export async function ready(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded')
-  await page.locator('header').first().waitFor({ state: 'visible' })
+  await page.locator('header').first().waitFor({ state: 'attached' })
+  await page.waitForFunction(() => {
+    if (document.querySelector('template[id^="B:"], div[hidden][id^="S:"]')) return false
+    const owned = (el: Element) => Object.keys(el).some((k) => k.startsWith('__reactFiber$'))
+    const ours = [...document.querySelectorAll('header, main, button')].filter((el) => !el.closest('.gm-style'))
+    return ours.some((el) => el.matches('header')) && ours.every(owned)
+  })
 }
 
 /** The server's HTML with `<script>` contents removed — i.e. the markup a
