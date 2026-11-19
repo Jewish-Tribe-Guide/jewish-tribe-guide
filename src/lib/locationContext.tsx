@@ -23,16 +23,6 @@ import { CURRENT_LOCATION_LABEL, useLiveLocation } from './useLiveLocation'
 export type LiveTracking = {
   tracking: boolean
   error: string | null
-  /** True when `error` came from a silent, mount-time auto-resume rather than
-   *  the visitor pressing "share" just now — see useWatchPosition's `start`.
-   *  LiveLocationPrompt needs this: a silent failure means tracking was
-   *  already on (from a previous visit) and just quietly dropped, which is a
-   *  different situation from "never asked yet" and shouldn't get the same
-   *  first-time "Share your live location?" pitch. */
-  errorSilent: boolean
-  /** True while a mount-time silent auto-resume is still pending — see
-   *  useLiveLocation's own doc comment on this exact field. */
-  resumingSilently: boolean
   start: () => void
   stop: () => void
 }
@@ -93,7 +83,6 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     tracking,
     geoError,
     geoErrorSilent,
-    resumingSilently,
     start,
     stop,
   } = useLiveLocation()
@@ -131,7 +120,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       anchor: { coords, label: coords ? address : '' },
       coords,
       accuracyM: accuracy,
-      liveTracking: { tracking, error: geoError, errorSilent: geoErrorSilent, resumingSilently, start, stop },
+      liveTracking: { tracking, error: geoError, start, stop },
       directionsOrigin: !tracking && coords && address && address !== CURRENT_LOCATION_LABEL ? address : coords,
       anchorListingId: listingId,
       setListingAnchor: (listing) => {
@@ -164,7 +153,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     // setAddress/setCoords/setAnchor are stable useCallback setters; start/stop
     // are stable closures over the same watch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [address, coords, accuracy, listingId, tracking, geoError, geoErrorSilent, resumingSilently],
+    [address, coords, accuracy, listingId, tracking, geoError, geoErrorSilent],
   )
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>

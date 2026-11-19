@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithListings, defaultCommunity, dismissLocationPrompt } from './helpers'
+import { categoryWithListings, defaultCommunity } from './helpers'
 
 // A search that finds nothing says so, with where to ask, as a category
 // page's does, as it's typed: not only on Enter, which most people never
@@ -12,7 +12,6 @@ test('the home says it found nothing as it is typed', async ({ page, request }) 
   const community = await defaultCommunity(page)
   const { category } = await categoryWithListings(request, community)
   await page.goto(`/${community}`)
-  await dismissLocationPrompt(page)
   const box = page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true })
   // Once the page is running: a kind of place's name shows its line.
   await box.fill(category.pluralLabel)
@@ -27,7 +26,6 @@ test('the map says it found nothing as it is typed, and in the list once searche
   const community = await defaultCommunity(page)
   const { category } = await categoryWithListings(request, community)
   await page.goto(`/${community}/map`)
-  await dismissLocationPrompt(page)
   const box = page.getByPlaceholder(/Search name, address/).filter({ visible: true })
   const nothing = page.getByTestId('ask-the-group').filter({ visible: true })
 

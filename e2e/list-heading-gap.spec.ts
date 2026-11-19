@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { categories, defaultCommunity, dismissLocationPrompt, ready, type Category } from './helpers'
+import { categories, defaultCommunity, ready, type Category } from './helpers'
 
 // The count over a category's list ("7 listings") sits the same distance
 // above the first row on every category page (the user, Oct 20: a gap under
@@ -22,7 +22,6 @@ async function withListings(page: Page, community: string, wantAddress: boolean)
 async function gapUnderHeading(page: Page, community: string, category: Category): Promise<number> {
   await page.goto(`/${community}/${category.id}`)
   await ready(page)
-  await dismissLocationPrompt(page)
   const heading = page.getByTestId('list-heading').filter({ visible: true }).first()
   const row = page.getByTestId('directory-row').filter({ visible: true }).first()
   await expect(row).toBeVisible()

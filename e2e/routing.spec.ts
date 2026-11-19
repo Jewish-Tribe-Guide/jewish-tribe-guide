@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categories, categoryWithListings, categoryWithMapPoints, defaultCommunity, dismissLocationPrompt, previewSettings, serverMarkup } from './helpers'
+import { categories, categoryWithListings, categoryWithMapPoints, defaultCommunity, previewSettings, serverMarkup } from './helpers'
 
 // hospitals/eruv/zmanim — see FIXED_VIEW_KINDS in src/lib/routes.ts. Kept in
 // sync by hand rather than imported: these are the literal strings the home
@@ -157,7 +157,6 @@ test.describe('URLs', () => {
     const place = ((await res.json()).resources as { id: string; name: string; geo?: unknown }[]).find((r) => r.geo)!
 
     await page.goto(`/${community}/map?cat=${category.id}&place=${place.id}`)
-    await dismissLocationPrompt(page)
 
     await expect(page.getByTestId('listing-view').getByRole('heading', { name: place.name }).first()).toBeVisible({ timeout: 10_000 })
   })
@@ -252,7 +251,6 @@ test.describe('URLs', () => {
     // as such: the Today home has no grid on a phone.
     await previewSettings(page, community, { homeStyle: 'classic' })
     await page.goto(`/${community}?preview=1`)
-    await dismissLocationPrompt(page)
     // Desktop's grid caps at a handful of tiles behind a trailing "All
     // categories" tile (see CategoryTileRow) — a low-listing-count category like eruv
     // can easily land behind it, so expand first if there's anything to
@@ -298,7 +296,6 @@ test.describe('URLs', () => {
   test('the privacy policy is reachable from a form that collects personal data', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}/feedback`)
-    await dismissLocationPrompt(page)
 
     // Feedback's note says just "Privacy" (PrivacyNote's `short`) — the
     // same as the desktop footer's link, so look for it in the page itself.
@@ -316,7 +313,6 @@ test.describe('URLs', () => {
 
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)
-    await dismissLocationPrompt(page)
     await page.getByRole('link', { name: 'Privacy' }).scrollIntoViewIfNeeded()
     await page.getByRole('link', { name: 'Privacy' }).click()
 

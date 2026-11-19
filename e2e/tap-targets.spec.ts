@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test'
-import { categories, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { categories, defaultCommunity, ready } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tap targets (Nov 18, review item 39).
@@ -45,7 +45,6 @@ async function listingWithPhoneAndWebsite(request: APIRequestContext, community:
     const item = body.resources?.find((r) => r.phone && r.website)
     if (!item) continue
     await page.goto(`/${community}/${category.id}/${item.id}`)
-    await dismissLocationPrompt(page)
     const details = page.getByTestId('listing-details').first()
     if ((await details.locator('a[href^="tel:"]').count()) === 0) continue
     return details
@@ -56,7 +55,6 @@ async function listingWithPhoneAndWebsite(request: APIRequestContext, community:
 test('the header’s Set location takes a fingertip', async ({ page }) => {
   await defaultCommunity(page)
   await ready(page)
-  await dismissLocationPrompt(page)
   const control = page.locator('header').getByRole('button', { name: 'Set location' }).locator('visible=true').first()
   await expectFingerSized(control, 'Set location')
 })
@@ -73,7 +71,6 @@ test('a listing’s phone number and website take a fingertip', async ({ page, r
 test('the map’s chips take a fingertip', async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
-  await dismissLocationPrompt(page)
   const all = page.getByRole('button', { name: 'All', exact: true }).locator('visible=true').first()
   await expectFingerSized(all, 'the All chip')
 })

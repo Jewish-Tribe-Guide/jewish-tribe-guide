@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithHoursField, defaultCommunity, dismissLocationPrompt } from './helpers'
+import { categoryWithHoursField, defaultCommunity } from './helpers'
 
 // The Map page's Filters (agreed Sep 30): one button before the category
 // chips, opening the category pages' own sheet with a section per category
@@ -13,7 +13,6 @@ test('the Map page’s Filters: a section per category, its Open now in the link
   const { category } = await categoryWithHoursField(request, community)
 
   await page.goto(`/${community}/map?cat=${category.id}`)
-  await dismissLocationPrompt(page)
 
   await page.getByTestId('map-filters-button').filter({ visible: true }).click()
   const sheet = page.getByTestId('map-filters').filter({ visible: true })

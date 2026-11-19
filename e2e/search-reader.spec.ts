@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { categoryWithHoursField, defaultCommunity, dismissLocationPrompt } from './helpers'
+import { categoryWithHoursField, defaultCommunity } from './helpers'
 
 // The AI isn't part of the search (the user, Oct 27: "trader joes" on
 // Synagogues found nothing, then the reading showed every shul; "feels weird
@@ -53,7 +53,6 @@ test('the home: Enter reads it in the background and says it found nothing', asy
   const asked = await standIn(page, category.id)
 
   await page.goto(`/${community}`)
-  await dismissLocationPrompt(page)
   const box = page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true })
   // Enter only once the page is running (no clock until hydration): a
   // kind of place's name shows its line once it is.
@@ -71,7 +70,6 @@ test('a category page: Enter reads it in the background, and still says it found
   const asked = await standIn(page, category.id)
 
   await page.goto(`/${community}/${category.id}`)
-  await dismissLocationPrompt(page)
   const box = page.getByRole('searchbox', { name: `Search ${category.pluralLabel}` })
   await typeThenEnter(page, box, asked)
 
@@ -88,7 +86,6 @@ test('the map: Enter reads it in the background, and nothing says "Read as"', as
   const asked = await standIn(page, category.id)
 
   await page.goto(`/${community}/map`)
-  await dismissLocationPrompt(page)
   const box = page.getByPlaceholder(/Search name, address/).filter({ visible: true })
   await typeThenEnter(page, box, asked)
 
@@ -105,7 +102,6 @@ test('typed and left, without Enter: read once the typing stops, on every page',
   const asked = await standIn(page, category.id)
 
   await page.goto(`/${community}`)
-  await dismissLocationPrompt(page)
   const home = page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true })
   // Words that find something are never read, however long they're left.
   await home.fill(category.pluralLabel)
@@ -117,11 +113,9 @@ test('typed and left, without Enter: read once the typing stops, on every page',
   // Each page is its own visit: the tab's answers don't carry over a load.
   asked.length = 0
   await page.goto(`/${community}/${category.id}`)
-  await dismissLocationPrompt(page)
   await typeAndLeave(page, page.getByRole('searchbox', { name: `Search ${category.pluralLabel}` }), asked)
 
   asked.length = 0
   await page.goto(`/${community}/map`)
-  await dismissLocationPrompt(page)
   await typeAndLeave(page, page.getByPlaceholder(/Search name, address/).filter({ visible: true }), asked)
 })

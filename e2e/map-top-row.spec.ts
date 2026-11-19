@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { defaultCommunity, dismissLocationPrompt } from './helpers'
+import { defaultCommunity } from './helpers'
 
 // The desktop Map page's top row (the user, Oct 15): Google Maps' sizes —
 // chips 32px tall with 14px words, a 48px search box, 40px round buttons —
@@ -14,7 +14,6 @@ test('phone map: the chips are Google Maps’ size too', async ({ page, isMobile
   test.skip(!isMobile, 'the phone’s chip row')
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
-  await dismissLocationPrompt(page)
   const all = page.getByRole('button', { name: 'All', exact: true }).filter({ visible: true })
   await expect(all).toBeVisible()
   expect(Math.round((await all.boundingBox())!.height), 'a chip is 32px tall').toBe(32)
@@ -25,7 +24,6 @@ test('desktop map: Google Maps’ sizes, and the chips, Set location and ✕ on 
   test.skip(isMobile, 'the desktop map’s top row')
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
-  await dismissLocationPrompt(page)
 
   const all = page.getByRole('button', { name: 'All', exact: true }).filter({ visible: true })
   await expect(all).toBeVisible()

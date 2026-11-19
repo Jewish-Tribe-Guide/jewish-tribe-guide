@@ -7,7 +7,6 @@ import type { AppMode } from '@/types'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
 import MobileTabBar from '@/components/MobileTabBar'
-import LiveLocationPrompt from '@/components/LiveLocationPrompt'
 import ContentFailureNotice from '@/components/ContentFailureNotice'
 import { LocationProvider, useLocation } from '@/lib/locationContext'
 import { PinnedProvider } from '@/lib/pinnedContext'
@@ -19,7 +18,6 @@ import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { useCategories } from '@/lib/useCategories'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { DEFAULT_MOBILE_TABS, type MobileTabConfig } from '@/lib/siteSettings'
-import { ui } from '@/lib/uiConfig'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The chrome around every public screen: header, footer, mobile tab bar, and
@@ -85,7 +83,7 @@ function PathAwareTabBar({ tabs, iconForTarget }: {
 }
 
 function Chrome({ children, year }: { children: React.ReactNode; year: number }) {
-  const { controls, liveTracking } = useLocation()
+  const { controls } = useLocation()
   const { goHome } = useSiteNavigation()
   const categories = useCategories()
   const settings = useSiteSettings()
@@ -137,17 +135,6 @@ function Chrome({ children, year }: { children: React.ReactNode; year: number })
           iconForTarget={(target) => categories?.find((c) => c.id === target)?.icon ?? undefined}
         />
       </Suspense>
-      <LiveLocationPrompt
-        // !errorSilent: a silent failure means tracking was already on from a
-        // previous visit and just quietly dropped (permission revoked between
-        // visits, a transient GPS error) — that's not "never asked yet," and
-        // popping the first-time "Share your live location?" pitch back up
-        // reads as the site not remembering it was already granted. The
-        // header pill's own error text (LocationControl) still surfaces what
-        // actually happened; this modal just stays out of the way for it.
-        enabled={ui.map.liveTracking && !liveTracking.tracking && !liveTracking.errorSilent && !liveTracking.resumingSilently}
-        onShare={liveTracking.start}
-      />
     </>
   )
 }

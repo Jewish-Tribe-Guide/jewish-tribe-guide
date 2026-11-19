@@ -148,8 +148,7 @@ export default function LocationControl({ controls }: Props) {
   // page load would be the surprise, not the fix (see geoErrorSilent's doc).
   // Reacting to a transition (error just occurred), not deriving a value from
   // current props — an effect is the right tool here, not render-time
-  // computation, and this pairs with the just-tuned resumingSilently/
-  // geoErrorSilent logic in useLiveLocation.ts (not touching that here).
+  // computation; geoErrorSilent is useLiveLocation's.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (controls.geoError && !controls.geoErrorSilent) setOpen(true)

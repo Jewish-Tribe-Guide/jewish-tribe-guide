@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { categories, defaultCommunity, dismissLocationPrompt, listingCounts } from './helpers'
+import { categories, defaultCommunity, listingCounts } from './helpers'
 
 // The phone home (the user, Oct 17), on a real build, at a fixed moment for
 // each kind of day: who keeps the guide right at the top (and the sheet it
@@ -48,7 +48,11 @@ async function openHome(page: Page, day: keyof typeof DAYS) {
   )
   await page.clock.setFixedTime(new Date(DAYS[day].at))
   await page.goto(`/${community}`)
-  await dismissLocationPrompt(page)
+  // A phone's first render is the computer's layout, with the computer's
+  // copy of Right now, until the screen is measured (useIsMobile, Oct 16).
+  // The location box's "Not now" used to buy that wait; it's gone (Nov 19).
+  const phone = await page.evaluate(() => matchMedia('(max-width: 639px), (max-height: 639px)').matches)
+  if (phone) await expect(page.locator('[data-testid="right-now"][data-wide]')).toHaveCount(0)
   return community
 }
 
@@ -253,9 +257,9 @@ test.describe('on a phone', () => {
     const home = await look(page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true }))
     const category = (await categories(request, community)).find((c) => c.kind === 'listing')!
     await page.goto(`/${community}/${category.id}`)
-    await dismissLocationPrompt(page)
-    const there = await look(page.getByRole('searchbox').filter({ visible: true }).first())
-    expect(home).toEqual(there)
+    // Retried: read while the page swaps in the phone's layout, the box is
+    // a detached one and every style comes back empty.
+    await expect.poll(() => look(page.getByRole('searchbox').filter({ visible: true }).first())).toEqual(home)
   })
 })
 

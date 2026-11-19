@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { defaultCommunity, dismissLocationPrompt, previewSettings } from './helpers'
+import { defaultCommunity, previewSettings } from './helpers'
 import { features } from '../src/lib/features'
 
 // The Today home (step 6), on a real build, at a fixed moment for each kind
@@ -52,7 +52,6 @@ async function openToday(page: Page, day: keyof typeof DAYS, path = '') {
   await page.route('**/api/zmanim?**', (route) => route.fulfill({ json: { ok: true, data: DAYS[day].zmanim } }))
   await page.clock.setFixedTime(new Date(DAYS[day].at))
   await page.goto(`/${community}${path}?preview=1`)
-  await dismissLocationPrompt(page)
   return community
 }
 

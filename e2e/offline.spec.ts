@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithListings, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { categoryWithListings, defaultCommunity, ready } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The service worker.
@@ -112,7 +112,6 @@ test.describe('service worker', () => {
 
     await page.goto(`/${community}/${category.id}`)
     await ready(page)
-    await dismissLocationPrompt(page)
     await serviceWorkerReady(page)
 
     // The visit that populates the cache. A worker that only took control on
@@ -130,7 +129,6 @@ test.describe('service worker', () => {
       const response = await page.reload()
       expect(response?.status(), 'the cached page should be served, not an error').toBe(200)
       await ready(page)
-      await dismissLocationPrompt(page)
 
       // The listing names are the whole point — a shell with empty content
       // would technically load and be useless.
@@ -173,7 +171,6 @@ test.describe('service worker', () => {
     const community = await defaultCommunity(page)
     const { category } = await categoryWithListings(request, community)
     await ready(page)
-    await dismissLocationPrompt(page)
     await serviceWorkerReady(page)
 
     const path = `/${community}/${category.id}`

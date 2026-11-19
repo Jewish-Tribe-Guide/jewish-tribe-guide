@@ -118,22 +118,26 @@ describe('SiteChrome', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/couldn.t load the list of categories/)
   })
 
-  it('shows the "share your location" prompt on a fresh visit, and dismisses on "Not now"', async () => {
-    const user = userEvent.setup()
+  // Nov 19 (the user): the site no longer asks for location when it opens.
+  // It asks when the visitor reaches for it: "Use my location" above a list,
+  // Set location in the header, or sorting by Distance with nothing to
+  // measure from. Before, a "Share your live location?" box covered the
+  // first screen of every first visit, and again three days after a "Not
+  // now".
+  it('asks nothing about location when the site opens', async () => {
     renderWithProviders(
       <SiteChrome year={2026}>
         <p>Page content</p>
       </SiteChrome>,
     )
 
-    expect(await screen.findByText('Share your live location?')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Not now' }))
-
-    expect(screen.queryByText('Share your live location?')).not.toBeInTheDocument()
-    expect(localStorage.getItem('jpc:live-location-prompt')).not.toBeNull()
+    await act(async () => {})
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByText(/share your live location/i)).not.toBeInTheDocument()
+    expect(mockGeolocation.watchPosition).not.toHaveBeenCalled()
   })
 
-  it('sharing location starts the live GPS watch', async () => {
+  it('"Use my location" opens the location menu, and sharing there starts the live GPS watch', async () => {
     const user = userEvent.setup()
     renderWithProviders(
       <SiteChrome year={2026}>
@@ -141,14 +145,12 @@ describe('SiteChrome', () => {
       </SiteChrome>,
     )
 
-    await user.click(await screen.findByRole('button', { name: 'Share my location' }))
+    act(() => void document.dispatchEvent(new CustomEvent('jpc:open-location')))
+    await user.click(await screen.findByRole('button', { name: 'Share my live location' }))
 
     expect(mockGeolocation.watchPosition).toHaveBeenCalledTimes(1)
     expect(localStorage.getItem('jpc:live-tracking-enabled')).toBe('1')
-
-    // A GPS tick updating the shared location doesn't crash the tree — the
-    // prompt itself, at least, should be gone now that tracking is on.
+    // A GPS tick updating the shared location doesn't crash the tree.
     act(() => emitPosition({ lat: 40, lng: -75 }))
-    expect(screen.queryByText('Share your live location?')).not.toBeInTheDocument()
   })
 })

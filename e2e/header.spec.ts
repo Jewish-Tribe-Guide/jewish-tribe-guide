@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { defaultCommunity, ready } from './helpers'
 
 // The Categories mega-menu (HeaderNav, desktop only) spans the header's own
 // content row — the same left/right edges as the logo-to-location-pill
@@ -21,7 +21,6 @@ test.describe('header — Categories mega-menu spans the header content row', ()
     for (const width of [1400, 960, 760]) {
       await page.setViewportSize({ width, height: 800 })
       await page.goto(`/${community}`)
-      await dismissLocationPrompt(page)
       await ready(page)
 
       const trigger = page.getByRole('button', { name: 'Categories', exact: true })

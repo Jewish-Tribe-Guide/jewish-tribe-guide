@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { defaultCommunity, dismissLocationPrompt } from './helpers'
+import { defaultCommunity } from './helpers'
 
 // Activity's nightly rows (the user, Nov 17; boards W1, X4, X5). Each night
 // is a row in What changed that opens its own page, at its own address.
@@ -19,7 +19,6 @@ test('a night that never ran is not found', async ({ page, request }) => {
 test('a night’s row opens its page, and Back returns to What changed', async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/changes`)
-  await dismissLocationPrompt(page)
   await expect(page.getByTestId('changes-day').first()).toBeVisible()
   const row = page.getByTestId('validated-night').first()
   test.skip((await row.count()) === 0, 'no nightly runs recorded in this project yet')

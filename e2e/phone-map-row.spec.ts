@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { categories, defaultCommunity, dismissLocationPrompt, ready, type Category } from './helpers'
+import { categories, defaultCommunity, ready, type Category } from './helpers'
 
 // A tester always wants the map (Nov 16). On a phone, a category's list row
 // is Filters · Map on the left and Sort at the right, on one line (the
@@ -76,7 +76,6 @@ test.describe('the phone list row with Map', () => {
     for (const c of cats) {
       await page.goto(`/${community}/${c.id}`)
       await ready(page)
-      await dismissLocationPrompt(page)
       const boxes = await rowBoxes(page)
       expectSides(boxes, await rowSides(page), `${c.label} at ${width}`)
       expectOneLine(boxes, `${c.label} at ${width}`, width)
@@ -98,7 +97,6 @@ test.describe('the phone list row with Map', () => {
     test.skip(!c, 'needs a category with a map and listings')
     await page.goto(`/${community}/${c.id}`)
     await ready(page)
-    await dismissLocationPrompt(page)
     await page.getByTestId('list-heading').filter({ visible: true }).first().getByTestId('list-map').click()
 
     await expect(page).toHaveURL(new RegExp(`/${community}/map\\?(.*&)?cat=${c.id}(&.*)?$`))
@@ -130,7 +128,6 @@ test.describe('the phone list row with Map', () => {
     test.skip(!c, 'needs a category with a map and listings')
     await page.goto(`/${community}/${c.id}`)
     await ready(page)
-    await dismissLocationPrompt(page)
     await page.getByTestId('list-heading').filter({ visible: true }).first().getByTestId('list-map').click()
     await expect(page.getByTestId('map-back')).toBeVisible()
     await page.getByRole('button', { name: 'Expand nearby list' }).click()
@@ -164,7 +161,6 @@ test.describe('the phone list row with Map', () => {
     const { c, names } = pick!
     await page.goto(`/${community}/${c.id}`)
     await ready(page)
-    await dismissLocationPrompt(page)
     for (const name of names.slice(0, 2)) {
       await page.locator('main').getByRole('button', { name: `Show details for ${name}` }).first().click()
       const tile = page.getByTestId('listing-map-tile').filter({ visible: true }).first()
@@ -181,7 +177,6 @@ test.describe('the phone list row with Map', () => {
   test('the Map tab opened as a tab has no ‹', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}/map`)
-    await dismissLocationPrompt(page)
     await expect(page.getByPlaceholder(/Search name, address/)).toBeVisible()
     await expect(page.getByTestId('map-back')).toHaveCount(0)
   })

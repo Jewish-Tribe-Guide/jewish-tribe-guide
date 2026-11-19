@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { defaultCommunity, dismissLocationPrompt } from './helpers'
+import { defaultCommunity } from './helpers'
 
 // The Map page's list of places (the user, Oct 16):
 // - Back from a place opened deep in the list landed at the list's top. It
@@ -29,7 +29,6 @@ test('phone: Back from a place puts the sheet’s list where it was', async ({ p
   test.skip(!isMobile, 'the phone’s sheet')
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
-  await dismissLocationPrompt(page)
   await page.getByRole('button', { name: 'Expand nearby list' }).click()
   const list = page.getByTestId('sheet-scroll')
   await expect(list.getByTestId('nearby-name').first()).toBeVisible()
@@ -45,7 +44,6 @@ test('phone: lowered after scrolling, the sheet is only its line', async ({ page
   test.skip(!isMobile, 'the phone’s sheet')
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
-  await dismissLocationPrompt(page)
   const sheet = page.getByTestId('map-sheet')
   const list = page.getByTestId('sheet-scroll')
 
@@ -69,7 +67,6 @@ test('computer: Back from a place puts the sidebar’s list where it was', async
   test.skip(isMobile, 'the computer’s sidebar')
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
-  await dismissLocationPrompt(page)
   // The sidebar can start closed here; open it as someone would.
   const show = page.getByRole('button', { name: 'Show sidebar' })
   if (await show.isVisible()) await show.click()

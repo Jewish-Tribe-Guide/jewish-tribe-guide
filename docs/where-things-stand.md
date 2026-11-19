@@ -995,8 +995,6 @@ Left out on purpose:
   says "refresh" and loses the answers, the steps are raw `pushState`, the
   "✅" and section emoji, and Support/Volunteer as the generic wizard.
 - The parked Today home stays parked (the user, Nov 18).
-- Asking for location: being drawn (stop asking on the first load; ask
-  when the visitor reaches for something that needs it). Not built.
 
 Done:
 
@@ -1092,9 +1090,13 @@ Done:
   - With no location set, the map's list starts from the community's
     centre, and the phone's lowered sheet says "137 places", not "137
     places nearby — drag up".
-  - The location prompt closes on Escape, takes the focus while open and
-    gives it back, keeps Tab inside it, and draws a pin icon, not 📍. Its
-    words (the "pill") wait for the location-ask drawing.
+  - The "Share your live location?" box no longer opens with the site
+    (the user, Nov 19: "I think we can fix the location ask"). Location is
+    asked for when the visitor reaches for it: "Use my location" above a
+    list, Set location in the header, or Distance with nothing to measure
+    from, each of which opens the header's location menu. A visitor who
+    shared before is picked up again silently, as before. The box, its
+    three-day re-ask and the e2e suites' `dismissLocationPrompt` are gone.
   - With storage blocked (Safari's "Block all cookies"), the Map and the
     home no longer show "Something went wrong": saved places, pins and
     searches read as none, the sidebar opens at its usual width, a vote

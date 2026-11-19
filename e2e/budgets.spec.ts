@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib'
 import { expect, test, type Page } from '@playwright/test'
-import { openAddForm, defaultCommunitySlug, dismissLocationPrompt, largestCategory, ready } from './helpers'
+import { openAddForm, defaultCommunitySlug, largestCategory, ready } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // What a page actually downloads.
@@ -88,7 +88,6 @@ async function load(page: Page, path: string, shown: (page: Page) => Promise<voi
   )
 
   await page.goto(path)
-  await dismissLocationPrompt(page)
   await shown(page)
 
   const deadline = Date.now() + 8_000
@@ -187,7 +186,6 @@ test.describe('home screen weight', () => {
       if (r.headers()['next-router-prefetch']) prefetched.push(decodeURIComponent(r.url()))
     })
     await page.goto(`/${community}`)
-    await dismissLocationPrompt(page)
     await ready(page)
     const fromCards = () => prefetched.filter((u) => u.includes('davening=1'))
 

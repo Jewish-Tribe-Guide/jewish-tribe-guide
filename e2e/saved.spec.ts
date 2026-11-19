@@ -1,27 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { categoryWithListings, categoryWithMapPoints, defaultCommunity, defaultCommunitySlug, largestCategory } from './helpers'
 
-// A more patient version of helpers.ts' dismissLocationPrompt: that one is a
-// single point-in-time check (`isVisible()`, no retry), which assumes the
-// prompt — if it's going to show at all — has already rendered by the time
-// it's called. It hadn't, reliably, on this spec's pages: LiveLocationPrompt
-// only becomes visible once useLiveLocation's own mount effects resolve,
-// which lands after the search box's own visible signal. Missing the dismiss
-// here isn't cosmetic like it is elsewhere — the prompt is a full-screen
-// overlay, and every following interaction in these tests is a click, which
-// its overlay blocks outright rather than just failing a visibility
-// assertion. This polls briefly instead of checking once.
-async function dismissLocationPromptIfItAppears(page: Page): Promise<void> {
-  const notNow = page.getByRole('button', { name: 'Not now' })
-  const appeared = await notNow
-    .waitFor({ state: 'visible', timeout: 3000 })
-    .then(() => true)
-    .catch(() => false)
-  if (!appeared) return
-  await notNow.click()
-  await notNow.waitFor({ state: 'hidden' })
-}
-
 // Saving (Pin until Oct 14) is entirely client-side (localStorage — see
 // src/lib/pinned.ts, whose key keeps the old name), no database, no accounts.
 // These check: the bookmark at the top of a listing saves it, with Undo; a
@@ -81,7 +60,6 @@ test.describe('saved places', () => {
     const item = ((await res.json()).resources as { id: string; name: string }[])[0]
 
     await page.goto(`/${community}/${category.id}/${item.id}`)
-    await dismissLocationPromptIfItAppears(page)
 
     const save = page.getByRole('button', { name: `Save ${item.name}`, exact: true }).and(page.locator(':visible'))
     await expect(save).toHaveAttribute('aria-pressed', 'false')
@@ -91,7 +69,6 @@ test.describe('saved places', () => {
     await expect(toast).toContainText('Saved to You')
 
     await page.reload()
-    await dismissLocationPromptIfItAppears(page)
     await expect(save).toHaveAttribute('aria-pressed', 'true')
 
     await save.click()
@@ -110,7 +87,6 @@ test.describe('saved places', () => {
     await page.goto(`/${community}/map`)
     const searchInput = page.getByPlaceholder(/Search name, address/)
     await searchInput.waitFor({ state: 'visible' })
-    await dismissLocationPromptIfItAppears(page)
 
     // The count is its own text node right after "Saved" with no space in
     // between (see the chip's own JSX) — matching on the accessible name via
@@ -121,7 +97,6 @@ test.describe('saved places', () => {
 
     await page.reload()
     await searchInput.waitFor({ state: 'visible' })
-    await dismissLocationPromptIfItAppears(page)
 
     // Still there after a reload, same as a real visitor's localStorage would be.
     await expect(pinnedChip).toBeVisible()
@@ -136,13 +111,11 @@ test.describe('saved places', () => {
     await page.goto(`/${community}/map`)
     const searchInput = page.getByPlaceholder(/Search name, address/)
     await searchInput.waitFor({ state: 'visible' })
-    await dismissLocationPromptIfItAppears(page)
     await expect(page.getByRole('button', { name: /^Saved\s*\d+$/ })).toHaveCount(0)
 
     await seedPinned(page, { id: listing.id, categoryId: listing.category })
     await page.reload()
     await searchInput.waitFor({ state: 'visible' })
-    await dismissLocationPromptIfItAppears(page)
 
     const pinnedChip = page.getByRole('button', { name: /^Saved\s*1$/ }).and(page.locator(':visible'))
     await expect(pinnedChip).toBeVisible()
@@ -157,14 +130,12 @@ test.describe('saved places', () => {
     const { category } = await largestCategory(request, community)
 
     await page.goto(`/${community}`)
-    await dismissLocationPromptIfItAppears(page)
     await page.getByRole('textbox', { name: 'Search resources' }).fill(category.pluralLabel)
     const save = page.getByRole('button', { name: new RegExp(`^Save “.+” in ${category.pluralLabel}$`) }).first()
     await save.click()
     await expect(save).toHaveAttribute('aria-pressed', 'true')
 
     await page.goto(`/${community}/you`)
-    await dismissLocationPromptIfItAppears(page)
     const searches = page.getByTestId('you-searches')
     await expect(searches).toContainText(category.pluralLabel)
     await searches.getByRole('link').first().click()
@@ -181,7 +152,6 @@ test.describe('saved places', () => {
     const listing = await mappableListing(request, community)
     await seedPinned(page, { id: listing.id, categoryId: listing.category })
     await page.goto(`/${community}/you`)
-    await dismissLocationPromptIfItAppears(page)
     const heading = page.getByTestId('you-places').getByRole('heading', { name: 'Places' })
     await expect(heading).toBeVisible()
     const photo = await page.getByTestId('category-hero').locator('> div').first().boundingBox()

@@ -288,31 +288,6 @@ export async function largestCategory(
   return best
 }
 
-/** Dismisses the "Share your live location?" prompt if it's showing.
- *
- *  It's a full-screen overlay that intercepts pointer events, so on mobile —
- *  where it appears on a first visit — nothing else on the page is clickable
- *  until it's dealt with. A real visitor answers it before doing anything else,
- *  so tests do too.
- *
- *  The prompt renders after a data-dependent effect, not on first paint, so
- *  a one-shot `isVisible()` check races it: it can appear moments after the
- *  check passes and intercept whatever the test clicks next. Actively wait a
- *  bit instead — harmless (and fast to resolve) when it never shows up.
- *
- *  1000ms used to be that wait. Reported live in CI: multiple unrelated
- *  tests timing out on `locator.click` with this exact prompt's own
- *  backdrop (`role="presentation"`, `z-[70]`) "intercepts pointer events",
- *  retried for the test's full 60s budget — the prompt's data-dependent
- *  effect finishing just past 1000ms under CI's real resource contention
- *  (this repo's own file-level notes document the same "suspect a budget,
- *  not the system under test" shape happening more than once elsewhere),
- *  so this returned early believing there was nothing to dismiss while the
- *  prompt was still about to open. 5000ms, matching this suite's own
- *  default `expect` timeout elsewhere — same reasoning as the doc above:
- *  still fast when the prompt never shows, since the wait resolves the
- *  instant `state: 'visible'` is met OR the timeout is reached, not a fixed
- *  delay either way. */
 /** Opens an open listing's editor: its Edit listing, which opens the
  *  editor itself everywhere (Oct 15; on a category page it used to open
  *  the "+ Add" box first). `scope`: where the listing's own Edit listing
@@ -320,17 +295,6 @@ export async function largestCategory(
 export async function openListingEditor(page: Page, scope: Page | Locator = page): Promise<void> {
   await scope.getByRole('button', { name: 'Edit listing' }).filter({ visible: true }).click()
   await page.getByRole('heading', { name: 'Edit listing' }).filter({ visible: true }).first().waitFor()
-}
-
-export async function dismissLocationPrompt(page: Page): Promise<void> {
-  const notNow = page.getByRole('button', { name: 'Not now' })
-  try {
-    await notNow.waitFor({ state: 'visible', timeout: 5000 })
-  } catch {
-    return
-  }
-  await notNow.click()
-  await notNow.waitFor({ state: 'hidden' })
 }
 
 /** The category page's own Add control — GenericDirectory's floating

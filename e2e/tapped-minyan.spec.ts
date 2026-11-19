@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { defaultCommunity, dismissLocationPrompt, minyanimCategory, ready } from './helpers'
+import { defaultCommunity, minyanimCategory, ready } from './helpers'
 
 // Oct 16: a minyan tapped in Minyanim by time opens its place on that
 // minyan, the time it showed at the top, rather than at the top of the
@@ -12,7 +12,6 @@ test('a minyan tapped in Minyanim by time opens its place on that minyan', async
 
   await page.goto(`/${community}/${shuls!.id}?davening=1`)
   await ready(page)
-  await dismissLocationPrompt(page)
   const rows = page.getByTestId('minyanim-rows')
   // Late in the day there may be nothing left today: tomorrow, then.
   if ((await rows.getByRole('link').count()) === 0) await page.getByRole('tab').nth(1).click()

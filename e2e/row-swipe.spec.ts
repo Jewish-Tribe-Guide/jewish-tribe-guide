@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { defaultCommunity, dismissLocationPrompt, largestCategory, ready } from './helpers'
+import { defaultCommunity, largestCategory, ready } from './helpers'
 
 // A row swiped open on a phone is put away by the next touch anywhere else,
 // as iPhone lists do (the user, Oct 16): a tap on another row does only
@@ -11,7 +11,6 @@ test('phone: with a row swiped open, a tap on another row only closes it', async
   const { category } = await largestCategory(request, community)
   await page.goto(`/${community}/${category.id}`)
   await ready(page)
-  await dismissLocationPrompt(page)
 
   // SwipeRow's wrapper, one per row.
   const rows = page.locator('main [data-swipe-group]')
@@ -43,7 +42,6 @@ test('computer: with a row swiped open, a click on another row or a scroll only 
   test.skip(isMobile, 'the computer’s sidebar')
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
-  await dismissLocationPrompt(page)
   const show = page.getByRole('button', { name: 'Show sidebar' })
   if (await show.isVisible()) await show.click()
   const list = page.getByTestId('sidebar-scroll')

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { categories, categoryAddButton, openAddForm, categoryWithListings, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { categories, categoryAddButton, openAddForm, categoryWithListings, defaultCommunity, ready } from './helpers'
 import { listingSlug } from '../src/lib/listingSlug'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,7 +24,6 @@ test.describe('accessibility', () => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)
     await ready(page)
-    await dismissLocationPrompt(page)
 
     const results = await new AxeBuilder({ page }).disableRules(['color-contrast']).analyze()
 
@@ -49,7 +48,6 @@ test.describe('accessibility', () => {
     const { category } = await categoryWithListings(request, community)
     await page.goto(`/${community}/${category.id}`)
     await ready(page)
-    await dismissLocationPrompt(page)
 
     const results = await new AxeBuilder({ page }).disableRules(['color-contrast']).analyze()
 
@@ -84,7 +82,6 @@ test.describe('accessibility', () => {
       // on its own <main> instead.
       if (path === 'map') await page.locator('main').first().waitFor({ state: 'visible' })
       else await ready(page)
-      await dismissLocationPrompt(page)
       await expectNoViolations(page)
     })
   }
@@ -97,7 +94,6 @@ test.describe('accessibility', () => {
 
     await page.goto(`/${community}/${category.id}/${listingSlug(item)}`)
     await ready(page)
-    await dismissLocationPrompt(page)
     await expectNoViolations(page)
   })
 
@@ -109,7 +105,6 @@ test.describe('accessibility', () => {
       if (!kinds.has(kind)) continue
       await page.goto(`/${community}/${slug}`)
       await ready(page)
-      await dismissLocationPrompt(page)
       await expectNoViolations(page)
     }
   })
@@ -119,7 +114,6 @@ test.describe('accessibility', () => {
     const { category } = await categoryWithListings(request, community)
     await page.goto(`/${community}/${category.id}`)
     await ready(page)
-    await dismissLocationPrompt(page)
 
     await categoryAddButton(page).click()
     await expect(page.getByRole('dialog').getByRole('button', { name: 'See what changes' })).toBeVisible()
@@ -132,7 +126,6 @@ test.describe('accessibility', () => {
     const { category } = await categoryWithListings(request, community)
     await page.goto(`/${community}/${category.id}`)
     await ready(page)
-    await dismissLocationPrompt(page)
 
     await openAddForm(page)
     await expect(page.getByRole('dialog')).toBeVisible()

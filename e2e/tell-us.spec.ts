@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryAddButton, categoryWithListings, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { categoryAddButton, categoryWithListings, defaultCommunity, ready } from './helpers'
 
 // "+ Add" opens the box ("Add or update a place" since Oct 10) on every
 // screen but the Map (decided Oct 5). Read-only like everything in e2e/: nothing here reads a
@@ -9,7 +9,6 @@ test('the home page’s “+ Add” opens the box', async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}`)
   await ready(page)
-  await dismissLocationPrompt(page)
 
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   const box = page.getByRole('dialog', { name: 'Add or update a place' })
@@ -23,7 +22,6 @@ test('a category’s “+” opens the box, with filling it in yourself one link
   const { category } = await categoryWithListings(request, community)
   await page.goto(`/${community}/${category.id}`)
   await ready(page)
-  await dismissLocationPrompt(page)
 
   await categoryAddButton(page).click()
   const box = page.getByRole('dialog', { name: 'Add or update a place' })
@@ -42,7 +40,6 @@ test('the browser’s Back and Forward walk the box’s steps, a row’s Back ke
   const { category } = await categoryWithListings(request, community)
   await page.goto(`/${community}/${category.id}`)
   await ready(page)
-  await dismissLocationPrompt(page)
 
   const page0 = page.url()
   await categoryAddButton(page).click()
@@ -96,7 +93,6 @@ test.describe('the box on a phone', () => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)
     await ready(page)
-    await dismissLocationPrompt(page)
 
     await page.getByRole('button', { name: 'Add', exact: true }).click()
     const box = page.getByRole('dialog', { name: 'Add or update a place' })
@@ -116,7 +112,6 @@ test.describe('the box on a phone', () => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)
     await ready(page)
-    await dismissLocationPrompt(page)
 
     await page.getByRole('button', { name: 'Add', exact: true }).click()
     await page.getByRole('dialog', { name: 'Add or update a place' }).getByLabel('Your message').fill('Acme on 5th has challah')
@@ -158,7 +153,6 @@ test('an open listing’s Edit listing opens the editor, not the box about that 
   const listing = body.resources[0] as { id: string; name: string }
   await page.goto(`/${community}/${category.id}?item=${listing.id}`)
   await ready(page)
-  await dismissLocationPrompt(page)
 
   if (isMobile) {
     await expect(categoryAddButton(page)).toHaveCount(0)

@@ -7,7 +7,6 @@ const css = read('src/app/globals.css')
 // Overlays are mounted conditionally, so with no enter animation they pop in.
 // Each entry is a file and the class its dim backdrop or popover must carry.
 const OVERLAYS: Array<[string, string]> = [
-  ['src/components/LiveLocationPrompt.tsx', 'overlay-in'],
   ['src/components/ImageCropModal.tsx', 'overlay-in'],
   ['src/components/home/ContributePicker.tsx', 'overlay-in'],
   ['src/components/resources/ActionDialog.tsx', 'overlay-in'],

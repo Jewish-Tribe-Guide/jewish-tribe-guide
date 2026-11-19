@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryAddButton, categoryWithDistances, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
+import { categoryAddButton, categoryWithDistances, defaultCommunity, ready } from './helpers'
 
 // Adding a place yourself (agreed Oct 5): the "+" box, "Find the place",
 // then the listing's boxes as rows (Oct 11), in the box, with Back at each
@@ -13,7 +13,6 @@ test('Adding finds the place first, then asks the category’s questions, with B
 
   await page.goto(`/${community}/${category.id}`)
   await ready(page)
-  await dismissLocationPrompt(page)
   await categoryAddButton(page).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Find the place' }).click()
 
