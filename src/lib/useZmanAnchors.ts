@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from 'react'
 import { useToday } from '@/lib/useNow'
-import { community } from '@/community.config'
 import { useCommunityTimezone } from '@/lib/communityContext'
 import type { ZmanimData } from '@/types'
 import { applyOffsetMinutes } from '@/lib/zmanim'
+import { HOURS_TIMEZONE } from '@/lib/hours'
 import { roundZmanimCoord, zmanimBatchPath, zmanimDate, zmanimPath } from '@/lib/zmanimRequest'
 import { clampTimeText, type MinyanBounds, type ZmanAnchor } from '@/lib/davening'
 
 export type AnchorTimes = {
   /** The clock these were asked for in: the community's, which reads the
-   *  offset time back out (resolveAnchorTime). */
+   *  offset time back out (resolveAnchorTime). Always set by the fetch;
+   *  missing only from anchors built by hand (tests). */
   timezone?: string
   sunsetIso?: string
   candleLightingIso?: string
@@ -156,10 +157,16 @@ export function useZmanAnchors(coords: Array<Geo | null | undefined>): Record<st
 
 export { geoKey }
 
-/** Falls back to the community's default location when a shul has no geo of
- *  its own, so a calculated time is still shown for a same-city app. */
-export function geoOrCommunityDefault(geo: Geo | null | undefined): Geo {
-  return geo ?? community.mapCenter
+/** Where a shul with no location of its own is found in an anchors record:
+ *  its community's centre, which the hook that loads them reads and files
+ *  here (useMinyanSchedule), so the plain functions that look a shul up
+ *  needn't know where the community is. It was the deployment config's
+ *  centre, Philly's, for every community (Nov 19). */
+export const COMMUNITY_SPOT = 'community'
+
+/** The key a shul's zmanim are found under in an anchors record. */
+export function anchorKey(geo: Geo | null | undefined): string {
+  return geo ? geoKey(geo) : COMMUNITY_SPOT
 }
 
 /** Resolves a minyan's calculated clock time from its anchor + offset against
@@ -182,7 +189,7 @@ export function resolveAnchorTime(
     : row.anchor === 'candle_lighting' ? anchors.candleLightingIso
     : anchors.havdalahIso
   if (!iso) return null
-  const computed = applyOffsetMinutes(iso, row.offsetMinutes ?? 0, anchors.timezone ?? community.timezone)
+  const computed = applyOffsetMinutes(iso, row.offsetMinutes ?? 0, anchors.timezone ?? HOURS_TIMEZONE)
   return clampTimeText(computed, row)
 }
 

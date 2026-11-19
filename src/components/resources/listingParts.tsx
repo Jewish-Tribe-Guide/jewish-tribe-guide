@@ -1,5 +1,4 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import { community } from '@/community.config'
 import { PencilIcon } from '@/components/icons'
 
 // Small pieces an opened listing's sections share (ListingView, DaveningCard).
@@ -125,13 +124,14 @@ export function EditButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-/** "Sep 30", in the community's own timezone, so the server and the
- *  browser always agree (a date near midnight read in two timezones is two
+/** "Sep 30", in the community's own timezone (useCommunityTimezone; it
+ *  was the deployment config's, Philly's, until Nov 19), so the server and
+ *  the browser always agree (a date near midnight read in two timezones is two
  *  dates, and a mismatch React redoes the page for). With the year once it's
  *  most of a year ago, which needs the visitor's clock: `now`, from useNow,
  *  null until the page has hydrated. */
-export function shortDate(iso: string, now: number | null = null): string {
+export function shortDate(iso: string, timezone: string, now: number | null = null): string {
   const d = new Date(iso)
   const old = now !== null && now - d.getTime() > 300 * 86_400_000
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(old ? { year: 'numeric' } : {}), timeZone: community.timezone })
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(old ? { year: 'numeric' } : {}), timeZone: timezone })
 }

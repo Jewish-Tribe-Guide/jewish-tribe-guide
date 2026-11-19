@@ -586,7 +586,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const otherHours = main === 'groups' ? [] : hoursFields.filter((f) => !f.audienceKey && !placed.has(f.key) && !inAbout(f) && hasAny(item[f.key]))
   // When Google last updated the box, at its foot (Oct 6): one date for
   // the box, not a list of which of its lines are Google's.
-  const googleLead = googleKeepsBox(item, { hours: otherHours.length > 0 }) ? `Checked with Google, ${shortDate(item.googleSyncedAt!, clock)}` : null
+  const googleLead = googleKeepsBox(item, { hours: otherHours.length > 0 }) ? `Checked with Google, ${shortDate(item.googleSyncedAt!, timezone, clock)}` : null
   // The website, by name, with the address and phone (Oct 6): its round
   // button above says only "Website".
   const website = buttons.find((a): a is Extract<ActionSpec, { kind: 'link' }> => a.kind === 'link' && isWebsite(a.field) && !inAbout(a.field))
@@ -775,7 +775,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   // (Nov 18 review, item 13).
   const googleText = !fromGoogle && aboutKey === 'googleDescription' && !!item.placeId
   const aboutFoot = fromGoogle ? (
-    <span data-testid="about-google">{item.googleSyncedAt ? `Checked with Google, ${shortDate(item.googleSyncedAt, clock)}.` : 'Checked with Google.'}</span>
+    <span data-testid="about-google">{item.googleSyncedAt ? `Checked with Google, ${shortDate(item.googleSyncedAt, timezone, clock)}.` : 'Checked with Google.'}</span>
   ) : aboutKey && !googleText ? (
     <FreshnessFooter resourceId={item.id} {...boxDate(item, aboutKey)} section={aboutKey} onEdit={editAbout} />
   ) : undefined

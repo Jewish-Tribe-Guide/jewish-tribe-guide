@@ -1,6 +1,6 @@
 'use client'
 
-import { useCommunityTimezone } from '@/lib/communityContext'
+import { useCommunityPlace, useCommunityTimezone } from '@/lib/communityContext'
 import { useCategories } from '@/lib/useCategories'
 import { useAllListings } from '@/lib/useAllListings'
 import { useNow } from '@/lib/useNow'
@@ -14,10 +14,9 @@ import { listMinyanim, minyanimOn, type ShulMinyanim } from '@/lib/upcomingDaven
 import type { AnswerSchedule } from '@/lib/askAnswer'
 import { useZmanim } from '@/lib/useZmanim'
 import { secularHoliday } from '@/lib/secularHolidays'
-import { useZmanAnchors, geoOrCommunityDefault } from '@/lib/useZmanAnchors'
+import { useZmanAnchors, COMMUNITY_SPOT, geoKey } from '@/lib/useZmanAnchors'
 import type { AnchorTimes } from '@/lib/useZmanAnchors'
 import type { LatLng } from '@/lib/geo'
-import { community } from '@/community.config'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
@@ -68,6 +67,7 @@ export type MinyanSchedule = {
  */
 export function useMinyanSchedule(coords: LatLng | null, only?: readonly DirectoryResource[]): MinyanSchedule | null {
   const timezone = useCommunityTimezone()
+  const { center } = useCommunityPlace()
   const categories = useCategories()
   // A category page passes its own listings (`only`): it has no provider of
   // every listing on the site, which only the home screen and the map load.
@@ -88,7 +88,7 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   // plain `new Date(now).getDay()` produced whenever the two disagreed.
   // Falls back to the community's own default location: whether today is
   // Yom Tov doesn't depend on which address a visitor set.
-  const { data: zmanimData } = useZmanim(coords ?? community.mapCenter)
+  const { data: zmanimData } = useZmanim(coords ?? center)
   // Today and the six days after it: what "Shabbos" or "Sunday" means when
   // asked this week, which a festival can change (Shemini Atzeres on
   // Shabbos). Counted on the calendar from today, not 24 hours at a time:
@@ -120,8 +120,13 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   // Only shuls with at least one anchor-based row need a resolved sunset —
   // fetching zmanim for every shul's location regardless would cost a
   // request per distinct address for a card that mostly doesn't need it.
-  const anchorGeos = shuls.filter((s) => s.minyanim.some((m) => m.anchor)).map((s) => geoOrCommunityDefault(s.geo))
-  const anchors = useZmanAnchors(anchorGeos)
+  // A shul with no location of its own is timed by its community's centre,
+  // filed under COMMUNITY_SPOT for the functions that look shuls up
+  // (anchorKey).
+  const anchorGeos = shuls.filter((s) => s.minyanim.some((m) => m.anchor)).map((s) => s.geo ?? center)
+  const bySpot = useZmanAnchors(anchorGeos)
+  const atCentre = bySpot[geoKey(center)]
+  const anchors = atCentre ? { ...bySpot, [COMMUNITY_SPOT]: atCentre } : bySpot
 
   // Nothing is scheduled before the page has hydrated, when there's no time
   // yet (see useNow).

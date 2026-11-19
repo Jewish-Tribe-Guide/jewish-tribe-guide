@@ -5,7 +5,6 @@ import { describedByItsText, type AskHit, type DayWindow, type AskResult, type H
 import { itemEntry, itemWords } from '@/lib/itemNames'
 import { itemDateFor, itemDateText, itemWording, seenAtFor } from '@/lib/itemMarks'
 import { itemsField } from '@/lib/listingView'
-import { community } from '@/community.config'
 import { formatOpenAtTime, termMatches, termsAsTyped, words, type MetaAsk, type MinyanAsk, type MinyanWhen, type TimesAsk } from '@/lib/ask'
 import { SIGN_UP_MARK, TEFILLAH_LABELS, type Tefillah } from '@/lib/davening'
 import type { MinyanSlot } from '@/lib/upcomingDavening'
@@ -381,9 +380,11 @@ export function answerFor(
      *  time go to the shul nearer it, as the rows' own distances do. Only
      *  for that order; no distance is said from it. */
     center?: LatLng | null
-    /** The time, once the page knows it: an item's "seen today" is said
-     *  with it. Without it, no date is said. */
+    /** The time, once the page knows it, and the community's clock: an
+     *  item's "seen today" is said with them. Without both, no date is said
+     *  (it was said on the deployment config's clock, Philly's, Nov 19). */
     now?: number | null
+    timezone?: string | null
   } = {},
 ): Answer | null {
   const answer = withBest(result, baseAnswer(result, options))
@@ -401,7 +402,7 @@ export function answerFor(
 
 function baseAnswer(
   result: AskResult,
-  { schedule = null, coords = null, center = null, now = null }: { schedule?: AnswerSchedule | null; coords?: LatLng | null; center?: LatLng | null; now?: number | null },
+  { schedule = null, coords = null, center = null, now = null, timezone = null }: { schedule?: AnswerSchedule | null; coords?: LatLng | null; center?: LatLng | null; now?: number | null; timezone?: string | null },
 ): Answer | null {
   const { query, hits } = result
   if (!query.raw) return null
@@ -528,8 +529,8 @@ function baseAnswer(
     // Joe's, 0.2 mi, seen today", and how many have been this week. A dish
     // approved from its menu since says so instead: "on its menu Oct 2".
     const seenOf = (h: AskHit) => {
-      const date = now === null || !h.matched[0] ? null : itemDateFor(h.item, h.matched[0].tag)
-      return date ? `, ${itemDateText(date, now, community.timezone)}` : ''
+      const date = now === null || !timezone || !h.matched[0] ? null : itemDateFor(h.item, h.matched[0].tag)
+      return date && timezone ? `, ${itemDateText(date, now, timezone)}` : ''
     }
     const meatless = meatlessNote(having)
     const thisWeek = now === null ? 0 : having.filter((h) => {

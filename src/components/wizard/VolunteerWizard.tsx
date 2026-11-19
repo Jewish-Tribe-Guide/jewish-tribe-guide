@@ -8,8 +8,7 @@ import { useForm } from '@/lib/useForms'
 import { useHospitals } from '@/lib/useHospitals'
 import type { FormStep } from '@/lib/forms'
 import type { Hospital } from '@/types'
-import { community } from '@/community.config'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunityPlace, useCommunitySlug } from '@/lib/communityContext'
 
 const ANYWHERE = 'anywhere'
 
@@ -37,14 +36,14 @@ const KNOWN_IDS = new Set([
 // Step, but TS can't see through the JSON boundary to know every 'single'/
 // 'multi' step actually carries `options` — the admin editor and seed data
 // both guarantee that invariant, so the cast is safe.
-function toWizardSteps(steps: FormStep[], hospitals: Hospital[]): Step[] {
+function toWizardSteps(steps: FormStep[], hospitals: Hospital[], region: string): Step[] {
   const resolved = steps.map((s) =>
     s.optionsSource === 'hospitals'
       ? {
           ...s,
           options: [
             ...hospitals.map((h) => ({ value: h.id, label: h.name })),
-            { value: ANYWHERE, label: `Anywhere in the ${community.region} area` },
+            { value: ANYWHERE, label: `Anywhere in the ${region} area` },
           ],
         }
       : s,
@@ -61,7 +60,8 @@ export default function VolunteerWizard({ preselect, onClose }: Props) {
   const activeCommunity = useCommunitySlug()
   const form = useForm('volunteer')
   const hospitalsData = useHospitals()
-  const steps = useMemo(() => (form ? toWizardSteps(form.steps, hospitalsData ?? []) : []), [form, hospitalsData])
+  const { region } = useCommunityPlace()
+  const steps = useMemo(() => (form ? toWizardSteps(form.steps, hospitalsData ?? [], region) : []), [form, hospitalsData, region])
   const initial: Answers = preselect && preselect.length ? { waysToHelp: preselect } : {}
 
   const handleSubmit = async (a: Answers) => {

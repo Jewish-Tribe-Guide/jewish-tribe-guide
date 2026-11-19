@@ -1,7 +1,6 @@
 'use client'
 
-import { community } from '@/community.config'
-import { useCommunityTimezone } from '@/lib/communityContext'
+import { useCommunityPlace, useCommunityTimezone } from '@/lib/communityContext'
 import { dayInTimezone } from '@/lib/activity'
 import { shabbosIsOver } from '@/lib/schedules'
 import { editWeek, weekAfter, type EditWeek } from '@/lib/thisWeekEdit'
@@ -17,9 +16,10 @@ import { useZmanim } from '@/lib/useZmanim'
  */
 export function useEditWeek(enabled: boolean): { week: EditWeek; next: EditWeek } | null {
   const timezone = useCommunityTimezone()
+  const { center } = useCommunityPlace()
   const now = useNow()
   // Nothing fetched for a place with no times.
-  const { data } = useZmanim(enabled ? community.mapCenter : null)
+  const { data } = useZmanim(enabled ? center : null)
   if (!enabled || now === null) return null
   const today = dayInTimezone(timezone, new Date(now))
   const week = editWeek(today, shabbosIsOver(today, now, data?.shabbos?.havdalah?.iso))

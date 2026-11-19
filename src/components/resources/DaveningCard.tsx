@@ -4,7 +4,7 @@ import { useContext, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { formatDays, isMinyanim, signUpAction, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from '@/lib/davening'
 import { useMinyanSchedule } from '@/lib/useMinyanSchedule'
-import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from '@/lib/useZmanAnchors'
+import { anchorKey, resolveAnchorTime, type AnchorTimes } from '@/lib/useZmanAnchors'
 import { dateText, readSchedules, regularMinyanim, scheduleDayText, sendsWeekly, shabbosComesFirst, thisWeeksDays, weekByDates, type DayPosting, type SpecialSchedule, type WeekDayTimes } from '@/lib/schedules'
 import { isShabbosRow } from '@/lib/minyanText'
 import { clockMinutes, noteText, SHABBOS_PART_LABELS, ruleLinesToday, shabbosList, timeText, weekdayTable, type ShabbosLine } from '@/lib/weekTable'
@@ -104,7 +104,7 @@ export default function DaveningCard({
   // nothing else; no asking for the Shabbos or weekday times it won't have.
   const minyanOnly = !!category && isMinyanOnly(item, category)
   const season = schedule?.season ?? null
-  const anchors = schedule?.anchors[geoKey(geoOrCommunityDefault(item.geo))]
+  const anchors = schedule?.anchors[anchorKey(item.geo)]
   // A summer/winter pair goes by its zman (seasonPairs.ts).
   const week = weekdayTable(rows, season, anchors)
   const shab = shabbosList(rows, season, anchors)

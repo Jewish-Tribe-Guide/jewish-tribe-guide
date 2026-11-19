@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { loadGoogleMaps, MAPS_API_KEY, MAPS_MAP_ID, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { destinationQuery, directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
 import { haversineMiles } from '@/lib/geo'
-import { community } from '@/community.config'
+import { useCommunityPlace } from '@/lib/communityContext'
 import type { DirectoryResource } from '@/types'
 import { glyphSrcFor, glyphTextFor } from '@/lib/categoryIcons'
 import { BookmarkIcon } from '@/components/icons'
@@ -148,8 +148,6 @@ type Props = {
    *  own zoom buttons, where its Layers button sits, wherever those land. */
   cornerControl?: ReactNode
 }
-
-const DEFAULT_CENTER = community.mapCenter
 
 // Narrows `points` to the ones the automatic "fit everything" framing should
 // actually include — see Props.zoomRadiusMiles. `radiusMiles == null` means
@@ -502,7 +500,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, frameToken, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles, eruvim, onSelectEruv, selectedEruvId = null, frameEruvim = false, cornerControl }: Props) {
+export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, frameToken, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles, eruvim, onSelectEruv, selectedEruvId = null, frameEruvim = false, cornerControl }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -547,6 +545,12 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   const obscuredTopPxRef = useRef(obscuredTopPx)
   const onManualDragRef = useRef(onManualDrag)
   const zoomRadiusMilesRef = useRef(zoomRadiusMiles)
+  // Where the map starts, and what "everything near" is measured from: the
+  // community's centre unless told otherwise (Nov 19: it was the deployment
+  // config's, Philly's, for every community). A ref: a community doesn't
+  // change under a mounted map.
+  const { center: communityCenter } = useCommunityPlace()
+  const startCenterRef = useRef(fallbackCenter ?? communityCenter)
   useEffect(() => { onViewListingRef.current = onViewListing }, [onViewListing])
   useEffect(() => { onSelectPointRef.current = onSelectPoint }, [onSelectPoint])
   useEffect(() => { onDeselectPointRef.current = onDeselectPoint }, [onDeselectPoint])
@@ -625,7 +629,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       .then(() => {
         if (cancelled || !containerRef.current) return
         mapRef.current = new google.maps.Map(containerRef.current, {
-          center: fallbackCenter,
+          center: startCenterRef.current,
           zoom: 12,
           mapId: MAPS_MAP_ID,
           mapTypeControl: false,
@@ -674,7 +678,6 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       cancelled = true
       unsubscribe()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── One-finger pan / plain-scroll zoom, like the real Google Maps ─────────
@@ -925,7 +928,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     // framing and won: a map link to one place (a listing's map, ?place=)
     // opened on the whole city with the place lost in it (Nov 16).
     if (shouldLeaveToSelection(points, selectedIdRef.current)) return
-    const anchor = DEFAULT_CENTER
+    const anchor = startCenterRef.current
     const framed = pointsWithinZoomRadius(points, anchor, zoomRadiusMilesRef.current)
     if (framed.length === 1) {
       map.setCenter(framed[0])

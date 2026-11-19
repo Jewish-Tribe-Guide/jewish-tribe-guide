@@ -142,6 +142,17 @@ export function useCommunityCenter(): { lat: number; lng: number } | null {
   return useContext(CommunityContext)?.community.mapCenter ?? null
 }
 
+/** Where the community is and what its area is called: its centre, which
+ *  distances and zmanim are measured from while the visitor hasn't said
+ *  where they are (and a shul with no location of its own is timed by), and
+ *  its region ("Philadelphia"). Each community's own (Nov 19: they were the
+ *  deployment config's, Philly's, for every community). Outside a community
+ *  route (the admin console's previews), the config community's. */
+export function useCommunityPlace(): { center: { lat: number; lng: number }; region: string } {
+  const c = useContext(CommunityContext)?.community
+  return { center: c?.mapCenter ?? configCommunity.mapCenter, region: c?.region ?? configCommunity.region }
+}
+
 // ── The "/" redirect hint ────────────────────────────────────────────────────
 
 /** Records the community the visitor is reading, so a later bare "/" can send

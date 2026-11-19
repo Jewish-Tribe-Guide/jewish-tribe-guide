@@ -7,10 +7,9 @@ import { mapQueryString, routes } from '@/lib/routes'
 import DirectoryHeader from './DirectoryHeader'
 import { CategoryBandFrame, HeroTitle } from './CategoryBandFrame'
 import { ChevronRightIcon } from '@/components/icons'
-import { community } from '@/community.config'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
-import { useCommunitySlug, useContributions } from '@/lib/communityContext'
+import { useCommunityPlace, useCommunitySlug, useContributions } from '@/lib/communityContext'
 import { useNow } from '@/lib/useNow'
 import { eruvView, localParts, type Eruv } from '@/lib/eruv'
 import { fullestEruv } from '@/lib/eruvFields'
@@ -91,6 +90,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', color = '#64748b', band
   useSetScreenHeader(true, title, onUp)
   const isMobile = useIsMobile()
   const slug = useCommunitySlug()
+  const { center } = useCommunityPlace()
   const clock = useNow()
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [pointedId, setPointedId] = useState<string | null>(null)
@@ -225,7 +225,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', color = '#64748b', band
     <EruvMap
       eruvim={mapped}
       you={you}
-      fallbackCenter={community.mapCenter}
+      fallbackCenter={center}
       onSelect={openEruv}
       highlightId={open?.id ?? pointedId}
       onHover={isMobile ? undefined : setPointedId}

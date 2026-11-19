@@ -13,8 +13,7 @@ import { neighborhoodsFor } from '@/lib/places'
 import { answerSchedule, useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
-import { useCommunitySlug, useContributions } from '@/lib/communityContext'
-import { community } from '@/community.config'
+import { useCommunityPlace, useCommunitySlug, useCommunityTimezone, useContributions } from '@/lib/communityContext'
 
 // The home's search, as the home box runs it: a question searched and
 // answered (askSearch, askAnswer), and the lines saying where it could go
@@ -29,6 +28,10 @@ export type HomeCard = { id?: string; title: string; href?: string | null }
 export function useHomeSearch(coords: LatLng | null, { eruv = false }: { eruv?: boolean } = {}) {
   const communitySlug = useCommunitySlug()
   const contributions = useContributions()
+  // Where the community is and its clock: distances and zmanim with no
+  // location set, and when an item was seen (Nov 19: the config's, Philly's).
+  const { center } = useCommunityPlace()
+  const timezone = useCommunityTimezone()
   const categories = useCategories()
   const listings = useAllListings()
   // Against useMinyanSchedule's clock, not a fresh `new Date()` in render
@@ -43,15 +46,16 @@ export function useHomeSearch(coords: LatLng | null, { eruv = false }: { eruv?: 
   const zmanimPage = categories?.some((c) => c.kind === 'zmanim') ?? false
   const eruvStatuses = useEruvStatuses(communitySlug, eruvPage && eruv)
   // The same request the minyan schedule makes (same place, so one fetch).
-  const zmanim = useZmanim(coords ?? community.mapCenter)
+  const zmanim = useZmanim(coords ?? center)
 
   const ask = (text: string): { result: AskResult; answer: Answer | null } => {
     const result = searchAsk(listings ?? [], categories ?? [], text, { coords, now: new Date(schedule?.now ?? 0), places })
     const answer = answerFor(result, {
       coords,
-      center: community.mapCenter,
+      center,
       schedule: result.query.minyan && schedule ? answerSchedule(schedule) : null,
       now: schedule?.now ?? null,
+      timezone,
     })
     // "What's on this site?", "how do I add a listing?" (see metaAnswer).
     if (result.query.meta) {
@@ -82,7 +86,7 @@ export function useHomeSearch(coords: LatLng | null, { eruv = false }: { eruv?: 
   const placeSub = (item: DirectoryResource, category: CategoryConfig) => {
     const now = schedule ? new Date(schedule.now) : null
     const open = now ? openState(item, category, now) : null
-    const from = coords ?? community.mapCenter
+    const from = coords ?? center
     const miles = item.geo ? haversineMiles(from, item.geo) : null
     return [
       category.label,
@@ -107,7 +111,7 @@ export function useHomeSearch(coords: LatLng | null, { eruv = false }: { eruv?: 
           timesSub: result.query.times ? (timesLine(result.query.times, zmanim.data) ?? (zmanim.status === 'error' ? null : 'Looking up the times…')) : null,
           cards,
           placeSub,
-          near: coords ?? community.mapCenter,
+          near: coords ?? center,
           eruvim: eruvStatuses?.available ? eruvStatuses : null,
         })
       : []

@@ -7,10 +7,9 @@ import { PHOTO_FIELD_KEY, type CategoryConfig, type CategoryField } from '@/lib/
 import { useNow } from '@/lib/useNow'
 import { itemDateFor, itemDateText } from '@/lib/itemMarks'
 import { isMinyanOnly, isStale } from '@/lib/listingView'
-import { community as communityConfig } from '@/community.config'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
@@ -216,6 +215,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // built. Before the page has hydrated there's no time (see useNow), so no
   // Open badge and no opening or closing time yet.
   const clock = useNow()
+  const timezone = useCommunityTimezone()
   const now = clock === null ? null : new Date(clock)
   // The row's second line: open status, distance, what kind of place, how
   // many items. See lib/listingRow.ts. No davening line on a shul's row
@@ -525,7 +525,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                     <Chip key={m.tag} tone={m.sometimes || (date && isStale(date.at, clock)) ? 'amber' : 'slate'}>
                       {m.tag}
                       {m.sometimes ? ' · sometimes' : ''}
-                      {date ? ` · ${itemDateText(date, clock, communityConfig.timezone)}` : ''}
+                      {date ? ` · ${itemDateText(date, clock, timezone)}` : ''}
                     </Chip>
                   )
                 })}

@@ -1172,9 +1172,17 @@ Done:
   - The map's pins use Google's current pin (`glyphText`, `glyphSrc`,
     the pin as its own element), so the console no longer warns about
     the old one on every map load.
-  - **Not done:** a shul with no location of its own, in a community
-    other than Philly, still measures "Next minyan" from Philly's centre
-    (`geoOrCommunityDefault` in `useZmanAnchors.ts`).
+  - Each community's own centre, area name and clock, everywhere on the
+    site and in the admin (Nov 19): a shul with no location of its own is
+    timed by its community's centre (`anchorKey`, `COMMUNITY_SPOT`), the
+    map opens there, distances and the home's zmanim are measured from it,
+    the footer and Volunteer wizard name its region, and "seen today" and
+    "last checked Oct 2" read its clock (`useCommunityPlace`,
+    `useCommunityTimezone`). `publicUsesCommunityPlace.test.ts` fails on
+    any new read of the config's. Left on the config on purpose: the
+    Privacy page's date (one policy for the site) and `HOURS_TIMEZONE`,
+    the last resort when a caller passes no clock (its callers weren't
+    audited).
 
 ## Open from the boxes and fields work (Nov 10)
 
