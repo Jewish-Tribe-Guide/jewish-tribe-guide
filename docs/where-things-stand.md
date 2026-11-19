@@ -2139,10 +2139,10 @@ for that exact change, in the same conversation. Show the dry run first.
    on live, nothing else (backup in that session's scratchpad). Its
    flavours get dated from that menu once PR 365 deploys.
 
-1j. **FINE WINE & GOOD SPIRITS (live, Oct 28):** has no Google place
-   (only the street address's, for Directions), so the nightly sync skips
-   it. Fix: set its place id to the store's, on live; needs a yes, after
-   looking the id up and showing it.
+1j. ~~FINE WINE & GOOD SPIRITS has no Google place~~ Done Oct 28, by an
+   edit that evening: it has the store's place id, Google keeps its name,
+   hours, phone and website, and the nightly sync reaches it (checked
+   Nov 19: last synced that morning).
 1k. **Migration 092 (`look_again`)** is run on dev and live (checked Nov 3,
    after PR 373 deployed: live's table has every column, no rows yet).
 
