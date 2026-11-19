@@ -317,20 +317,6 @@ export function getOpenStatus(
   return { isOpen, closing: isOpen ? hoursClosing(openVal, 60, now, timezone) : null, closure: null }
 }
 
-/** "2026-06-07T…" → "Synced from Google · updated 3d ago" / "… updated today".
- *  Returns null if unparseable or absent. A listing-level fact (from its
- *  Google placeId), not tied to any one hours field — see PlaceDetailBody's
- *  own use of this for why it isn't gated on the category having hours at all. */
-export function syncedLabel(iso?: string): string | null {
-  if (!iso) return null
-  const then = new Date(iso).getTime()
-  if (Number.isNaN(then)) return null
-  const days = Math.floor((Date.now() - then) / 86_400_000)
-  if (days <= 0) return 'Synced from Google · updated today'
-  if (days === 1) return 'Synced from Google · updated 1d ago'
-  return `Synced from Google · updated ${days}d ago`
-}
-
 /**
  * One-line label for today's hours shown on a directory card.
  *  - Structured hours → "Today: 9:00 AM – 5:00 PM" or "Closed today"
@@ -346,25 +332,6 @@ export function formatTodayHours(v: unknown, now: Date = new Date(), timezone: s
   if (day === null || day === undefined) return 'Closed today'
   if (!day.open || !day.close) return null
   return `Today: ${dayRangesText(day)}`
-}
-
-/**
- * Full 7-day breakdown for the expandable hours view on a directory card.
- *  - Structured hours → one entry per day (Sun→Sat), with today flagged.
- *  - Legacy text string or missing → null (caller falls back to the raw text).
- */
-export function formatWeekHours(
-  v: unknown,
-  now: Date = new Date(),
-): Array<{ key: DayKey; label: string; text: string; isToday: boolean }> | null {
-  if (!hasAnyHours(v)) return null
-  const hours = v as Record<string, DayHours>
-  const todayKey = DAY_KEYS[now.getDay()]
-  return DAY_KEYS.map((key) => {
-    const day = hours[key] ?? null
-    const text = day ? `${fmt12(day.open)} – ${fmt12(day.close)}` : 'Closed'
-    return { key, label: DAY_LABELS[key], text, isToday: key === todayKey }
-  })
 }
 
 /**

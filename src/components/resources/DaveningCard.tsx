@@ -12,7 +12,7 @@ import { DAY_KEYS, type DayKey } from '@/lib/hours'
 import { boxDate, isMinyanOnly } from '@/lib/listingView'
 import { THIS_WEEK_SECTION } from '@/lib/boxDates'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
-import { ui } from '@/lib/uiConfig'
+import { useContributions } from '@/lib/communityContext'
 import { ChevronRightIcon, PlusIcon } from '@/components/icons'
 import AddScheduleBox from './AddScheduleBox'
 import UpdateTimesBox from './UpdateTimesBox'
@@ -69,7 +69,7 @@ export default function DaveningCard({
   const tapped = useTappedMinyan(item.id)?.minyanId
   const tappedRow = tapped && isMinyanim(minyanim) ? minyanim.find((m) => m.id === tapped) : undefined
   const schedule = useMinyanSchedule(null, [item])
-  const canAdd = ui.contributions.edit && (!category || resolveCapabilities(category.capabilities).edit)
+  const canAdd = useContributions().edit && (!category || resolveCapabilities(category.capabilities).edit)
 
   // Whose times today's and tomorrow's are: a special schedule's, or the
   // regular ones on a festival day with none posted.

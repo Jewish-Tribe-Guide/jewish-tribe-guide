@@ -40,7 +40,7 @@ import { useLearnAfterPause } from '@/lib/useLearnAfterPause'
 import { ListingOnwardContext, type ListingOnwardSource } from './listingOnward'
 import ListingColumn from './ListingColumn'
 import UpvoteButton from './UpvoteButton'
-import { useActiveCommunity, useOptionalCommunitySlug } from '@/lib/communityContext'
+import { useActiveCommunity, useOptionalCommunitySlug, useContributions } from '@/lib/communityContext'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import CategoryAsk from './CategoryAsk'
@@ -626,7 +626,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const upvotes = !!category.upvotesEnabled && ui.upvotes
   // Per-category capabilities layered under the global `ui.*` master switches.
   const caps = resolveCapabilities(category.capabilities)
-  const canAdd = ui.contributions.add && caps.add
+  const contributions = useContributions()
+  const canAdd = contributions.add && caps.add
   // "+" opens "Saw something? Tell us" (agreed Oct 5); today's Add form is
   // one tap inside it, "Add a place".
   const [tellOpen, setTellOpen] = useState(false)
@@ -650,7 +651,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     setTellOpen(true)
   }
   // Adding to a shul's times is an edit to the shul ("+ Add a minyan").
-  const canEdit = ui.contributions.edit && caps.edit
+  const canEdit = contributions.edit && caps.edit
   const showSearch = ui.search.directory && caps.directorySearch
   const liveCount = (item: DirectoryResource) => voteCounts[item.id] ?? item.upvotes ?? 0
 
@@ -1887,7 +1888,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             upvote={
               upvotes ? (
                 <UpvoteButton
-                  variant="recommend"
                   name={columnItem.name}
                   resourceId={columnItem.id}
                   count={liveCount(columnItem)}

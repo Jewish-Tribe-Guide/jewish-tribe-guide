@@ -5,9 +5,8 @@ import Link from 'next/link'
 import type { CategoryConfig } from '@/lib/categories'
 import { resolveCapabilities } from '@/lib/categories'
 import { useCategories } from '@/lib/useCategories'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunitySlug, useContributions } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
-import { ui } from '@/lib/uiConfig'
 import { categoryTint, getCategoryColor, getCategoryTilePhoto } from '@/lib/categoryColor'
 import { TilePhoto } from './sections'
 
@@ -31,6 +30,7 @@ import { TilePhoto } from './sections'
 export default function ContributePicker({ onClose }: { onClose: () => void }) {
   const categories = useCategories()
   const community = useCommunitySlug()
+  const contributions = useContributions()
   const [query, setQuery] = useState('')
 
   // Escape closes it, as it does every other dialog in the app.
@@ -43,7 +43,7 @@ export default function ContributePicker({ onClose }: { onClose: () => void }) {
   const eligible = (categories ?? []).filter((c: CategoryConfig) => {
     if (c.kind !== 'listing') return false
     const caps = resolveCapabilities(c.capabilities)
-    return ui.contributions.add && caps.add
+    return contributions.add && caps.add
   })
   const q = query.trim().toLowerCase()
   const filtered = q ? eligible.filter((c) => c.pluralLabel.toLowerCase().includes(q)) : eligible

@@ -1,7 +1,7 @@
-import { community } from '@/community.config'
 import { getZmanimData } from '@/lib/zmanim'
 import { parseZmanimRequest, zmanimDateCheck } from '@/lib/zmanimRequest'
 import { enforceRateLimit } from '@/lib/rateLimit'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // Cacheable at the CDN: the answer depends only on the (rounded) location, the
 // timezone and today's date, so every visitor near the same spot can share one.
@@ -16,7 +16,9 @@ export async function GET(request: Request) {
   if (limited) return limited
 
   const params = new URL(request.url).searchParams
-  const parsed = parseZmanimRequest(params, community.timezone)
+  // No `tzid`: the requested community's clock (`?community=`), else the
+  // default community's, never the deployment config's (Nov 18, item 33).
+  const parsed = parseZmanimRequest(params, (await resolveCommunity(communitySlugFromRequest(request))).timezone)
   if (!parsed.ok) {
     return Response.json({ ok: false, error: parsed.error }, { status: 400 })
   }

@@ -2,14 +2,12 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
-import { ui } from '@/lib/uiConfig'
 import { getResourceById } from '@/lib/resourceStore'
 import { fetchFestivals } from '@/lib/festivals'
-import { community } from '@/community.config'
 import { readSchedule, type ScheduleSource } from '@/lib/scheduleReader'
 import { readShulWeek } from '@/lib/shulWeekReading'
 import { getCategoryById } from '@/lib/categoryStore'
-
+import { editableCommunity } from '@/lib/listingWrite'
 import { UUID } from '@/lib/itemMarkRoutes'
 
 // POST /api/schedule/read   multipart: listingId, festival | kind=regular, turnstileToken, company, and text or file
@@ -49,14 +47,14 @@ export async function POST(request: Request) {
   if (!(await verifyTurnstile(field('turnstileToken') || undefined, clientIp(request)))) {
     return Response.json({ ok: false, code: 'turnstile', error: 'Verification failed. Please try again.' }, { status: 403 })
   }
-  if (!ui.contributions.edit) return Response.json({ ok: false, error: 'This action is not available.' }, { status: 403 })
 
-  // The listing's own community, from the row: a live one only.
+  // The listing's own community, from the row: a live one only, taking
+  // edits. Its clock and its place read the times (Nov 18, item 33).
   const listingId = field('listingId')
-  const { data: row } = UUID.test(listingId)
-    ? await getAdminClient().from('resource').select('community_id').eq('id', listingId).eq('status', 'approved').maybeSingle<{ community_id: string }>()
-    : { data: null }
-  const listing = row ? await getResourceById(listingId, row.community_id) : null
+  if (!UUID.test(listingId)) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
+  const community = await editableCommunity(listingId)
+  if (community instanceof Response) return community
+  const listing = await getResourceById(listingId, community.slug)
   if (!listing) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
 
   const text = field('text').trim()
@@ -83,7 +81,7 @@ export async function POST(request: Request) {
     if (field('kind') === 'regular') {
       // "Update their times": the shul's regular times, compared with what
       // the guide has (scheduleUpdate.ts).
-      const category = await getCategoryById(row!.community_id, listing.category)
+      const category = await getCategoryById(community.slug, listing.category)
       const minyanimField = category?.detailFields.find((f) => f.type === 'minyanim')
       if (!minyanimField) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
       result = await readShulWeek(listing, minyanimField.key, source, apiKey, { where: community })

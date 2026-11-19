@@ -8,6 +8,7 @@ const m = vi.hoisted(() => ({
   revalidateTag: vi.fn(),
   rpc: vi.fn(),
   del: vi.fn(),
+  row: vi.fn(),
   recordActivity: vi.fn(),
   removeVisitorActivity: vi.fn(),
   verifyTurnstile: vi.fn(),
@@ -16,11 +17,13 @@ const m = vi.hoisted(() => ({
   submitListingUpdate: vi.fn(),
   notify: vi.fn(),
   ui: { contributions: { add: true, edit: true, report: true } },
+  communityUi: {} as Record<string, unknown>,
 }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
 vi.mock('next/cache', () => ({ revalidateTag: m.revalidateTag }))
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => fn() }))
-// The withdrawal's query, recorded as one call with its filters.
+// The withdrawal's query, recorded as one call with its filters; the
+// listing's row (its community) as m.row.
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     rpc: m.rpc,
@@ -30,7 +33,8 @@ vi.mock('@/lib/supabase/admin', () => ({
         delete: () => chain,
         eq: (...a: unknown[]) => (filters.push(['eq', ...a]), chain),
         gte: (...a: unknown[]) => (filters.push(['gte', ...a]), chain),
-        select: () => m.del(table, filters),
+        select: () => (table === 'resource' ? chain : m.del(table, filters)),
+        maybeSingle: () => m.row(table, filters),
       }
       return chain
     },
@@ -38,7 +42,14 @@ vi.mock('@/lib/supabase/admin', () => ({
 }))
 vi.mock('@/lib/activityStore', () => ({ recordActivity: m.recordActivity, removeVisitorActivity: m.removeVisitorActivity }))
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
-vi.mock('@/lib/uiConfig', () => ({ ui: m.ui }))
+vi.mock('@/lib/uiConfig', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/uiConfig')>()
+  return { ...actual, ui: m.ui, contributionsFor: (own: unknown) => actual.contributionsFor(own, m.ui.contributions) }
+})
+// The listing's own community: its clock, and its own switches (m.communityUi).
+vi.mock('@/lib/communityStore', () => ({
+  resolveCommunity: async (slug: string) => ({ slug, timezone: 'America/New_York', mapCenter: { lat: 39.95, lng: -75.16 }, ui: m.communityUi }),
+}))
 vi.mock('@/lib/resourceStore', () => ({ getResourceById: m.getResourceById }))
 vi.mock('@/lib/categoryStore', () => ({ getCategoryById: m.getCategoryById }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate }))
@@ -60,6 +71,8 @@ const marked = (changed = true) => ({
 beforeEach(() => {
   vi.resetAllMocks()
   m.ui.contributions.edit = true
+  m.communityUi = {}
+  m.row.mockResolvedValue({ data: { community_id: 'philly' }, error: null })
   m.enforceRateLimit.mockResolvedValue(null)
   m.verifyTurnstile.mockResolvedValue(true)
   m.recordActivity.mockResolvedValue([8])
@@ -114,6 +127,14 @@ describe('POST /api/resource/:id/item/gone (Not anymore)', () => {
     m.verifyTurnstile.mockResolvedValue(true)
     m.ui.contributions.edit = false
     expect((await POST(req('POST', { field: 'm', item: 'Chicken' }), ctx())).status).toBe(403)
+    expect(m.rpc).not.toHaveBeenCalled()
+  })
+
+  // Nov 18 review, item 33: the listing's own community's switch, before
+  // the warning goes up.
+  it('puts up no warning where the listing’s own community has edits off', async () => {
+    m.communityUi = { contributions: { edit: false } }
+    expect((await POST(req('POST', { field: 'm', item: 'Chicken', turnstileToken: 't' }), ctx())).status).toBe(403)
     expect(m.rpc).not.toHaveBeenCalled()
   })
 

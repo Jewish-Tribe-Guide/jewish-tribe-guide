@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { Community } from './communityStore'
 import { COMMUNITY_COOKIE } from './configCommunity'
 import { community as configCommunity } from '@/community.config'
+import { contributionsFor, type Contributions } from './uiConfig'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Which community the visitor is looking at — now decided by the URL.
@@ -126,6 +127,12 @@ export function useOptionalCommunitySlug(): string | null {
  *  (the admin console's previews) it's the config community's. */
 export function useCommunityTimezone(): string {
   return useContext(CommunityContext)?.community.timezone ?? configCommunity.timezone
+}
+
+/** Which public contributions this community takes (contributionsFor).
+ *  Outside a community route, the deployment's own switches. */
+export function useContributions(): Contributions {
+  return contributionsFor(useContext(CommunityContext)?.community.ui)
 }
 
 /** The community's map centre, or null outside a community route. Google's

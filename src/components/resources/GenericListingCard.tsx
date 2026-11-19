@@ -11,7 +11,7 @@ import { isMinyanOnly, isStale } from '@/lib/listingView'
 import { community as communityConfig } from '@/community.config'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunitySlug, useContributions } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
@@ -29,7 +29,6 @@ import Chip from './Chip'
 import { initialsOf, listingRowFacts, listingRowNote, type RowNote } from '@/lib/listingRow'
 import { photoOnCard, thirdLineFields } from '@/lib/cardLines'
 import { FACT_TONE } from './rowFactTone'
-import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { usePinned } from '@/lib/pinnedContext'
 import { countEvent } from '@/lib/countEvent'
@@ -231,9 +230,9 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   })
 
   const fields = category.detailFields
-  // Per-category capabilities layered under the global `ui.contributions` switches.
+  // Per-category capabilities layered under the community’s contribution switches.
   const caps = resolveCapabilities(category.capabilities)
-  const canEdit = ui.contributions.edit && caps.edit
+  const canEdit = useContributions().edit && caps.edit
 
   // A listing is "Open" if ANY of its hours fields say so — see getOpenStatus.
   // Against useNow rather than the render's own clock: open/closed is the
@@ -262,7 +261,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // Upvotes live in the opened listing now (the sheet on a phone, the dialog
   // on desktop), not on every row: a column of "👍 0" said nothing while a
   // list was being scanned. Popularity still orders the list.
-  const upvote = upvotes ? <UpvoteButton variant="recommend" name={item.name} resourceId={item.id} count={count} onCountChange={onVote} /> : null
+  const upvote = upvotes ? <UpvoteButton name={item.name} resourceId={item.id} count={count} onCountChange={onVote} /> : null
   // The opened listing's last part: the places near it in this list, then
   // the whole list. Opening one closes this listing first.
   const onwardSource = useListingOnward()

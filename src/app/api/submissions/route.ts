@@ -21,7 +21,7 @@ import { payloadTooLarge } from '@/lib/limits'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
 import { hasListingChanged } from '@/lib/listingDiff'
-import { ui } from '@/lib/uiConfig'
+import { contributionsFor } from '@/lib/uiConfig'
 import type { ResourceSubmission, SubmissionRow } from '@/types'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { normalizeEmail } from '@/lib/activity'
@@ -77,6 +77,8 @@ export async function POST(request: Request) {
   }
 
   const community = await resolveCommunity(communitySlugFromRequest(request))
+  // The deployment's switches and this community's own (contributionsFor).
+  const contributions = contributionsFor(community.ui)
   const { operation, targetType = 'listing', targetId, note } = body
   // Only the email a visitor typed. A name is how the guide's own checks
   // and admins sign (submissionSource, editedBy), so one sent from here
@@ -91,7 +93,7 @@ export async function POST(request: Request) {
   if (targetType === 'eruv' && operation === 'create') {
     const categories = await listCategories(community.slug)
     const page = categories.find((c) => c.kind === 'eruv')
-    if (!ui.contributions.add || !page || !resolveCapabilities(page.capabilities).add) return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
+    if (!contributions.add || !page || !resolveCapabilities(page.capabilities).add) return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
     // Hidden ones too: adding one by the same name would fail at approval.
     const listed = await listEruvimForAdmin(community.slug)
     if (!listed.available) return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
@@ -109,7 +111,7 @@ export async function POST(request: Request) {
   }
 
   if (targetType === 'eruv') {
-    if (!ui.contributions.edit) return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
+    if (!contributions.edit) return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
     if (operation !== 'update' || !targetId) return Response.json({ ok: false, errors: ['Unknown operation.'] }, { status: 400 })
     const eruv = (await listEruvim(community.slug)).eruvim.find((e) => e.id === targetId)
     if (!eruv) return Response.json({ ok: false, errors: ['Eruv not found.'] }, { status: 404 })
@@ -127,15 +129,15 @@ export async function POST(request: Request) {
   }
 
   // Curated-directory gate: refuse whichever contribution paths the community
-  // turned off in community.config (ui.contributions), so hiding a button can't
+  // turned off (contributionsFor: the deployment's config and its own row), so hiding a button can't
   // be bypassed by posting directly.
   const allowed =
     operation === 'create'
-      ? ui.contributions.add
+      ? contributions.add
       : operation === 'update'
-        ? ui.contributions.edit
+        ? contributions.edit
         : operation === 'delete'
-          ? ui.contributions.report
+          ? contributions.report
           : true // unknown operations fall through to the 400 below
   if (!allowed) {
     return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
@@ -168,7 +170,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, errors: ['Listing not found.'] }, { status: 404 })
   }
 
-  // Per-category gate: on top of the global `ui.contributions` check above, the
+  // Per-category gate: on top of the community’s contributions check above, the
   // target category can independently turn add/edit/report off. Resolve the
   // category from the payload (create) or the existing listing (update/delete),
   // so a disabled per-category button can't be bypassed by posting directly.

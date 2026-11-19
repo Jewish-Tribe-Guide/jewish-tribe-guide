@@ -1,7 +1,7 @@
-import { community } from '@/community.config'
 import { getZmanimData } from '@/lib/zmanim'
 import { parseZmanimBatchRequest, zmanimDateCheck } from '@/lib/zmanimRequest'
 import { enforceRateLimit } from '@/lib/rateLimit'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // Same cache policy as the single-location route: the answer depends only on
 // the (rounded) locations, the timezone and today's date.
@@ -15,7 +15,8 @@ export async function GET(request: Request) {
   if (limited) return limited
 
   const params = new URL(request.url).searchParams
-  const parsed = parseZmanimBatchRequest(params, community.timezone)
+  // No `tzid`: the requested community's clock, as /api/zmanim.
+  const parsed = parseZmanimBatchRequest(params, (await resolveCommunity(communitySlugFromRequest(request))).timezone)
   if (!parsed.ok) {
     return Response.json({ ok: false, error: parsed.error }, { status: 400 })
   }

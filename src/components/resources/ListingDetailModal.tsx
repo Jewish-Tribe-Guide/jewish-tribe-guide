@@ -4,13 +4,13 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
-import { ui } from '@/lib/uiConfig'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunitySlug, useContributions } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import ListingView from './ListingView'
 import type { SearchFound } from '@/lib/askSearch'
 import ListingEditBar from './ListingEditBar'
+import { useEditFormHistory } from './useEditFormHistory'
 import dynamic from 'next/dynamic'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
@@ -90,57 +90,17 @@ export default function ListingDetailModal({
   const community = useCommunitySlug()
   // The listing's own URL, for the edit bar's overflow Share.
   const listingPath = routes.listing(community, category.id, listingSlug(item))
-  const canReport = ui.contributions.report && resolveCapabilities(category.capabilities).report
+  const canReport = useContributions().report && resolveCapabilities(category.capabilities).report
 
-  // Own history entry, nested on top of whatever real navigation got this
-  // dialog open in the first place — so browser back closes the form and
-  // returns to the detail view, not out of the dialog (or off the page)
-  // entirely. Same pattern MapPlaceDetail's own formOpen uses; see that
-  // component's doc for why. Doesn't touch the `?item=` query param this
-  // dialog's own open/close already syncs (see GenericDirectory's
-  // onExpandedChange) — that stays exactly as it was the whole time this
-  // is open, same as it does while just viewing details.
-  const [formOpen, setFormOpen] = useState<'edit' | null>(null)
-  // Whether the editor is on its Request removal screen. Owned here, not in
-  // the editor, because it's a step of its own: it has its own history
-  // entry on top of the form's, so Back, Escape and the browser's Back each
-  // step out of removal into the edit (with whatever was typed there still
-  // there) rather than out of editing altogether — the removal screen has
-  // no Cancel of its own. Also names the dialog "Request removal of
+  // The editor and its Request removal screen, each an entry nested on top
+  // of whatever real navigation got this dialog open, so browser back closes
+  // the form and returns to the detail view, not out of the dialog (or off
+  // the page). Shared with MapPlaceDetail. Doesn't touch the `?item=` query
+  // param this dialog's own open/close already syncs (see GenericDirectory's
+  // onExpandedChange). Removal also names the dialog "Request removal of
   // {name}" instead of "Suggest an edit".
-  const [removalOpen, setRemovalOpen] = useState(false)
-  useEffect(() => {
-    function onPopState(e: PopStateEvent) {
-      const state = e.state as { detailModalForm?: 'edit'; detailModalRemoval?: boolean } | null
-      setFormOpen(state?.detailModalForm === 'edit' ? 'edit' : null)
-      setRemovalOpen(state?.detailModalForm === 'edit' && !!state.detailModalRemoval)
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [])
-  const openForm = (mode: 'edit') => {
-    history.pushState({ ...(window.history.state ?? {}), detailModalForm: mode }, '')
-    setFormOpen(mode)
-  }
-  // One step back: from removal to the edit, from the edit to the listing.
-  const stepBack = () => history.back()
-  // All the way out of the form — which, after a removal request is sent,
-  // is two entries back (the receipt's "Back to the listing").
-  const closeForm = () => (removalOpen ? history.go(-2) : history.back())
-  const changeRemovalOpen = (open: boolean) => {
-    if (open === removalOpen) return
-    if (open) {
-      history.pushState({ ...(window.history.state ?? {}), detailModalRemoval: true }, '')
-      setRemovalOpen(true)
-    } else stepBack()
-  }
-  // The edit bar's Request removal: straight to that screen, one
-  // history entry, so Back returns to the listing.
-  const openRemoval = () => {
-    history.pushState({ ...(window.history.state ?? {}), detailModalForm: 'edit', detailModalRemoval: true }, '')
-    setFormOpen('edit')
-    setRemovalOpen(true)
-  }
+  const formHistory = useEditFormHistory('detailModal')
+  const { formOpen, removalOpen, openForm, stepBack, closeForm, changeRemovalOpen, openRemoval } = formHistory
   // A row of the editor open (or a minyan, a person in one): Back and
   // Escape close that, not the editor.
   const [editorStep, setEditorStep] = useState<EditorStep | null>(null)
@@ -162,10 +122,7 @@ export default function ListingDetailModal({
   const [wasOpen, setWasOpen] = useState(isOpen)
   if (isOpen !== wasOpen) {
     setWasOpen(isOpen)
-    if (isOpen) {
-      setFormOpen(null)
-      setRemovalOpen(false)
-    }
+    if (isOpen) formHistory.reset()
   }
 
   // Reference-counted, not a plain `document.body.style.overflow = isOpen ?
@@ -205,7 +162,7 @@ export default function ListingDetailModal({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen, onClose, onNavigate, formOpen, editorStep])
+  }, [isOpen, onClose, onNavigate, formOpen, editorStep, stepBack])
 
   if (!isOpen) return null
 

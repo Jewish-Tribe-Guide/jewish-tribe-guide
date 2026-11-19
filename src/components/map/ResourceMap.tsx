@@ -7,7 +7,7 @@ import { destinationQuery, directionsUrl, type LatLng } from '@/lib/googleMapsLi
 import { haversineMiles } from '@/lib/geo'
 import { community } from '@/community.config'
 import type { DirectoryResource } from '@/types'
-import { glyphElementFor, glyphTextFor } from '@/lib/categoryIcons'
+import { glyphSrcFor, glyphTextFor } from '@/lib/categoryIcons'
 import { BookmarkIcon } from '@/components/icons'
 import { clearEruvim, drawEruvim, emphasizeEruvim, eruvDrawKey, type DrawnEruv, type MapEruv } from './eruvLayer'
 import MapUnavailable from './MapUnavailable'
@@ -317,7 +317,8 @@ export const USER_PULSE_STYLE =
 // miss at a glance; the halo gives it a lasting visual difference and the
 // bounce draws the eye the instant a new pin is picked — the one visual tie
 // between "what the sheet is showing" and "where that is on the map".
-function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
+// Exported for its test.
+export function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
   if (!document.getElementById('jpc-pin-select-style')) {
     const style = document.createElement('style')
     style.id = 'jpc-pin-select-style'
@@ -327,22 +328,22 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
     document.head.appendChild(style)
   }
 
-  // A hand-built glyph (see lib/categoryIcons.tsx): a plain "H" string for
-  // hospitals, an SVG line icon Element for everything else, the plain
+  // A hand-built glyph (see lib/categoryIcons.tsx): an "H" for hospitals,
+  // the category's line icon as an image for everything else, the plain
   // four-squares one for a category with none of its own. Never the emoji.
-  const glyphIcon = glyphTextFor(p.filterId) ?? glyphElementFor(p.filterId)
+  // Not PinElement's `glyph` or `.element`: both are deprecated, and Google
+  // warned about them on every map load (Nov 18, review item 47). The pin
+  // is an element itself.
+  const text = glyphTextFor(p.filterId)
   const pin = new google.maps.marker.PinElement({
     background: p.color,
     borderColor: '#ffffff',
-    glyph: glyphIcon ?? null,
-    // Ignored once `glyph` is an SVG Element (glyphElementFor's icons color
-    // themselves white directly) — still applies to a plain-string glyph
-    // (the "H" text, or the plain-emoji fallback), where PinElement really
-    // does read it.
+    ...(text ? { glyphText: text } : { glyphSrc: glyphSrcFor(p.filterId) }),
+    // Colors the "H"; the line icon's image is white already.
     glyphColor: '#ffffff',
     scale: isSelected ? 1.6 : 1,
   })
-  if (!isSelected && !p.pinned) return pin.element
+  if (!isSelected && !p.pinned) return pin
 
   const wrap = document.createElement('div')
   wrap.style.cssText =
@@ -353,7 +354,7 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
     halo.style.cssText = pinHaloStyle(p.color)
     wrap.append(halo)
   }
-  wrap.append(pin.element)
+  wrap.append(pin)
   // A small badge over the pin's own glyph, not a swap to a different marker
   // color/icon — the category color+glyph is how a visitor already tells
   // pins apart at a glance, and a pinned place is still that same category,

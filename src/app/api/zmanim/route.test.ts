@@ -4,6 +4,11 @@ const mockGetZmanimData = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/zmanim', () => ({ getZmanimData: mockGetZmanimData }))
 const mockEnforce = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: mockEnforce }))
+// Two communities on different clocks: no `tzid` means the requested one's.
+vi.mock('@/lib/communityStore', () => ({
+  communitySlugFromRequest: (r: Request) => new URL(r.url).searchParams.get('community'),
+  resolveCommunity: async (slug: string | null) => (slug === 'yerushalayim' ? { slug, timezone: 'Asia/Jerusalem' } : { slug: 'philly', timezone: 'America/New_York' }),
+}))
 
 const { GET } = await import('./route')
 const get = (q: string) => GET(new Request(`http://localhost/api/zmanim?${q}`))
@@ -59,5 +64,16 @@ describe('GET /api/zmanim', () => {
     expect((await get(`lat=1&lng=2&date=${today}`)).headers.get('Cache-Control')).toContain('s-maxage=')
     expect((await get('lat=1&lng=2&date=2001-01-01')).headers.get('Cache-Control')).toBe('no-store')
     expect((await get('lat=1&lng=2&date=tomorrow')).status).toBe(400)
+  })
+
+  // Nov 18 review, item 33: the default was the deployment config's clock,
+  // so another community's "today" turned over at Philadelphia's midnight.
+  it('with no tzid, answers on the requested community’s clock', async () => {
+    mockEnforce.mockResolvedValue(null)
+    mockGetZmanimData.mockResolvedValue({ hebrewDate: 'x' })
+    await get('lat=31.78&lng=35.22&community=yerushalayim')
+    expect(mockGetZmanimData).toHaveBeenLastCalledWith({ latitude: 31.78, longitude: 35.22, timezone: 'Asia/Jerusalem' })
+    await get('lat=39.95&lng=-75.16')
+    expect(mockGetZmanimData).toHaveBeenLastCalledWith({ latitude: 39.95, longitude: -75.16, timezone: 'America/New_York' })
   })
 })

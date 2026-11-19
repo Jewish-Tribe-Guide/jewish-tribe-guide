@@ -7,11 +7,12 @@ import ListingView, { type Onward } from '@/components/resources/ListingView'
 import type { SearchFound } from '@/lib/askSearch'
 import { scrollingAncestor } from '@/lib/scrollingAncestor'
 import ListingEditBar from '@/components/resources/ListingEditBar'
+import { useEditFormHistory } from '@/components/resources/useEditFormHistory'
 import dynamic from 'next/dynamic'
 import { ui } from '@/lib/uiConfig'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunitySlug, useContributions } from '@/lib/communityContext'
 import BackIconButton from '@/components/BackIconButton'
 import UpvoteButton from '@/components/resources/UpvoteButton'
 
@@ -90,50 +91,21 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
   // not the list underneath it or off the map entirely. Same pattern as
   // that one; see its own comment for why (and CategoryEditor's
   // openPreview/closePreview, the precedent both follow).
-  const [formOpen, setFormOpen] = useState<'edit' | null>(null)
+  // The editor's Request removal screen is a step of its own too, one more
+  // entry on top of the form's. Shared with the desktop dialog
+  // (useEditFormHistory).
+  const formHistory = useEditFormHistory('mapSheet')
+  const { formOpen, removalOpen, stepBack, closeForm, changeRemovalOpen } = formHistory
   const [titleSlot, setTitleSlot] = useState<HTMLElement | null>(null)
-  // The editor's Request removal screen is a step of its own, one more
-  // history entry on top of the form's — so Back and the phone's back
-  // swipe step out of removal into the edit (what was typed there still
-  // there), not out of editing altogether. It has no Cancel of its own.
-  // Same as the desktop dialog (ListingDetailModal).
-  const [removalOpen, setRemovalOpen] = useState(false)
   // Whether the editor holds anything typed and not yet sent.
   const [changed, setChanged] = useState(false)
-  useEffect(() => {
-    function onPopState(e: PopStateEvent) {
-      const state = e.state as { mapSheetForm?: 'edit'; mapSheetRemoval?: boolean } | null
-      const open = state?.mapSheetForm === 'edit' ? 'edit' : null
-      setFormOpen(open)
-      setRemovalOpen(open === 'edit' && !!state?.mapSheetRemoval)
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [])
   const openForm = (mode: 'edit') => {
-    history.pushState({ ...(window.history.state ?? {}), mapSheetForm: mode }, '')
     setChanged(false)
-    setFormOpen(mode)
+    formHistory.openForm(mode)
   }
-  // One step back: from removal to the edit, from the edit to the listing.
-  const stepBack = () => history.back()
-  // All the way out of the form — two entries back once a removal request
-  // has been sent from its own screen.
-  const closeForm = () => (removalOpen ? history.go(-2) : history.back())
-  const changeRemovalOpen = (open: boolean) => {
-    if (open === removalOpen) return
-    if (open) {
-      history.pushState({ ...(window.history.state ?? {}), mapSheetRemoval: true }, '')
-      setRemovalOpen(true)
-    } else stepBack()
-  }
-  // The bar's Request removal: straight to that screen, one
-  // history entry, so Back returns to the listing.
   const openRemoval = () => {
-    history.pushState({ ...(window.history.state ?? {}), mapSheetForm: 'edit', mapSheetRemoval: true }, '')
     setChanged(false)
-    setFormOpen('edit')
-    setRemovalOpen(true)
+    formHistory.openRemoval()
   }
   // A row of the editor open (or a minyan, a person in one): Back closes
   // that, not the editor.
@@ -168,13 +140,14 @@ export default function MapPlaceDetail({ item, category, color, onBack, found, u
     onEditingChange?.(formOpen !== null)
   }, [formOpen, onEditingChange])
   const caps = resolveCapabilities(category.capabilities)
-  const canEdit = ui.contributions.edit && caps.edit
-  const canReport = ui.contributions.report && caps.report
+  const contributions = useContributions()
+  const canEdit = contributions.edit && caps.edit
+  const canReport = contributions.report && caps.report
   const shownUpvote =
     upvote !== undefined
       ? upvote
       : category.upvotesEnabled && ui.upvotes
-        ? <UpvoteButton variant="recommend" name={item.name} resourceId={item.id} count={item.upvotes ?? 0} />
+        ? <UpvoteButton name={item.name} resourceId={item.id} count={item.upvotes ?? 0} />
         : null
 
   if (formOpen) {

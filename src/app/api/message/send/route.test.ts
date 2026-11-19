@@ -14,12 +14,16 @@ const m = vi.hoisted(() => ({
   sendSubmissionNotification: vi.fn(),
   after: [] as Array<() => unknown>,
   ui: { contributions: { add: true, edit: true, report: true } },
+  communityUi: {} as Record<string, unknown>,
 }))
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => void m.after.push(fn) }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
 vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
-vi.mock('@/lib/uiConfig', () => ({ ui: m.ui }))
-vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly', name: 'Philadelphia' }) }))
+vi.mock('@/lib/uiConfig', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/uiConfig')>()
+  return { ...actual, ui: m.ui, contributionsFor: (own: unknown) => actual.contributionsFor(own, m.ui.contributions) }
+})
+vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly', name: 'Philadelphia', ui: m.communityUi }) }))
 vi.mock('@/lib/resourceStore', async (original) => ({ ...(await original<object>()), listApprovedResources: m.listApprovedResources }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate, submitListingCreate: m.submitListingCreate }))
@@ -43,6 +47,7 @@ beforeEach(() => {
   m.after.length = 0
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', SUPABASE)
   m.ui.contributions.add = m.ui.contributions.edit = true
+  m.communityUi = {}
   m.enforceRateLimit.mockResolvedValue(null)
   m.verifyTurnstile.mockResolvedValue(true)
   m.listApprovedResources.mockResolvedValue([arch])
@@ -161,6 +166,14 @@ describe('POST /api/message/send', () => {
     expect(await res.json()).toMatchObject({ ok: true, filed: 0 })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
     expect(m.submitListingCreate).not.toHaveBeenCalled()
+  })
+
+  // Nov 18 review, item 33: the community's own switch, not only the
+  // deployment's.
+  it('files no store’s change where this community takes no edits', async () => {
+    m.communityUi = { contributions: { edit: false } }
+    expect(await (await post({ text: 'x', stores: [{ listingId: ARCH, items }] })).json()).toMatchObject({ ok: true, filed: 0 })
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 
   it('keeps only photos the reader kept', async () => {

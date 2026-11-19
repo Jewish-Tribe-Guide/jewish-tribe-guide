@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { useZmanAnchors, geoKey, resolveAnchorTime } from './useZmanAnchors'
 
+// The community the page is showing: its clock.
+const clock = vi.hoisted(() => ({ timezone: 'America/New_York' }))
+vi.mock('@/lib/communityContext', () => ({ useCommunityTimezone: () => clock.timezone }))
+
 // The module-level cache used to be keyed on location alone, on the reasoning
 // that zmanim "don't change within a session". A session here is a phone in
 // someone's pocket: a tab opened on Thursday evening went on captioning
@@ -39,6 +43,7 @@ function becomeVisible() {
 }
 
 beforeEach(() => {
+  clock.timezone = 'America/New_York'
   fetchCount = 0
   sunsetIso = '2026-08-28T19:23:00-04:00'
   vi.useFakeTimers()
@@ -115,6 +120,20 @@ describe('useZmanAnchors batching', () => {
     expect(urls().length).toBeGreaterThan(0)
     expect(urls().some((u) => u.includes('/batch'))).toBe(false)
     expect(new Set(urls()).size).toBe(1)
+  })
+
+  // Nov 18 review, item 33: both asked on the deployment config's clock
+  // (the batch by saying nothing), so another community's shuls were given
+  // Philadelphia's "today".
+  it('asks on the community’s own clock, one spot or several', async () => {
+    clock.timezone = 'Asia/Jerusalem'
+    stubBatch()
+    render(<Many geos={[freshGeo(), freshGeo()]} />)
+    render(<Many geos={[freshGeo()]} />)
+    await flush()
+    expect(urls().some((u) => u.includes('/batch'))).toBe(true)
+    expect(urls().some((u) => !u.includes('/batch'))).toBe(true)
+    for (const u of urls()) expect(u).toContain('tzid=Asia%2FJerusalem')
   })
 
   it('one failing spot does not take the others down', async () => {
@@ -214,6 +233,12 @@ describe('resolveAnchorTime with bounds', () => {
         at('2026-06-26T20:13:00-04:00'),
       ),
     ).toBe('7:00 PM')
+  })
+
+  // Nov 18 review, item 33: read back out on the deployment config's clock,
+  // a Yerushalayim shul's 4:47pm candle lighting came out as 9:47 AM.
+  it('reads the time on the clock it was asked for in', () => {
+    expect(resolveAnchorTime(rule, { timezone: 'Asia/Jerusalem', candleLightingIso: '2026-10-23T16:47:00+03:00' })).toBe('4:47 PM')
   })
 
   it('is unaffected when a row carries no bounds', () => {

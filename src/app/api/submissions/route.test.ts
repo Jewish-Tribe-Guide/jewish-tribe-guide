@@ -45,7 +45,10 @@ vi.mock('@/lib/eruvStore', () => ({ listEruvim: m.listEruvim, listEruvimForAdmin
 vi.mock('@/lib/email', () => ({ sendSubmissionNotification: m.sendSubmissionNotification }))
 vi.mock('@/lib/confirmationEmail', () => ({ sendSubmissionConfirmation: m.sendSubmissionConfirmation }))
 vi.mock('next/server', () => ({ after: m.after }))
-vi.mock('@/lib/uiConfig', () => ({ ui: { contributions: m.contributions } }))
+vi.mock('@/lib/uiConfig', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/uiConfig')>()
+  return { ...actual, ui: { contributions: m.contributions }, contributionsFor: (own: unknown) => actual.contributionsFor(own, m.contributions) }
+})
 
 import { SYNC_INTERNAL_FIELDS } from '@/lib/syncFields'
 
@@ -135,6 +138,19 @@ describe('POST /api/submissions — refusals before anything is stored', () => {
     ['delete', 'report'],
   ] as const)('403s a %s when the community has turned %s off', async (operation, flag) => {
     m.contributions[flag] = false
+    const res = await post({ operation, targetId: 'r1', payload: listing })
+    expect(res.status).toBe(403)
+    nothingStored()
+  })
+
+  // Nov 18 review, item 33: the community's own switch (its row's `ui`) was
+  // read by nothing, so only the whole deployment's could turn one off.
+  it.each([
+    ['create', 'add'],
+    ['update', 'edit'],
+    ['delete', 'report'],
+  ] as const)('403s a %s when this community alone has turned %s off', async (operation, flag) => {
+    m.resolveCommunity.mockResolvedValue({ slug: 'ues', ui: { contributions: { [flag]: false } } })
     const res = await post({ operation, targetId: 'r1', payload: listing })
     expect(res.status).toBe(403)
     nothingStored()

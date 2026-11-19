@@ -1121,6 +1121,36 @@ Done:
     sent; the page-load trace now starts when it arrives.
   - JS budgets for a category page, a listing's own page and the map
     (`budgets.spec.ts`), counting the site's own scripts.
+- Tidying (items 33, 42–44, 47):
+  - Each community's own clock: zmanim, festivals, a shul's week read
+    from a photo and its times are worked out in the listing's community's
+    timezone, not Philly's (`apiUsesCommunityClock.test.ts` fails if a
+    route under `src/app/api` reads the deployment's config community).
+  - Contributions on or off per community: a community's `ui` row can
+    switch add, edit or report off for itself (`contributionsFor`); the
+    deployment switch still wins. Nothing sets it yet, so nothing changes
+    on the site.
+  - The four routes a visitor changes a shul or a listing's items through
+    share one start (`listingWrite.ts`). The photo check had drifted: a
+    week read from the "+ Add" box's photo was refused by one of them.
+  - The map's search suggestions are one list for the phone and the
+    computer, and the listing editor's history entries one hook
+    (`useEditFormHistory`) for the computer's dialog and the map's sheet.
+    Those entries are still written with `history.pushState`, not Next's
+    router; moving them is a change of its own.
+  - Dead code out: the upvote button's two looks no screen used (both
+    drew a 👍), `formatWeekHours`, `syncedLabel`, the map's unused `onUp`
+    and its re-export of the hospital colour. Five public reads no screen
+    calls stay (`/api/site-settings`, `home-sections`, `forms`,
+    `hospitals`, `campaign-banners`): the e2e suites read them to know
+    what the site should show, and warm the cache through them. Their
+    comments said screens fetched them; they say who does now.
+  - The map's pins use Google's current pin (`glyphText`, `glyphSrc`,
+    the pin as its own element), so the console no longer warns about
+    the old one on every map load.
+  - **Not done:** a shul with no location of its own, in a community
+    other than Philly, still measures "Next minyan" from Philly's centre
+    (`geoOrCommunityDefault` in `useZmanAnchors.ts`).
 
 ## Open from the boxes and fields work (Nov 10)
 

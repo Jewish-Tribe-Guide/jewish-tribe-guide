@@ -1,9 +1,13 @@
 import { listHospitals } from '@/lib/hospitalStore'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
-// GET /api/hospitals — the hospital list (with per-hospital "Jewish life" info)
-// for the patient module's map pins, "About Your Hospital" pages, and the
-// volunteer/support forms. Empty for a non-hospital community.
+// GET /api/hospitals — the hospital list, with each hospital's "Jewish life"
+// info. Empty for a non-hospital community. Public read.
+//
+// No screen fetches this: every page gets it from the [community] layout
+// (loadCommunityContent). It stays for the e2e suites, which read it to know
+// what the site should show instead of hardcoding it, and warm the cache
+// through it (Nov 18, review item 43). Read by e2e/warmup.setup.ts.
 export async function GET(request: Request) {
   try {
     const community = await resolveCommunity(communitySlugFromRequest(request))

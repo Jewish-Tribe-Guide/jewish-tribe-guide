@@ -1,18 +1,10 @@
 import { after } from 'next/server'
-import { getAdminClient } from '@/lib/supabase/admin'
-import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
-import { isHoneypotTripped } from '@/lib/honeypot'
-import { verifyTurnstile } from '@/lib/turnstile'
-import { ui } from '@/lib/uiConfig'
-import { resolveCapabilities } from '@/lib/categories'
-import { getResourceById } from '@/lib/resourceStore'
-import { getCategoryById } from '@/lib/categoryStore'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
 import { itemsField } from '@/lib/listingView'
 import { itemEntry } from '@/lib/itemNames'
 import { addedItemName, additionSubmission, alreadyListed, cleanItemName, itemMarks, itemWording } from '@/lib/itemMarks'
-import { UUID } from '@/lib/itemMarkRoutes'
+import { editableListing, failsBotCheck, openListingWrite } from '@/lib/listingWrite'
 
 // POST /api/resource/:id/item/add   { item, sometimes?, from?, turnstileToken, company }
 // "+ Add an item" on an opened listing (agreed Oct 1). An item is a new
@@ -30,35 +22,19 @@ import { UUID } from '@/lib/itemMarkRoutes'
 const FAILED = { ok: false, error: 'That didn’t send. Please try again.' }
 
 export async function POST(request: Request, ctx: RouteContext<'/api/resource/[id]/item/add'>) {
-  const limited = await enforceRateLimit(request, 'submissions', { limit: 10, windowSec: 60 })
-  if (limited) return limited
-
-  const { id } = await ctx.params
-  if (!UUID.test(id)) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
-  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
-  if (body && isHoneypotTripped(body)) return Response.json({ ok: true })
+  const opened = await openListingWrite(request, ctx)
+  if (opened instanceof Response) return opened
+  const { id, body } = opened
   const name = cleanItemName(body?.item)
   if (!body || !name) return Response.json({ ok: false, error: 'What did you see? A short name, like “Challah”.' }, { status: 400 })
-  if (!(await verifyTurnstile(typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined, clientIp(request)))) {
-    return Response.json({ ok: false, code: 'turnstile', error: 'Verification failed. Please try again.' }, { status: 403 })
-  }
-  if (!ui.contributions.edit) return Response.json({ ok: false, error: 'This action is not available.' }, { status: 403 })
+  const bot = await failsBotCheck(request, body)
+  if (bot) return bot
 
   try {
     // The listing's own community, from the row: a live one only.
-    const { data: row } = await getAdminClient()
-      .from('resource')
-      .select('community_id')
-      .eq('id', id)
-      .eq('status', 'approved')
-      .maybeSingle<{ community_id: string }>()
-    const listing = row ? await getResourceById(id, row.community_id) : null
-    const category = listing && row ? await getCategoryById(row.community_id, listing.category) : null
-    const field = category ? itemsField(category) : null
-    if (!listing || !category || !field || !row) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
-    if (!resolveCapabilities(category.capabilities).edit) {
-      return Response.json({ ok: false, error: 'This action is not available for this category.' }, { status: 403 })
-    }
+    const found = await editableListing(id, itemsField)
+    if (found instanceof Response) return found
+    const { community, listing, category, field } = found
 
     const listed = alreadyListed(itemMarks(listing, field), name)
     if (listed) return Response.json({ ok: true, already: { item: listed.name, field: listed.key } })
@@ -73,7 +49,7 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
       `${where}: ${named}${sometimes ? ` (${say.sometimes})` : ''}.`,
       ...(itemEntry(name) ? [] : ['A name not on the item list yet.']),
     ].join(' ')
-    const submission = await submitListingUpdate(row.community_id, id, additionSubmission(category, listing, field.key, name, sometimes), note, null)
+    const submission = await submitListingUpdate(community.slug, id, additionSubmission(category, listing, field.key, name, sometimes), note, null)
     after(() => sendSubmissionNotification(submission).catch((err) => console.error('[item/add] Admin notification failed:', err)))
     return Response.json({ ok: true, item: named, sometimes })
   } catch (err) {

@@ -13,9 +13,8 @@ import { neighborhoodsFor } from '@/lib/places'
 import { answerSchedule, useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunitySlug, useContributions } from '@/lib/communityContext'
 import { community } from '@/community.config'
-import { ui } from '@/lib/uiConfig'
 
 // The home's search, as the home box runs it: a question searched and
 // answered (askSearch, askAnswer), and the lines saying where it could go
@@ -29,6 +28,7 @@ export type HomeCard = { id?: string; title: string; href?: string | null }
  *  are fetched for the lines (see mentionsEruv): not on every visit. */
 export function useHomeSearch(coords: LatLng | null, { eruv = false }: { eruv?: boolean } = {}) {
   const communitySlug = useCommunitySlug()
+  const contributions = useContributions()
   const categories = useCategories()
   const listings = useAllListings()
   // Against useMinyanSchedule's clock, not a fresh `new Date()` in render
@@ -56,7 +56,7 @@ export function useHomeSearch(coords: LatLng | null, { eruv = false }: { eruv?: 
     // "What's on this site?", "how do I add a listing?" (see metaAnswer).
     if (result.query.meta) {
       const kind = result.categoryIds?.length === 1 ? categories?.find((c) => c.id === result.categoryIds![0]) : undefined
-      const addTo = kind && ui.contributions.add && resolveCapabilities(kind.capabilities).add
+      const addTo = kind && contributions.add && resolveCapabilities(kind.capabilities).add
         ? { label: kind.label, href: `${routes.slug(communitySlug, kind.id)}?form=create` }
         : null
       return {

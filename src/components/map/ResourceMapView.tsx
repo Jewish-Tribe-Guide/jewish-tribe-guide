@@ -100,9 +100,6 @@ function openNowIdsFor(
     })
     .map((p) => p.id)
 }
-// The hospital pin's colour and glyph live in categoryColor.ts.
-// Re-exported here for the map's own callers.
-export { HOSPITAL_COLOR, HOSPITAL_ICON }
 // A dropped pin's marker id is prefixed with this so a click handler can
 // tell it apart from a real listing/hospital point without a separate prop
 // threaded through every consumer — see droppedMapPoints below.
@@ -134,7 +131,6 @@ const stripApostrophes = (s: string) => s.replace(/['’‘ʼʻ]/g, '')
 type SelectablePoint = MapPoint & { filterId: string; raw?: DirectoryResource }
 
 type Props = {
-  onUp: () => void
   /** Initial location from the header's "Set location" control, if already set. */
   userLocation?: LatLng | null
   /** Pre-select a single category filter on arrival (from a category's "Map" button). */
@@ -1607,47 +1603,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               mobile's: matching places while typing, click one to jump
               straight to its card. ─────────────────────────────────────── */}
       {dropdownShown && (
-        <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-lg">
-          {showOpenNowSuggestion && (
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={selectOpenNow}
-              className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
-            >
-              <span
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"
-                aria-hidden="true"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="9" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
-                </svg>
-              </span>
-              <span className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-900">Open now</p>
-                <p className="truncate text-xs text-slate-400">Show only listings open right now</p>
-              </span>
-            </button>
-          )}
-          {searchSuggestions.map((p) => (
-            <button
-              key={p.id}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => selectSuggestion(p)}
-              className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
-            >
-              <SuggestionIcon point={p} />
-              <span className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-900">{p.name}</p>
-                <p className="truncate text-xs text-slate-400">
-                  {p.categoryLabel}
-                  {p.address ? ` · ${p.address}` : ''}
-                </p>
-              </span>
-            </button>
-          ))}
-          {typedNothing && nothingBox(input, 'rounded-none border-0')}
-        </div>
+        <SearchSuggestions
+          className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-lg"
+          rowPadding="px-3"
+          openNow={showOpenNowSuggestion}
+          onOpenNow={selectOpenNow}
+          places={searchSuggestions}
+          onPick={selectSuggestion}
+          nothing={typedNothing && nothingBox(input, 'rounded-none border-0')}
+        />
       )}
     </div>
   )
@@ -2529,49 +2493,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                           places while typing, tap one to jump straight to its
                           card instead of just narrowing the list. ─────────── */}
                   {dropdownShown && (
-                    <div className="mt-2 overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-900/5">
-                      {showOpenNowSuggestion && (
-                        <button
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={selectOpenNow}
-                          className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
-                        >
-                          <span
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"
-                            aria-hidden="true"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                              <circle cx="12" cy="12" r="9" />
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
-                            </svg>
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-slate-900">Open now</p>
-                            <p className="truncate text-xs text-slate-400">Show only listings open right now</p>
-                          </span>
-                        </button>
-                      )}
-                      {searchSuggestions.map((p) => (
-                        <button
-                          key={p.id}
-                          // Prevents the input's blur (which would close this
-                          // dropdown before the click lands) from firing at all.
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => selectSuggestion(p)}
-                          className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
-                        >
-                          <SuggestionIcon point={p} />
-                          <span className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-slate-900">{p.name}</p>
-                            <p className="truncate text-xs text-slate-400">
-                              {p.categoryLabel}
-                              {p.address ? ` · ${p.address}` : ''}
-                            </p>
-                          </span>
-                        </button>
-                      ))}
-                      {typedNothing && nothingBox(input, 'rounded-none border-0')}
-                    </div>
+                    <SearchSuggestions
+                      className="mt-2 overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-900/5"
+                      rowPadding="px-4"
+                      openNow={showOpenNowSuggestion}
+                      onOpenNow={selectOpenNow}
+                      places={searchSuggestions}
+                      onPick={selectSuggestion}
+                      nothing={typedNothing && nothingBox(input, 'rounded-none border-0')}
+                    />
                   )}
                 </div>
               )}
@@ -2769,6 +2699,54 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
  *  the sidebar first, else the row under the pointer. Reads the hover store
  *  itself, so only the map redraws as the pointer moves down the list. A
  *  hover never moves the map: ResourceMap frames only on frameToken. */
+/** The search box's dropdown, on the computer and the phone alike (it was
+ *  written out twice, Nov 18 review item 42): "Open now" when the words
+ *  could mean it, then the matching places, each a tap straight to its
+ *  card, then what to do when nothing matched. A press doesn't take the
+ *  focus off the box, which would close the list before the tap landed. */
+function SearchSuggestions<P extends SelectablePoint>({ className, rowPadding, openNow, onOpenNow, places, onPick, nothing }: {
+  className: string
+  rowPadding: string
+  openNow: boolean
+  onOpenNow: () => void
+  places: P[]
+  onPick: (p: P) => void
+  nothing: ReactNode
+}) {
+  const row = `flex w-full items-center gap-3 ${rowPadding} py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer`
+  return (
+    <div className={className}>
+      {openNow && (
+        <button onMouseDown={(e) => e.preventDefault()} onClick={onOpenNow} className={row}>
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500" aria-hidden="true">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-900">Open now</p>
+            <p className="truncate text-xs text-slate-400">Show only listings open right now</p>
+          </span>
+        </button>
+      )}
+      {places.map((p) => (
+        <button key={p.id} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(p)} className={row}>
+          <SuggestionIcon point={p} />
+          <span className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-900">{p.name}</p>
+            <p className="truncate text-xs text-slate-400">
+              {p.categoryLabel}
+              {p.address ? ` · ${p.address}` : ''}
+            </p>
+          </span>
+        </button>
+      ))}
+      {nothing}
+    </div>
+  )
+}
+
 /** A search line's icon: the place's category's line icon on its tint, a
  *  pin for a pin of your own. Category emoji used to show here, and 📍 for
  *  the rest (Nov 18: no emoji as icons). */

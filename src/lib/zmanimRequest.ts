@@ -113,8 +113,9 @@ export function canonicalZmanimPoints(points: ZmanimPoint[]): ZmanimPoint[] {
   return [...seen.values()].sort((a, b) => a.lat - b.lat || a.lng - b.lng)
 }
 
-export function zmanimBatchPath(points: ZmanimPoint[], date?: string): string {
-  return `/api/zmanim/batch?${canonicalZmanimPoints(points).map((p) => `p=${p.lat},${p.lng}`).join('&')}${date ? `&date=${date}` : ''}`
+export function zmanimBatchPath(points: ZmanimPoint[], tzid?: string, date?: string): string {
+  const tz = tzid ? `&tzid=${encodeURIComponent(tzid)}` : ''
+  return `/api/zmanim/batch?${canonicalZmanimPoints(points).map((p) => `p=${p.lat},${p.lng}`).join('&')}${tz}${date ? `&date=${date}` : ''}`
 }
 
 export type ParsedZmanimBatch =

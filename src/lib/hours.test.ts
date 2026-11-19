@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { businessClosure, dayAndMinutesInTimezone, effectiveBusinessStatus, fmt12, formatHoursSummary, formatTodayHours, formatWeekHours, getOpenStatus, hasAnyHours, hoursClosing, hoursNextOpening, hoursOpenNow, isStructuredHours, placesApiHoursToStructured, syncedLabel, type StructuredHours } from './hours'
+import { businessClosure, dayAndMinutesInTimezone, effectiveBusinessStatus, fmt12, formatHoursSummary, formatTodayHours, getOpenStatus, hasAnyHours, hoursClosing, hoursNextOpening, hoursOpenNow, isStructuredHours, placesApiHoursToStructured, type StructuredHours } from './hours'
 
 // Everything here reads `new Date()`, so each test pins the clock. The local
 // timezone matters: hoursOpenNow uses getDay()/getHours(), i.e. the *viewer's*
@@ -193,22 +193,6 @@ describe('formatTodayHours', () => {
   })
 })
 
-describe('formatWeekHours', () => {
-  it('returns all seven days in order and flags today', () => {
-    vi.setSystemTime(WEDNESDAY(12))
-    const week = formatWeekHours(WEEKDAY_9_TO_5)
-    expect(week?.map((d) => d.key)).toEqual(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'])
-    expect(week?.find((d) => d.isToday)?.key).toBe('wed')
-    expect(week?.find((d) => d.key === 'sun')?.text).toBe('Closed')
-    expect(week?.find((d) => d.key === 'fri')?.text).toBe('9:00 AM – 2:00 PM')
-  })
-
-  it('returns null for a legacy text value', () => {
-    vi.setSystemTime(WEDNESDAY(12))
-    expect(formatWeekHours('Mon-Fri 9-5')).toBeNull()
-  })
-})
-
 describe('formatHoursSummary', () => {
   it('collapses consecutive identical days into a range', () => {
     expect(formatHoursSummary(WEEKDAY_9_TO_5)).toBe(
@@ -283,34 +267,6 @@ describe('placesApiHoursToStructured', () => {
       { open: { day: 2, hour: 14, minute: 0 }, close: { day: 2, hour: 18, minute: 0 } },
     ])
     expect(result?.tue).toEqual({ open: '09:00', close: '18:00', periods: [{ open: '09:00', close: '12:00' }, { open: '14:00', close: '18:00' }] })
-  })
-})
-
-describe('syncedLabel', () => {
-  beforeEach(() => {
-    vi.setSystemTime(WEDNESDAY(12))
-  })
-
-  it('returns null when there is nothing to sync from', () => {
-    expect(syncedLabel(undefined)).toBeNull()
-  })
-
-  it('returns null for an unparseable timestamp', () => {
-    expect(syncedLabel('not a date')).toBeNull()
-  })
-
-  it('says "today" for anything synced today', () => {
-    expect(syncedLabel(WEDNESDAY(9).toISOString())).toBe('Synced from Google · updated today')
-  })
-
-  it('says "1d ago" for yesterday', () => {
-    const yesterday = new Date(2026, 5, 23, 12)
-    expect(syncedLabel(yesterday.toISOString())).toBe('Synced from Google · updated 1d ago')
-  })
-
-  it('counts multiple days', () => {
-    const fiveDaysAgo = new Date(2026, 5, 19, 12)
-    expect(syncedLabel(fiveDaysAgo.toISOString())).toBe('Synced from Google · updated 5d ago')
   })
 })
 
@@ -487,7 +443,6 @@ describe('a place saved as closed every day (fixes table, Sep 29)', () => {
     expect(hasAnyHours(allClosed)).toBe(false)
     expect(hoursOpenNow(allClosed, tuesdayNoon)).toBeNull()
     expect(formatTodayHours(allClosed, tuesdayNoon)).toBeNull()
-    expect(formatWeekHours(allClosed, tuesdayNoon)).toBeNull()
     expect(hoursClosing(allClosed, 60, tuesdayNoon)).toBeNull()
   })
 

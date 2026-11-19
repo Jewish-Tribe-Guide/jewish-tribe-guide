@@ -18,6 +18,19 @@ class Bounds {
   union(b: Bounds) { this.pts.push(...b.pts) }
   isEmpty() { return this.pts.length === 0 }
 }
+// Google's PinElement is an element itself; its `.element` is deprecated and
+// warned about on every map load (Nov 18, review item 47), so reading it here
+// fails the test.
+class FakePin extends HTMLElement {
+  constructor(o: { background: string }) {
+    super()
+    this.dataset.pin = o.background
+  }
+  get element(): HTMLElement {
+    throw new Error('PinElement.element is deprecated: use the PinElement itself')
+  }
+}
+if (!customElements.get('fake-eruv-pin')) customElements.define('fake-eruv-pin', FakePin)
 class Shape {
   constructor(o: Record<string, unknown>) { calls.drawn++; shapes.push(o) }
   addListener() {}
@@ -45,13 +58,7 @@ beforeEach(() => {
       Polygon: Shape,
       Polyline: Shape,
       marker: {
-        PinElement: class {
-          element: HTMLElement
-          constructor(o: { background: string }) {
-            this.element = document.createElement('div')
-            this.element.dataset.pin = o.background
-          }
-        },
+        PinElement: FakePin,
         AdvancedMarkerElement: class {
           position: unknown
           map: unknown

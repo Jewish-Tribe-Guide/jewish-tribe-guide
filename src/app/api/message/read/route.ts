@@ -2,7 +2,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
-import { ui } from '@/lib/uiConfig'
+import { contributionsFor } from '@/lib/uiConfig'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
@@ -61,7 +61,9 @@ export async function POST(request: Request) {
   if (!form) return Response.json({ ok: false, error: 'Invalid request.' }, { status: 400 })
   const field = (k: string) => (typeof form.get(k) === 'string' ? (form.get(k) as string) : '')
   if (isHoneypotTripped({ company: field('company') })) return Response.json({ ok: false, error: 'Invalid request.' }, { status: 400 })
-  if (!ui.contributions.add && !ui.contributions.edit) return Response.json({ ok: false, error: 'This action is not available.' }, { status: 403 })
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const contributions = contributionsFor(community.ui)
+  if (!contributions.add && !contributions.edit) return Response.json({ ok: false, error: 'This action is not available.' }, { status: 403 })
 
   const text = field('text').trim().slice(0, 8000)
   const files = form.getAll('file').filter((f): f is File => f instanceof File && f.size > 0)
@@ -75,7 +77,6 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, code: 'turnstile', error: 'Verification failed. Please try again.' }, { status: 403 })
   }
 
-  const community = await resolveCommunity(communitySlugFromRequest(request))
   try {
     const [listings, categories] = await Promise.all([listApprovedResources(community.slug), listCategories(community.slug)])
     const live = categories.filter((c) => c.active !== false)

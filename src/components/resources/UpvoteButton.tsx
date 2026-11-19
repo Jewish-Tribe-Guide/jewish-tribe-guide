@@ -57,18 +57,12 @@ export default function UpvoteButton({
   resourceId,
   count: initialCount,
   onCountChange,
-  variant = 'box',
   name,
 }: {
   resourceId: string
   count: number
   /** Notifies the parent of the latest count so it can re-sort by popularity. */
   onCountChange?: (count: number) => void
-  /** 'box' — the bordered 👍/count tile. 'inline' — a minimal "👍 count" that
-   *  sits in a row (used in the collapsed listing header). */
-  /** `recommend`: the small outline thumbs-up beside an opened listing's
-   *  name, with the count only once there is one. */
-  variant?: 'box' | 'inline' | 'recommend'
   /** The listing's name, for a screen reader: "Upvote Judah". */
   name?: string
 }) {
@@ -164,72 +158,26 @@ export default function UpvoteButton({
 
   const title = voted ? 'Remove your upvote' : 'Upvote this place'
 
-  if (variant === 'recommend') {
-    return (
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={busy}
-        aria-pressed={voted}
-        aria-label={`Upvote${name ? ` ${name}` : ''}${count > 0 ? `, ${count} upvote${count === 1 ? '' : 's'}` : ''}`}
-        title={title}
-        className={[
-          'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border text-sm font-bold transition-colors cursor-pointer disabled:opacity-60',
-          count > 0 ? 'px-3' : 'w-9',
-          voted ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400',
-        ].join(' ')}
-      >
-        <ThumbIcon className="h-4 w-4" />
-        {count > 0 && <span aria-hidden="true">{count}</span>}
-      </button>
-    )
-  }
-
-  if (variant === 'inline') {
-    return (
-      <button
-        onClick={handleClick}
-        disabled={busy}
-        aria-pressed={voted}
-        title={title}
-        className={[
-          // A filled chip, not just colored text — this used to be plain
-          // text sitting right next to the (non-interactive) distance,
-          // "👍 0 | 📍 0.3 mi", both the exact same weight. Reported live as
-          // unclear that it's tappable at all. A border was tried first, but
-          // at this text-xs size a 1px outline is easy to miss without any
-          // hover state to reinforce it (mobile, no cursor); a background
-          // fill reads as "this is a surface" without depending on someone
-          // noticing a hairline. Neutral gray at rest (not primary-colored)
-          // so it doesn't read as one more badge in the category-tag row
-          // below (Bakery, IKC) — it tints to primary only once voted.
-          'inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors disabled:opacity-60',
-          voted
-            ? 'bg-primary/10 text-primary'
-            : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-        ].join(' ')}
-      >
-        <span aria-hidden="true">👍</span>
-        {count}
-      </button>
-    )
-  }
-
+  // The small outline thumbs-up beside an opened listing's name, with the
+  // count only once there is one. Its one look: a bordered 👍 tile and an
+  // inline "👍 5" chip were left from the old listing cards, used by no
+  // screen (Nov 18, review item 43).
   return (
     <button
+      type="button"
       onClick={handleClick}
       disabled={busy}
       aria-pressed={voted}
+      aria-label={`Upvote${name ? ` ${name}` : ''}${count > 0 ? `, ${count} upvote${count === 1 ? '' : 's'}` : ''}`}
       title={title}
       className={[
-        'flex flex-col items-center justify-center rounded-md border px-2.5 py-1 cursor-pointer transition-colors min-w-[2.75rem]',
-        voted
-          ? 'border-primary bg-primary/5 text-primary'
-          : 'border-slate-300 text-slate-500 hover:border-primary hover:text-primary',
+        'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border text-sm font-bold transition-colors cursor-pointer disabled:opacity-60',
+        count > 0 ? 'px-3' : 'w-9',
+        voted ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400',
       ].join(' ')}
     >
-      <span className="text-sm leading-none" aria-hidden="true">👍</span>
-      <span className="text-xs font-semibold leading-tight">{count}</span>
+      <ThumbIcon className="h-4 w-4" />
+      {count > 0 && <span aria-hidden="true">{count}</span>}
     </button>
   )
 }

@@ -10,7 +10,7 @@ import { ChevronRightIcon } from '@/components/icons'
 import { community } from '@/community.config'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useCommunitySlug, useContributions } from '@/lib/communityContext'
 import { useNow } from '@/lib/useNow'
 import { eruvView, localParts, type Eruv } from '@/lib/eruv'
 import { fullestEruv } from '@/lib/eruvFields'
@@ -31,7 +31,6 @@ import { usePinned } from '@/lib/pinnedContext'
 import { pointerHover } from '@/lib/pointerHover'
 import { AddButton } from '@/components/AddButton'
 import { resolveCapabilities } from '@/lib/categories'
-import { ui } from '@/lib/uiConfig'
 import dynamic from 'next/dynamic'
 
 // Loaded on the first tap of "+ Add", as every category page loads it.
@@ -137,7 +136,8 @@ export default function EruvInfo({ onUp, title = 'Eruv', color = '#64748b', band
   const ready = loaded?.available && now ? loaded : null
   const eruvPage = useCategories()?.find((c) => c.kind === 'eruv')
   const open = ready?.eruvim.find((e) => e.id === openId) ?? (ready && openFullest && eruvPage ? fullestEruv(ready.eruvim, eruvPage) : null)
-  const canAdd = !!ready && ui.contributions.add && !!eruvPage && resolveCapabilities(eruvPage.capabilities).add
+  const contributions = useContributions()
+  const canAdd = !!ready && contributions.add && !!eruvPage && resolveCapabilities(eruvPage.capabilities).add
   // The + Add box, kept on the page once opened so it slides away when
   // closed (SiteAddButton's note).
   const [tellOpen, setTellOpen] = useState(false)

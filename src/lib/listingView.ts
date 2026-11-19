@@ -117,7 +117,9 @@ export type MainThing = 'section' | 'boxes' | 'davening' | 'items' | 'groups' | 
  *  ("Main dishes", "+ Add the first dish"), so every listing in it opens
  *  the same way (agreed Oct 1, Food and Grocery). Not where nobody can add
  *  to it (edits off): an empty list would be a dead end. */
-export function mainThing(item: DirectoryResource, category: CategoryConfig): MainThing | null {
+/** `edits`: whether the community takes edits (useContributions). An empty
+ *  items list is the main thing only where someone can add to it. */
+export function mainThing(item: DirectoryResource, category: CategoryConfig, edits: boolean = ui.contributions.edit): MainThing | null {
   const fields = category.detailFields
   if (mainCardOf(category)) return 'section'
   if (boxesOf(category).length > 0) return 'boxes'
@@ -129,7 +131,7 @@ export function mainThing(item: DirectoryResource, category: CategoryConfig): Ma
   const listed = itemsField(category)
   const items = listed && !there(listed.key) ? listed : undefined
   if (items && selectValues(item[items.key]).length + selectValues(item[`${items.key}_sometimes`]).length > 0) return 'items'
-  if (items && ui.contributions.edit && resolveCapabilities(category.capabilities).edit) return 'items'
+  if (items && edits && resolveCapabilities(category.capabilities).edit) return 'items'
   if (audienceGroups(item, category).length > 0) return 'groups'
   if (parseWalkLists(category.walkList).length > 0 && item.geo) return 'walk'
   if (primaryLink(item, category)) return 'join'
@@ -151,8 +153,8 @@ export function mainThing(item: DirectoryResource, category: CategoryConfig): Ma
  *  this right" instead. */
 export type ConfirmPlace = { at: 'card'; subject: string } | { at: 'join' } | { at: 'sections' } | { at: 'boxes' }
 
-export function confirmPlace(item: DirectoryResource, category: CategoryConfig): ConfirmPlace | null {
-  const main = mainThing(item, category)
+export function confirmPlace(item: DirectoryResource, category: CategoryConfig, edits: boolean = ui.contributions.edit): ConfirmPlace | null {
+  const main = mainThing(item, category, edits)
   if (main === 'section') return { at: 'card', subject: mainCardOf(category)!.label }
   if (main === 'davening') return { at: 'card', subject: 'Times' }
   // Each section's hours in its own box, on its own date (Oct 6): whoever

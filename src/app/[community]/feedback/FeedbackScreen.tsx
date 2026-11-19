@@ -12,7 +12,7 @@ import { useSetScreenHeader, useSetTabHeader } from '@/lib/headerVisibility'
 import { PAGE_COLUMN } from '@/lib/pageColumn'
 import { DEFAULT_MOBILE_TABS } from '@/lib/siteSettings'
 import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
-import { ui } from '@/lib/uiConfig'
+import { useContributions } from '@/lib/communityContext'
 
 const EYEBROW = 'mx-0.5 text-[13px] font-bold uppercase tracking-[0.06em] text-slate-500'
 
@@ -46,7 +46,7 @@ export default function FeedbackScreen({ email = null }: { email?: string | null
   useSetScreenHeader(drillDown, 'Feedback', goHome)
   useSetTabHeader(tab?.label?.trim() || 'Feedback', isMobile && !!tab)
 
-  const tellUs = ui.contributions.add
+  const tellUs = useContributions().add
   const heading = settings.feedbackHeading
 
   return (

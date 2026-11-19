@@ -10,7 +10,7 @@ import { ui } from '@/lib/uiConfig'
 import { formatTodayHours, hasAnyHours } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { useZmanim } from '@/lib/useZmanim'
-import { useActiveCommunity, useCommunityTimezone } from '@/lib/communityContext'
+import { useActiveCommunity, useCommunityTimezone, useContributions } from '@/lib/communityContext'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { useShareLink } from '@/lib/useShareLink'
 import { directionsUrl, destinationQuery } from '@/lib/googleMapsLinks'
@@ -172,7 +172,8 @@ export default function ListingView({ item, category, color, place = null, upvot
   const shul = useNextMinyan(item.id)
   const { isPinned, toggle: toggleSaved } = usePinned()
 
-  const main = mainThing(item, category)
+  const contributions = useContributions()
+  const main = mainThing(item, category, contributions.edit)
   // Contact or About, where the admin put a field there by name.
   const fixedPlace = fixedPlaceOf(category)
   // A listing's items and this visitor's answers about them, shared by the
@@ -181,10 +182,10 @@ export default function ListingView({ item, category, color, place = null, upvot
   const itemApi = useItemMarks(item, category, itemsF)
   // Where "Still right?" is asked: beside the one thing that's the
   // community's to keep, not about the whole listing (confirmPlace).
-  const confirmAt = confirmPlace(item, category)
+  const confirmAt = confirmPlace(item, category, contributions.edit)
   // Edit under each main box (agreed Oct 10): a sheet with only that box's
   // fields (BoxEditSheet), where the category takes edits.
-  const canEdit = ui.contributions.edit && resolveCapabilities(category.capabilities).edit
+  const canEdit = contributions.edit && resolveCapabilities(category.capabilities).edit
   const [boxEdit, setBoxEdit] = useState<BoxEdit | null>(null)
   const editBox = canEdit ? (edit: BoxEdit) => setBoxEdit(edit) : undefined
   // The whole-listing editor's rows this listing has (editorRows): a box
