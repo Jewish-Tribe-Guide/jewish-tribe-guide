@@ -930,13 +930,11 @@ describe('ResourceMapView — campaign chip', () => {
       [liveBanner],
     )
 
-    // Queried by the ✨ marker, not accessible name: aria-hidden excludes the
-    // sparkle from the button's accessible name, and the campaign category
-    // also still appears as its own ordinary chip elsewhere in the row (this
-    // is an additional distinctly-styled affordance, not a replacement) — so
-    // "Grocery Stores" alone would match two buttons.
-    const sparkle = screen.getByText('✨')
-    expect(within(sparkle.closest('button')!).getByText('Grocery Stores')).toBeInTheDocument()
+    // Queried by its own test id: the campaign category also still appears
+    // as its own ordinary chip elsewhere in the row (this is an additional
+    // distinctly-styled affordance, not a replacement) — so "Grocery
+    // Stores" alone would match two buttons.
+    expect(within(screen.getByTestId('campaign-chip')).getByText('Grocery Stores')).toBeInTheDocument()
   })
 
   // Real bug: ResourceMapView renders TWO separate <CategoryFilter> instances
@@ -954,13 +952,48 @@ describe('ResourceMapView — campaign chip', () => {
       [liveBanner],
     )
 
-    // Queried by the ✨ marker, not accessible name: aria-hidden excludes the
-    // sparkle from the button's accessible name, and the campaign category
-    // also still appears as its own ordinary chip elsewhere in the row (this
-    // is an additional distinctly-styled affordance, not a replacement) — so
-    // "Grocery Stores" alone would match two buttons.
-    const sparkle = screen.getByText('✨')
-    expect(within(sparkle.closest('button')!).getByText('Grocery Stores')).toBeInTheDocument()
+    // Queried by its own test id: the campaign category also still appears
+    // as its own ordinary chip elsewhere in the row (this is an additional
+    // distinctly-styled affordance, not a replacement) — so "Grocery
+    // Stores" alone would match two buttons.
+    expect(within(screen.getByTestId('campaign-chip')).getByText('Grocery Stores')).toBeInTheDocument()
+  })
+})
+
+// No emoji as icons (how-we-work.md): they read as childish and cheap, and
+// every phone draws them differently. The map's search lines showed each
+// category's emoji (and 📍 for the rest), the computer's tracking button
+// was 📍, and the campaign chip ✨ (Nov 18, item 15 of the public review).
+const EMOJI = /\p{Extended_Pictographic}/u
+
+describe('ResourceMapView — no emoji', () => {
+  it('draws the search lines’ icons as the site’s line icons', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ category: 'grocery', name: 'Acme Grocery' })], [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', icon: '🛒' })])
+    const input = screen.getByPlaceholderText(/Search name, address/)
+    await user.click(input)
+    await user.type(input, 'Acme')
+    const line = screen.getAllByText('Acme Grocery').map((n) => n.closest('button')!).find((b) => b.className.includes('py-2.5'))!
+    expect(line).toBeTruthy()
+    expect(line.textContent).not.toMatch(EMOJI)
+    expect(line.querySelector('svg')).not.toBeNull()
+  })
+
+  it('draws the computer’s tracking button as a line icon', () => {
+    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ category: 'grocery', name: 'Acme Grocery' })])
+    const track = screen.getByRole('button', { name: 'Track my location' })
+    expect(track.textContent).not.toMatch(EMOJI)
+    expect(track.querySelector('svg')).not.toBeNull()
+  })
+
+  it('gives the campaign chip its category’s icon, not a sparkle', () => {
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores', icon: '🛒' })],
+      [{ id: 'sukkah-map', categoryId: 'grocery', title: 'Sukkah Map', subtitle: '', startDate: '2000-01-01', endDate: '2999-12-31', destination: 'map' }],
+    )
+    for (const chip of screen.getAllByRole('button', { name: /Grocery Stores/ })) expect(chip.textContent).not.toMatch(EMOJI)
   })
 })
 
@@ -2151,6 +2184,16 @@ describe('ResourceMapView — eruv lines', () => {
     fireEvent.click(await eruvButton())
     expect(screen.getByRole('button', { name: 'Hide sidebar' })).toBeInTheDocument()
     expect(within(document.querySelector('aside')!).getByTestId('nearby-eruvim')).toHaveTextContent('Center City Eruv')
+  })
+
+  // Where and when each status was read, as the Eruv page says (Nov 18).
+  it('says in the list where each eruv’s status came from', async () => {
+    renderMap(<ResourceMapView onUp={() => {}} />, places, twoKinds)
+    fireEvent.click(await eruvButton())
+    const list = within(document.querySelector('aside')!).getByTestId('nearby-eruvim')
+    expect(within(list).getAllByText(/^From example\.org, /)).toHaveLength(2)
+    // The short line: how often it's read is on the eruv's own page.
+    expect(list).not.toHaveTextContent('every 15 minutes')
   })
 
   it('on a phone, raises the sheet to the eruvim, as a category chip raises it to its places', async () => {

@@ -117,4 +117,51 @@ describe('LiveLocationPrompt', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
+  // A modal (Nov 18, item 19 of the public review): Escape is "Not now",
+  // the keyboard starts inside it rather than on the page behind, and it
+  // goes back where it was once the prompt closes. It draws no emoji
+  // (item 15). Its words (a "location pill" a phone lacks) wait for the
+  // location ask being drawn.
+  it('Escape closes it as "Not now" does', async () => {
+    const onShare = vi.fn()
+    const user = userEvent.setup()
+    render(<LiveLocationPrompt enabled={true} onShare={onShare} />)
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(onShare).not.toHaveBeenCalled()
+    expect(localStorage.getItem('jpc:live-location-prompt')).not.toBeNull()
+  })
+
+  it('takes the focus while open and gives it back after', async () => {
+    const before = document.createElement('button')
+    document.body.appendChild(before)
+    before.focus()
+    const user = userEvent.setup()
+    render(<LiveLocationPrompt enabled={true} onShare={vi.fn()} />)
+    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+    await user.click(screen.getByRole('button', { name: /not now/i }))
+    expect(document.activeElement).toBe(before)
+    before.remove()
+  })
+
+  it('keeps Tab inside it', async () => {
+    const behind = document.createElement('button')
+    document.body.appendChild(behind)
+    const user = userEvent.setup()
+    render(<LiveLocationPrompt enabled={true} onShare={vi.fn()} />)
+    const dialog = screen.getByRole('dialog')
+    for (let i = 0; i < 4; i++) {
+      await user.tab()
+      expect(dialog.contains(document.activeElement)).toBe(true)
+    }
+    await user.tab({ shift: true })
+    expect(dialog.contains(document.activeElement)).toBe(true)
+    behind.remove()
+  })
+
+  it('draws no emoji', () => {
+    render(<LiveLocationPrompt enabled={true} onShare={vi.fn()} />)
+    const text = screen.getByRole('dialog').textContent ?? ''
+    expect(text).not.toMatch(/\p{Extended_Pictographic}/u)
+  })
 })

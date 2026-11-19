@@ -605,13 +605,15 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
         <span className="h-1 w-9 rounded-full bg-slate-300" aria-hidden="true" />
         {snap === 'peek' && (
           <span className="max-w-full truncate px-4 text-xs font-medium text-slate-500" data-testid="sheet-peek-line">
+            {/* A count, not "nearby" (near nothing with no location set),
+                and no "drag up": the handle says that (Nov 18). */}
             {selected
               ? // A place open, lowered: which, since none of it shows.
-                `${selected.name} — drag up`
+                selected.name
               : eruvim && eruvim.length > 0
                 ? // The eruvim lead the list, places or none (Oct 15).
-                  `${eruvim.length} ${eruvim.length === 1 ? 'eruv' : 'eruvim'}${points.length > 0 ? ` · ${points.length} place${points.length !== 1 ? 's' : ''}` : ''} — drag up`
-                : `${points.length} place${points.length !== 1 ? 's' : ''} nearby — drag up`}
+                  `${eruvim.length} ${eruvim.length === 1 ? 'eruv' : 'eruvim'}${points.length > 0 ? ` · ${points.length} place${points.length !== 1 ? 's' : ''}` : ''}`
+                : `${points.length} place${points.length !== 1 ? 's' : ''}`}
           </span>
         )}
       </div>

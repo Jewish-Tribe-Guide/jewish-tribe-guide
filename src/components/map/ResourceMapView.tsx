@@ -260,7 +260,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
         lng: p.lng,
         name: p.label,
         color: DROPPED_PIN_COLOR,
-        glyph: '📍',
         categoryLabel: 'Your pin',
         filterId: DROPPED_FILTER_ID,
       })),
@@ -1637,13 +1636,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               onClick={() => selectSuggestion(p)}
               className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
             >
-              <span
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base"
-                style={{ backgroundColor: categoryTint(p.color) }}
-                aria-hidden="true"
-              >
-                {p.glyph ?? '📍'}
-              </span>
+              <SuggestionIcon point={p} />
               <span className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-slate-900">{p.name}</p>
                 <p className="truncate text-xs text-slate-400">
@@ -1673,6 +1666,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const campaignHighlighted = !!campaignOption && effectiveSelected.has(campaignOption.id) && !allChipsOn
   const campaignChip = campaignOption && (
     <div
+      data-testid="campaign-chip"
       className={`relative flex shrink-0 items-stretch rounded-full text-sm font-semibold transition-colors ${
         campaignHighlighted ? 'text-white' : 'bg-gradient-to-r from-amber-50 to-amber-100 text-amber-900'
       }`}
@@ -1683,7 +1677,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
         aria-pressed={effectiveSelected.has(campaignOption.id)}
         className={`flex items-center gap-1 ${CHIP_SIZE} rounded-full cursor-pointer ${campaignHighlighted ? '' : 'hover:from-amber-100 hover:to-amber-200'}`}
       >
-        <span aria-hidden="true">✨</span>
+        <CategoryGlyph categoryId={campaignOption.id} className={`${CHIP_GLYPH} shrink-0`} />
         <span>{campaignOption.label}</span>
       </button>
     </div>
@@ -1756,7 +1750,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       eruvimOn && eruvData && clock !== null
         ? eruvimWithLines.map(({ eruv: e }) => {
             const v = eruvView(e, new Date(clock), eruvData.timezone, eruvData.candles)
-            return { id: e.id, name: e.name, tone: v.tone, label: v.label }
+            // Where and when, without how often (the eruv's page says that).
+            return { id: e.id, name: e.name, tone: v.tone, label: v.label, checked: v.checked?.split(' · ')[0] ?? null }
           })
         : [],
     [eruvimOn, eruvData, eruvimWithLines, clock],
@@ -2376,7 +2371,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                       : 'bg-white text-slate-600 ring-slate-900/10 hover:bg-slate-50'
                   }`}
                 >
-                  <span aria-hidden="true">📍</span>
+                  {/* The phone's location button's arrow, not an emoji. */}
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 2 19 21 12 17 5 21z" />
+                  </svg>
                 </button>
               )}
               {/* ── Floating search + filters (mobile) — laid directly over the
@@ -2562,13 +2560,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                           onClick={() => selectSuggestion(p)}
                           className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
                         >
-                          <span
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base"
-                            style={{ backgroundColor: categoryTint(p.color) }}
-                            aria-hidden="true"
-                          >
-                            {p.glyph ?? '📍'}
-                          </span>
+                          <SuggestionIcon point={p} />
                           <span className="min-w-0 flex-1">
                             <p className="text-sm font-semibold text-slate-900">{p.name}</p>
                             <p className="truncate text-xs text-slate-400">
@@ -2777,6 +2769,21 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
  *  the sidebar first, else the row under the pointer. Reads the hover store
  *  itself, so only the map redraws as the pointer moves down the list. A
  *  hover never moves the map: ResourceMap frames only on frameToken. */
+/** A search line's icon: the place's category's line icon on its tint, a
+ *  pin for a pin of your own. Category emoji used to show here, and 📍 for
+ *  the rest (Nov 18: no emoji as icons). */
+function SuggestionIcon({ point }: { point: SelectablePoint }) {
+  return (
+    <span
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+      style={{ backgroundColor: categoryTint(point.color), color: point.color }}
+      aria-hidden="true"
+    >
+      {point.filterId === DROPPED_FILTER_ID ? <PinIcon className="h-4 w-4" /> : <CategoryGlyph categoryId={point.filterId} className="h-4 w-4" />}
+    </span>
+  )
+}
+
 function MapWithHover({ highlight, selectedId, ...props }: ComponentProps<typeof ResourceMap> & { highlight: Highlight }) {
   const hovered = useSyncExternalStore(highlight.subscribe, highlight.get, () => null)
   // A map Google broke stays in its own box: the page's search, chips and

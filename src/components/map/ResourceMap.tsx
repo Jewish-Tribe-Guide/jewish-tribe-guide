@@ -10,6 +10,7 @@ import type { DirectoryResource } from '@/types'
 import { glyphElementFor, glyphTextFor } from '@/lib/categoryIcons'
 import { BookmarkIcon } from '@/components/icons'
 import { clearEruvim, drawEruvim, emphasizeEruvim, eruvDrawKey, type DrawnEruv, type MapEruv } from './eruvLayer'
+import MapUnavailable from './MapUnavailable'
 
 /** One plottable place on the map. */
 export type MapPoint = {
@@ -1189,7 +1190,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       marker.addListener('gmp-click', () => {
         const iw = infoWindowRef.current
         if (!iw) return
-        iw.setContent('<div style="font-weight:600;color:#2563eb;font-size:13px">📍 You are here</div>')
+        iw.setContent('<div style="font-weight:600;color:#2563eb;font-size:13px">You are here</div>')
         iw.open({ map, anchor: marker })
       })
       userMarkerRef.current = marker
@@ -1239,14 +1240,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     onResumeFollow?.()
   }
 
-  if (!MAPS_API_KEY || authFailed) {
-    return (
-      <div className="flex h-full min-h-0 w-full flex-1 items-center justify-center rounded-2xl bg-slate-100 p-6 text-center text-sm text-slate-500">
-        The map couldn’t load. Check that the Google Maps API key is configured and the
-        Maps JavaScript API is enabled.
-      </div>
-    )
-  }
+  if (!MAPS_API_KEY || authFailed) return <MapUnavailable />
 
   return (
     // flex-1/min-h-0 (not a plain h-full percentage) all the way down to the

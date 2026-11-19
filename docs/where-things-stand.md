@@ -1072,6 +1072,27 @@ Done:
     friendly one. Not from the page: Next 16.3 wrote a page redirect's
     Location twice for a listing rendered on demand, and on the first
     request the browser got `a, a` and a 404.
+- The map (items 15–20):
+  - No emoji on the map: the search lines draw the category's line icon
+    (a pin for your own pins), the computer's tracking button the phone's
+    arrow, the campaign chip its category's icon instead of a sparkle,
+    and "You are here" is words. The forms' emoji wait with the forms.
+  - The map's eruv rows say where and when their status was read
+    ("From centercityeruv.com, 2:55 PM"), as the Eruv page does.
+  - When the map can't load, it says everything on it is in the list,
+    not to check an API key (one message, `MapUnavailable`, for both
+    ways it fails).
+  - With no location set, the map's list starts from the community's
+    centre, and the phone's lowered sheet says "137 places", not "137
+    places nearby — drag up".
+  - The location prompt closes on Escape, takes the focus while open and
+    gives it back, keeps Tab inside it, and draws a pin icon, not 📍. Its
+    words (the "pill") wait for the location-ask drawing.
+  - With storage blocked (Safari's "Block all cookies"), the Map and the
+    home no longer show "Something went wrong": saved places, pins and
+    searches read as none, the sidebar opens at its usual width, a vote
+    keeps a token for the visit and a counted vote stays counted
+    (`safeStorage.ts`).
 
 ## Open from the boxes and fields work (Nov 10)
 

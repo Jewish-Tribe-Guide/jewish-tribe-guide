@@ -38,7 +38,7 @@ async function dismissLocationPromptIfItAppears(page: Page): Promise<void> {
 // playwright.config.ts), which isn't in the Google Maps API key's allowed
 // referrers, so the map fails outright — reproducibly, with zero
 // interaction, straight off a plain `/map` load ("The map couldn't load.
-// Check that the Google Maps API key is configured…"), independent of
+// Everything on it is in the list."), independent of
 // anything these tests do. Real, correctly-allowlisted domains never hit
 // this. So rather than drive the (locally unusable) UI path to the pin
 // control, these seed `jpc:pinned-listings` directly — same shape

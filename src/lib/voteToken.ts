@@ -1,14 +1,20 @@
 'use client'
 
+import { storageGet, storageSet } from './safeStorage'
+
 const TOKEN_KEY = 'jpc_voter_token'
 
 /** A stable anonymous token per browser (minted on first vote). Lets the
  *  server dedupe one vote per browser without requiring accounts. */
+// With storage blocked, one token for as long as the page is open.
+let unstoredToken: string | null = null
+
 export function getVoterToken(): string {
-  let t = localStorage.getItem(TOKEN_KEY)
+  let t = storageGet(TOKEN_KEY) ?? unstoredToken
   if (!t) {
     t = crypto.randomUUID()
-    localStorage.setItem(TOKEN_KEY, t)
+    unstoredToken = t
+    storageSet(TOKEN_KEY, t)
   }
   return t
 }

@@ -94,6 +94,27 @@ describe('UpvoteButton', () => {
     expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'false')
   })
 
+  // Storage that refuses writes (Safari blocking cookies, a full store):
+  // remembering the vote threw inside the request's try, and its catch
+  // rolled back a vote the server had counted (Nov 18).
+  it('keeps a counted vote when this browser can’t remember it', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ ok: true, count: 6, voted: true }) }))
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      removeItem: () => {},
+      clear: () => {},
+      setItem: () => {
+        throw new DOMException('The quota has been exceeded.', 'QuotaExceededError')
+      },
+    })
+    const user = userEvent.setup()
+    render(<UpvoteButton resourceId="r1" count={5} />)
+    await user.click(screen.getByRole('button'))
+    await waitFor(() => expect(screen.getByRole('button')).not.toBeDisabled())
+    expect(screen.getByText('6')).toBeInTheDocument()
+    expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('rolls back on a network failure too', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
     const user = userEvent.setup()

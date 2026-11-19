@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { track } from '@vercel/analytics'
 import { isPreviewMode } from '@/lib/previewDraft'
+import { PinIcon } from './icons'
 
 const PROMPT_KEY = 'jpc:live-location-prompt'
 // How long to wait before asking again after a "Not now" — not a permanent
@@ -59,9 +60,44 @@ export default function LiveLocationPrompt({ enabled, onShare }: Props) {
     }
   }, [enabled])
 
-  if (!visible) return null
+  // A modal (Nov 18): the keyboard starts in it, Tab stays in it, Escape is
+  // "Not now", and the focus goes back where it was once it closes. Before,
+  // Escape did nothing and the focus stayed on the page behind.
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const onEscape = useEffectEvent(() => dismiss())
+  useEffect(() => {
+    if (!visible) return
+    const before = document.activeElement as HTMLElement | null
+    const dialog = dialogRef.current
+    dialog?.querySelector<HTMLElement>('button')?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onEscape()
+        return
+      }
+      if (e.key !== 'Tab' || !dialog) return
+      const buttons = [...dialog.querySelectorAll<HTMLElement>('button')]
+      if (buttons.length === 0) return
+      const first = buttons[0]
+      const last = buttons[buttons.length - 1]
+      const inside = dialog.contains(document.activeElement)
+      if (e.shiftKey && (!inside || document.activeElement === first)) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && (!inside || document.activeElement === last)) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      if (before?.isConnected) before.focus()
+    }
+  }, [visible])
 
-  const dismiss = () => {
+  function dismiss() {
     interactedRef.current = true
     try {
       localStorage.setItem(PROMPT_KEY, String(Date.now()))
@@ -72,7 +108,7 @@ export default function LiveLocationPrompt({ enabled, onShare }: Props) {
     track('location_prompt_dismissed')
   }
 
-  const share = () => {
+  function share() {
     interactedRef.current = true
     try {
       localStorage.removeItem(PROMPT_KEY)
@@ -84,6 +120,8 @@ export default function LiveLocationPrompt({ enabled, onShare }: Props) {
     onShare()
   }
 
+  if (!visible) return null
+
   return (
     <div
       className="overlay-in fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
@@ -92,13 +130,14 @@ export default function LiveLocationPrompt({ enabled, onShare }: Props) {
     >
       <div
         className="dialog-in w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-5 shadow-xl"
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Share your live location"
       >
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xl" aria-hidden="true">
-            📍
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary" aria-hidden="true">
+            <PinIcon className="h-5 w-5" />
           </span>
           <h2 className="text-base font-semibold text-slate-900">Share your live location?</h2>
         </div>

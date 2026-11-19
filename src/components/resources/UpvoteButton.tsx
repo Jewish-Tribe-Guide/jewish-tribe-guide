@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { getVoterToken, getMyVotedIds, noteMyVote } from '@/lib/voteToken'
 import { usePreviewSend, useFetchOrPreview } from '@/lib/previewSend'
 import { ThumbIcon } from '@/components/icons'
+import { storageSet } from '@/lib/safeStorage'
 
 const VOTED_KEY = 'jpc_voted'
 const COUNT_KEY = 'jpc_vote_counts'
@@ -34,7 +35,7 @@ function rememberVote(id: string, voted: boolean) {
   const s = getVotedSet()
   if (voted) s.add(id)
   else s.delete(id)
-  localStorage.setItem(VOTED_KEY, JSON.stringify([...s]))
+  storageSet(VOTED_KEY, JSON.stringify([...s]))
 }
 
 function getRememberedCounts(): Record<string, { count: number; at: number }> {
@@ -48,7 +49,7 @@ function getRememberedCounts(): Record<string, { count: number; at: number }> {
 function rememberCount(id: string, count: number) {
   const all = getRememberedCounts()
   all[id] = { count, at: Date.now() }
-  localStorage.setItem(COUNT_KEY, JSON.stringify(all))
+  storageSet(COUNT_KEY, JSON.stringify(all))
 }
 
 
