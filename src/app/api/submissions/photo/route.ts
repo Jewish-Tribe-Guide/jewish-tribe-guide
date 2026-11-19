@@ -1,12 +1,14 @@
 import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { imageTypeOf } from '@/lib/imageBytes'
+import { verifyTurnstile } from '@/lib/turnstile'
 
 // Same bucket every other admin-uploaded image uses (see
 // admin/categories/icon/route.ts) — a separate path prefix, not a separate
 // bucket. Uses the admin (service-role) Supabase client because there's no
 // admin session here to check: this route is public, gated by rate limiting
-// instead, same posture as POST /api/submissions itself.
+// instead, and by the Turnstile challenge, same posture as POST
+// /api/submissions itself.
 const BUCKET = 'site-assets'
 const MAX_BYTES = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
@@ -35,6 +37,15 @@ export async function POST(request: Request) {
     form = await request.formData()
   } catch {
     return Response.json({ ok: false, errors: ['Invalid upload.'] }, { status: 400 })
+  }
+
+  // Every upload writes to storage, so a script mustn't be able to fill it
+  // (Nov 19). The photo goes up when it's picked, before the listing's own
+  // send, so it has its own challenge (ImageUploadField's `challenge`): a
+  // token is single-use, and the send needs the form's.
+  const turnstileToken = form.get('turnstileToken')
+  if (!(await verifyTurnstile(typeof turnstileToken === 'string' ? turnstileToken : undefined, clientIp(request)))) {
+    return Response.json({ ok: false, code: 'turnstile', errors: ['Couldn’t check this upload. Please try again.'] }, { status: 403 })
   }
 
   const file = form.get('file')

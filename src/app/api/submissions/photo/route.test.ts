@@ -5,7 +5,9 @@ const m = vi.hoisted(() => ({
   createBucket: vi.fn(),
   upload: vi.fn(),
   getPublicUrl: vi.fn(),
+  verifyTurnstile: vi.fn(),
 }))
+vi.mock('@/lib/turnstile', () => ({ verifyTurnstile: m.verifyTurnstile }))
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
@@ -15,9 +17,10 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 const { POST } = await import('./route')
 
-function upload(file?: File | string) {
+function upload(file?: File | string, turnstileToken?: string) {
   const form = new FormData()
   if (file !== undefined) form.set('file', file)
+  if (turnstileToken !== undefined) form.set('turnstileToken', turnstileToken)
   return POST(new Request('http://x/api/submissions/photo', { method: 'POST', body: form }))
 }
 const SIGNATURES: Record<string, number[]> = {
@@ -37,12 +40,26 @@ const png = (bytes = 16) => image('image/png', bytes, 'p.png')
 beforeEach(() => {
   vi.resetAllMocks()
   m.enforceRateLimit.mockResolvedValue(null)
+  m.verifyTurnstile.mockResolvedValue(true)
   m.createBucket.mockResolvedValue({ error: null })
   m.upload.mockResolvedValue({ error: null })
   m.getPublicUrl.mockReturnValue({ data: { publicUrl: 'https://cdn/x.png' } })
 })
 
 describe('POST /api/submissions/photo', () => {
+  it('stores nothing without a passed challenge', async () => {
+    m.verifyTurnstile.mockResolvedValue(false)
+    const res = await upload(png(), 'used-token')
+    expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject({ ok: false, code: 'turnstile' })
+    expect(m.upload).not.toHaveBeenCalled()
+  })
+
+  it('checks the token the upload carries, from the uploader', async () => {
+    expect((await upload(png(), 'tok')).status).toBe(200)
+    expect(m.verifyTurnstile).toHaveBeenCalledWith('tok', '1.2.3.4')
+  })
+
   it('returns the rate limiter’s response and stores nothing', async () => {
     m.enforceRateLimit.mockResolvedValue(new Response('slow', { status: 429 }))
     expect((await upload(png())).status).toBe(429)

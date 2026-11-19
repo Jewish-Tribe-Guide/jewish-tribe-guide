@@ -762,7 +762,7 @@ export default function ListingEditor({
             f.type === 'image' ? (
               <div key={f.key}>
                 <p className={fieldLabel}>{f.label}</p>
-                <ImageUploadField value={photo} onChange={(v) => setDetail(f.key, v)} uploadUrl="/api/submissions/photo" shape="circle" showRepositionHint={false} collapseUrlInput />
+                <ImageUploadField value={photo} onChange={(v) => setDetail(f.key, v)} uploadUrl="/api/submissions/photo" challenge shape="circle" showRepositionHint={false} collapseUrlInput />
               </div>
             ) : (
               fieldInput(f)

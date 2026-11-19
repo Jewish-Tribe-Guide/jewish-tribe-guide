@@ -1028,11 +1028,14 @@ Done:
   from Cloudflare (`budgets.spec.ts` now checks the home page too).
 - Photo uploads are stored with the type their bytes show, and refused
   when the bytes are not a PNG, JPG, GIF or WebP, whatever the label says.
-  **Not done:** Turnstile on uploads (a token is single-use, and the photo
-  goes up when picked, before the listing's own submit uses the form's
-  token; it needs a second challenge), and clearing photos no listing
-  uses (it deletes stored files, so it waits for a yes on what counts as
-  unused: a rejected edit's photo, an old photo in What changed).
+  Since Nov 19 an upload also needs a passed Turnstile challenge: the
+  photo field runs its own (`challenge` on `ImageUploadField`), started
+  when a picture is picked, shown only if Cloudflare wants a click, a
+  fresh token per upload; after 20s without one it sends anyway and the
+  route decides. The admin's own editors use the same field and pass it
+  too. **Your call:** clearing photos no listing uses (it deletes stored
+  files, so it waits for a yes on what counts as unused: a rejected
+  edit's photo, an old photo in What changed).
 - Public reads: a form's unpublished draft no longer goes out with the
   published form, and `/api/eruv` says a read failed and when, not the
   error's text.
