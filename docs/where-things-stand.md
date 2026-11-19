@@ -1055,9 +1055,15 @@ Done:
   when a picture is picked, shown only if Cloudflare wants a click, a
   fresh token per upload; after 20s without one it sends anyway and the
   route decides. The admin's own editors use the same field and pass it
-  too. **Your call:** clearing photos no listing uses (it deletes stored
-  files, so it waits for a yes on what counts as unused: a rejected
-  edit's photo, an old photo in What changed).
+  too. Unused photos on live, cleared Nov 19 (the user's yes): the 23
+  files no row mentioned (18 listing photos, mostly re-cropped on Aug
+  10–11, 3 old logos, 2 old category banners; 1.5 MB), backed up first to
+  `backups/prod-site-assets-unused-2026-11-19/` on the user's machine.
+  Every file a row mentions was checked to still load after. Kept on
+  purpose: the 36 only an edit in History mentions (old photos, two
+  rejected edits' photos, three screenshots the reader read), since
+  History shows them. Nothing deletes stored files yet; live holds about
+  12 MB of Supabase's 1 GB, so not worth automating until it grows.
 - Public reads: a form's unpublished draft no longer goes out with the
   published form, and `/api/eruv` says a read failed and when, not the
   error's text.
