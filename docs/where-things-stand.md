@@ -2146,10 +2146,8 @@ for that exact change, in the same conversation. Show the dry run first.
 1k. **Migration 092 (`look_again`)** is run on dev and live (checked Nov 3,
    after PR 373 deployed: live's table has every column, no rows yet).
 
-1l. **Migration 094 (`eruv.details`, Nov 9):** on dev (the user ran it
-    Nov 9), not on live. One `add column if not exists`; nothing is read from it until an
-    admin makes a field on the Eruv page, so it can go any time after the
-    branch deploys. Needs a yes.
+1l. ~~Migration 094 (`eruv.details`)~~ On dev and live (checked Nov 19:
+    live's eruv rows have the column).
 
 ## For the user or the community
 
