@@ -2089,8 +2089,8 @@ for that exact change, in the same conversation. Show the dry run first.
    Shtiebel and the mikvahs, among others.
 
 1b. **Eruv status by email (6c):** migration 084 is run on both databases
-   (the user, Oct 19). Northeast's address on live is still to set: a yes,
-   once the branch is deployed. Elkins Park's sender is still unknown.
+   (the user, Oct 19). Northeast's address is set on live and its emails
+   arrive (checked Nov 19: one kept that morning). Elkins Park's sender is still unknown.
 1c. **"Candle Lighting & Zmanim"** (decided Oct 20): the user renamed it
    on live Oct 20 (label and plural). Its description there is empty,
    and nothing waits on it (Nov 19): search finds the page by its built-in
@@ -2290,8 +2290,8 @@ for that exact change, in the same conversation. Show the dry run first.
    **Northeast:** `jcor-ne-philadelphia@groups.io`, set on dev Oct 19.
    **For the user:** subscribe phillyjewishguide@gmail.com to the list;
    after this branch is deployed, paste the new Gmail script over the old
-   one (the secret and trigger stay); then set Northeast's address on live
-   (a yes). The script talks to the live site, so the preview can't receive
+   one (the secret and trigger stay); Northeast's address on live is set
+   (checked Nov 19). The script talks to the live site, so the preview can't receive
    a real email.
    **Open: Elkins Park.** No sender yet: how YIEP announces its status
    isn't known (ask 267-415-6760, yiep.org, whether there's an email
