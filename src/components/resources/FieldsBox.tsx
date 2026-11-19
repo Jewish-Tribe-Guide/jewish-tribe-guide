@@ -4,7 +4,7 @@ import { selectValues, type CategoryField } from '@/lib/categories'
 import { formatPhone } from '@/lib/validation'
 import { formatHoursSummary, hasAnyHours } from '@/lib/hours'
 import { readContacts, webLink, type ContactEntry } from '@/lib/contacts'
-import { PhoneIcon } from '@/components/icons'
+import { GlobeIcon, MailIcon, PhoneIcon } from '@/components/icons'
 import { Card, InBoxProvider } from './listingParts'
 
 // Kept light (no data hooks), so the "+ Add" box can show a list as the
@@ -29,37 +29,35 @@ export function hasValue(f: CategoryField, v: unknown): boolean {
 }
 
 /** One entry of a list: where it's from, the name in bold, who under it,
- *  the note, then its phones to tap, and its email and website, small. */
+ *  the note, then each phone, its email and its website on a row of its
+ *  own, 44px tall (board A, Nov 19): side by side, a fingertip's tap
+ *  reached the next number. */
 function ContactLines({ entry }: { entry: ContactEntry }) {
+  const rows = [
+    ...(entry.phones ?? []).map((p) => ({ key: p, href: `tel:${p.replace(/\D/g, '')}`, text: formatPhone(p), icon: <PhoneIcon className="h-4 w-4 shrink-0" />, web: false, small: false })),
+    ...(entry.email ? [{ key: 'email', href: `mailto:${entry.email}`, text: entry.email, icon: <MailIcon className="h-4 w-4 shrink-0" />, web: false, small: true }] : []),
+    ...(entry.web ? [{ key: 'web', href: webLink(entry.web).href, text: webLink(entry.web).label, icon: <GlobeIcon className="h-4 w-4 shrink-0" />, web: true, small: true }] : []),
+  ]
   return (
     <div className="py-2.5" data-testid="contact">
       {entry.from && <p className="text-[12.5px] font-bold text-muted">From {entry.from}</p>}
       <p className="text-[15px] font-bold leading-snug text-slate-900">{entry.name}</p>
       {entry.who && <p className="text-[14px] leading-snug text-slate-700">{entry.who}</p>}
       {entry.note && <p className="mt-0.5 text-[14px] leading-snug whitespace-pre-line text-slate-700">{entry.note}</p>}
-      {entry.phones && (
-        <p className="mt-1 flex flex-wrap gap-x-3.5 gap-y-1">
-          {entry.phones.map((p) => (
-            <a key={p} href={`tel:${p.replace(/\D/g, '')}`} className="inline-flex items-center gap-1.5 text-[14.5px] font-bold text-primary hover:underline">
-              <PhoneIcon className="h-3.5 w-3.5" />
-              {formatPhone(p)}
+      {rows.length > 0 && (
+        <div className="mt-1 divide-y divide-slate-100">
+          {rows.map((r) => (
+            <a
+              key={r.key}
+              href={r.href}
+              {...(r.web ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+              className={`flex min-h-11 items-center gap-2.5 break-all font-bold text-primary hover:underline ${r.small ? 'text-[14.5px]' : 'text-[15px]'}`}
+            >
+              {r.icon}
+              {r.text}
             </a>
           ))}
-        </p>
-      )}
-      {entry.email && (
-        <p className="mt-0.5 text-[13.5px]">
-          <a href={`mailto:${entry.email}`} className="break-all text-primary hover:underline">
-            {entry.email}
-          </a>
-        </p>
-      )}
-      {entry.web && (
-        <p className="mt-0.5 text-[13.5px]">
-          <a href={webLink(entry.web).href} target="_blank" rel="noopener noreferrer" className="break-all text-primary hover:underline">
-            {webLink(entry.web).label}
-          </a>
-        </p>
+        </div>
       )}
     </div>
   )
@@ -70,7 +68,7 @@ function ContactLines({ entry }: { entry: ContactEntry }) {
 export function BoxField({ field: f, item }: { field: CategoryField; item: DirectoryResource }) {
   if (f.type === 'contacts') {
     return (
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-slate-200">
         {readContacts(item[f.key]).map((e, i) => (
           <ContactLines key={`${e.name}:${i}`} entry={e} />
         ))}

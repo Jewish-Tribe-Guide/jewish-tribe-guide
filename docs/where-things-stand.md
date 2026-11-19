@@ -1167,11 +1167,12 @@ Done:
   - The header's Set location, a listing's phone number, website, email
     and links, and the map's chips each take a 44px tap without changing
     how they look (`tap-44` in `globals.css`). A listing's details rows
-    are 4px taller to fit them. Not done: a hospital contact's phones and
-    email, which sit 4px apart, so 44px targets would overlap and a tap
-    could dial the wrong number. It needs each on a row of its own about
-    44px tall, a contact visibly taller: **your call**, a drawing first
-    (checked Nov 19). Cards/List left out.
+    are 4px taller to fit them. A contact's phones, email and website
+    (a hospital's Who to call, Rides…) each sit on a row of their own, 44px
+    tall, a faint line between them and a stronger one between contacts
+    (board A, picked Nov 19, canvas PMkcvVX1wzuqcbcryH2JqC; built the same
+    day). Side by side 4px apart, a tap could dial the next number. A
+    website row gets the globe icon, which the board didn't show. Cards/List left out.
   - Sentry loads after the page instead of in its first download
     (`deferredSentry.ts`). Errors thrown before it arrives are kept and
     sent; the page-load trace now starts when it arrives.
@@ -1732,10 +1733,8 @@ The user's answers on Nov 10, evening, and what was done with them:
   the status email after an admin's own Google refresh. Not in the email,
   on purpose: the times themselves, and "working again". With nothing
   waiting but something broken, the subject says "1 stopped working".
-  Phone, computer and quiet renders checked against N7-N9. **Migration
-  096 is on dev (Nov 12), not live** (see "Waiting for a yes"); until it is,
-  Google's changes are emailed at once as before and the nightly email
-  just has no Changed on its own. Not seen in a real inbox yet: the
+  Phone, computer and quiet renders checked against N7-N9. Migration
+  096 is on live too (checked Nov 19). Not seen in a real inbox yet: the
   first one goes out the night after this reaches the live site.
 - **A line turned down in a shul's week isn't filed again** (fixed Nov 12,
   prod queue). A read week is filed whole, so a line the admin rejected
@@ -2079,15 +2078,8 @@ Still different, each needing the user:
 The rule (AGENTS.md): nothing is written to the live database without a yes
 for that exact change, in the same conversation. Show the dry run first.
 
-0. **Migration 096 (`night_note`, Nov 12):** a new table for the
-   nightly email's Google line. On dev since Nov 12; live needs a yes.
-   The email itself is live (PR 384), so until 096 runs there, Google's
-   changes go out at once as before. The site works without it.
-0. **Migration 095 (map card photo, Nov 11):** one `add column if not
-   exists`. Run it on live before or with the deploy that ships the map
-   card; the card works without it, only its photo can't be saved. Then
-   the photo is set in the admin (City Hall, by the user's call). Needs a
-   yes.
+0. ~~Migrations 095 and 096~~ Both on live (checked Nov 19: the map card's
+   photo column holds City Hall, and `night_note` exists).
 1. **Philly Synagogues:** add the "Minyan" yes/no field, and rename the
    category "Shuls & minyanim".
 1a. **Watches on shuls' and mikvahs' own pages** are on the live site
