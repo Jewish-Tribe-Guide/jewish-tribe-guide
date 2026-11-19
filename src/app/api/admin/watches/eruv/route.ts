@@ -1,5 +1,4 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead } from '@/lib/adminRoute'
 import { listEruvimForAdmin } from '@/lib/eruvStore'
 import { addWatch, listWatches } from '@/lib/watchStore'
 import { runAndRecord } from '@/lib/watchRunner'
@@ -20,9 +19,7 @@ import type { EruvSuggestion } from '@/lib/eruvSuggestion'
 //     when the daily run hasn't yet (syncEruvWebsiteWatches does the same).
 //     A paused one isn't read.
 
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  if (!(await getAdminUserForCommunity(request, community.slug))) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
+export const GET = adminRead(async (request: Request, { community }) => {
   try {
     const [{ eruvim, available }, { watches }, pending] = await Promise.all([
       listEruvimForAdmin(community.slug),
@@ -49,11 +46,9 @@ export async function GET(request: Request) {
     console.error('[admin/watches/eruv] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the eruvim.'] }, { status: 502 })
   }
-}
+})
 
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  if (!(await getAdminUserForCommunity(request, community.slug))) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
+export const POST = adminRead(async (request: Request, { community }) => {
   const body = (await request.json().catch(() => null)) as { action?: unknown; id?: unknown } | null
   const bad = (msg: string) => Response.json({ ok: false, errors: [msg] }, { status: 400 })
   if (body?.action !== 'read' || typeof body.id !== 'string') return bad('Unknown action.')
@@ -77,4 +72,4 @@ export async function POST(request: Request) {
     console.error('[admin/watches/eruv] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not read its website.'] }, { status: 502 })
   }
-}
+})

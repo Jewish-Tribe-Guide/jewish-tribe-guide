@@ -1,12 +1,10 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
+import { adminRead } from '@/lib/adminRoute'
 import {
   addCommunityAdminEmail,
   removeCommunityAdminEmail,
-  communitySlugFromRequest,
   getAdminNotifyPreference,
   getAdminReviewNotifyPreference,
   getCommunityAdminEmails,
-  resolveCommunity,
   setAdminNotifyPreference,
   setAdminReviewNotifyPreference,
 } from '@/lib/communityStore'
@@ -18,11 +16,7 @@ import {
 // getAdminUserForCommunity (any of THIS community's own admins), not the
 // superadmin-only check GET /api/admin/communities uses — a regular admin
 // should be able to see who else has access to their own console.
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (_request: Request, { community, admin }) => {
   try {
     const [adminEmails, myNotify, myReviewNotify] = await Promise.all([
       getCommunityAdminEmails(community.slug),
@@ -34,7 +28,7 @@ export async function GET(request: Request) {
     console.error('[admin/team] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the team list.'] }, { status: 502 })
   }
-}
+})
 
 // PATCH /api/admin/team  body: { notify?: boolean; reviewNotify?: boolean }
 // Sets one or both of the SIGNED-IN admin's own notification preferences —
@@ -44,11 +38,7 @@ export async function GET(request: Request) {
 // self-only. At least one field is required; either can be given alone so
 // the Team tab's two checkboxes can each PATCH independently without
 // clobbering the other.
-export async function PATCH(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const PATCH = adminRead(async (request: Request, { community, admin }) => {
   let body: { notify?: unknown; reviewNotify?: unknown }
   try {
     body = (await request.json()) as { notify?: unknown; reviewNotify?: unknown }
@@ -73,16 +63,12 @@ export async function PATCH(request: Request) {
     console.error('[admin/team] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not update your notification preference.'] }, { status: 502 })
   }
-}
+})
 
 // POST /api/admin/team  body: { email }
 // Adds one email to this community's admin allowlist. Same auth as GET —
 // any of this community's own admins can grow their own team.
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const POST = adminRead(async (request: Request, { community }) => {
   let body: { email?: unknown }
   try {
     body = (await request.json()) as { email?: unknown }
@@ -105,7 +91,7 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : 'Could not add that email.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }
-}
+})
 
 // DELETE /api/admin/team  body: { email }
 // Takes one email off this community's admin allowlist (the admin redesign's
@@ -113,11 +99,7 @@ export async function POST(request: Request) {
 // Communities tab). Same auth as GET. Never the caller's own address: no one
 // can lock themselves out by mistake, and the last admin can't leave the
 // list empty.
-export async function DELETE(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const DELETE = adminRead(async (request: Request, { community, admin }) => {
   let body: { email?: unknown }
   try {
     body = (await request.json()) as { email?: unknown }
@@ -137,4 +119,4 @@ export async function DELETE(request: Request) {
     console.error('[admin/team] DELETE failed:', err)
     return Response.json({ ok: false, errors: ['Could not remove that admin.'] }, { status: 502 })
   }
-}
+})

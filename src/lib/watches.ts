@@ -96,7 +96,7 @@ export type WatchCheck = {
   listedAs?: string
   /** A kosher list's: the places on it Google said were permanently
    *  closed, and when, so they aren't asked about again every night
-   *  (keystoneRun.ts's knownClosed, Nov 18). */
+   *  (kosherListRun.ts's knownClosed, Nov 18). */
   closedOnGoogle?: { name: string; at: string }[]
   /** A shul's page: the day (YYYY-MM-DD) the AI last read it, so it's
    *  read again each Friday and Saturday morning even when it hasn't

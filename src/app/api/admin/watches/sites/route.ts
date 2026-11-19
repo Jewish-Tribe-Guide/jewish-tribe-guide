@@ -1,5 +1,4 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead } from '@/lib/adminRoute'
 import { jobFindings } from '@/lib/watchFindingStore'
 import { listWatches } from '@/lib/watchStore'
 import { isListingPageWatch } from '@/lib/listingPageWatch'
@@ -15,11 +14,7 @@ import { routes } from '@/lib/routes'
 //     should go to grocery"), and when its last one was decided. Nothing is
 //     read here. Admin only.
 
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (request: Request, { community }) => {
   try {
     const [{ watches }, { categories, places }] = await Promise.all([listWatches(community.slug), sitePlaces(community.slug)])
     const { findings, decided } = places.length ? await jobFindings(community.slug, 'sites', categories) : { findings: [], decided: new Map() }
@@ -37,4 +32,4 @@ export async function GET(request: Request) {
     console.error('[admin/watches/sites] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the places.'] }, { status: 502 })
   }
-}
+})

@@ -1,6 +1,6 @@
 import { GUIDE_PAGE_ERROR, isGuidePage } from '@/lib/guidePage'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead } from '@/lib/adminRoute'
+import { resolveCommunity } from '@/lib/communityStore'
 import { jobFindings } from '@/lib/watchFindingStore'
 import { addWatch, listWatches, removeWatch, updateWatch } from '@/lib/watchStore'
 import { runAndRecord } from '@/lib/watchRunner'
@@ -135,11 +135,7 @@ async function searchFor(slug: string, place: DirectoryResource, watches: readon
   return { added, reason }
 }
 
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (request: Request, { community }) => {
   try {
     const now = Date.now()
     const job = jobOf(request)
@@ -186,13 +182,9 @@ export async function GET(request: Request) {
     console.error('[admin/watches/hours] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the places.'] }, { status: 502 })
   }
-}
+})
 
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const POST = adminRead(async (request: Request, { community }) => {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   const action = body?.action
   const resourceId = typeof body?.resourceId === 'string' ? body.resourceId : ''
@@ -320,4 +312,4 @@ export async function POST(request: Request) {
     console.error('[admin/watches/hours] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })
   }
-}
+})

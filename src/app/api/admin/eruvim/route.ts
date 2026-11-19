@@ -1,5 +1,4 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead } from '@/lib/adminRoute'
 import { addEruv, listEruvimForAdmin, removeEruv, saveEmailRead, updateEruv, type AdminEruv } from '@/lib/eruvStore'
 import { keptEmailSays } from '@/lib/eruvEmail'
 import { readAndSaveMap, readEruvNow } from '@/lib/eruvReadNow'
@@ -27,11 +26,7 @@ export const maxDuration = 60
 /** Website searches an admin can run in ten minutes, as for a watch's check. */
 const FIND_LIMIT = { limit: 20, windowSec: 600 }
 
-const notAuthorized = () => Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  if (!(await getAdminUserForCommunity(request, community.slug))) return notAuthorized()
+export const GET = adminRead(async (_request: Request, { community }) => {
   try {
     const { eruvim, available } = await listEruvimForAdmin(community.slug)
     return Response.json({ ok: true, available, timezone: community.timezone, eruvim })
@@ -39,17 +34,13 @@ export async function GET(request: Request) {
     console.error('[admin/eruvim] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the eruvim.'] }, { status: 502 })
   }
-}
+})
 
 async function one(community: string, id: string): Promise<AdminEruv | null> {
   return (await listEruvimForAdmin(community)).eruvim.find((e) => e.id === id) ?? null
 }
 
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return notAuthorized()
-
+export const POST = adminRead(async (request: Request, { community }) => {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   const action = body?.action
   const id = typeof body?.id === 'string' ? body.id : ''
@@ -104,4 +95,4 @@ export async function POST(request: Request) {
     console.error('[admin/eruvim] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })
   }
-}
+})

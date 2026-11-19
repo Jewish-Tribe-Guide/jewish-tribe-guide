@@ -6,17 +6,18 @@ import type { Session } from '@supabase/supabase-js'
 import { useLayoutEffect } from 'react'
 import { makeCategory } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import { mockRouter } from '@/test/nextNavigationMock'
+import { historyRouter, mockRouter } from '@/test/nextNavigationMock'
 import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { resetTodo } from '@/lib/useTodo'
 import { SubmissionCard } from './SubmissionCard'
 import type { EnrichedSubmission } from '@/types'
 import ModerationQueue from './ModerationQueue'
+import { moveBack } from './useScreenHistory'
 
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 vi.mock('next/navigation', () => ({
-  useRouter: () => mockRouter,
+  useRouter: () => historyRouter,
   usePathname: () => '/test-community',
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -87,7 +88,11 @@ beforeEach(() => {
   vi.mocked(fetchJson).mockResolvedValue({})
 })
 
-afterEach(() => {
+afterEach(async () => {
+  // To do's moves go through one queue for the page (useScreenHistory),
+  // each waiting for the one before to land: a move still on its way when
+  // the address is put back below would hold the next test's for seconds.
+  await moveBack(0)
   cleanup()
   resetTodo()
   // An opened suggestion is in the address; the next test starts on the list.
@@ -426,6 +431,8 @@ describe('ModerationQueue — an opened card', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Mekor Habracha' })).toBeInTheDocument()
     expect(window.location.search).toBe('?open=shul-1')
+    // Through Next's router, not history.pushState behind it (AGENTS.md).
+    expect(mockRouter.push).toHaveBeenCalledWith('/?open=shul-1', { scroll: false })
     // Friday's mincha is with Shabbos; the rabbi didn't change.
     expect(screen.getByRole('heading', { name: 'Usual Shabbos times' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Usual weekday times' })).not.toBeInTheDocument()

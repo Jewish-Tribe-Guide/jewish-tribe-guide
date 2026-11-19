@@ -6,9 +6,9 @@ import type { SiteSettings } from '@/lib/siteSettings'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { parseOkJson } from '@/lib/fetchJson'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
 import { INBOX_BASE, adminBase } from '@/lib/adminNav'
 import { AdminBox, AdminRow } from './AdminUI'
+import { useAdminApi } from './useAdminApi'
 import FeedbackEditor from './FeedbackEditor'
 import FormEditor from './FormEditor'
 import { AddListButton } from './DragList'
@@ -36,6 +36,7 @@ export default function FormsManager({
   onClose: () => void
 }) {
   const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [forms, setForms] = useState<FormConfig[] | null>(null)
   const [feedbackOn, setFeedbackOn] = useState<boolean | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -43,10 +44,9 @@ export default function FormsManager({
   const load = useCallback(async () => {
     setError(null)
     try {
-      const headers = { Authorization: `Bearer ${token}` }
       const [formRes, settingsRes] = await Promise.all([
-        fetch(withCommunity('/api/admin/forms', community), { headers }),
-        fetch(withCommunity('/api/admin/site-settings', community), { headers }),
+        api.fetch('/api/admin/forms'),
+        api.fetch('/api/admin/site-settings'),
       ])
       const formBody = await parseOkJson<{ forms: FormConfig[] }>(formRes, 'Failed to load forms.')
       const settingsBody = await parseOkJson<{ settings: SiteSettings }>(settingsRes, 'Failed to load.')
@@ -55,7 +55,7 @@ export default function FormsManager({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community])
+  }, [api])
   useLoadOnMount(load)
 
   if (openId === 'feedback') return <FeedbackEditor token={token} onBack={onClose} />

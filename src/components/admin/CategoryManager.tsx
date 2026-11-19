@@ -4,9 +4,9 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { CategoryConfig } from '@/lib/categories'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { prefetchCategoryListings } from '@/lib/categoryListings'
-import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
+import { parseOkJson } from '@/lib/fetchJson'
+import { useAdminApi } from './useAdminApi'
 import { adminBase } from '@/lib/adminNav'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { MapFoldIcon } from '@/components/icons'
@@ -77,6 +77,7 @@ export default function CategoryManager({
   // it too; it used to fall through to the list.
   const editingId = rawEditingId && !rawEditingId.includes(':') ? `${CAT_PREFIX}${rawEditingId}` : rawEditingId
   const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const keptHere = kept?.community === community ? kept : null
   const [categories, setCategories] = useState<CategoryConfig[] | null>(keptHere?.categories ?? null)
   const [placeCounts, setPlaceCounts] = useState<Record<string, number>>(keptHere?.placeCounts ?? {})
@@ -139,7 +140,7 @@ export default function CategoryManager({
   const load = useCallback(async () => {
     setError(null)
     try {
-      const catRes = await fetch(withCommunity('/api/admin/categories?counts=1', community), { headers: { Authorization: `Bearer ${token}` } })
+      const catRes = await api.fetch('/api/admin/categories?counts=1')
       const catBody = await parseOkJson<{ categories: CategoryConfig[]; placeCounts?: Record<string, number> }>(catRes, 'Failed to load categories.')
       // A kept list that turns out stale (changed in another tab) starts
       // the open page again from what's saved, before anything's typed,
@@ -153,7 +154,7 @@ export default function CategoryManager({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community])
+  }, [api, community])
 
   useLoadOnMount(load)
 
@@ -206,13 +207,10 @@ export default function CategoryManager({
     setError(null)
     setSwitching(screen.kind)
     try {
-      await fetchJson(
-        withCommunity(row ? `/api/admin/categories/${row.id}` : '/api/admin/categories', community),
-        {
-          method: row ? 'PATCH' : 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(row ? { active: on } : { label: screen.label, pluralLabel: screen.label, kind: screen.kind, icon: screen.icon }),
-        },
+      await api.send(
+        row ? 'PATCH' : 'POST',
+        row ? `/api/admin/categories/${row.id}` : '/api/admin/categories',
+        row ? { active: on } : { label: screen.label, pluralLabel: screen.label, kind: screen.kind, icon: screen.icon },
         'Could not change it.',
       )
       await load()

@@ -1,5 +1,5 @@
 import { revalidatePath, revalidateTag } from 'next/cache'
-import { getAdminUser } from '@/lib/adminAuth'
+import { siteAdminRead } from '@/lib/adminRoute'
 import { TAGS } from '@/lib/cacheTags'
 import { PAGE_SLUGS, updatePage, type PageSlug } from '@/lib/pagesStore'
 import { sanitizeRichText } from '@/lib/richText'
@@ -14,10 +14,13 @@ function isPageSlug(slug: string): slug is PageSlug {
 // PATCH /api/admin/pages/[slug] — update a static page's title/body. Takes
 // effect immediately (no draft/publish step, same reasoning as site-settings
 // — this is plain copy). Admin only.
-export async function PATCH(request: Request, { params }: { params: Promise<{ slug: string }> }) {
-  const admin = await getAdminUser(request)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+//
+// siteAdminRead, not siteAdminWrite, though it writes: it invalidates in its
+// own way below (the global `pages` tag, each community's path, and the
+// second pass), and the page is in no community's content tags. The
+// wrapper's revalidatePublicContent would add every community's content and
+// its own second pass on the layout to each page save.
+export const PATCH = siteAdminRead(async (request: Request, _admin, { params }: { params: Promise<{ slug: string }> }) => {
   const { slug } = await params
   if (!isPageSlug(slug)) {
     return Response.json({ ok: false, errors: ['Unknown page.'] }, { status: 404 })
@@ -77,4 +80,4 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sl
     console.error('[admin/pages] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not save page.'] }, { status: 502 })
   }
-}
+})

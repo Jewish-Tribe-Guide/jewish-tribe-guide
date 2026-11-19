@@ -1,7 +1,7 @@
 'use client'
 
 import ImageUploadField from '@/components/ImageUploadField'
-import { withCommunity } from '@/lib/useCommunityData'
+import { useAdminApiFor } from './useAdminApi'
 
 // The banner on a computer, the one photo a page has — shared by the full
 // category editor and SingletonEditor. The same picker as the Home page's
@@ -28,11 +28,12 @@ export function CardBandImageField({
   originalSource?: File | string | null
   onOriginalSourceChange?: (source: File | string | null) => void
 }) {
+  const api = useAdminApiFor(token, community)
   return (
     <ImageUploadField
       value={cardBandImageUrl.trim() || cardImageUrl.trim()}
       onChange={(url) => onChange(url, '')}
-      uploadUrl={withCommunity('/api/admin/categories/band', community)}
+      uploadUrl={api.url('/api/admin/categories/band')}
       token={token}
       shape="square"
       aspect={5}

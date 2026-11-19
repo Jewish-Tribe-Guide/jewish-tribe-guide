@@ -2,14 +2,13 @@
 
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson } from '@/lib/fetchJson'
-import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useCategories } from '@/lib/useCategories'
 import { useNow } from '@/lib/useNow'
 import { routes } from '@/lib/routes'
 import { changeDay, changeTime, type Change } from '@/lib/whatChanged'
 import ChangeRow from '@/components/changes/ChangeRow'
+import { useAdminApi } from './useAdminApi'
 
 // ── What changed, for the admin (step 7a) ───────────────────────────────────
 // Every change visitors see on What changed and Today's "This week", and the
@@ -21,6 +20,7 @@ type Loaded = { changes: Change[]; timezone: string }
 
 export default function WhatChangedAdmin({ token }: { token: string }) {
   const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const categories = useCategories() ?? []
   const now = useNow()
   const [data, setData] = useState<Loaded | null>(null)
@@ -31,11 +31,11 @@ export default function WhatChangedAdmin({ token }: { token: string }) {
   const load = useCallback(async () => {
     setError(null)
     try {
-      setData(await fetchJson<Loaded>(withCommunity('/api/admin/changes', community), { headers: { Authorization: `Bearer ${token}` } }, 'Failed to load the changes.'))
+      setData(await api.get<Loaded>('/api/admin/changes', 'Failed to load the changes.'))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community])
+  }, [api])
 
   useLoadOnMount(load)
 
@@ -43,15 +43,7 @@ export default function WhatChangedAdmin({ token }: { token: string }) {
     setSaveError(null)
     setBusy(change.id)
     try {
-      await fetchJson(
-        withCommunity('/api/admin/changes', community),
-        {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rowIds: change.rowIds, hidden }),
-        },
-        'Could not save.',
-      )
+      await api.send('PATCH', '/api/admin/changes', { rowIds: change.rowIds, hidden }, 'Could not save.')
       setData((d) => d && { ...d, changes: d.changes.map((c) => (c.id === change.id ? { ...c, hidden } : c)) })
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not save.')

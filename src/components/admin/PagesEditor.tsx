@@ -2,12 +2,12 @@
 
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson } from '@/lib/fetchJson'
 import RichTextEditor from '@/components/admin/RichTextEditor'
 import { pageBodyToHtml, sanitizeRichText } from '@/lib/richText'
 import type { PageSlug, StaticPage } from '@/lib/pagesStore'
 import { AdminBox, AdminField, adminInputClass } from './AdminUI'
 import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
+import { useSiteAdminApi } from './useAdminApi'
 
 // The admin Pages tab: edit the title and body of the site's standalone
 // content pages (About, Privacy). The body is a small WYSIWYG (bold, italic,
@@ -26,6 +26,7 @@ import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
 // them, one Save bar, and leaving or switching with changes asks first. One
 // copy serves every community (pagesStore.ts), and the screen says so.
 export default function PagesEditor({ token }: { token: string }) {
+  const api = useSiteAdminApi(token)
   const [pages, setPages] = useState<StaticPage[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [activeSlug, setActiveSlug] = useState<PageSlug | null>(null)
@@ -36,17 +37,13 @@ export default function PagesEditor({ token }: { token: string }) {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const body = await fetchJson<{ pages: StaticPage[] }>(
-        '/api/admin/pages',
-        { headers: { Authorization: `Bearer ${token}` } },
-        'Failed to load.',
-      )
+      const body = await api.get<{ pages: StaticPage[] }>('/api/admin/pages', 'Failed to load.')
       setPages(body.pages)
       setActiveSlug((current) => current ?? body.pages[0]?.slug ?? null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token])
+  }, [api])
 
   useLoadOnMount(load)
 
@@ -75,17 +72,14 @@ export default function PagesEditor({ token }: { token: string }) {
     setSaving(true)
     setError(null)
     try {
-      const body = await fetchJson<{ page: StaticPage }>(
+      const body = await api.send<{ page: StaticPage }>(
+        'PATCH',
         `/api/admin/pages/${activeSlug}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          // Sanitized here as well as in the route: this strips the styled
-          // spans and stray tags a paste leaves behind, so what comes back
-          // from the server matches the draft and the form settles as clean
-          // rather than staying dirty against its own saved value.
-          body: JSON.stringify({ title: draft.title, body: sanitizeRichText(draft.body) }),
-        },
+        // Sanitized here as well as in the route: this strips the styled
+        // spans and stray tags a paste leaves behind, so what comes back
+        // from the server matches the draft and the form settles as clean
+        // rather than staying dirty against its own saved value.
+        { title: draft.title, body: sanitizeRichText(draft.body) },
         'Save failed.',
       )
       setPages((all) => all?.map((p) => (p.slug === body.page.slug ? body.page : p)) ?? all)

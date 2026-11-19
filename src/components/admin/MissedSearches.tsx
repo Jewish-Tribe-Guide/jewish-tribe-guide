@@ -2,14 +2,13 @@
 
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson } from '@/lib/fetchJson'
-import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import type { ClassifiedMiss } from '@/lib/missedSearches'
 import CollapsibleSection from './CollapsibleSection'
 import { AdminEmpty } from './AdminUI'
+import { useAdminApi } from './useAdminApi'
 
 // ── The "Missed searches" tab: the seeding to-do list ───────────────────────
 // Searches on the site that found nothing, most asked first, each re-run
@@ -124,7 +123,7 @@ function SearchRow({
 }
 
 export default function MissedSearches({ token }: { token: string }) {
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [data, setData] = useState<Loaded | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -133,17 +132,11 @@ export default function MissedSearches({ token }: { token: string }) {
   const load = useCallback(async () => {
     setError(null)
     try {
-      setData(
-        await fetchJson<Loaded>(
-          withCommunity('/api/admin/missed-searches', community),
-          { headers: { Authorization: `Bearer ${token}` } },
-          'Failed to load missed searches.',
-        ),
-      )
+      setData(await api.get<Loaded>('/api/admin/missed-searches', 'Failed to load missed searches.'))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community])
+  }, [api])
 
   useLoadOnMount(load)
 
@@ -151,15 +144,7 @@ export default function MissedSearches({ token }: { token: string }) {
     setSaveError(null)
     setBusy(term)
     try {
-      await fetchJson(
-        withCommunity('/api/admin/missed-searches', community),
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ term, dismissed }),
-        },
-        'Could not save.',
-      )
+      await api.post('/api/admin/missed-searches', { term, dismissed }, 'Could not save.')
       setData((d) =>
         d && {
           ...d,

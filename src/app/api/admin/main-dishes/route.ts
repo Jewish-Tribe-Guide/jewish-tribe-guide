@@ -1,6 +1,5 @@
 import { after } from 'next/server'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead, adminWrite, unchanged } from '@/lib/adminRoute'
 import { listCategories } from '@/lib/categoryStore'
 import { getResourceById, listApprovedResources } from '@/lib/resourceStore'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
@@ -147,19 +146,19 @@ function listedDishes(item: DirectoryResource, field: CategoryField) {
  *  changes nothing: the dishes it found are dated from the menu straight
  *  away, as Use this would, with nothing left to decide (the user, Oct 22:
  *  "If I add the menu it should have that as its date"). Else the reading
- *  as it is. */
-async function dateAgreeing(slug: string, listing: DirectoryResource, field: CategoryField, reading: StoredMenuReading, by: string) {
-  if (reading.status !== 'proposed') return { reading }
+ *  as it is. `wrote`: whether the listing changed, so the public site's
+ *  cache needs dropping (the wrapper does it, or the caller after a reply). */
+async function dateAgreeing(slug: string, listing: DirectoryResource, field: CategoryField, reading: StoredMenuReading, by: string): Promise<{ body: { reading: StoredMenuReading; menuDated?: string[] }; wrote: boolean }> {
+  if (reading.status !== 'proposed') return { body: { reading }, wrote: false }
   const listed = listedDishes(listing, field)
   const proposal = dishProposal(listed, reading)
   const found = proposal.rows.filter((r) => r.status === 'same').map((r) => r.name)
-  if (proposal.updates || !found.length) return { reading }
+  if (proposal.updates || !found.length) return { body: { reading }, wrote: false }
   const at = new Date().toISOString()
-  if (!(await setMenuDishes(slug, listing.id, field.key, { always: proposal.always, sometimes: proposal.sometimes }, { names: found, at, menuUrl: reading.sourceUrl }))) return { reading }
+  if (!(await setMenuDishes(slug, listing.id, field.key, { always: proposal.always, sometimes: proposal.sometimes }, { names: found, at, menuUrl: reading.sourceUrl }))) return { body: { reading }, wrote: false }
   await decideMenuReading(slug, listing.id, 'approved', by)
-  await revalidatePublicContent()
   const dated = new Set([...found, ...listed.menuDated].map((n) => n.toLowerCase()))
-  return { reading: { ...reading, status: 'approved' as const, decidedAt: at, decidedBy: by }, menuDated: listed.dishes.filter((n) => dated.has(n.toLowerCase())) }
+  return { body: { reading: { ...reading, status: 'approved' as const, decidedAt: at, decidedBy: by }, menuDated: listed.dishes.filter((n) => dated.has(n.toLowerCase())) }, wrote: true }
 }
 
 /** A menu link given, read with the rest of the place's menu on its
@@ -197,11 +196,7 @@ function cleanNames(raw: unknown): string[] {
   })).values()]
 }
 
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (request: Request, { community }) => {
   // One place, for Edit.
   const itemId = new URL(request.url).searchParams.get('item')
   if (itemId !== null) {
@@ -256,13 +251,12 @@ export async function GET(request: Request) {
     console.error('[admin/main-dishes] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the food places.'] }, { status: 502 })
   }
-}
+})
 
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+// The wrapper drops the public site's cache after a save to the listing;
+// what only an admin sees (a page stopped, a reading kept, skipped or
+// marked no menu) leaves it alone (unchanged).
+export const POST = adminWrite(async (request: Request, { community, admin }) => {
   // Photos come as a form; everything else as JSON.
   const form = (request.headers.get('content-type') ?? '').includes('multipart/form-data') ? await request.formData().catch(() => null) : null
   const body = form
@@ -284,7 +278,7 @@ export async function POST(request: Request) {
       const page = pagesOf((await listWatches(community.slug)).watches, resourceId).find((w) => w.id === id)
       if (!page) return Response.json({ ok: false, errors: ['That page isn’t read for it.'] }, { status: 400 })
       await updateWatch(community.slug, page.id, { createdBy: PAGE_STOPPED_CREATOR, active: false })
-      return Response.json({ ok: true })
+      return unchanged(Response.json({ ok: true }))
     }
 
     if (action === 'read') {
@@ -296,22 +290,24 @@ export async function POST(request: Request) {
       for (const w of pagesOf((await listWatches(community.slug)).watches, resourceId).filter((x) => x.active)) pages.push((await runAndRecord(w, undefined, undefined, { full: true })).watch)
       // Its menu (menuPlaceRead.ts).
       const read = await readPlaceMenu(community.slug, listing, kind, apiKey)
-      return Response.json({ ok: true, ...(read ? await dateAgreeing(community.slug, listing, kind.field, read, admin.email) : { reading: read }), pages })
+      const agreed = read ? await dateAgreeing(community.slug, listing, kind.field, read, admin.email) : null
+      const res = Response.json({ ok: true, ...(agreed ? agreed.body : { reading: read }), pages })
+      return agreed?.wrote ? res : unchanged(res)
     }
 
     if (action === 'link') {
       const url = readMenuLink(body?.url)
       if (!url) return Response.json({ ok: false, errors: ['That isn’t a web address.'] }, { status: 400 })
       if (!(await saveMenuLink(community.slug, resourceId, url))) return Response.json({ ok: false, errors: ['That listing isn’t live any more.'] }, { status: 404 })
-      await revalidatePublicContent()
       const apiKey = process.env.OPENAI_API_KEY
       if (!apiKey) return Response.json({ ok: true, menuUrl: url, reading: null })
       const readIt = async () => dateAgreeing(community.slug, listing, kind.field, await readLink(community.slug, listing, kind, url, apiKey), admin.email)
-      if (body?.background !== true) return Response.json({ ok: true, menuUrl: url, ...(await readIt()) })
-      // Answered at once, read after the reply (the user, Nov 2).
+      if (body?.background !== true) return Response.json({ ok: true, menuUrl: url, ...(await readIt()).body })
+      // Answered at once, read after the reply (the user, Nov 2), so a
+      // listing it changes drops the cache itself: the wrapper's pass is over.
       const started = await startMenuReading(community.slug, resourceId, url)
       after(() =>
-        readIt().catch(async (err) => {
+        readIt().then(async ({ wrote }) => { if (wrote) await revalidatePublicContent() }).catch(async (err) => {
           console.error('[admin/main-dishes] reading a menu link failed:', err)
           await saveMenuReading(community.slug, resourceId, { status: 'failed', sourceUrl: url, dishes: [], note: 'Saved as its menu link, but it couldn’t be read. Read it again.', model: null }).catch(() => {})
         }),
@@ -321,7 +317,6 @@ export async function POST(request: Request) {
 
     if (action === 'unlink') {
       if (!(await saveMenuLink(community.slug, resourceId, null))) return Response.json({ ok: false, errors: ['That listing isn’t live any more.'] }, { status: 404 })
-      await revalidatePublicContent()
       return Response.json({ ok: true, menuUrl: null })
     }
 
@@ -346,23 +341,25 @@ export async function POST(request: Request) {
         note: dishes.length ? null : (read.note ?? 'No dishes in those photos.'),
         model: read.model,
       })
-      return Response.json({ ok: true, ...(await dateAgreeing(community.slug, listing, kind.field, reading, admin.email)) })
+      const agreed = await dateAgreeing(community.slug, listing, kind.field, reading, admin.email)
+      const res = Response.json({ ok: true, ...agreed.body })
+      return agreed.wrote ? res : unchanged(res)
     }
 
     if (action === 'no_menu' || action === 'cant_read') {
-      return Response.json({ ok: true, reading: forTab(await (action === 'cant_read' ? markNoMenu(community.slug, resourceId, admin.email, MENU_CANT_READ_NOTE) : markNoMenu(community.slug, resourceId, admin.email))) })
+      return unchanged(Response.json({ ok: true, reading: forTab(await (action === 'cant_read' ? markNoMenu(community.slug, resourceId, admin.email, MENU_CANT_READ_NOTE) : markNoMenu(community.slug, resourceId, admin.email))) }))
     }
 
     const stored = await getMenuReading(community.slug, resourceId)
     if (action === 'undo_no_menu') {
       if (stored && isNoMenu(stored)) await clearMenuReading(community.slug, resourceId)
-      return Response.json({ ok: true, reading: null })
+      return unchanged(Response.json({ ok: true, reading: null }))
     }
     if (!stored) return Response.json({ ok: false, errors: ['Read its menu first.'] }, { status: 409 })
 
     if (action === 'skip') {
       await decideMenuReading(community.slug, resourceId, 'skipped', admin.email)
-      return Response.json({ ok: true })
+      return unchanged(Response.json({ ok: true }))
     }
 
     // Use this, or Edit's Save to the listing.
@@ -390,7 +387,6 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, errors: ['That listing isn’t live any more.'] }, { status: 404 })
     }
     await decideMenuReading(community.slug, resourceId, 'approved', admin.email)
-    await revalidatePublicContent()
     const menuDated = new Set([...found, ...listedDishes(listing, kind.field).menuDated].map((n) => n.toLowerCase()))
     const dishes = [...lists.always, ...lists.sometimes]
     return Response.json({ ok: true, dishes, sometimes: lists.sometimes, menuDated: dishes.filter((n) => menuDated.has(n.toLowerCase())) })
@@ -398,4 +394,4 @@ export async function POST(request: Request) {
     console.error('[admin/main-dishes] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not do that.'] }, { status: 502 })
   }
-}
+})

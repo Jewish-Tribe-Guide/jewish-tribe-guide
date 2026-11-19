@@ -1,8 +1,6 @@
 'use client'
 
 import { Fragment, useState } from 'react'
-import { fetchJson } from '@/lib/fetchJson'
-import { withCommunity } from '@/lib/useCommunityData'
 import { sourceKind } from '@/lib/watchPurposes'
 import type { WatchedPlace } from '@/lib/watchPlaces'
 import { BoxRow, BoxRows, BUTTON, GO, LINK, Pill } from './JobBoxes'
@@ -25,6 +23,7 @@ import type { AdminEruv } from '@/lib/eruvStore'
 import type { EruvFinding } from '@/lib/eruvJob'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
+import { useAdminApiFor } from './useAdminApi'
 
 // A place opened on its own screen, PlacePage.tsx (openedPlaceBoxes.ts says
 // what goes in it).
@@ -270,10 +269,10 @@ export default function OpenedPlace({
   const [eruvEditing, setEruvEditing] = useState<{ eruv: AdminEruv; finding: EruvFinding } | null>(null)
   const isMobile = useIsMobile()
   const opened = openedPlace(place.id, jobs, now)
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  const api = useAdminApiFor(token, community)
   const post = <T,>(path: string, body: Record<string, unknown>) => {
     wroteFor(place.id).push(path)
-    return fetchJson<T>(withCommunity(path, community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not do that.')
+    return api.post<T>(path, body)
   }
 
   /** Photos of a menu, read for its dishes (the Dishes page's). */
@@ -283,7 +282,7 @@ export default function OpenedPlace({
     body.append('resourceId', place.id)
     for (const f of files) body.append('file', f)
     wroteFor(place.id).push('/api/admin/main-dishes')
-    return fetchJson(withCommunity('/api/admin/main-dishes', community), { method: 'POST', headers: { Authorization: headers.Authorization }, body }, 'Could not read those photos.')
+    return api.post('/api/admin/main-dishes', body, 'Could not read those photos.')
   }
 
   async function run(what: string, work: () => Promise<unknown>) {
@@ -329,7 +328,7 @@ export default function OpenedPlace({
     setError(null)
     if (e.kind === 'eruv') return setEruvEditing({ eruv: e.eruv, finding: e.finding })
     try {
-      const { item, category } = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`/api/admin/watches/google?item=${place.id}`, community), { headers }, 'Could not open its listing.')
+      const { item, category } = await api.get<{ item: DirectoryResource; category: CategoryConfig }>(`/api/admin/watches/google?item=${place.id}`, 'Could not open its listing.')
       const edits = e.makers.map((m) => m(item, category)).filter((x) => x !== null)
       if (!edits.length) throw new Error('Could not open its box.')
       const open = (n: number) => {
@@ -338,7 +337,7 @@ export default function OpenedPlace({
           setEditing(null)
           return void onChanged()
         }
-        setEditing({ item, category, n, saved: n, edit: withSave(fe, { community, token, onSaved: () => open(n + 1) }) })
+        setEditing({ item, category, n, saved: n, edit: withSave(fe, { api, onSaved: () => open(n + 1) }) })
       }
       open(0)
     } catch (err) {
@@ -363,7 +362,7 @@ export default function OpenedPlace({
               values: { hotline: eruvEditing.finding.hotline ?? '', alertsUrl: eruvEditing.finding.alertsUrl ?? '' },
               onSave: async (values: EruvValues) => {
                 try {
-                  await fetchJson(withCommunity(`/api/admin/submissions/${eruvEditing.finding.id}`, community), { method: 'PATCH', headers, body: JSON.stringify({ status: 'approved', payload: values }) }, 'Could not save that.')
+                  await api.send('PATCH', `/api/admin/submissions/${eruvEditing.finding.id}`, { status: 'approved', payload: values }, 'Could not save that.')
                 } catch (err) {
                   return [err instanceof Error ? err.message : 'Could not save that.']
                 }
@@ -387,7 +386,7 @@ export default function OpenedPlace({
 
   if (place.state === 'waiting') {
     const w = waitingGroups(place.id, jobs, now)
-    const patch = (id: string, body: Record<string, unknown>) => fetchJson(withCommunity(`/api/admin/submissions/${id}`, community), { method: 'PATCH', headers, body: JSON.stringify(body) }, 'Could not do that.')
+    const patch = (id: string, body: Record<string, unknown>) => api.send('PATCH', `/api/admin/submissions/${id}`, body, 'Could not do that.')
     // Each group's buttons, the first its main one, as drawn.
     const buttons = (g: WaitGroup) => waitingAnswers(g.decide, place.id, { patch, post })
     // Edit: the box its job page's Edit opens, here.

@@ -35,7 +35,7 @@ import FieldPicker, { type FieldPickerScreen } from './FieldPicker'
 import { PreviewBeside } from './SitePreview'
 import SaveBar, { LEAVE_QUESTION, useLeaveGuard } from './SaveBar'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
+import { useAdminApi } from './useAdminApi'
 import { takeCategoryListings } from '@/lib/categoryListings'
 import { fieldFromRef, fieldRef, screenFromSearch, type EditorScreen } from '@/lib/editorScreenUrl'
 import { focusOn } from '@/lib/previewFocus'
@@ -103,6 +103,7 @@ function CategoryEditorScreen({
   // opened, Questions). Its preview is the page alone.
   const eruvPage = initial?.kind === 'eruv'
   const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [previewing, setPreviewing] = useState(false)
   // Page, A listing or Adding, beside the settings and opened full size.
   const [previewView, setPreviewView] = useState<PreviewView>('page')
@@ -152,7 +153,8 @@ function CategoryEditorScreen({
   useEffect(() => {
     if (!eruvPage) return
     let cancelled = false
-    fetch(withCommunity('/api/admin/eruvim', community), { headers: { Authorization: `Bearer ${token}` } })
+    api
+      .fetch('/api/admin/eruvim')
       .then(async (res) => {
         const body = await res.json()
         if (!cancelled && res.ok && body.ok) setPlaceCount((body.eruvim as { active: boolean }[]).filter((e) => e.active).length)
@@ -161,7 +163,7 @@ function CategoryEditorScreen({
     return () => {
       cancelled = true
     }
-  }, [eruvPage, community, token])
+  }, [eruvPage, api])
   useEffect(() => {
     if (!countId) return
     let cancelled = false

@@ -1,12 +1,10 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead, adminWrite, unchanged } from '@/lib/adminRoute'
 import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { neighborhoodsFor } from '@/lib/places'
 import { searchAsk } from '@/lib/askSearch'
 import { askWordKey, askWordLabel, proposeWords, type TaughtWord } from '@/lib/askWords'
 import { listTaughtWords, teachWord, unteachWord } from '@/lib/askWordStore'
-import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { describeReading } from '@/lib/readingSearch'
 import { forgetReading, listReadings } from '@/lib/questionReadingStore'
 
@@ -26,11 +24,7 @@ import { forgetReading, listReadings } from '@/lib/questionReadingStore'
 // The questions are what visitors typed. Only the words, a count and when
 // are kept, never who asked; the tab is for admins alone.
 
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (_request: Request, { community }) => {
   try {
     const [{ readings, available }, cached, listings, taught] = await Promise.all([
       listReadings(community.slug),
@@ -70,7 +64,7 @@ export async function GET(request: Request) {
     console.error('[admin/read-questions] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load read questions.'] }, { status: 502 })
   }
-}
+})
 
 /** A word to teach, checked against the categories: one that exists, and
  *  a filter its page offers, with a pick it has. Null when it isn't. */
@@ -90,11 +84,9 @@ function wordToTeach(raw: unknown, categories: Awaited<ReturnType<typeof listCat
   return null
 }
 
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+// Teaching a word changes every search box, so the wrapper drops the cached
+// categories; forgetting a reading changes nothing a visitor sees (unchanged).
+export const POST = adminWrite(async (request: Request, { community, admin }) => {
   let body: { key?: unknown; action?: unknown; word?: unknown; question?: unknown }
   try {
     body = await request.json()
@@ -114,7 +106,6 @@ export async function POST(request: Request) {
         if (!word) return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
         await unteachWord(community.slug, word)
       }
-      await revalidatePublicContent()
       return Response.json({ ok: true })
     } catch (err) {
       console.error('[admin/read-questions] teach failed:', err)
@@ -126,9 +117,9 @@ export async function POST(request: Request) {
 
   try {
     await forgetReading(community.slug, key)
-    return Response.json({ ok: true })
+    return unchanged(Response.json({ ok: true }))
   } catch (err) {
     console.error('[admin/read-questions] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save.'] }, { status: 502 })
   }
-}
+})

@@ -1,5 +1,4 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead } from '@/lib/adminRoute'
 import { listCategories } from '@/lib/categoryStore'
 import { listWatches } from '@/lib/watchStore'
 import { loadListings } from '@/lib/listingReads'
@@ -18,11 +17,7 @@ import { siteUrl } from '@/lib/siteUrl'
 //
 // Adding a newsletter, linking a sender to its shul or skipping one is
 // POST /api/admin/watches, as from a place's own page.
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (request: Request, { community }) => {
   try {
     const [setup, { watches }, info, places, categories] = await Promise.all([
       getNewsletterSetup(community.slug),
@@ -50,14 +45,11 @@ export async function GET(request: Request) {
     console.error('[admin/watches/newsletters] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the newsletters.'] }, { status: 502 })
   }
-}
+})
 
 // POST { url } — Paste its link: tried at once, kept only if it answers with
 // this community's key (SetupBad14).
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
+export const POST = adminRead(async (request: Request, { community }) => {
   const body = (await request.json().catch(() => null)) as { url?: unknown } | null
   const link = readWebAppLink(body?.url)
   if (!link) return Response.json({ ok: false, errors: ['That isn’t its web app link. It ends in /exec.'] }, { status: 400 })
@@ -72,4 +64,4 @@ export async function POST(request: Request) {
     console.error('[admin/watches/newsletters] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })
   }
-}
+})

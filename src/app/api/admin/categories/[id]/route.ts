@@ -1,7 +1,6 @@
-import { revalidatePublicContent } from '@/lib/revalidateContent'
+import { adminWrite, unchanged } from '@/lib/adminRoute'
 import { isPlaceKind, type PlaceKind } from '@/lib/placeKinds'
 import type { NextRequest } from 'next/server'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { updateCategory, deleteCategory, categoryDeleteCounts } from '@/lib/categoryStore'
 import { clearCategoryFieldData, applyFieldOptionRenames } from '@/lib/resourceStore'
 import { isHttpUrl } from '@/lib/validation'
@@ -11,7 +10,6 @@ import { parseQuestionCard, type QuestionCard } from '@/lib/questionCards'
 import { parseWalkLists, type WalkList } from '@/lib/walkList'
 import { parseListingParts, type ListingParts } from '@/lib/listingParts'
 import { isValidPinColor } from '@/lib/categoryColor'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 type PatchBody = {
   label?: string
@@ -67,11 +65,7 @@ type PatchBody = {
 // and capabilities. Only the provided keys change. Its id (its address)
 // never does: banners, home sections, Right now, tabs, subscribers and
 // pending suggestions all name it. Admin only.
-export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/categories/[id]'>) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx: RouteContext<'/api/admin/categories/[id]'>) => {
   const { id } = await ctx.params
 
   let body: PatchBody
@@ -120,10 +114,13 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   if (body.walkList != null) body.walkList = parseWalkLists(body.walkList)
   if (body.listingParts != null) body.listingParts = parseListingParts(body.listingParts)
 
+  // A refusal comes before anything is written (a 4xx isn't invalidated,
+  // adminRoute.ts).
+  if (body.pinColor && !isValidPinColor(body.pinColor)) {
+    return Response.json({ ok: false, errors: ['The pin colour must be a hex value like #2657bf.'] }, { status: 400 })
+  }
+
   try {
-    if (body.pinColor && !isValidPinColor(body.pinColor)) {
-      return Response.json({ ok: false, errors: ['The pin colour must be a hex value like #2657bf.'] }, { status: 400 })
-    }
     const category = await updateCategory(community.slug, id, body)
     if (!category) {
       return Response.json({ ok: false, errors: ['Category not found.'] }, { status: 404 })
@@ -140,8 +137,6 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     if (body.applyOptionRenames?.length) {
       ;({ updated: renamed } = await applyFieldOptionRenames(community.slug, id, body.applyOptionRenames))
     }
-    // The public site caches this content; drop it so the edit shows up.
-    await revalidatePublicContent()
     return Response.json({ ok: true, category, cleared, renamed })
   } catch (err) {
     console.error('[admin/categories/:id] PATCH failed:', err)
@@ -178,27 +173,21 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     }
     return Response.json({ ok: false, errors: ['Could not update category.'] }, { status: 502 })
   }
-}
+})
 
 // DELETE /api/admin/categories/:id — permanently remove a category and all of
 // its listings (and the Eruv's eruvim and their watches). Admin only.
 // ?dry=1 only counts what would go, for the confirm.
-export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin/categories/[id]'>) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const DELETE = adminWrite(async (request: NextRequest, { community }, ctx: RouteContext<'/api/admin/categories/[id]'>) => {
   const { id } = await ctx.params
   try {
     if (new URL(request.url).searchParams.get('dry') === '1') {
-      return Response.json({ ok: true, ...(await categoryDeleteCounts(community.slug, id)) })
+      return unchanged(Response.json({ ok: true, ...(await categoryDeleteCounts(community.slug, id)) }))
     }
     const counts = await deleteCategory(community.slug, id)
-    // The public site caches this content; drop it so the edit shows up.
-    await revalidatePublicContent()
     return Response.json({ ok: true, ...counts })
   } catch (err) {
     console.error('[admin/categories/:id] DELETE failed:', err)
     return Response.json({ ok: false, errors: ['Could not delete category.'] }, { status: 502 })
   }
-}
+})

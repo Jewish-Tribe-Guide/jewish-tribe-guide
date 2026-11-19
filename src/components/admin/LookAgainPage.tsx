@@ -4,14 +4,14 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { fetchJson } from '@/lib/fetchJson'
-import { withCommunity } from '@/lib/useCommunityData'
+import type { AdminApi } from '@/lib/adminApi'
 import { NIGHTLY_JOBS, nextRunAt } from '@/lib/jobRuns'
 import { filterLooks, isFoundPage, lookView, LOOK_GROUPS, type LookKind, type LookShown } from '@/lib/lookAgain'
 import { placePath } from '@/lib/placeLink'
 import { AdminBack, AdminEmpty, AdminMenu, Chevron, MoreToggle } from './AdminUI'
 import { day, shortUrl } from './watchText'
 import { useWatchJobsAndReload } from './useWatchJobs'
+import { useAdminApi } from './useAdminApi'
 
 // Look again (board XSuFCMdLQmBYNJqfWaEM3A, Oct 27): what the jobs couldn't
 // find, tried again a month after the last try, a few a night. One list,
@@ -32,7 +32,7 @@ const SHORT = Object.fromEntries(LOOK_GROUPS.map((g) => [g.kind, g.short])) as R
 
 const JOB = NIGHTLY_JOBS.find((j) => j.id === 'look-again')!
 
-function Opened({ item, token, community, base, reload }: { item: LookShown; token: string; community: string; base: string; reload: () => Promise<void> }) {
+function Opened({ item, api, base, reload }: { item: LookShown; api: AdminApi; base: string; reload: () => Promise<void> }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [said, setSaid] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -41,11 +41,7 @@ function Opened({ item, token, community, base, reload }: { item: LookShown; tok
     setError(null)
     setSaid(null)
     try {
-      const r = await fetchJson<{ found?: boolean; read?: boolean }>(
-        withCommunity('/api/admin/watches/look-again', community),
-        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action, kind: item.kind, id: item.id }) },
-        'Could not do that.',
-      )
+      const r = await api.post<{ found?: boolean; read?: boolean }>('/api/admin/watches/look-again', { action, kind: item.kind, id: item.id }, 'Could not do that.')
       if (action === 'try') setSaid(r.found ? 'Found it. It’s waiting in To do.' : r.read ? 'Read it.' : item.kind === 'menu' ? 'Still couldn’t be read.' : 'Nothing found this time.')
       await reload()
     } catch (err) {
@@ -128,7 +124,7 @@ function LeftOut({ names }: { names: string[] }) {
   )
 }
 
-function Rows({ rows, showKind, ...rest }: { rows: LookShown[]; showKind: boolean; token: string; community: string; base: string; reload: () => Promise<void> }) {
+function Rows({ rows, showKind, ...rest }: { rows: LookShown[]; showKind: boolean; api: AdminApi; base: string; reload: () => Promise<void> }) {
   const [open, setOpen] = useState<string | null>(null)
   const [all, setAll] = useState(false)
   return (
@@ -172,6 +168,7 @@ function Rows({ rows, showKind, ...rest }: { rows: LookShown[]; showKind: boolea
 export default function LookAgainPage({ token }: { token: string }) {
   const community = useCommunitySlug()
   const base = adminBase(community)
+  const api = useAdminApi(token)
   const { jobs, reload } = useWatchJobsAndReload(token)
   const [now] = useState(() => Date.now())
   const [query, setQuery] = useState('')
@@ -183,7 +180,7 @@ export default function LookAgainPage({ token }: { token: string }) {
   if (loaded === null) return <div className="space-y-4">{head}<p className="text-sm text-red-700">Couldn’t load Look again.</p></div>
   if (!loaded.available) return <div className="space-y-4">{head}<p className="text-sm text-amber-800">Look again isn’t set up on this site yet.</p></div>
   const view = lookView(loaded.items, nextRunAt(JOB, now))
-  const shared = { token, community, base, reload }
+  const shared = { api, base, reload }
   const [tonight, due] = view.tonight.split(' · ')
   const pool = stopped === 'stopped' ? view.stopped : view.rows
   const rows = filterLooks(pool, kind, query)

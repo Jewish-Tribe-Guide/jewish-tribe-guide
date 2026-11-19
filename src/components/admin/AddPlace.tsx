@@ -3,7 +3,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { isCategorySyncEligible, type CategoryConfig } from '@/lib/categories'
 import { sectionFlags, type EditorRow, type EditorValues } from '@/lib/editorRows'
-import { fetchJson } from '@/lib/fetchJson'
 import { websiteKeyOf, type CheckedField } from '@/lib/googleJob'
 import { adminBase } from '@/lib/adminNav'
 import { samePage } from '@/lib/hoursJob'
@@ -12,7 +11,7 @@ import { jobPageReads } from '@/lib/listingPageWatch'
 import { keepsMenuLink } from '@/lib/menuLink'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
-import { withCommunity } from '@/lib/useCommunityData'
+import { useAdminApi } from './useAdminApi'
 import { sourceKind, sourceProblem } from '@/lib/watchPurposes'
 import AddressInput from '@/components/intake/AddressInput'
 import { SUBMIT_PILL } from '@/components/resources/submitPill'
@@ -80,8 +79,8 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   const [guideGmail, setGuideGmail] = useState<string | null>(null)
   const [taking, setTaking] = useState(false)
   const inGuide = useMemo(() => new Set(listings.map((l) => l.placeId).filter((id): id is string => typeof id === 'string' && !!id)), [listings])
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-  const post = <T,>(path: string, body: Record<string, unknown>) => fetchJson<T>(withCommunity(path, community), { method: 'POST', headers, body: JSON.stringify(body) }, 'Could not do that.')
+  const api = useAdminApi(token)
+  const post = <T,>(path: string, body: Record<string, unknown>) => api.post<T>(path, body)
   // On the kosher lists? From their kept copy, so as soon as it has a name.
   const asksKosher = step === 'finish' && KOSHER_JOB_CATEGORIES.includes(category.id) && !!draft.name.trim()
   // A mikvah's Women's, Men's and Keilim are each a row here, and only the ones
@@ -320,7 +319,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
 
   /** What's found waiting, or back to Places with nothing to say. */
   async function seeFound(listing: DirectoryResource, noEmail = false, fromEmail = false, notSaved: string[] = []) {
-    const { found = [] } = await fetchJson<{ found?: Found[] }>(withCommunity(`/api/admin/listings/${listing.id}/found`, community), { headers }, 'Could not see what it found.').catch(() => ({ found: [] as Found[] }))
+    const { found = [] } = await api.get<{ found?: Found[] }>(`/api/admin/listings/${listing.id}/found`, 'Could not see what it found.').catch(() => ({ found: [] as Found[] }))
     const lines = foundLines(category, listing as unknown as Record<string, unknown>, found, new Date().toISOString().slice(0, 10))
     if (lines.length) setAddedAs({ listing, stage: 'found', lines, fromEmail, notSaved })
     else if (noEmail) setAddedAs({ listing, stage: 'no-email', lines: [], notSaved })

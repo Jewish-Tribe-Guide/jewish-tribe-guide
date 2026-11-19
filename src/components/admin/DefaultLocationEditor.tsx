@@ -2,9 +2,7 @@
 
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson, parseOkJson } from '@/lib/fetchJson'
-import { withCommunity } from '@/lib/useCommunityData'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { useAdminApi } from './useAdminApi'
 import { staticMapUrl } from '@/lib/staticMap'
 import AddressInput from '@/components/intake/AddressInput'
 import { AdminBox, AdminEmpty } from './AdminUI'
@@ -53,7 +51,7 @@ function SpotMap({ at }: { at: { lat: number; lng: number } }) {
 }
 
 export default function DefaultLocationEditor({ token }: { token: string }) {
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [stored, setStored] = useState<Stored | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [text, setText] = useState('')
@@ -65,8 +63,7 @@ export default function DefaultLocationEditor({ token }: { token: string }) {
   const load = useCallback(async () => {
     setLoadError(null)
     try {
-      const res = await fetch(withCommunity('/api/admin/default-location', community), { headers: { Authorization: `Bearer ${token}` } })
-      const body = await parseOkJson<Stored>(res, 'Could not load the default location.')
+      const body = await api.get<Stored>('/api/admin/default-location', 'Could not load the default location.')
       setStored(body)
       // Until an admin has picked a place, it's the city the community was
       // made with, which is its region.
@@ -74,7 +71,7 @@ export default function DefaultLocationEditor({ token }: { token: string }) {
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community])
+  }, [api])
   useLoadOnMount(load)
 
   async function save() {
@@ -83,13 +80,10 @@ export default function DefaultLocationEditor({ token }: { token: string }) {
     setSaving(true)
     setError(null)
     try {
-      const body = await fetchJson<{ center: Stored['center']; label: string; timezone: string }>(
-        withCommunity('/api/admin/default-location', community),
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ ...picked, label: text }),
-        },
+      const body = await api.send<{ center: Stored['center']; label: string; timezone: string }>(
+        'PUT',
+        '/api/admin/default-location',
+        { ...picked, label: text },
         message,
       )
       setStored({ ...stored, center: body.center, label: body.label, timezone: body.timezone })

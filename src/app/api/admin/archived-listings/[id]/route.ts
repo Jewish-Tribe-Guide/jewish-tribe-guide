@@ -1,26 +1,18 @@
-import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { after, type NextRequest } from 'next/server'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
+import { adminWrite } from '@/lib/adminRoute'
 import { restoreResource, hardDeleteArchivedResource } from '@/lib/resourceStore'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // PATCH /api/admin/archived-listings/:id — restore an archived listing back
 // to 'approved' (it reappears on the public site exactly as it was). Admin
 // only.
-export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/archived-listings/[id]'>) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const PATCH = adminWrite(async (_request: NextRequest, { community }, ctx: RouteContext<'/api/admin/archived-listings/[id]'>) => {
   const { id } = await ctx.params
   try {
     const resource = await restoreResource(id, community.slug)
     if (!resource) {
       return Response.json({ ok: false, errors: ['Listing not found (or not archived).'] }, { status: 404 })
     }
-    // The public site caches this content; drop it so the edit shows up.
-    await revalidatePublicContent()
     // Its walks along the streets now, not tonight (walkRouteJob.ts).
     after(() => runWalkRoutesAfterChange(community.slug))
     return Response.json({ ok: true, resource })
@@ -28,26 +20,20 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     console.error('[admin/archived-listings/:id] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not restore listing.'] }, { status: 502 })
   }
-}
+})
 
 // DELETE /api/admin/archived-listings/:id — permanently deletes an archived
 // listing. Irreversible. Admin only.
-export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin/archived-listings/[id]'>) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const DELETE = adminWrite(async (_request: NextRequest, { community }, ctx: RouteContext<'/api/admin/archived-listings/[id]'>) => {
   const { id } = await ctx.params
   try {
     const found = await hardDeleteArchivedResource(id, community.slug)
     if (!found) {
       return Response.json({ ok: false, errors: ['Listing not found (or not archived).'] }, { status: 404 })
     }
-    // The public site caches this content; drop it so the edit shows up.
-    await revalidatePublicContent()
     return Response.json({ ok: true })
   } catch (err) {
     console.error('[admin/archived-listings/:id] DELETE failed:', err)
     return Response.json({ ok: false, errors: ['Could not permanently delete listing.'] }, { status: 502 })
   }
-}
+})

@@ -6,15 +6,13 @@ import type { ResourceSubmission } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { fetchJson } from '@/lib/fetchJson'
 import { placePath } from '@/lib/placeLink'
 import { shortDay } from '@/lib/todo'
 import type { TodoFilter, TodoPlace, TodoThing } from '@/lib/todoPlaces'
 import { firstThing, shownThing } from '@/lib/todoPlaces'
-import { withCommunity } from '@/lib/useCommunityData'
 import { updateTodo } from '@/lib/useTodo'
 import { AdminBack, AdminBox } from './AdminUI'
-import type { QueuePosition } from './ChangeReview'
+import { useAdminApi } from './useAdminApi'
 import { SubmissionCard } from './SubmissionCard'
 import { SubmissionReview } from './SubmissionReview'
 import ThingSwitches from './ThingSwitches'
@@ -22,7 +20,7 @@ import TodoBroken from './TodoBroken'
 import TodoChange from './TodoChange'
 import TodoNewPlace from './TodoNewPlace'
 import TodoReading from './TodoReading'
-import PlaceFrame, { CloseButton, PlaceButtons, PlaceCard, type PlaceButton } from './PlaceFrame'
+import PlaceFrame, { CloseButton, PlaceButtons, PlaceCard, type PlaceButton, type PlacePosition } from './PlaceFrame'
 import type { Jobs } from './useWatchJobs'
 
 // A place opened from To do (the "one tap per place" boards, approved
@@ -54,7 +52,7 @@ export default function TodoPlaceScreen({
   place: TodoPlace
   /** The list's filter, which picks the thing it opens on. */
   filters: TodoFilter[]
-  position: QueuePosition
+  position: PlacePosition
   categoriesById: Map<string, CategoryConfig>
   token: string
   busyId: string | null
@@ -155,7 +153,7 @@ export default function TodoPlaceScreen({
         ),
       )
     }
-    if (t.kind === 'feedback') return <Feedback key={t.id} thing={t} name={place.name} position={position} switches={switches} token={token} community={community} />
+    if (t.kind === 'feedback') return <Feedback key={t.id} thing={t} name={place.name} position={position} switches={switches} token={token} />
     // A broken check, fixed right here (R3Site, R2Menu, R2Google).
     if (t.kind === 'broken' && jobs && place.placeId) {
       return <TodoBroken key={t.id} placeId={place.placeId} name={place.name} label={t.label} jobs={jobs} token={token} community={community} position={position} switches={switches} reload={reload} />
@@ -191,7 +189,7 @@ export default function TodoPlaceScreen({
   )
 }
 
-function Header({ place, position }: { place: TodoPlace; position: QueuePosition }) {
+function Header({ place, position }: { place: TodoPlace; position: PlacePosition }) {
   return (
     <AdminBack
       back={{ label: 'To do', onClick: position.back }}
@@ -226,15 +224,14 @@ function Feedback({
   position,
   switches,
   token,
-  community,
 }: {
   thing: Extract<TodoThing, { kind: 'feedback' }>
   name: string
-  position: QueuePosition
+  position: PlacePosition
   switches: ReactNode
   token: string
-  community: string
 }) {
+  const api = useAdminApi(token)
   const r = thing.response
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -242,11 +239,7 @@ function Feedback({
     setBusy(true)
     setError(null)
     try {
-      await fetchJson(
-        withCommunity(`/api/admin/responses/${r.id}`, community),
-        { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ status: 'handled' }) },
-        'Could not mark it done.',
-      )
+      await api.send('PATCH', `/api/admin/responses/${r.id}`, { status: 'handled' }, 'Could not mark it done.')
       updateTodo((d) => ({ ...d, responses: d.responses.filter((x) => x.id !== r.id) }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not mark it done.')

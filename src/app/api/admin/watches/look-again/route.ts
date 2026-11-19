@@ -1,7 +1,5 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead, adminWrite, unchanged } from '@/lib/adminRoute'
 import { enforceRateLimit } from '@/lib/rateLimit'
-import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { listJobRuns } from '@/lib/jobRunStore'
 import { listEruvimForAdmin, saveStatusRead, updateEruv } from '@/lib/eruvStore'
 import { readEruvPage } from '@/lib/eruvReader'
@@ -32,9 +30,7 @@ type Action = (typeof ACTIONS)[number]
  *  an AI read. */
 const TRY_LIMIT = { limit: 20, windowSec: 600 }
 
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  if (!(await getAdminUserForCommunity(request, community.slug))) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
+export const GET = adminRead(async (request: Request, { community }) => {
   try {
     const [loaded, { runs }] = await Promise.all([loadLookAgain(community.slug), listJobRuns()])
     return Response.json({ ok: true, ...loaded, runs: runs['look-again'] ?? [] })
@@ -42,11 +38,9 @@ export async function GET(request: Request) {
     console.error('[admin/watches/look-again] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load Look again.'] }, { status: 502 })
   }
-}
+})
 
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  if (!(await getAdminUserForCommunity(request, community.slug))) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
+export const POST = adminWrite(async (request: Request, { community }) => {
   const body = (await request.json().catch(() => null)) as { action?: unknown; kind?: unknown; id?: unknown } | null
   const action = body?.action as Action
   const kind = body?.kind as LookKind
@@ -63,10 +57,11 @@ export async function POST(request: Request) {
     if (!available) return bad('Look again isn’t set up on this site yet.', 503)
     const item = items.find((i) => i.kind === kind && i.id === id)
     if (!item) return bad('Look again isn’t trying that one.', 404)
-    if (action === 'try') return Response.json({ ok: true, ...(await tryLook(slug, item, process.env.OPENAI_API_KEY)) })
+    // A try, a Stop and a Not change only what Look again reads next, never what the site shows.
+    if (action === 'try') return unchanged(Response.json({ ok: true, ...(await tryLook(slug, item, process.env.OPENAI_API_KEY)) }))
     if (action === 'stop' || action === 'resume') {
       await saveStopped(slug, kind, id, action === 'stop' ? new Date().toISOString() : null)
-      return Response.json({ ok: true })
+      return unchanged(Response.json({ ok: true }))
     }
     const found = item.found
     if (!found) return bad('It found nothing to answer.')
@@ -76,7 +71,7 @@ export async function POST(request: Request) {
         await notThisPlace(slug, id, found.placeId)
         await answerFound(slug, kind, id, null)
       }
-      return Response.json({ ok: true })
+      return unchanged(Response.json({ ok: true }))
     }
     if (isFoundPage(found)) {
       const eruv = (await listEruvimForAdmin(slug)).eruvim.find((e) => e.id === id)
@@ -85,11 +80,10 @@ export async function POST(request: Request) {
       await saveStatusRead(slug, id, await readEruvPage(found.url, new Date()))
     } else await pickGooglePlace(slug, id, found.placeId)
     await answerFound(slug, kind, id, null)
-    await revalidatePublicContent()
     return Response.json({ ok: true })
   } catch (err) {
     if (err instanceof GoogleJobError) return bad(err.message, err.status)
     console.error('[admin/watches/look-again] POST failed:', err)
     return bad('Could not do that.', 502)
   }
-}
+})

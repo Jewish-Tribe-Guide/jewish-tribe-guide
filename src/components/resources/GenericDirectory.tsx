@@ -1,5 +1,6 @@
 'use client'
 
+import { whenSettled } from '@/lib/whenSettled'
 import { Fragment, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, selectValues, type CategoryConfig } from '@/lib/categories'
@@ -807,27 +808,31 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // setTimeout, not requestAnimationFrame: rAF is paused entirely while the
   // tab is backgrounded, which would silently drop this if the visitor
   // switched apps mid-wait and back.
-  const scrollItemIntoViewWhenSettled = (id: string, behavior: ScrollBehavior) => {
-    let timer = 0
-    let lastTop: number | null = null
-    let stableChecks = 0
-    const waitForSettled = () => {
-      const el = listingColumnRef.current ?? itemRowRefs.current.get(id)
-      if (!el) {
-        timer = window.setTimeout(waitForSettled, 32)
-        return
-      }
-      const top = el.getBoundingClientRect().top
-      stableChecks = lastTop !== null && Math.abs(top - lastTop) < 0.5 ? stableChecks + 1 : 0
-      lastTop = top
-      if (stableChecks >= 2) {
-        scrollItemIntoView(id, behavior)
-        return
-      }
-      timer = window.setTimeout(waitForSettled, 32)
+  //
+  // It gives up after a few seconds (whenSettled), and any wait still going
+  // when the list goes away is stopped, so a row that never shows up can't
+  // keep a timer running.
+  const settleWaits = useRef(new Set<() => void>())
+  useEffect(() => {
+    const waits = settleWaits.current
+    return () => {
+      for (const cancel of waits) cancel()
+      waits.clear()
     }
-    timer = window.setTimeout(waitForSettled, 32)
-    return () => window.clearTimeout(timer)
+  }, [])
+  const scrollItemIntoViewWhenSettled = (id: string, behavior: ScrollBehavior) => {
+    const cancel = whenSettled(
+      () => listingColumnRef.current ?? itemRowRefs.current.get(id),
+      () => {
+        settleWaits.current.delete(cancel)
+        scrollItemIntoView(id, behavior)
+      },
+    )
+    settleWaits.current.add(cancel)
+    return () => {
+      cancel()
+      settleWaits.current.delete(cancel)
+    }
   }
 
   // Every rendered card's open/close handle, keyed by listing id — same

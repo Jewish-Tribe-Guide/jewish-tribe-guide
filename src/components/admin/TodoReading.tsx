@@ -3,8 +3,6 @@
 import { useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
-import { fetchJson } from '@/lib/fetchJson'
-import { withCommunity } from '@/lib/useCommunityData'
 import { ChangedTag } from '@/components/resources/editorParts'
 import BoxEditSheet, { type BoxEdit } from '@/components/resources/BoxEditSheet'
 import { withSave } from './findingEdits'
@@ -14,6 +12,7 @@ import { kindsOf } from './WatchKinds'
 import { waitingAnswers, type WaitAnswer } from './waitingAnswers'
 import { groupEdit, ownGroups, waitingGroups, type WaitBox, type WaitGroup, type WaitRow } from './waitingGroups'
 import type { Jobs } from './useWatchJobs'
+import { useAdminApiFor } from './useAdminApi'
 
 // What a job read that's decided on the place itself (a closure, a check
 // against Google, a menu's reading, a place the guide has archived), on To
@@ -86,9 +85,8 @@ export default function TodoReading({
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<{ item: DirectoryResource; category: CategoryConfig; edit: BoxEdit } | null>(null)
   const [changing, setChanging] = useState<string | null>(null)
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-  const send = (method: 'PATCH' | 'POST', path: string, body: Record<string, unknown>) =>
-    fetchJson(withCommunity(path, community), { method, headers, body: JSON.stringify(body) }, 'Could not do that.')
+  const api = useAdminApiFor(token, community)
+  const send = (method: 'PATCH' | 'POST', path: string, body: Record<string, unknown>) => api.send(method, path, body)
 
   const g = ownGroups(waitingGroups(placeId, jobs, now).groups)[0]
   const kind = kindsOf(jobs, '', now)?.kinds.find((k) => k.places.some((p) => p.id === placeId))
@@ -124,10 +122,10 @@ export default function TodoReading({
     if (e?.kind !== 'boxes') return
     setError(null)
     try {
-      const { item, category } = await fetchJson<{ item: DirectoryResource; category: CategoryConfig }>(withCommunity(`/api/admin/watches/google?item=${placeId}`, community), { headers }, 'Could not open its listing.')
+      const { item, category } = await api.get<{ item: DirectoryResource; category: CategoryConfig }>(`/api/admin/watches/google?item=${placeId}`, 'Could not open its listing.')
       const fe = e.makers.map((m) => m(item, category)).find((x) => x !== null)
       if (!fe) throw new Error('Could not open its box.')
-      setEditing({ item, category, edit: withSave(fe, { community, token, onSaved: () => void reload().then(() => setEditing(null)) }) })
+      setEditing({ item, category, edit: withSave(fe, { api, onSaved: () => void reload().then(() => setEditing(null)) }) })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not open its listing.')
     }

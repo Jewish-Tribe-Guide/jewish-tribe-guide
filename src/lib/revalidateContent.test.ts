@@ -230,11 +230,21 @@ describe('who may call revalidatePublicContent', () => {
   )
 
   it('is only admin routes and cron jobs', () => {
-    expect(callers.length, 'the scan should find the admin routes that do call it').toBeGreaterThan(10)
+    // Most admin routes invalidate through their wrapper now (adminRoute.ts),
+    // so the callers are it, the cron jobs, and the few routes with their own.
+    expect(callers, 'the scan should find the wrapper').toContain('src/lib/adminRoute.ts')
+    expect(callers.length, 'the scan should find the cron jobs and routes that call it too').toBeGreaterThan(3)
     const others = callers.filter(
-      (f) => !/^src\/app\/api\/(admin|cron)\//.test(f),
+      // adminRoute.ts is the admin routes' own wrapper, held to them below.
+      (f) => !/^src\/app\/api\/(admin|cron)\//.test(f) && f !== 'src/lib/adminRoute.ts',
     )
     expect(others, 'a public route calling this holds a function open for every visitor request').toEqual([])
+  })
+
+  it('reaches no public route through the admin routes’ wrapper', () => {
+    const wrapped = files('src').filter((f) => /from\s*'@\/lib\/adminRoute'/.test(readFileSync(f, 'utf-8')))
+    expect(wrapped.length, 'the scan should find the routes that use it').toBeGreaterThan(10)
+    expect(wrapped.filter((f) => !/^src\/app\/api\/admin\//.test(f))).toEqual([])
   })
 })
 

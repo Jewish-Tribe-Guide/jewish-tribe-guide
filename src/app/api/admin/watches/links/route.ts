@@ -1,5 +1,4 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead } from '@/lib/adminRoute'
 import { checkOneLink, linkStandings } from '@/lib/linkCheckRun'
 
 // GET  /api/admin/watches/links — every link a listing shows that the
@@ -12,22 +11,16 @@ import { checkOneLink, linkStandings } from '@/lib/linkCheckRun'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
+export const GET = adminRead(async (request: Request, { community }) => {
   try {
     return Response.json({ ok: true, links: await linkStandings(community.slug) })
   } catch (err) {
     console.error('[admin/watches/links] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the links.'] }, { status: 502 })
   }
-}
+})
 
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
+export const POST = adminRead(async (request: Request, { community }) => {
   const body = (await request.json().catch(() => null)) as { action?: unknown; resourceId?: unknown; key?: unknown } | null
   const resourceId = typeof body?.resourceId === 'string' ? body.resourceId : ''
   const key = typeof body?.key === 'string' ? body.key : ''
@@ -40,4 +33,4 @@ export async function POST(request: Request) {
     console.error('[admin/watches/links] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not check the link.'] }, { status: 502 })
   }
-}
+})

@@ -1,6 +1,5 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
+import { adminRead } from '@/lib/adminRoute'
 import { listSubmissionsByStatus } from '@/lib/submissionStore'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import type { SubmissionStatus } from '@/types'
 
 const VALID_STATUSES: SubmissionStatus[] = ['pending', 'approved', 'rejected']
@@ -8,13 +7,7 @@ const VALID_STATUSES: SubmissionStatus[] = ['pending', 'approved', 'rejected']
 // GET /api/admin/submissions?status=pending|approved|rejected — changes in
 // that status, most-recently-acted-on first. Defaults to 'pending' (the
 // moderation queue's own call never passes one). Admin only.
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) {
-    return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-  }
-
+export const GET = adminRead(async (request: Request, { community }) => {
   const requested = new URL(request.url).searchParams.get('status') ?? 'pending'
   if (!VALID_STATUSES.includes(requested as SubmissionStatus)) {
     return Response.json(
@@ -30,4 +23,4 @@ export async function GET(request: Request) {
     console.error('[admin/submissions] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load submissions.'] }, { status: 502 })
   }
-}
+})

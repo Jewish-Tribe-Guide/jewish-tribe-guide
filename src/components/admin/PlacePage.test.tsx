@@ -425,7 +425,7 @@ describe('PlacePage', () => {
           ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a', id: 'w1' }],
         ])
         expect(await screen.findByText(/just now/)).toBeTruthy()
-        expect(screen.queryByTestId('change-review')).toBeNull()
+        expect(screen.queryByTestId('place-frame')).toBeNull()
       })
 
       it('differing, it opens To do’s change screen; Back leaves it waiting, not answered', async () => {
@@ -439,17 +439,20 @@ describe('PlacePage', () => {
         expect(screen.getAllByTestId('row-source')[0]).toHaveTextContent('Reading its website…')
         const scrolled = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
         release()
-        const review = await screen.findByTestId('change-review')
+        // To do's change screen (TodoChange), with To do's two answers:
+        // not a screen of its own with "Edit, then update" and "Leave it".
+        const review = await screen.findByTestId('place-frame')
         expect(scrolled).toHaveBeenCalledWith(0, 0)
-        expect(within(review).getByRole('button', { name: 'Update the listing' })).toBeTruthy()
+        expect(within(within(review).getByRole('group', { name: 'Decide' })).getAllByRole('button')).toHaveLength(2)
+        expect(within(review).queryByRole('button', { name: 'Edit, then update' })).toBeNull()
         expect(review).not.toHaveTextContent('1 of 1')
-        await user.click(within(review).getByRole('button', { name: /Back/ }))
-        expect(screen.queryByTestId('change-review')).toBeNull()
+        await user.click(within(review).getByRole('button', { name: 'Back' }))
+        expect(screen.queryByTestId('place-frame')).toBeNull()
         expect(vi.mocked(fetchJson).mock.calls.some(([, init]) => init?.method === 'PATCH')).toBe(false)
         const line = screen.getAllByTestId('row-source')[0]
         expect(line).toHaveTextContent('Its website has a change · Open')
         await user.click(within(line).getByRole('button', { name: 'Open' }))
-        expect(await screen.findByTestId('change-review')).toBeTruthy()
+        expect(await screen.findByTestId('place-frame')).toBeTruthy()
       })
 
       it('failing, it says so in red and keeps its way to read again or change it', async () => {

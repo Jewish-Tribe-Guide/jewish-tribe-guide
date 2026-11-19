@@ -9,6 +9,7 @@ const m = vi.hoisted(() => ({
   deleteCategory: vi.fn(),
   categoryDeleteCounts: vi.fn(),
   revalidatePublicContent: vi.fn(),
+  clearCategoryFieldData: vi.fn(),
 }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({
@@ -16,7 +17,7 @@ vi.mock('@/lib/communityStore', () => ({
   resolveCommunity: m.resolveCommunity,
 }))
 vi.mock('@/lib/categoryStore', () => ({ updateCategory: m.updateCategory, deleteCategory: m.deleteCategory, categoryDeleteCounts: m.categoryDeleteCounts }))
-vi.mock('@/lib/resourceStore', () => ({ clearCategoryFieldData: vi.fn(), applyFieldOptionRenames: vi.fn() }))
+vi.mock('@/lib/resourceStore', () => ({ clearCategoryFieldData: m.clearCategoryFieldData, applyFieldOptionRenames: vi.fn() }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: m.revalidatePublicContent }))
 
 const { PATCH, DELETE } = await import('./route')
@@ -172,5 +173,30 @@ describe('DELETE /api/admin/categories/:id', () => {
     expect(await (await del()).json()).toEqual({ ok: true, listings: 0, eruvim: 4, watches: 3 })
     expect(m.deleteCategory).toHaveBeenCalledWith('philly', 'eruv-information')
     expect(m.revalidatePublicContent).toHaveBeenCalled()
+  })
+})
+
+// A save that wrote and then failed used to answer its 502 without throwing
+// the cached site away, so the site kept the old copy for days while the
+// database held the new one (the admin review, Nov 18). adminWrite now
+// invalidates after anything but a refusal.
+describe('PATCH /api/admin/categories/:id — a save that fails partway', () => {
+  it('still drops the cached site when the update failed (it may have written)', async () => {
+    m.updateCategory.mockRejectedValue(new Error('connection reset'))
+    expect((await patch({ label: 'Shuls' })).status).toBe(502)
+    expect(m.revalidatePublicContent).toHaveBeenCalled()
+  })
+
+  it('still drops it when the category saved and clearing a field’s data failed', async () => {
+    m.clearCategoryFieldData.mockRejectedValue(new Error('timeout'))
+    expect((await patch({ hasPhone: false, clearFields: { phone: true } })).status).toBe(502)
+    expect(m.updateCategory).toHaveBeenCalled()
+    expect(m.revalidatePublicContent).toHaveBeenCalled()
+  })
+
+  it('refuses a bad pin colour before writing anything, and leaves the cache', async () => {
+    expect((await patch({ label: 'Shuls', pinColor: 'blue' })).status).toBe(400)
+    expect(m.updateCategory).not.toHaveBeenCalled()
+    expect(m.revalidatePublicContent).not.toHaveBeenCalled()
   })
 })

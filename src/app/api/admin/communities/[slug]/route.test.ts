@@ -51,6 +51,7 @@ describe('PATCH /api/admin/communities/:slug', () => {
     m.getAdminUser.mockResolvedValue(null)
     expect((await patch({ visible: true })).status).toBe(401)
     expect(m.setCommunityVisibility).not.toHaveBeenCalled()
+    expect(m.revalidatePublicContent).not.toHaveBeenCalled()
   })
 
   it('400s a body that is not JSON', async () => {
@@ -70,6 +71,7 @@ describe('PATCH /api/admin/communities/:slug', () => {
     expect(m.setCommunityEmailLists).not.toHaveBeenCalled()
     expect(m.addCommunityAdminEmail).not.toHaveBeenCalled()
     expect(m.removeCommunityAdminEmail).not.toHaveBeenCalled()
+    expect(m.revalidatePublicContent).not.toHaveBeenCalled()
   })
 
   it('publishes, returns the fresh token it just issued, and refreshes the public cache', async () => {
@@ -118,12 +120,14 @@ describe('PATCH /api/admin/communities/:slug', () => {
     expect(m.removeCommunityAdminEmail).toHaveBeenCalledWith('ues', 'old@x.co')
   })
 
-  it('502s with the store’s message, and does not refresh the cache, when saving fails', async () => {
+  // A 5xx may have written part of the change (visibility set, then an
+  // admin address refused), so siteAdminWrite refreshes the cache after it.
+  it('502s with the store’s message, and still refreshes the cache, when saving fails', async () => {
     m.setCommunityVisibility.mockRejectedValue(new Error('slug not found'))
     const res = await patch({ visible: true })
     expect(res.status).toBe(502)
     expect((await res.json()).errors).toEqual(['slug not found'])
-    expect(m.revalidatePublicContent).not.toHaveBeenCalled()
+    expect(m.revalidatePublicContent).toHaveBeenCalled()
   })
 })
 
@@ -163,6 +167,7 @@ describe('DELETE /api/admin/communities/:slug', () => {
     async (body) => {
       expect((await del(body)).status).toBe(400)
       expect(m.deleteCommunity).not.toHaveBeenCalled()
+      expect(m.revalidatePublicContent).not.toHaveBeenCalled()
     },
   )
 
@@ -178,5 +183,6 @@ describe('DELETE /api/admin/communities/:slug', () => {
     const res = await del({ confirmSlug: 'ues' })
     expect(res.status).toBe(502)
     expect((await res.json()).errors).toEqual(['has dependents'])
+    expect(m.revalidatePublicContent).toHaveBeenCalled()
   })
 })

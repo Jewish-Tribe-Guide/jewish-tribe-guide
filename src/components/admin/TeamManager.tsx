@@ -2,10 +2,9 @@
 
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson, parseOkJson } from '@/lib/fetchJson'
-import { withCommunity } from '@/lib/useCommunityData'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { parseOkJson } from '@/lib/fetchJson'
 import { AdminBox, AdminSwitch, adminInputClass } from './AdminUI'
+import { useAdminApi } from './useAdminApi'
 
 // Settings' Team tab (the admin redesign's board "Team"): who can sign in to
 // THIS community's admin, added and removed here by any of its admins, and
@@ -20,7 +19,7 @@ import { AdminBox, AdminSwitch, adminInputClass } from './AdminUI'
 const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
 
 export default function TeamManager({ token, me }: { token: string; me: string }) {
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [adminEmails, setAdminEmails] = useState<string[] | null>(null)
   const [prefs, setPrefs] = useState<{ notify: boolean; reviewNotify: boolean } | null>(null)
   const [prefError, setPrefError] = useState<string | null>(null)
@@ -34,9 +33,7 @@ export default function TeamManager({ token, me }: { token: string; me: string }
   const load = useCallback(async () => {
     setError(null)
     try {
-      const res = await fetch(withCommunity('/api/admin/team', community), {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await api.fetch('/api/admin/team')
       const body = await parseOkJson<{ adminEmails: string[]; myNotify: boolean; myReviewNotify: boolean }>(
         res,
         'Failed to load the team list.',
@@ -46,7 +43,7 @@ export default function TeamManager({ token, me }: { token: string; me: string }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, community])
+  }, [api])
 
   useLoadOnMount(load)
 
@@ -60,15 +57,7 @@ export default function TeamManager({ token, me }: { token: string; me: string }
     setPrefError(null)
     setSavingPref(true)
     try {
-      await fetchJson(
-        withCommunity('/api/admin/team', community),
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ [field]: next }),
-        },
-        message,
-      )
+      await api.send('PATCH', '/api/admin/team', { [field]: next }, message)
     } catch (err) {
       setPrefs(previous)
       setPrefError(err instanceof Error ? err.message : message)
@@ -81,15 +70,7 @@ export default function TeamManager({ token, me }: { token: string; me: string }
     setBusy(true)
     setListError(null)
     try {
-      const { adminEmails: next } = await fetchJson<{ adminEmails: string[] }>(
-        withCommunity('/api/admin/team', community),
-        {
-          method,
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ email }),
-        },
-        message,
-      )
+      const { adminEmails: next } = await api.send<{ adminEmails: string[] }>(method, '/api/admin/team', { email }, message)
       setAdminEmails(next)
       if (method === 'POST') setNewEmail('')
       setConfirming(null)

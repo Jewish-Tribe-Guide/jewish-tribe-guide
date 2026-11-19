@@ -1,9 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { fetchJson } from '@/lib/fetchJson'
-import { useCommunitySlug } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
+import { useAdminApi } from './useAdminApi'
 import type { CategoryConfig } from '@/lib/categories'
 
 // "Delete this page" at the foot of a category page (board 4), and the step
@@ -13,24 +11,20 @@ import type { CategoryConfig } from '@/lib/categories'
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
 export default function DeletePage({ token, category, onDeleted }: { token: string; category: CategoryConfig; onDeleted: () => void }) {
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const [asking, setAsking] = useState(false)
   const [counts, setCounts] = useState<{ eruvim: number; watches: number } | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const eruv = category.kind === 'eruv'
-  const url = withCommunity(`/api/admin/categories/${category.id}`, community)
+  const path = `/api/admin/categories/${category.id}`
 
   async function ask() {
     setError(null)
     setAsking(true)
     if (!eruv) return
     try {
-      const c = await fetchJson<{ eruvim: number; watches: number }>(
-        withCommunity(`/api/admin/categories/${category.id}?dry=1`, community),
-        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
-        'Couldn’t count its eruvim.',
-      )
+      const c = await api.send<{ eruvim: number; watches: number }>('DELETE', `${path}?dry=1`, undefined, 'Couldn’t count its eruvim.')
       setCounts({ eruvim: c.eruvim, watches: c.watches })
     } catch (err) {
       setAsking(false)
@@ -42,7 +36,7 @@ export default function DeletePage({ token, category, onDeleted }: { token: stri
     setError(null)
     setDeleting(true)
     try {
-      await fetchJson(url, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }, 'Delete failed.')
+      await api.send('DELETE', path, undefined, 'Delete failed.')
       onDeleted()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed.')

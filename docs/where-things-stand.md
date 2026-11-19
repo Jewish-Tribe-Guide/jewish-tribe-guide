@@ -969,13 +969,35 @@ Still open:
 - **A dated shul week is still compared with the usual times**
   (`shulWeekReading.ts`, `dropListed`), against the rule. The user, Nov
   18: talk about it after the rest.
-- With the admin-refactors session (PR 395): To do's own open/close is a
-  raw `history.pushState` (`goTo` in ModerationQueue; it works today,
-  checked in the browser after a reload, but it's the pattern AGENTS.md
-  warns against), one `useAdminApi` hook for the token/fetch/error
-  pattern, one admin route wrapper for auth + community + invalidation,
-  one change-review component (ChangeReview and TodoChange), and one
-  kosher-list runner for Keystone and Mekor.
+- A listing list's scroll-to-a-row wait gives up after about 3 seconds
+  and stops when the list goes away (`whenSettled`, Nov 19). It used to
+  poll every 32ms forever for a row that never appeared, and one timer
+  firing after a test's page was gone failed PR 395's unit job ("window is
+  not defined") with every test passing.
+- The four refactors, done Nov 18 (branch `claude/admin-refactors-85cd73`):
+  - One admin api (`src/lib/adminApi.ts`, `useAdminApi`): every screen's
+    `/api/admin` request gets the token and the community from it, and
+    `adminApiCalls.test.ts` fails on one built by hand. It keeps one api
+    across the hourly new token, so no screen reloads a draft over what's
+    typed (the Home page and Feedback fix, now for every screen).
+  - One route wrapper (`src/lib/adminRoute.ts`: `adminRead`,
+    `adminWrite`, `siteAdminRead`, `siteAdminWrite`): sign-in, the
+    community, and the public site's cache thrown away after a write, now
+    even when the save failed partway. Every admin route is on it
+    (`adminRoutesWrapped.test.ts` fails on one that isn't) but dev-login,
+    request-link and whoami, which sign in themselves. So a 502 from an
+    approval, a listing save, a kosher restore, Google or Look again now
+    refreshes the site, where it didn't. Pages and a new community keep
+    their own invalidation (`siteAdminRead`), and a save that changes
+    nothing public is marked `unchanged()`.
+  - To do's open and close go through Next's router (`moveTo`), not a raw
+    `history.pushState`. It worked before too (Next's patched pushState
+    copied the same page's state), so `todo-history.spec.ts` passed
+    against the old code as well; it guards the move.
+  - One change screen: Read now's finding on a saved place opens To do's
+    (TodoChange), with its answers; ChangeReview is gone.
+  - One kosher-list runner (`src/lib/kosherListRun.ts`) for Keystone-K
+    and Mekor, with the closed-on-Google memory and queue checks in it.
 
 ## The public site review (Nov 18, on `claude/public-review-46a065`)
 

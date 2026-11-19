@@ -1,7 +1,5 @@
-import { revalidatePublicContent } from '@/lib/revalidateContent'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
+import { adminWrite } from '@/lib/adminRoute'
 import { getAdminClient } from '@/lib/supabase/admin'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // Same bucket/mechanism as the logo route (see that file's own doc) — a
 // separate route rather than a shared one because the two differ slightly
@@ -27,11 +25,7 @@ async function ensureBucket() {
 // touch site_settings itself — the editor sets the returned URL on its
 // draft, same as pasting a URL, so it's still batched into the normal Save
 // changes flow rather than taking effect immediately.
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const POST = adminWrite(async (request: Request) => {
   let form: FormData
   try {
     form = await request.formData()
@@ -62,11 +56,9 @@ export async function POST(request: Request) {
     if (uploadError) throw uploadError
 
     const { data } = getAdminClient().storage.from(BUCKET).getPublicUrl(path)
-    // The public site caches this content; drop it so the edit shows up.
-    await revalidatePublicContent()
     return Response.json({ ok: true, url: data.publicUrl })
   } catch (err) {
     console.error('[admin/site-settings/hero-image] upload failed:', err)
     return Response.json({ ok: false, errors: ['Upload failed. Please try again.'] }, { status: 502 })
   }
-}
+})

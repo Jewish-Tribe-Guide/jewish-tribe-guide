@@ -5,12 +5,11 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { CategoryConfig } from '@/lib/categories'
-import { fetchJson } from '@/lib/fetchJson'
+import type { AdminApi } from '@/lib/adminApi'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { ADMIN_AREA_TAPPED, adminBase } from '@/lib/adminNav'
 import { watchesLine } from '@/lib/todo'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
 import { stepCount, withoutSteps } from '@/lib/stepAddress'
 import { eruvPlace, filterPlaces, isPlaceShow, nameKey, placeCounts, placeLine, sharedNames, streetOf, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
 import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notCheckedLine, type CheckedBy } from '@/lib/fieldCoverage'
@@ -21,6 +20,7 @@ import PlaceListing from './PlaceListing'
 import { AddButton } from '@/components/AddButton'
 import { coverageOf, useWatchJobsAndReload } from './useWatchJobs'
 import { moveBackTo, moveTo } from './useScreenHistory'
+import { useAdminApi } from './useAdminApi'
 
 // Places (the admin redesign's step 3, board 5): every listing in one list.
 // Find one by name, narrow by three menus (what's on the site, its category,
@@ -86,17 +86,17 @@ function setAddressParam(name: string, value: string, fallback: string) {
 }
 
 /** "142 pages · read last night", for Watches at the top of the list. */
-function useWatchesLine(token: string, community: string, now: number): string | undefined {
+function useWatchesLine(api: AdminApi, now: number): string | undefined {
   const [line, setLine] = useState<string>()
   useEffect(() => {
     let live = true
-    fetchJson<{ watches: { active: boolean; lastRunAt: string | null }[] }>(withCommunity('/api/admin/watches', community), { headers: { Authorization: `Bearer ${token}` } }, '')
+    api.get<{ watches: { active: boolean; lastRunAt: string | null }[] }>('/api/admin/watches', '')
       .then((body) => live && setLine(watchesLine(body.watches, now)))
       .catch(() => {})
     return () => {
       live = false
     }
-  }, [token, community, now])
+  }, [api, now])
   return line
 }
 
@@ -123,13 +123,14 @@ function WatchesRow({ href, line }: { href: string; line: string | undefined }) 
 export default function PlacesList({ token }: { token: string }) {
   const community = useCommunitySlug()
   const base = adminBase(community)
+  const api = useAdminApi(token)
   const router = useRouter()
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
   // The places first: the jobs only colour the rows and fill the coverage.
   const { jobs, reload } = useWatchJobsAndReload(token, { ready: data !== null || error !== null })
   const [now] = useState(() => Date.now())
-  const watches = useWatchesLine(token, community, now)
+  const watches = useWatchesLine(api, now)
   const coverage = useMemo(() => coverageOf(jobs), [jobs])
   const [show, setShow] = useState<PlaceShow>('site')
   const [category, setCategory] = useState('')
@@ -143,7 +144,7 @@ export default function PlacesList({ token }: { token: string }) {
 
   const load = useCallback(async () => {
     try {
-      const next = await fetchJson<Data>(withCommunity('/api/admin/listings', community), { headers: { Authorization: `Bearer ${token}` } }, 'Could not load the places.')
+      const next = await api.get<Data>('/api/admin/listings', 'Could not load the places.')
       // The pill and category the address names (the old Archived tab lands
       // on ?show=archived, a category page's count on ?category=); pick()
       // and the category menu keep the two in step after that.
@@ -157,7 +158,7 @@ export default function PlacesList({ token }: { token: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load the places.')
     }
-  }, [token, community])
+  }, [api])
   useLoadOnMount(load)
 
   function pick(next: PlaceShow) {

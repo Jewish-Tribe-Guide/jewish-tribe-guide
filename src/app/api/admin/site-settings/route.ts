@@ -1,10 +1,8 @@
+import { adminRead, adminWrite } from '@/lib/adminRoute'
 import { revalidatePath } from 'next/cache'
-import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { routes } from '@/lib/routes'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { MissingMapPhotoColumnError, MissingRightNowColumnError, MissingTodayColumnsError, getSiteSettingsUncached, toBeforeCandleItems, toRightNowCategories, updateSiteSettings } from '@/lib/siteSettingsStore'
 import { MAX_BEFORE_CANDLE_ITEMS, MAX_RIGHT_NOW, MAX_MOBILE_TABS, isHomeStyle, isTodayBlockId, type DesktopNavItem, type SiteSettings } from '@/lib/siteSettings'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // Recursive shape check — a 'link' item needs a target, a tab ('more-menu')
 // holds all links or all headings, a heading holds links, nothing goes
@@ -36,11 +34,7 @@ function validDesktopNavItems(items: unknown): items is DesktopNavItem[] {
 // GET /api/admin/site-settings — the current settings, for the admin editor.
 // Admin only (same data as the public route, just auth-gated for symmetry
 // with the rest of /admin).
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (request: Request, { community }) => {
   try {
     const settings = await getSiteSettingsUncached(community.slug)
     return Response.json({ ok: true, settings })
@@ -48,16 +42,12 @@ export async function GET(request: Request) {
     console.error('[admin/site-settings] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load site settings.'] }, { status: 502 })
   }
-}
+})
 
 // PATCH /api/admin/site-settings — update the site's branding text. Takes
 // effect immediately (no draft/publish step — this is plain copy, not
 // branching structure). Admin only.
-export async function PATCH(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const PATCH = adminWrite(async (request: Request, { community }) => {
   let body: Partial<SiteSettings>
   try {
     body = (await request.json()) as Partial<SiteSettings>
@@ -164,11 +154,10 @@ export async function PATCH(request: Request) {
 
   try {
     const settings = await updateSiteSettings(community.slug, body)
-    // The public site caches this content; drop it so the edit shows up.
-    await revalidatePublicContent()
     // What changed answers only while a tab or link has it (changesLinked),
     // so adding or taking off that tab flips its page between the page and
-    // a 404. The tags above are stale-while-revalidate, which served the
+    // a 404. The content tags (invalidated after this, by adminWrite) are
+    // stale-while-revalidate, which served the
     // admin the old 404 once after adding it (the user, Nov 15: "I don't see
     // what changed working when I added it as a tab"). Expire it now, so
     // the next load is the new answer, as /about's save does (route.test.ts).
@@ -181,4 +170,4 @@ export async function PATCH(request: Request) {
     console.error('[admin/site-settings] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not save site settings.'] }, { status: 502 })
   }
-}
+})

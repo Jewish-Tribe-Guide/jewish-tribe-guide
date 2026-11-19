@@ -2,11 +2,9 @@ import { validateSubmission, getResourceRowById, normalizeRow } from '@/lib/reso
 import { getCategoryById } from '@/lib/categoryStore'
 import { submitListingUpdate, submitListingDelete, approveSubmission } from '@/lib/submissionStore'
 import { normalizeUrl } from '@/lib/validation'
-import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { after, type NextRequest } from 'next/server'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminWrite } from '@/lib/adminRoute'
 import type { ResourceSubmission } from '@/types'
 
 // An admin's own edits to a listing on Places (the admin redesign's step 3:
@@ -16,11 +14,7 @@ import type { ResourceSubmission } from '@/types'
 // a decision on To do, and History shows who did it.
 
 // PATCH /api/admin/listings/:id — update the listing with `payload`.
-export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/listings/[id]'>) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const PATCH = adminWrite(async (request: NextRequest, { community, admin }, ctx: RouteContext<'/api/admin/listings/[id]'>) => {
   const { id } = await ctx.params
   const body = (await request.json().catch(() => null)) as { payload?: ResourceSubmission } | null
   const payload = body?.payload
@@ -45,22 +39,17 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     const submission = await submitListingUpdate(community.slug, id, payload, null, { name: admin.email, email: admin.email })
     await approveSubmission(submission.id, community.slug, admin.email)
     const row = await getResourceRowById(id, community.slug)
-    await revalidatePublicContent()
     after(() => runWalkRoutesAfterChange(community.slug))
     return Response.json({ ok: true, listing: row ? normalizeRow(row) : null })
   } catch (err) {
     console.error('[admin/listings/:id] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not update the listing.'] }, { status: 502 })
   }
-}
+})
 
 // DELETE /api/admin/listings/:id — archive it: off the site, and on Places'
 // Archived to bring back.
-export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin/listings/[id]'>) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const DELETE = adminWrite(async (_request: NextRequest, { community, admin }, ctx: RouteContext<'/api/admin/listings/[id]'>) => {
   const { id } = await ctx.params
   const current = await getResourceRowById(id, community.slug)
   if (!current || current.status !== 'approved') return Response.json({ ok: false, errors: ['That place isn’t on the site.'] }, { status: 404 })
@@ -68,11 +57,10 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin
   try {
     const submission = await submitListingDelete(community.slug, id, null, { name: admin.email, email: admin.email })
     await approveSubmission(submission.id, community.slug, admin.email)
-    await revalidatePublicContent()
     after(() => runWalkRoutesAfterChange(community.slug))
     return Response.json({ ok: true })
   } catch (err) {
     console.error('[admin/listings/:id] DELETE failed:', err)
     return Response.json({ ok: false, errors: ['Could not archive the listing.'] }, { status: 502 })
   }
-}
+})

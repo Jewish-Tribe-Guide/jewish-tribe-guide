@@ -7,10 +7,8 @@ import Wizard from '@/components/wizard/Wizard'
 import FormStepEditor from './FormStepEditor'
 import { useStepsInAddress } from './useStepsInAddress'
 import FormPreview, { resolvePreviewSteps } from './FormPreview'
-import { fetchJson } from '@/lib/fetchJson'
 import { stableJson } from '@/lib/stableJson'
-import { useCommunitySlug } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
+import { useAdminApi } from './useAdminApi'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import { AdminBack, AdminBox, AdminField, AdminPreviewButton, AdminRow, AdminSwitch, MoreToggle, adminInputClass } from './AdminUI'
 import { PreviewBeside } from './SitePreview'
@@ -127,7 +125,7 @@ export default function FormEditor({
   onChanged: () => void
 }) {
   const isNew = form === null
-  const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const live = published(form)
   const [draft, setDraft] = useState<FormContent>(() => form?.draft ?? live)
   // What the server holds as the draft: kept in step with `draft` below.
@@ -150,13 +148,8 @@ export default function FormEditor({
   async function keepDraft(next: FormContent | null) {
     if (!form) return
     try {
-      await fetchJson(
-        withCommunity(next ? `/api/admin/forms/${form.id}` : `/api/admin/forms/${form.id}/draft`, community),
-        next
-          ? { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(next) }
-          : { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
-        'Could not keep the draft.',
-      )
+      if (next) await api.send('PATCH', `/api/admin/forms/${form.id}`, next, 'Could not keep the draft.')
+      else await api.send('DELETE', `/api/admin/forms/${form.id}/draft`, undefined, 'Could not keep the draft.')
       setKept(next)
     } catch (err) {
       setErrors([err instanceof Error ? err.message : 'Could not keep the draft.'])
@@ -248,17 +241,12 @@ export default function FormEditor({
     setErrors([])
     setPublishing(true)
     if (keepTimer.current) clearTimeout(keepTimer.current)
-    const json = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
     try {
       if (!form) {
-        await fetchJson(withCommunity('/api/admin/forms', community), { method: 'POST', headers: json, body: JSON.stringify(draft) }, 'Could not make the form.')
+        await api.post('/api/admin/forms', draft, 'Could not make the form.')
       } else {
-        await fetchJson(withCommunity(`/api/admin/forms/${form.id}`, community), { method: 'PATCH', headers: json, body: JSON.stringify(draft) }, 'Could not keep the draft.')
-        await fetchJson(
-          withCommunity(`/api/admin/forms/${form.id}/publish`, community),
-          { method: 'POST', headers: { Authorization: `Bearer ${token}` } },
-          'Publish failed.',
-        )
+        await api.send('PATCH', `/api/admin/forms/${form.id}`, draft, 'Could not keep the draft.')
+        await api.post(`/api/admin/forms/${form.id}/publish`, undefined, 'Publish failed.')
       }
       onPublished()
     } catch (err) {
@@ -278,11 +266,7 @@ export default function FormEditor({
     if (!form) return
     setActive(on)
     try {
-      await fetchJson(
-        withCommunity(`/api/admin/forms/${form.id}/active`, community),
-        { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ active: on }) },
-        'Could not change that.',
-      )
+      await api.send('PATCH', `/api/admin/forms/${form.id}/active`, { active: on }, 'Could not change that.')
       onChanged()
     } catch (err) {
       setActive(!on)
@@ -293,7 +277,7 @@ export default function FormEditor({
   async function remove() {
     if (!form) return
     try {
-      await fetchJson(withCommunity(`/api/admin/forms/${form.id}`, community), { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }, 'Could not delete it.')
+      await api.send('DELETE', `/api/admin/forms/${form.id}`, undefined, 'Could not delete it.')
       onChanged()
       onBack()
     } catch (err) {

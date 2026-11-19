@@ -1,6 +1,5 @@
 import { GUIDE_PAGE_ERROR, isGuidePage } from '@/lib/guidePage'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead } from '@/lib/adminRoute'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { listCategories } from '@/lib/categoryStore'
 import { addWatch, getWatch, listWatches, removeWatch, updateWatch } from '@/lib/watchStore'
@@ -50,11 +49,7 @@ export const maxDuration = 60
 /** Checks an admin can run in ten minutes. */
 const CHECK_LIMIT = { limit: 20, windowSec: 600 }
 
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (request: Request, { community }) => {
   try {
     const [{ watches, available }, listings, categories] = await Promise.all([
       listWatches(community.slug),
@@ -79,13 +74,9 @@ export async function GET(request: Request) {
     console.error('[admin/watches] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the watches.'] }, { status: 502 })
   }
-}
+})
 
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const POST = adminRead(async (request: Request, { community, admin }) => {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   const action = body?.action
   // A check can have the AI read a page: a ceiling on how often.
@@ -203,4 +194,4 @@ export async function POST(request: Request) {
     console.error('[admin/watches] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })
   }
-}
+})

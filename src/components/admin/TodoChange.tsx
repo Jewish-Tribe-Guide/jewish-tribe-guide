@@ -11,14 +11,15 @@ import { routes } from '@/lib/routes'
 import { markTimes, submissionSource } from '@/lib/submissionSource'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useEditWeek } from '@/lib/useEditWeek'
-import { withCommunity } from '@/lib/useCommunityData'
 import ListingEditor, { type EditorControl } from '@/components/resources/ListingEditor'
 import { itemLists } from '@/components/resources/ItemsEditor'
 import PlaceFrame, { PlaceButtons, SourceCard, placeSubline, type PlaceButton, type PlacePosition } from './PlaceFrame'
 import { TheOriginal, fieldKeyFor } from './SubmissionReview'
 import { changeEdit } from './changeEdit'
 import { changeAnswers, oneMinyanTime } from './changeView'
+import { useAdminApi } from './useAdminApi'
 import { useEditorSteps, useStepsInAddress } from './useStepsInAddress'
+import ThingSwitches from './ThingSwitches'
 
 // A change on To do, in the listing's own editor (boards E1Times, R5Link,
 // R1Women, R6After): the rows it changes, filled in as it would leave them,
@@ -26,6 +27,12 @@ import { useEditorSteps, useStepsInAddress } from './useStepsInAddress'
 // folded under; and two answers that name the change. The first takes the
 // card as it is then, an edit in it included; the second leaves the
 // listing as it was. A change in parts is answered a part at a time.
+//
+// The one change screen: To do opens it among a place's things
+// (TodoPlaceScreen), and Read now on a saved place opens what it found in
+// it too (ChangeOnItsOwn, below). Read now's used to be a screen of its own
+// (ChangeReview) with other answers ("Edit, then update", "Leave it"), so
+// the same change was answered two ways depending on where it was opened.
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
 
@@ -61,6 +68,7 @@ export default function TodoChange({
   onEditing: (editing: boolean) => void
 }) {
   const community = useCommunitySlug()
+  const api = useAdminApi(token)
   const fields = category.detailFields
   const current = s.current!
   const parts = reviewParts(current, s.payload as never, category)
@@ -145,11 +153,7 @@ export default function TodoChange({
           adminSave={{
             label: answers.yes,
             via: async ({ payload }) => {
-              const res = await fetch(withCommunity(`/api/admin/submissions/${s.id}`, community), {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ status: 'approved', payload, ...(part ? { part: part.id } : {}) }),
-              })
+              const res = await api.fetch(`/api/admin/submissions/${s.id}`, { method: 'PATCH', body: { status: 'approved', payload, ...(part ? { part: part.id } : {}) } })
               savedPart.current = res.ok && !!((await res.clone().json().catch(() => null)) as { partial?: boolean } | null)?.partial
               return res
             },
@@ -158,6 +162,57 @@ export default function TodoChange({
         />
       )}
     </PlaceFrame>
+  )
+}
+
+/** A change opened on its own (Read now on a saved place, PlaceListing):
+ *  its parts as switches over it, as To do shows a place's things, the
+ *  answered ones ticked. A part answered drops out of the change once it's
+ *  read again (reviewParts.ts), so the next one opens. */
+export function ChangeOnItsOwn({
+  submission: s,
+  category,
+  back,
+  busy,
+  error,
+  token,
+  onModerate,
+  onUpdated,
+}: {
+  submission: EnrichedSubmission
+  category: CategoryConfig
+  back: () => void
+  busy?: boolean
+  error?: string | null
+  token: string
+  onModerate: (id: string, status: 'rejected', part?: string) => void
+  onUpdated: (id: string, partial?: boolean) => void
+}) {
+  const parts = s.current ? reviewParts(s.current, s.payload as never, category) : []
+  // As first opened: answered ones stay, ticked.
+  const [order] = useState(() => parts.map((p) => ({ id: p.id, label: p.label })))
+  const [on, setOn] = useState<string | null>(null)
+  const part = order.length > 1 ? (parts.find((p) => p.id === on) ?? parts[0]) : undefined
+  const things = [...order, ...parts.filter((p) => !order.some((o) => o.id === p.id))].map((p) => ({ ...p, done: !parts.some((x) => x.id === p.id) }))
+  const switches = part ? <ThingSwitches things={things} on={part.id} onPick={setOn} /> : null
+  const [onEditing] = useState(() => () => {})
+  if (!s.current) return <p className="m-0 text-[15px] text-slate-600">The listing it changes is gone.</p>
+  return (
+    <TodoChange
+      key={`${s.id}-${part?.id ?? ''}`}
+      submission={s}
+      category={category}
+      part={part?.id}
+      name={s.current.name}
+      position={{ at: 0, total: 1, back, alone: true }}
+      switches={switches}
+      busy={busy}
+      error={error}
+      token={token}
+      onModerate={onModerate}
+      onUpdated={onUpdated}
+      onEditing={onEditing}
+    />
   )
 }
 

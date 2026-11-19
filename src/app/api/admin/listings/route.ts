@@ -2,11 +2,9 @@ import { validateSubmission, getResourceRowById, normalizeRow, listResourcesForA
 import { getCategoryById, listCategoriesUncached } from '@/lib/categoryStore'
 import { submitListingCreate, approveSubmission } from '@/lib/submissionStore'
 import { normalizeUrl } from '@/lib/validation'
-import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { after } from 'next/server'
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
-import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { adminRead, adminWrite } from '@/lib/adminRoute'
 import type { ResourceSubmission } from '@/types'
 
 type Body = {
@@ -23,11 +21,7 @@ type Body = {
 // normal pending submission via submitListingCreate, then immediately calls
 // approveSubmission — the exact function the moderation queue's own approve
 // action calls — so every side effect of a real approval happens here too.
-export async function POST(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const POST = adminWrite(async (request: Request, { community, admin }) => {
   let body: Body
   try {
     body = (await request.json()) as Body
@@ -67,8 +61,6 @@ export async function POST(request: Request) {
     if (!resourceRow) {
       return Response.json({ ok: false, errors: ['Listing was created but could not be loaded.'] }, { status: 502 })
     }
-    // The public site caches this content; drop it so the new listing shows up.
-    await revalidatePublicContent()
     // Its walks along the streets now, not tonight (walkRouteJob.ts).
     after(() => runWalkRoutesAfterChange(community.slug))
     return Response.json({ ok: true, listing: normalizeRow(resourceRow) })
@@ -76,16 +68,12 @@ export async function POST(request: Request) {
     console.error('[admin/listings] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not add listing.'] }, { status: 502 })
   }
-}
+})
 
 // GET /api/admin/listings — every listing, on the site or archived, for
 // Places (the admin redesign's step 3), with every category, hidden ones
 // too, so each one opens in its own editor.
-export async function GET(request: Request) {
-  const community = await resolveCommunity(communitySlugFromRequest(request))
-  const admin = await getAdminUserForCommunity(request, community.slug)
-  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
-
+export const GET = adminRead(async (request: Request, { community }) => {
   try {
     const [rows, categories] = await Promise.all([listResourcesForAdmin(community.slug), listCategoriesUncached(community.slug)])
     // A category that takes no address (a WhatsApp group) never lacks one.
@@ -95,4 +83,4 @@ export async function GET(request: Request) {
     console.error('[admin/listings] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the places.'] }, { status: 502 })
   }
-}
+})

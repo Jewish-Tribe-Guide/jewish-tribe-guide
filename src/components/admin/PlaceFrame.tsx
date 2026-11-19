@@ -13,7 +13,9 @@ import { useOwnHead } from './AdminUI'
 // name with that line under it and "N of M" with up and down beside, an X
 // that closes the place, and the answers along the pane's bottom.
 
-export type PlacePosition = { at: number; total: number; back: () => void; prev?: () => void; next?: () => void }
+/** `alone`: opened on its own, not from To do's list (a change Read now
+ *  found on a saved place): no "N of M", no place before or after. */
+export type PlacePosition = { at: number; total: number; back: () => void; prev?: () => void; next?: () => void; alone?: boolean }
 
 export default function PlaceFrame({
   name,
@@ -43,7 +45,7 @@ export default function PlaceFrame({
   onBack?: () => void
 }) {
   useOwnHead()
-  const counter = (
+  const counter = !position.alone && (
     <span className="text-[13.5px] text-slate-500 whitespace-nowrap">
       {position.at + 1} of {position.total}
     </span>
@@ -51,7 +53,7 @@ export default function PlaceFrame({
   return (
     <div className="flex flex-col md:h-dvh" data-testid="place-frame">
       <header className="-mx-4 md:mx-0 flex items-center gap-1 min-h-14 bg-white border-b border-slate-200 pl-1 pr-4 md:gap-4 md:px-8 md:py-4">
-        <button type="button" onClick={onBack ?? position.back} aria-label={onBack ? 'Back' : 'Back to To do'} className="md:hidden inline-flex items-center justify-center w-11 h-11 shrink-0 text-primary cursor-pointer">
+        <button type="button" onClick={onBack ?? position.back} aria-label={onBack || position.alone ? 'Back' : 'Back to To do'} className="md:hidden inline-flex items-center justify-center w-11 h-11 shrink-0 text-primary cursor-pointer">
           <svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
             <path d="M10 3L5 8l5 5" />
           </svg>
@@ -62,8 +64,12 @@ export default function PlaceFrame({
         </div>
         <div className="max-md:hidden flex items-center gap-2">
           {counter}
-          <StepButton label="The place before" onClick={position.prev} d="M4 10l4-4 4 4" />
-          <StepButton label="The next place" onClick={position.next} d="M4 6l4 4 4-4" />
+          {!position.alone && (
+            <>
+              <StepButton label="The place before" onClick={position.prev} d="M4 10l4-4 4 4" />
+              <StepButton label="The next place" onClick={position.next} d="M4 6l4 4 4-4" />
+            </>
+          )}
           <CloseButton onClick={position.back} />
         </div>
       </header>

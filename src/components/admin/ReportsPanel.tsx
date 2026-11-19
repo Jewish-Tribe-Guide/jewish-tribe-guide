@@ -2,10 +2,9 @@
 
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { fetchJson } from '@/lib/fetchJson'
+import { useAdminApi } from './useAdminApi'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
 import { shortDay, type ReportPeriod } from '@/lib/reports'
 import type { Report } from '@/lib/reportsStore'
 import { AdminBox, AdminRow } from './AdminUI'
@@ -29,6 +28,7 @@ const DECIDED: { key: keyof Report['decided']; label: string }[] = [
 export default function ReportsPanel({ token }: { token: string }) {
   const community = useCommunitySlug()
   const base = adminBase(community)
+  const api = useAdminApi(token)
   const [period, setPeriod] = useState<ReportPeriod>('month')
   const [report, setReport] = useState<{ period: ReportPeriod; report: Report } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -37,17 +37,13 @@ export default function ReportsPanel({ token }: { token: string }) {
     async (p: ReportPeriod) => {
       setError(null)
       try {
-        const body = await fetchJson<{ report: Report }>(
-          withCommunity(`/api/admin/reports?period=${p}`, community),
-          { headers: { Authorization: `Bearer ${token}` } },
-          'Failed to load the reports.',
-        )
+        const body = await api.get<{ report: Report }>(`/api/admin/reports?period=${p}`, 'Failed to load the reports.')
         setReport({ period: p, report: body.report })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Something went wrong.')
       }
     },
-    [token, community],
+    [api],
   )
   useLoadOnMount(useCallback(() => load('month'), [load]))
 
