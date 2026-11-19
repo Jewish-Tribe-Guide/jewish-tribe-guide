@@ -59,6 +59,16 @@ test.describe('a listing has its own URL', () => {
 
     expect(response?.status()).toBe(200)
     await expect(page.getByText(item.name).first()).toBeVisible()
+    // By a permanent redirect to the friendly link, the prerendered page,
+    // not a render on every request (Nov 18). With one Location: from the
+    // page, Next wrote it twice, and the first visit after a start went to
+    // `/a,%20/a`, a 404.
+    expect(new URL(page.url()).pathname).toBe(`/${community}/${category.id}/${slugFor(item)}`)
+    const raw = await request.get(`/${community}/${category.id}/${item.id}`, { maxRedirects: 0 })
+    expect(raw.status()).toBe(308)
+    const locations = raw.headersArray().filter((h) => h.name.toLowerCase() === 'location').map((h) => h.value)
+    expect(locations).toHaveLength(1)
+    expect(new URL(locations[0], 'http://x').pathname).toBe(`/${community}/${category.id}/${slugFor(item)}`)
   })
 
   test('a made-up listing id 404s', async ({ page, request }) => {

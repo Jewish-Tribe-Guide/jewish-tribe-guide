@@ -59,7 +59,6 @@ import { useSavedSearches } from '@/lib/savedSearchesContext'
 import { categoryHref } from '@/lib/searchLands'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { useCategories } from '@/lib/useCategories'
-import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
 import { getCategoryColor, getCategoryTilePhoto } from '@/lib/categoryColor'
 import { SwipeRowGroup } from '@/components/SwipeRow'
 import dynamic from 'next/dynamic'
@@ -195,17 +194,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // visitor drilled into, never the home grid itself. Called further down,
   // once it's known whether a listing is this screen (a phone, from a link).
 
-  // Captured once, on this component's very first render — see
-  // backForwardNavigation's own module doc. A visitor who presses back/
-  // forward should land on a blank slate here even though the URL they're
-  // arriving on still carries whatever was filtered before (browser history
-  // doesn't forget a replaceState'd URL just because you navigated away and
-  // back — see the fuller reasoning in the effects below); a real
-  // navigation — a clicked link, a shared URL, typing an address — is
-  // exactly the case that SHOULD still hydrate from it, since that's what
-  // makes a filtered link shareable in the first place.
-  const [arrivedViaBackForward] = useState(() => didArriveViaBackForward(category.id))
-  const [search, setSearch] = useState(arrivedViaBackForward ? '' : (initialSearch ?? ''))
+  // What the address says, on Back and Forward too (Nov 18): Forward to a
+  // search shows the search. Before, back/forward arrivals landed on a
+  // blank page, and after a reload that blank page differed from the
+  // server's render (a hydration error).
+  const [search, setSearch] = useState(initialSearch ?? '')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
   const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
@@ -231,7 +224,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // itself is Suggest an edit's, which opens the box about it
   // (ListingEditBar, via TellAboutContext).
   const [openDialogItemId, setOpenDialogItemId] = useState<string | null>(null)
-  const [openNow, setOpenNow] = useState(arrivedViaBackForward ? false : (initialOpenNow ?? false))
+  const [openNow, setOpenNow] = useState(initialOpenNow ?? false)
   // Drives the "Open now" filter below. Without it the filter answers for the
   // moment the page rendered, so a list narrowed to what's open at 4pm still
   // shows those places at 10pm. Null until the page has hydrated (see
@@ -255,21 +248,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   useEffect(() => {
     if (appliedInitialSearchRef.current || !initialSearch) return
     appliedInitialSearchRef.current = true
-    if (arrivedViaBackForward) return
-    // One-time application of an external value on arrival, guarded above —
-    // not the "derive state from props on every render" pattern this lint
-    // rule is otherwise right to flag.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSearch(initialSearch)
-  }, [initialSearch, arrivedViaBackForward])
+  }, [initialSearch])
   const appliedInitialOpenNowRef = useRef(false)
   useEffect(() => {
     if (appliedInitialOpenNowRef.current || !initialOpenNow) return
     appliedInitialOpenNowRef.current = true
-    if (arrivedViaBackForward) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpenNow(true)
-  }, [initialOpenNow, arrivedViaBackForward])
+  }, [initialOpenNow])
   // `initialFilters` is `null` until FindResourcesConnected hydrates, then a
   // real (possibly empty) object from then on — see FindResources' own doc —
   // so that transition alone, not any specific key inside it, is the signal
@@ -292,19 +278,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   useEffect(() => {
     if (appliedInitialFiltersRef.current || !initialFilters) return
     appliedInitialFiltersRef.current = true
-    if (arrivedViaBackForward) return
-    // One-time application of an external value on arrival, guarded above by
-    // appliedInitialFiltersRef — not the "derive state from props on every
-    // render" pattern this lint rule is otherwise right to flag.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     applyAddressFilters(initialFilters)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialFilters, category, arrivedViaBackForward])
+  }, [initialFilters, category])
   // Resets this screen's own search/openNow/filters to blank, both in local
   // state and (via onParamsChange) back out to the address bar — what a
-  // back/forward arrival should show, since the URL alone can't be trusted
-  // to reflect "abandoned" vs. "still wanted" (see backForwardNavigation's
-  // own module doc). A ref, read through by both effects below, rather than
+  // return to this screen with no search in its address shows. A ref,
+  // read through by the effect below, rather than
   // a plain function: it closes over onParamsChange, which is often a fresh
   // closure every parent render, and neither effect should re-run just
   // because of that.
@@ -347,22 +327,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       onParamsChange?.(changes, { replace: true })
     }
   })
-  // Covers the genuine-document-reload case: arrivedViaBackForward was
-  // already true at THIS component's very first mount, so the URL needs
-  // catching up to the blank state already rendered above. Deliberately
-  // does NOT cover a subsequent same-document back/forward into an
-  // already-visited category — see the popstate listener just below for
-  // why that needs an entirely different mechanism, not a wider dependency
-  // array here.
-  useEffect(() => {
-    if (!arrivedViaBackForward) return
-    clearFiltersRef.current!()
-    // Deliberately once per mount only — arrivedViaBackForward itself never
-    // changes after mount, so there's nothing meaningful for this to react
-    // to twice.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   // A category screen is NOT torn down and remounted when a visitor
   // navigates away and back to it — it's kept alive under React's own
   // <Activity> instead (see ResourceMap.tsx's and homeRevealSignal.ts's own
@@ -398,13 +362,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // 10 with Challah" is `?q=challah`), it's that search, not a blank page:
   // the `initialXxx` props were applied once, on the first visit, and a
   // second search from home landed on the whole list (the user, Oct 13).
-  // Only back/forward blanks it, as on a first arrival.
+  // Back and Forward too: the address is what the page shows (Nov 18).
   const hasActivatedBeforeRef = useRef(false)
   const hiddenAtRef = useRef<string | null>(null)
   useEffect(() => {
     if (hasActivatedBeforeRef.current && hiddenAtRef.current !== window.location.pathname) {
       const params = Object.fromEntries(new URLSearchParams(window.location.search))
-      if (didArriveViaBackForward(category.id) || !carriesSearch(category, params)) clearFiltersRef.current!()
+      if (!carriesSearch(category, params)) clearFiltersRef.current!()
       else fromAddressRef.current!(params)
     }
     hasActivatedBeforeRef.current = true
@@ -1638,6 +1602,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       closeOpenListing(hostedId)
       findRow(hostedId)
     }
+    // A phone's sheet, Back from its step (Nov 18).
+    if (isMobile) {
+      for (const id of [...openCardIdsRef.current]) {
+        if (id !== params.get('item') && id !== pagedItemId) cardRefs.current.get(id)?.close()
+      }
+    }
   })
   useEffect(() => {
     const listener = () => onPop()
@@ -2090,20 +2060,34 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               onExpandedChange={(expanded) => {
                 if (expanded) openCardIdsRef.current.add(item.id)
                 else openCardIdsRef.current.delete(item.id)
-                onParamsChange?.(
-                  { item: expanded ? item.id : null, ...(expanded ? {} : { match: null }) },
-                  // Not when the address already names it: a link, or
-                  // Forward, reopening it. (On a phone arriving from its
-                  // link, the first render still thinks it's a computer.)
-                  expanded &&
-                  !hostedId &&
-                  !isMobile &&
-                  item.id !== reopenItemId &&
-                  item.id !== linkedItemId &&
-                  new URLSearchParams(window.location.search).get('item') !== item.id
-                    ? { step: LISTING_STEP }
-                    : { replace: true },
-                )
+                const address = new URLSearchParams(window.location.search)
+                // A phone's sheet opened from the list is a step too (Nov
+                // 18: Back left the page under it). Closed on the screen, it
+                // takes that step back, so Forward doesn't reopen it.
+                const stepBack =
+                  !expanded &&
+                  isMobile &&
+                  address.get('item') === item.id &&
+                  (window.history.state as { step?: string } | null)?.step === LISTING_STEP
+                if (stepBack) window.history.back()
+                // The listing's own link names it already: `?item=` on top
+                // made a reload on a phone the list with a sheet (Nov 18).
+                else if (!(expanded && item.id === linkedItemId && window.location.pathname !== routes.slug(activeCommunity.slug, category.id))) {
+                  onParamsChange?.(
+                    { item: expanded ? item.id : null, ...(expanded ? {} : { match: null }) },
+                    // Not when the address already names it: a link, or
+                    // Forward, reopening it. (On a phone arriving from its
+                    // link, the first render still thinks it's a computer.)
+                    expanded &&
+                    !hostedId &&
+                    item.id !== pagedItemId &&
+                    item.id !== reopenItemId &&
+                    item.id !== linkedItemId &&
+                    address.get('item') !== item.id
+                      ? { step: LISTING_STEP }
+                      : { replace: true },
+                  )
+                }
                 if (!expanded && item.id === revealedId) setRevealedId(null)
                 if (!expanded && item.id === reopenItemId) {
                   setClosedMatchFor(reopenKey)

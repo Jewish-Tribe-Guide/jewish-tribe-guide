@@ -1403,10 +1403,26 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
 
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onExit).not.toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: 'Back to results' })).not.toBeInTheDocument()
+    // A place open is an entry in the history: Escape takes it back, and
+    // the popstate (a moment later) closes it.
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Back to results' })).not.toBeInTheDocument())
 
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onExit).toHaveBeenCalledTimes(1)
+  })
+
+  // Nov 18: the browser's Back with a place open left the map and its
+  // search; it closes the place now, as on a phone.
+  it('the browser’s Back with a place open closes it and stays on the map', async () => {
+    const user = userEvent.setup()
+    const onExit = vi.fn()
+    renderStandalone(onExit)
+    await user.click(screen.getByRole('button', { name: /^Select / }))
+    expect(await screen.findByRole('button', { name: 'Back to results' })).toBeInTheDocument()
+
+    window.history.back()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Back to results' })).not.toBeInTheDocument())
+    expect(onExit).not.toHaveBeenCalled()
   })
 
   // Escape in the search box closes its suggestions; that's its level, and

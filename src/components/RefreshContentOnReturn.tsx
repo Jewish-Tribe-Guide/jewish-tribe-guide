@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { replaceAddress } from '@/lib/replaceAddress'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Asks the server for the community layout's content again on the moments it
@@ -149,6 +150,14 @@ export default function RefreshContentOnReturn({ community, version }: { communi
       clearTimeout(quiet)
       quiet = setTimeout(() => {
         stopWaiting()
+        // The category page and the map write their search, filters, an
+        // open listing and the Minyan view into the address behind Next's
+        // router, so a re-render doesn't follow every keystroke. The
+        // refresh's commit writes back the address the router last knew,
+        // which dropped them all: a reload then showed another screen
+        // (Nov 18, `?davening=1` gone on coming back). Told first, the
+        // router refreshes the address as it is.
+        replaceAddress(window.location.href)
         router.refresh()
       }, QUIET_MS)
     }

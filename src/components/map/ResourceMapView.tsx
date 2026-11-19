@@ -408,10 +408,34 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     (next: HostedEditor | null) => setEditor(next && desktopSelectedId ? { ...next, id: desktopSelectedId } : null),
     [desktopSelectedId],
   )
+  // A place opened on the computer's map is an entry in the history, as on
+  // a phone (MobileNearbySheet): Back closes it rather than leaving the map
+  // and its search (Nov 18). Not when the address names it already (a
+  // link, a reload). Closed on the screen, it takes that entry back, and
+  // the popstate listener below clears it.
   const setDesktopSelected = (p: SelectablePoint | null) => {
+    const stepped = (window.history.state as { mapPlaceOpen?: boolean } | null)?.mapPlaceOpen
+    if (!p && stepped && standalone) {
+      window.history.back()
+      return
+    }
+    if (p && !desktopSelected && !stepped && standalone && new URLSearchParams(window.location.search).get('place') !== p.id) {
+      window.history.pushState({ ...(window.history.state ?? {}), mapPlaceOpen: true }, '')
+    }
     setDesktopSelectedRaw(p)
     setSelectedPointId(p?.id)
   }
+  const onPlacePop = useEffectEvent((e: PopStateEvent) => {
+    if (isMobile || !desktopSelected || (e.state as { mapPlaceOpen?: boolean } | null)?.mapPlaceOpen) return
+    setDesktopSelectedRaw(null)
+    setSelectedPointId(undefined)
+  })
+  useEffect(() => {
+    if (!standalone) return
+    const listener = (e: PopStateEvent) => onPlacePop(e)
+    window.addEventListener('popstate', listener)
+    return () => window.removeEventListener('popstate', listener)
+  }, [standalone])
   // Desktop-only — the embedded home-screen map starts as a contained card
   // (like a widget, not the whole page); this expands it to cover the
   // viewport, and collapses it back in place. The standalone page-level map

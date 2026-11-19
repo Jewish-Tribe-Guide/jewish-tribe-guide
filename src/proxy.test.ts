@@ -10,6 +10,11 @@ const mockListCommunityVisibility = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/communityStore', () => ({
   listCommunityVisibility: mockListCommunityVisibility,
 }))
+const mockFriendlyListingPath = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/bareListingLink', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/bareListingLink')>()),
+  friendlyListingPath: mockFriendlyListingPath,
+}))
 
 function req(url: string, cookie?: string): NextRequest {
   return new NextRequest(new URL(url, 'https://example.com'), cookie ? { headers: { cookie } } : undefined)
@@ -29,6 +34,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   mockListCommunityVisibility.mockReset()
+  mockFriendlyListingPath.mockReset()
 })
 
 describe('proxy — "/" redirect', () => {
@@ -148,5 +154,46 @@ describe('proxy — hidden-community gating', () => {
     const inbox = await proxy(req('/inbox'))
     expect(admin.status).toBe(200)
     expect(inbox.status).toBe(200)
+  })
+})
+
+// An old link built from a listing's bare id goes to its friendly link from
+// here, by one 308 with one Location. From the page, Next's on-demand
+// prerender wrote Location twice, and the first visitor's browser followed
+// `/a, /a` as one address to a 404 (Nov 18).
+describe('proxy — a listing’s bare-id link', () => {
+  const ID = 'd3661e08-9941-41b7-be41-9bb36cf34614'
+
+  it('308s to the friendly link, keeping the query string', async () => {
+    mockListCommunityVisibility.mockResolvedValue({ philly: { visible: true, previewToken: 'tok' } })
+    mockFriendlyListingPath.mockResolvedValue('/philly/cemetery/montefiore-d3661e')
+    const res = await proxy(req(`/philly/cemetery/${ID}?minyan=x`))
+    expect(res.status).toBe(308)
+    const to = new URL(res.headers.get('location')!)
+    expect(to.pathname).toBe('/philly/cemetery/montefiore-d3661e')
+    expect(to.search).toBe('?minyan=x')
+    expect(mockFriendlyListingPath).toHaveBeenCalledWith({ community: 'philly', category: 'cemetery', id: ID })
+  })
+
+  it('lets the page answer when there is no such listing, or the lookup fails', async () => {
+    mockListCommunityVisibility.mockResolvedValue({ philly: { visible: true, previewToken: 'tok' } })
+    mockFriendlyListingPath.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('supabase blip'))
+    expect((await proxy(req(`/philly/cemetery/${ID}`))).status).toBe(200)
+    expect((await proxy(req(`/philly/cemetery/${ID}`))).status).toBe(200)
+  })
+
+  it('looks nothing up for a friendly link or any other path', async () => {
+    mockListCommunityVisibility.mockResolvedValue({ philly: { visible: true, previewToken: 'tok' } })
+    await proxy(req('/philly/cemetery/montefiore-d3661e'))
+    await proxy(req('/philly/cemetery'))
+    await proxy(req(`/philly/cemetery/${ID}/more`))
+    expect(mockFriendlyListingPath).not.toHaveBeenCalled()
+  })
+
+  it('keeps a hidden community’s listings behind its gate', async () => {
+    mockListCommunityVisibility.mockResolvedValue({ blatimore: { visible: false, previewToken: 'secret-token' } })
+    mockFriendlyListingPath.mockResolvedValue('/blatimore/grocery/x-d3661e')
+    expect((await proxy(req(`/blatimore/grocery/${ID}`))).status).toBe(404)
+    expect(mockFriendlyListingPath).not.toHaveBeenCalled()
   })
 })

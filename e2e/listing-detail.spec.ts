@@ -396,6 +396,52 @@ test.describe('listing detail — mobile', () => {
     await expect.poll(() => new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
   })
 
+  // The listing's own link used to gain `?item=` once it opened, and a
+  // reload of that showed the list with a sheet instead of the page (Nov 18).
+  test('a listing’s own link stays as it is, and a reload is the same page', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithListings(request, community)
+    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
+    const item = (await res.json()).resources[0] as { id: string; name: string }
+
+    await page.goto(`/${community}/${category.id}/${item.id}`)
+    await dismissLocationPrompt(page)
+    const listing = page.getByTestId('listing-page')
+    await expect(listing).toBeVisible()
+    await page.waitForTimeout(1_000)
+    expect(new URL(page.url()).searchParams.get('item')).toBeNull()
+
+    await page.reload()
+    await dismissLocationPrompt(page)
+    await expect(listing).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  // Back with a listing's sheet open left the category altogether (Nov 18);
+  // on the Map it closed the sheet. Now it closes the sheet here too, and
+  // Forward opens it again.
+  test('Back closes a listing’s sheet and stays on the list; Forward opens it again', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithListings(request, community)
+
+    await page.goto(`/${community}/${category.id}`)
+    await dismissLocationPrompt(page)
+    const trigger = page.getByRole('button', { name: /^Show details for / }).first()
+    const name = (await trigger.getAttribute('aria-label'))!.replace(/^Show details for /, '')
+    await trigger.click()
+    const sheet = page.getByRole('dialog', { name })
+    await expect(sheet).toBeVisible()
+
+    await page.goBack()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: `Show details for ${name}` }).first()).toBeVisible()
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
+    expect(new URL(page.url()).searchParams.get('item')).toBeNull()
+
+    await page.goForward()
+    await expect(sheet).toBeVisible()
+  })
+
   // Back wrote the category's address behind Next's router (Nov 17): the
   // router still held the listing's, and wrote it back into the address on
   // its next commit. The test above caught that about 1 run in 13, whenever

@@ -218,7 +218,11 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
 
   function selectPlace(point: Point, frame = true) {
     selectedFrameRef.current = frame
-    if (selected === null) history.pushState({ ...(window.history.state ?? {}), mapSheetOpen: true }, '')
+    // Not when this entry has it already, or the address names the place
+    // (a reload with one open): a second entry made Back need two presses
+    // (Nov 18).
+    const here = (window.history.state as { mapSheetOpen?: boolean } | null)?.mapSheetOpen || new URLSearchParams(window.location.search).get('place') === point.id
+    if (selected === null && !here) history.pushState({ ...(window.history.state ?? {}), mapSheetOpen: true }, '')
     setSelected(point)
     // Only raise a collapsed sheet — if it's already half or full (the
     // visitor deliberately expanded it, e.g. browsing the full list), picking

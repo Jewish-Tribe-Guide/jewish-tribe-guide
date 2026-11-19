@@ -77,6 +77,27 @@ describe('RefreshContentOnReturn', () => {
     expect(mockRouter.refresh).toHaveBeenCalledTimes(1)
   })
 
+  // Nov 18: the Minyan view's `?davening=1`, written behind Next's router,
+  // was wiped by the refresh's commit, which writes the router's address.
+  it('tells the router the address as it is before refreshing', async () => {
+    window.history.replaceState({ __NA: true, step: 'minyanim' }, '', '/philly/synagogue?davening=1')
+    const replace = vi.spyOn(window.history, 'replaceState')
+    try {
+      show()
+      letThrottleExpire()
+      window.dispatchEvent(new Event('focus'))
+      await settle()
+      expect(mockRouter.refresh).toHaveBeenCalledTimes(1)
+      expect(replace).toHaveBeenCalledTimes(1)
+      expect(replace.mock.invocationCallOrder[0]).toBeLessThan(mockRouter.refresh.mock.invocationCallOrder[0]!)
+      const [state, , url] = replace.mock.calls[0]!
+      expect(String(url)).toBe('http://localhost:3000/philly/synagogue?davening=1')
+      expect(state).toEqual({ step: 'minyanim' })
+    } finally {
+      replace.mockRestore()
+    }
+  })
+
   it('leaves the page alone when nothing changed, so a tap never waits on a refresh', async () => {
     serverVersion = ON_SCREEN
     show()

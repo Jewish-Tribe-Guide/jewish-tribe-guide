@@ -1052,6 +1052,26 @@ Done:
 - Zmanim are fetched with the date, in the community's time, so a CDN
   can't hand back yesterday's just after midnight. A date more than a
   day off is refused; today's is cached, any other isn't.
+- Back, Forward and reload (items 1–7):
+  - Coming back to the tab after an admin's change no longer drops the
+    search, Filters, an open listing or the Minyan view from the address
+    (the refresh wrote back the router's older address). The refresh now
+    tells the router the address first. If the Minyan view was opened
+    from the page, it redraws once then, losing its scroll.
+  - Back and Forward onto a category show the search its address carries,
+    as a link does; before, they blanked it, and after a reload Back threw
+    a hydration error. `backForwardNavigation.ts` is gone.
+  - A phone's listing sheet opened from the list is a step: Back closes it
+    and stays on the list, Forward reopens it. A listing's own link no
+    longer gains `?item=`, so a reload is the same page.
+  - The computer's Map: a place opened is an entry, so Back closes it
+    instead of leaving the map. The phone's Map no longer adds a second
+    entry for a place after a reload (Back needed two presses).
+  - A bare-id listing link redirects (308) to the friendly one, from
+    the proxy (`bareListingLink.ts`); the approval email builds the
+    friendly one. Not from the page: Next 16.3 wrote a page redirect's
+    Location twice for a listing rendered on demand, and on the first
+    request the browser got `a, a` and a 404.
 
 ## Open from the boxes and fields work (Nov 10)
 

@@ -11,7 +11,6 @@ import { resolveCapabilities } from '@/lib/categories'
 import { resetMockIntersectionObserver, setAllIntersecting } from '@/test/intersectionObserverMock'
 import type { DirectoryResource } from '@/types'
 import { TellAboutContext } from './tellAbout'
-import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { ScreenHeaderProvider, useScreenHeader } from '@/lib/headerVisibility'
 import { useNextMinyan as useNextMinyanInColumn } from './nextMinyans'
@@ -21,13 +20,6 @@ vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
   usePathname: () => '/test-community',
   useSearchParams: () => new URLSearchParams(),
-}))
-
-// Defaults to "a real navigation" — see backForwardNavigation's own module
-// doc — overridden per-test (see the "arriving via browser back/forward"
-// describe block below) for the one behavior that depends on it.
-vi.mock('@/lib/backForwardNavigation', () => ({
-  didArriveViaBackForward: vi.fn(() => false),
 }))
 
 // The question reader (an AI, over the network): off unless a test reads.
@@ -572,61 +564,44 @@ describe('GenericDirectory', () => {
   })
 
   describe('arriving via browser back/forward', () => {
-    afterEach(() => {
-      vi.mocked(didArriveViaBackForward).mockReturnValue(false)
-    })
-
-    // Browser history keeps whatever a replaceState last set an entry's URL
-    // to, permanently — so a visitor who filtered this category, went back
-    // to (say) Home, then pressed forward, lands back on THIS SAME entry
-    // with the exact URL it was left at, filters included. See
-    // backForwardNavigation's own module doc: that's expected for a real
-    // navigation (a shared link should still show what it says), but
-    // surprising for a back/forward traversal specifically — pressing
-    // forward into a page you already left reads as "show me that page
-    // again," not "restore the exact search I'd abandoned." This is the
-    // "blank slate" behavior fixing that: same URL, but the directory
-    // itself declines to apply it, and clears it back out to match.
-    it("ignores a shared URL's search/filters and clears them from the address bar, when the page arrived via back/forward", () => {
-      vi.mocked(didArriveViaBackForward).mockReturnValue(true)
+    // The user, Nov 18 (item 4 of the public review): Forward to a search
+    // showed the category's whole list, and the search fell out of the
+    // address. Back and Forward land on what the address says, as a link
+    // does.
+    it('comes back by Back or Forward to an address with a search: that search', async () => {
+      const user = userEvent.setup()
       const onParamsChange = vi.fn()
-      const category = makeCategory({
-        detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
-      })
+      const category = makeCategory({ detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })
       const items = [
-        { ...makeListing({ id: 'a', name: 'Kosher Mart' }), isKosher: true },
-        { ...makeListing({ id: 'b', name: 'Regular Mart' }), isKosher: false },
-      ] as unknown as DirectoryResource[]
-      renderWithProviders(
-        <GenericDirectory
-          category={category}
-          items={items}
-          initialSearch="kosher"
-          initialFilters={{ f_isKosher: '1' }}
-          {...handlers}
-          onParamsChange={onParamsChange}
-        />,
+        makeListing({ id: 'a', name: 'Kosher Mart', m: ['Challah'] }),
+        makeListing({ id: 'b', name: 'Regular Mart', m: ['Wine'] }),
+      ]
+      const screenAs = (mode: 'visible' | 'hidden') => (
+        <Activity mode={mode}>
+          <GenericDirectory category={category} items={items} {...handlers} onParamsChange={onParamsChange} />
+        </Activity>
       )
+      const { rerenderWithProviders } = renderWithProviders(screenAs('visible'))
+      await user.type(screen.getByRole('searchbox'), 'regular')
+      onParamsChange.mockClear()
 
-      // Blank slate: the search box is empty and BOTH listings show — the
-      // URL's own `?q=kosher&f_isKosher=1` was never applied to state.
-      expect(screen.getByRole('searchbox')).toHaveValue('')
-      expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
-      expect(screen.getByText('Regular Mart')).toBeInTheDocument()
+      const here = window.location.pathname
+      window.history.pushState(null, '', '/philly')
+      rerenderWithProviders(screenAs('hidden'))
+      window.history.replaceState(null, '', `/philly/${category.id}?q=regular`)
+      window.dispatchEvent(new PopStateEvent('popstate'))
+      rerenderWithProviders(screenAs('visible'))
 
-      // The address bar gets caught up to match what's actually on screen.
-      expect(onParamsChange).toHaveBeenCalledWith(
-        expect.objectContaining({ q: null, f_isKosher: null }),
-        { replace: true },
-      )
+      expect(screen.getByRole('searchbox')).toHaveValue('regular')
+      expect(screen.queryByText('Kosher Mart')).not.toBeInTheDocument()
+      expect(onParamsChange).not.toHaveBeenCalledWith(expect.objectContaining({ q: null }), expect.anything())
+      window.history.replaceState(null, '', here)
     })
 
     // The other half of the same behavior: a REAL navigation (a clicked
     // link, a shared URL, typing an address) is exactly the case that
     // SHOULD still hydrate from the URL — that's what makes a filtered link
-    // shareable at all. didArriveViaBackForward defaults to false (see the
-    // top-of-file mock), so this is the same setup as the test above with
-    // nothing overridden.
+    // shareable at all.
     it("still applies a shared URL's search/filters normally on a real navigation", () => {
       const category = makeCategory({
         detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
