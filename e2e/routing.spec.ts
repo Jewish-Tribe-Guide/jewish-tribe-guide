@@ -28,7 +28,8 @@ test.describe('URLs', () => {
   test('"/" is a real HTTP redirect, not a client-side one', async ({ request }) => {
     const res = await request.get('/', { maxRedirects: 0 })
 
-    expect(res.status()).toBe(308)
+    // Temporary: it depends on the remembered community (see proxy.ts).
+    expect(res.status()).toBe(307)
     expect(res.headers()['location']).toMatch(/\/[a-z0-9-]+$/)
   })
 
@@ -36,7 +37,7 @@ test.describe('URLs', () => {
     // The admin's preview frame relies on this; a dropped param fails silently.
     const res = await request.get('/?preview=1', { maxRedirects: 0 })
 
-    expect(res.status()).toBe(308)
+    expect(res.status()).toBe(307)
     expect(res.headers()['location']).toContain('?preview=1')
   })
 

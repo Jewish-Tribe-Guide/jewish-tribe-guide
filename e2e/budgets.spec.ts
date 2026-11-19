@@ -33,7 +33,7 @@ type Loaded = { url: string; type: string; bytes: number }
  *  quiet (no new request for a second, or 8s at most — well inside the config's
  *  test timeout). Not `networkidle`: the map, zmanim and geolocation keep
  *  connections open, so it never settles. */
-async function load(page: Page, path: string): Promise<Loaded[]> {
+async function load(page: Page, path: string, shown: (page: Page) => Promise<void> = ready): Promise<Loaded[]> {
   const done: Loaded[] = []
   const sizing: Promise<void>[] = []
   let lastRequestAt = Date.now()
@@ -89,7 +89,7 @@ async function load(page: Page, path: string): Promise<Loaded[]> {
 
   await page.goto(path)
   await dismissLocationPrompt(page)
-  await ready(page)
+  await shown(page)
 
   const deadline = Date.now() + 8_000
   while (Date.now() - lastRequestAt < 1_000 && Date.now() < deadline) await page.waitForTimeout(200)
@@ -147,6 +147,34 @@ test.describe('home screen weight', () => {
     console.log(`[budget:${testInfo.project.name}] you js=${kb(js)}KB`)
     expect(kb(js), 'initial JavaScript, gzipped').toBeLessThan(400)
   })
+
+  // The category, listing and map pages had no budget (Nov 18, review item
+  // 41), so a dependency landing in one of them alone went unnoticed. Only
+  // this site's own scripts count here: the map's Google script is Google's
+  // size, comes only with a key, and isn't ours to trim.
+  // Measured Nov 18: a category page and a listing's page 398 KB, the map
+  // 353 KB (the phone's within 5 KB), with Sentry out of the first download.
+  // The same headroom as the home's ceiling.
+  for (const [name, ceiling, path] of [
+    ['a category page', 470, async (request: import('@playwright/test').APIRequestContext, community: string) => `/${community}/${(await largestCategory(request, community)).category.id}`],
+    ['a listing’s own page', 470, async (request: import('@playwright/test').APIRequestContext, community: string) => {
+      const { category } = await largestCategory(request, community)
+      const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
+      const item = ((await res.json()) as { resources: { id: string }[] }).resources[0]!
+      return `/${community}/${category.id}/${item.id}`
+    }],
+    ['the map', 420, async (_request: import('@playwright/test').APIRequestContext, community: string) => `/${community}/map`],
+  ] as const) {
+    test(`${name}’s initial JavaScript stays under its ceiling`, async ({ page, request }, testInfo) => {
+      const community = await defaultCommunitySlug(request)
+      // The phone's Map has no header to wait for (it folds away over the map).
+      const loaded = await load(page, await path(request, community), (p) => p.locator('main').first().waitFor())
+
+      const own = loaded.filter((r) => isScript(r) && new URL(r.url).pathname.startsWith('/_next/'))
+      console.log(`[budget:${testInfo.project.name}] ${name} js=${kb(sum(own))}KB`)
+      expect(kb(sum(own)), 'initial JavaScript, gzipped').toBeLessThan(ceiling)
+    })
+  }
 
   // A phone's first render is the computer layout, until it has measured
   // itself, and the computer cards' links prefetched on it: every phone home
@@ -288,17 +316,19 @@ test.describe('category page weight', () => {
     const { category } = await largestCategory(request, community)
 
     const hosts: string[] = []
-    page.on('request', (r) => void hosts.push(new URL(r.url()).host))
+    page.context().on('request', (r) => void hosts.push(new URL(r.url()).host))
 
     // The computer home ends on the email signup, which needs the challenge
-    // only once someone types in it (Nov 18).
+    // only once someone types in it (Nov 18). Each page is its own tab: load()
+    // measures a tab's first visit.
     await load(page, `/${community}`)
-    await load(page, `/${community}/${category.id}`)
+    const category_ = await page.context().newPage()
+    await load(category_, `/${community}/${category.id}`)
     expect(hosts.filter((h) => h === TURNSTILE_HOST), 'while only browsing').toHaveLength(0)
 
     // The positive control: opening the form does load it. Without this, the
     // assertion above passes just as happily when the widget is simply broken.
-    await openAddForm(page)
+    await openAddForm(category_)
     await expect.poll(() => hosts.includes(TURNSTILE_HOST), { timeout: 15_000 }).toBe(true)
   })
 })

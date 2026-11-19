@@ -45,13 +45,13 @@ function redirectRoot(request: NextRequest) {
   // this used to lose `?preview=1` from the admin's preview frame.
   url.search = request.nextUrl.search
 
-  // 308 (permanent), not the 307 default: "/" is the single most-linked URL
-  // the site has (every bare-domain backlink and search-engine crawl of the
-  // apex lands here), and the mapping to the default community's path is
-  // permanent in practice. A 307 tells Google the destination might still
-  // change, which withholds full confidence in consolidating ranking signal
-  // onto /philly — a real, if modest, SEO cost for something this central.
-  return NextResponse.redirect(url, 308)
+  // 307 (temporary). It was a 308 for search engines' sake, but where "/"
+  // goes depends on the visitor's remembered community, and a browser keeps
+  // a permanent redirect without asking again: a visitor who switched to
+  // another community kept landing on the old one from "/" (Nov 18, item 38
+  // of the public review). The answer changes per visitor, so it can't be
+  // permanent.
+  return NextResponse.redirect(url, 307)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

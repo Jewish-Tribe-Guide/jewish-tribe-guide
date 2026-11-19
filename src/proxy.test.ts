@@ -38,9 +38,13 @@ afterEach(() => {
 })
 
 describe('proxy — "/" redirect', () => {
-  it('redirects to the config default when no community cookie is set', async () => {
+  // Temporary (307), not permanent: where "/" goes depends on the visitor's
+  // remembered community, and a browser keeps a permanent redirect, so a
+  // visitor who switched kept landing on the old one (Nov 18, item 38 of
+  // the public review).
+  it('redirects to the config default when no community cookie is set, temporarily', async () => {
     const res = await proxy(req('/'))
-    expect(res.status).toBe(308)
+    expect(res.status).toBe(307)
     expect(new URL(res.headers.get('location')!).pathname).toBe('/philly')
   })
 

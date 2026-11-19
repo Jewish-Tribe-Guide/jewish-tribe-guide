@@ -687,14 +687,14 @@ export default function ListingView({ item, category, color, place = null, upvot
       {showSetLocation && <SetLocationRow item={item} />}
       {showPhone && (
         <Row icon={<PhoneIcon className="h-[17px] w-[17px]" />}>
-          <a href={`tel:${item.phone!.replace(/\D/g, '')}`} className="text-primary hover:underline">
+          <a href={`tel:${item.phone!.replace(/\D/g, '')}`} className="tap-44 inline-block text-primary hover:underline">
             {item.phone}
           </a>
         </Row>
       )}
       {website && websiteName && (
         <Row icon={<GlobeIcon className="h-[17px] w-[17px]" />}>
-          <a href={website.href} target="_blank" rel="noopener noreferrer" className="break-all text-primary hover:underline">
+          <a href={website.href} target="_blank" rel="noopener noreferrer" className="tap-44 inline-block break-all text-primary hover:underline">
             {websiteName}
           </a>
         </Row>
@@ -719,9 +719,9 @@ export default function ListingView({ item, category, color, place = null, upvot
           }
         >
           {a.kind === 'email' ? (
-            <a href={`mailto:${a.address}`} className="text-primary hover:underline">{a.address}</a>
+            <a href={`mailto:${a.address}`} className="tap-44 inline-block text-primary hover:underline">{a.address}</a>
           ) : a.kind === 'link' ? (
-            <a href={a.href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{(isWebsite(a.field) && siteName(a.href)) || a.field.linkLabel || a.field.label}</a>
+            <a href={a.href} target="_blank" rel="noopener noreferrer" className="tap-44 inline-block text-primary hover:underline">{(isWebsite(a.field) && siteName(a.href)) || a.field.linkLabel || a.field.label}</a>
           ) : null}
         </Row>
       ))}
@@ -729,7 +729,7 @@ export default function ListingView({ item, category, color, place = null, upvot
         <Row key={f.key}>
           {!f.hideLabel && <span className="block text-[13px] text-muted">{f.label}</span>}
           {f.type === 'tel' ? (
-            <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="text-primary hover:underline">{formatPhone(String(item[f.key]))}</a>
+            <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="tap-44 inline-block text-primary hover:underline">{formatPhone(String(item[f.key]))}</a>
           ) : (
             <span className={f.type === 'textarea' ? 'whitespace-pre-line' : undefined}>{String(item[f.key]).trim()}</span>
           )}
@@ -1142,7 +1142,7 @@ function ShareButton({ path, name, pill = false }: { path: string; name: string;
 
 function Row({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex items-start gap-3 py-2.5 text-[15px] leading-snug text-slate-800">
+    <div className="flex items-start gap-3 py-3 text-[15px] leading-snug text-slate-800">
       <span className="mt-0.5 w-[17px] shrink-0 text-slate-400">{icon}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>

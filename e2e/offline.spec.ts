@@ -165,6 +165,64 @@ test.describe('service worker', () => {
     }
   })
 
+  // Nov 18, review item 36: a tap fetches the next page's data, never the
+  // page, so a page reached by a tap was never kept, and only pages loaded
+  // whole were there with no signal. The page now asks the worker to keep
+  // it (storeTappedPage.ts).
+  test('keeps a page reached by a tap, for no signal', async ({ page, request, context }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await categoryWithListings(request, community)
+    await ready(page)
+    await dismissLocationPrompt(page)
+    await serviceWorkerReady(page)
+
+    const path = `/${community}/${category.id}`
+    expect((await cachedUrls(page)).map((u) => new URL(u).pathname), 'not kept before the tap').not.toContain(path)
+    // What a tap does: the router moves to it without loading the page.
+    await page.evaluate((p) => (window as unknown as { next: { router: { push: (p: string) => void } } }).next.router.push(p), path)
+    await expect(page).toHaveURL(new RegExp(`${path}$`))
+    // Two <main>s for a moment while the router swaps pages.
+    await expect(page.locator('main').filter({ hasText: category.pluralLabel }).first()).toBeVisible()
+
+    await expect
+      .poll(async () => (await cachedUrls(page)).map((u) => new URL(u).pathname), { timeout: 15_000 })
+      .toContain(path)
+
+    await context.setOffline(true)
+    try {
+      const response = await page.goto(path)
+      expect(response?.status(), 'the kept page, not an error').toBe(200)
+      await expect(page.locator('main').filter({ hasText: category.pluralLabel }).first()).toBeVisible()
+    } finally {
+      await context.setOffline(false)
+    }
+  })
+
+  // Nov 18, review item 36: "/" is a redirect, which is never kept, so an
+  // installed app (it opens at "/") showed the offline page every time it
+  // was opened with no signal.
+  test('opens the community home for "/" with no signal', async ({ page, context }) => {
+    const community = await defaultCommunity(page)
+    await ready(page)
+    await serviceWorkerReady(page)
+    // Loaded whole while the worker is in charge, so it keeps the home.
+    await page.reload()
+    await ready(page)
+    await expect
+      .poll(async () => (await cachedUrls(page)).map((u) => new URL(u).pathname), { timeout: 10_000 })
+      .toContain(`/${community}`)
+
+    await context.setOffline(true)
+    try {
+      const response = await page.goto('/')
+      expect(response?.status(), 'the kept home, not an error').toBe(200)
+      await expect(page.getByRole('heading', { name: 'You’re offline' })).toHaveCount(0)
+      await ready(page)
+    } finally {
+      await context.setOffline(false)
+    }
+  })
+
   test('serves a content API from cache when the network is gone', async ({ page, context }) => {
     const community = await defaultCommunity(page)
     await ready(page)

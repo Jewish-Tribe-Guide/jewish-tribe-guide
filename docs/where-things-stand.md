@@ -1093,6 +1093,34 @@ Done:
     searches read as none, the sidebar opens at its usual width, a vote
     keeps a token for the visit and a counted vote stays counted
     (`safeStorage.ts`).
+- Speed and phones (items 35–41):
+  - A page is handed over as it arrives; the service worker stores its
+    copy afterwards. Before, every page on an installed or returning
+    phone waited for its last byte and the cache write.
+  - On one bar, a page that hasn't answered in 4 seconds shows its saved
+    copy; the request carries on and stores the fresh one.
+  - With no signal: "/" (where the installed app opens) shows the
+    community home visited last, not the offline page; a page saved
+    without its query string still opens with one; and a page reached by
+    a tap is there too: the page asks the worker to keep it, 3 seconds
+    after the tap, at most every 6 hours a page, never with Data Saver
+    (`storeTappedPage.ts`). The offline page links home.
+  - The script cache keeps 300 files, oldest out first, instead of every
+    deploy's.
+  - `/` redirects with 307, not 308: it follows a remembered community,
+    and a browser keeps a permanent redirect after the visitor switches.
+    **Your call:** the installed app's name and icon are Philly's for
+    every community (`manifest.ts`).
+  - The header's Set location, a listing's phone number, website, email
+    and links, and the map's chips each take a 44px tap without changing
+    how they look (`tap-44` in `globals.css`). A listing's details rows
+    are 4px taller to fit them. Not done: a hospital contact's phones and
+    email, which sit too close together for it, and Cards/List (left out).
+  - Sentry loads after the page instead of in its first download
+    (`deferredSentry.ts`). Errors thrown before it arrives are kept and
+    sent; the page-load trace now starts when it arrives.
+  - JS budgets for a category page, a listing's own page and the map
+    (`budgets.spec.ts`), counting the site's own scripts.
 
 ## Open from the boxes and fields work (Nov 10)
 
