@@ -47,7 +47,7 @@ visible response, ≤1s to the answer on a phone, Core Web Vitals at p75).
 The first tap on a place on a phone no longer slides up an empty sheet:
 its code loads once a category page is idle (`src/lib/preloadable.tsx`),
 checked by `e2e/first-tap.spec.ts`. Still open: make PR builds faster
-(~12 min now). The e2e shards wait for cache-roundtrip and admin-write and
+(10–13 min, checked Nov 19 on that day's green PR runs). The e2e shards wait for cache-roundtrip and admin-write and
 are unbalanced; about 6–7 min looks reachable.
 
 **Nov 16, the user's notes after the release:**
@@ -966,9 +966,24 @@ it says otherwise:
 
 Still open:
 
-- **A dated shul week is still compared with the usual times**
-  (`shulWeekReading.ts`, `dropListed`), against the rule. The user, Nov
-  18: talk about it after the rest.
+- **Shul watches, to be rewritten rather than patched** (the user, Nov
+  19: "I don't want patches anymore"). The plan, waiting on the user:
+  `docs/shul-watch-rebuild.md`. A dated week is still compared
+  with and filled from the usual times (`keepUncovered`, `dropListed`,
+  `compareTimes` on weeks), because a week replaces its day and the
+  reader takes one highlighted time as a week. Decided Nov 19: we post
+  schedules, not highlights (see `docs/how-we-work.md`). A week only from
+  a whole-week source (calendar or newsletter); a highlighted time is
+  ignored (Mekor's homepage "Fri 4:25" box); usual times are compared
+  only with the shul's regular-schedule page. Found the same day: Lower
+  Merion's full calendar (lowermerionsynagogue.org/calendar, every
+  minyan every day) is never read; the watch reads its homepage. Mekor's
+  site has no calendar, so its week is the newsletter's. Approvals (about
+  40 a week for 14 shuls) left alone for now, to see if this brings
+  them down. Newsletters read Nov 19 (a month of each, in the guide's
+  Gmail): Society Hill, BZBI, Mekor and Kol Tzedek give the week; the
+  Shtiebel's gives Shabbos only, waiting on the user; Sons of Israel
+  has sent nothing. Details in the plan.
 - A listing list's scroll-to-a-row wait gives up after about 3 seconds
   and stops when the list goes away (`whenSettled`, Nov 19). It used to
   poll every 32ms forever for a row that never appeared, and one timer
@@ -1077,9 +1092,11 @@ Done:
   live's clean-up checks only live's rows. So the Nov 19 one took the old
   logo dev's Philly still used, and the icon e2e tests failed on the test
   project (CI's too). Fixed on dev the same day: the file, from the
-  backup, now in dev's own storage and dev's logo pointed at it. Live's
-  weekly sweep can do it again to any other of those 130 once live stops
-  using it; the lasting fix is a sync that copies files instead of links.
+  backup, now in dev's own storage and dev's logo pointed at it. Then
+  (the user: "dev should not be linking to live photos") the other 129
+  were copied into dev's storage and dev's 211 rows pointed at them; dev
+  links to no live file now. `sync-dev-from-prod` copies a row's files
+  with it from now on (`scripts/storedFileCopy.mjs`).
 - Public reads: a form's unpublished draft no longer goes out with the
   published form, and `/api/eruv` says a read failed and when, not the
   error's text.
@@ -2139,17 +2156,15 @@ for that exact change, in the same conversation. Show the dry run first.
    on live, nothing else (backup in that session's scratchpad). Its
    flavours get dated from that menu once PR 365 deploys.
 
-1j. **FINE WINE & GOOD SPIRITS (live, Oct 28):** has no Google place
-   (only the street address's, for Directions), so the nightly sync skips
-   it. Fix: set its place id to the store's, on live; needs a yes, after
-   looking the id up and showing it.
+1j. ~~FINE WINE & GOOD SPIRITS has no Google place~~ Done Oct 28, by an
+   edit that evening: it has the store's place id, Google keeps its name,
+   hours, phone and website, and the nightly sync reaches it (checked
+   Nov 19: last synced that morning).
 1k. **Migration 092 (`look_again`)** is run on dev and live (checked Nov 3,
    after PR 373 deployed: live's table has every column, no rows yet).
 
-1l. **Migration 094 (`eruv.details`, Nov 9):** on dev (the user ran it
-    Nov 9), not on live. One `add column if not exists`; nothing is read from it until an
-    admin makes a field on the Eruv page, so it can go any time after the
-    branch deploys. Needs a yes.
+1l. ~~Migration 094 (`eruv.details`)~~ On dev and live (checked Nov 19:
+    live's eruv rows have the column).
 
 ## For the user or the community
 
@@ -2159,9 +2174,11 @@ for that exact change, in the same conversation. Show the dry run first.
    undated one, The Brazillian BBQ (spelled so on live, off Keystone-K's
    list), was confirmed by someone that evening. The trust line now says
    "every listing dated" once the live cache refreshes (any admin save).
-   Shtetl, Rita's, New York Bagel Bakery and Sababa Falafel are dated by
-   Google's sync but still have the problems that held them back (off
-   Keystone-K's list, closed temporarily, bad place id): fix or remove each.
+   Shtetl, Rita's, New York Bagel Bakery and Sababa Falafel (checked on
+   live Nov 19): Shtetl is archived. Google says three of the four live
+   Rita's and New York Bagel Bakery are closed temporarily (Rita's is
+   seasonal). Sababa Falafel has no Google place, so the nightly sync
+   skips it: setting one needs the id looked up, shown, and a yes.
 3. **Check the menu reader's browser on the preview** (Oct 20): Admin →
    Main dishes → Insomnia Cookies → "Read again" should come back with
    cookies, brownies and ice cream within about 20 seconds. It's the one
@@ -2188,9 +2205,16 @@ for that exact change, in the same conversation. Show the dry run first.
      dishes the last read never looked for, from the run's 3 AI reads
      (`dishesToLookFor`). One it names gets its menu date; one it doesn't
      waits on the kind page.
-   - Still open: two of the Dottie's branches share dotties.com with the
-     first branch's watch (one watch per page), so the daily run never
-     looks for theirs. Read it now on each does.
+   - Fixed Nov 19 (`claude/next-round`, not live until it deploys):
+     branches that share a menu page share one watch, on the first
+     branch, and an unchanged menu was read again only for that branch's
+     dishes, so a dish added by hand to another branch alone was never
+     looked for (Dottie's (4), Rita's (4), PLNT Burger, Playa Bowls, LUHV,
+     Insomnia on live). Now every branch's unlooked-for dishes are looked
+     for, each by its own reading (or the first branch's, if it has
+     none). A dish any branch lists is asked about and isn't proposed as
+     new to the others; one the menu lacks waits on the branch that lists
+     it, and isn't looked for again.
    **Oct 26, "why does HipCityVeg say Oct 17, and Goldie?"** Two causes,
    both fixed on `redesign/oct18-fixes` (not live until it deploys):
    - Menus are checked last each night, and the shul and mikvah pages
@@ -3030,12 +3054,8 @@ after the deploy, dry run first, and needs its own go-ahead.
 ## Small open decisions
 
 7. The "+" button covers part of the third tile in a row on the phone home.
-8. Counts on the admin's To do tabs (how many are waiting in the queue,
-   Watches, Read questions, Responses). Not shown: no count is loaded
-   anywhere the nav can read it, and the agreement was no new requests just
-   for these. Showing them would mean the sign-in check (or one new small
-   request) returning the four counts on every admin page load.
-   (Folds into the admin redesign below.)
+8. ~~Counts on the admin's To do tabs~~ Done with the admin redesign
+   (Oct 29): To do is one list, and the nav shows its count.
 
 ## Planned: the admin redesign (started Oct 28, brief agreed Oct 28)
 

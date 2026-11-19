@@ -77,6 +77,22 @@ work is in `docs/where-things-stand.md`.
 - **Usual times and a week are separate.** A dated week is never compared
   with, matched to, or filled from a shul's usual times, and never borrows
   their notes, sign-up group or join link.
+- **We post schedules, not highlights** (Nov 19). A week comes only from a
+  source that gives the whole week: a shul's calendar, or its newsletter's
+  weekly schedule. One time highlighted for a date (a homepage's "this
+  Shabbos" box, an events list) is ignored: a person wouldn't read it as
+  the week, or as "the usual times except this". A day with a week shows
+  that week only; a day without one shows the usual times, labelled as
+  usual. A shul with no whole week that week (no calendar, no newsletter
+  yet) shows no "this week" box at all. Usual times are never put with
+  this week's schedule. Holiday timetables (Mekor's Tisha B'Av) are their
+  own thing, not decided yet.
+- **Shul watches, in short** (agreed Nov 19). Usual times come from the
+  shul's regular-schedule page, and are compared only with it. A week
+  comes from a whole-week source (a calendar the shul keeps is whole), and
+  is compared only with our copy of that week; the newer source wins. Anything else is ignored. The hard
+  parts: telling whether a source is the whole week, and finding the page
+  that has it.
 - **Watch everything that's out there, cheaply.** Every field needs
   something keeping it current. Google keeps what it owns on a listing
   (`details.googleFields`), and the website watch checks the rest. Address
