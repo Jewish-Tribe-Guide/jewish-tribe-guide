@@ -935,7 +935,9 @@ it says otherwise:
 - The three screen nits, fixed Nov 18: Places says the street of a place
   another place has the name of (68d03fd5); Reports and History say
   Approved and Rejected, as To do's buttons do, not Taken and Left
-  (8d549ac4, a change to the Oct 29 Reports board's wording); a shul's
+  (8d549ac4, a change to the Oct 29 Reports board's wording; `e2e/admin.
+  spec.ts` still looked for "Taken" and failed, fixed on the public
+  review's branch); a shul's
   usual times on its admin listing read by tefillah then time, Shabbos's
   Friday first (d17d456c).
 
