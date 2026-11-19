@@ -84,12 +84,13 @@ work is in `docs/where-things-stand.md`.
   the week, or as "the usual times except this". A day with a week shows
   that week only; a day without one shows the usual times, labelled as
   usual. A shul with no whole week that week (no calendar, no newsletter
-  yet) shows no "this week" box at all. A holiday timetable for its dates
-  (Mekor's Tisha B'Av) is whole for those dates, so it is their schedule.
+  yet) shows no "this week" box at all. Usual times are never put with
+  this week's schedule. Holiday timetables (Mekor's Tisha B'Av) are their
+  own thing, not decided yet.
 - **Shul watches, in short** (agreed Nov 19). Usual times come from the
   shul's regular-schedule page, and are compared only with it. A week
-  comes from a whole-week source, and is compared only with our copy of
-  that week; the newer source wins. Anything else is ignored. The hard
+  comes from a whole-week source (a calendar the shul keeps is whole), and
+  is compared only with our copy of that week; the newer source wins. Anything else is ignored. The hard
   parts: telling whether a source is the whole week, and finding the page
   that has it.
 - **Watch everything that's out there, cheaply.** Every field needs
