@@ -7,7 +7,7 @@ import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { ui } from '@/lib/uiConfig'
-import { formatTodayHours, hasAnyHours } from '@/lib/hours'
+import { formatTodayHours, hasAnyHours, placeClock } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { useZmanim } from '@/lib/useZmanim'
 import { useActiveCommunity, useCommunityTimezone, useContributions } from '@/lib/communityContext'
@@ -810,8 +810,8 @@ export default function ListingView({ item, category, color, place = null, upvot
   const walks = walkLists.length > 0 && item.geo && main !== 'walk' ? <WalkLists lists={walkLists} from={item.geo} fromItem={item} /> : null
   // The Shabbos card comes right after the main thing on a Friday or Erev
   // Yom Tov, until candle lighting; the rest of the week, after the places
-  // within a walk.
-  const nowMinutes = now ? now.getHours() * 60 + now.getMinutes() : null
+  // within a walk. On the place's clock, as candle lighting is.
+  const nowMinutes = now ? placeClock(now).minutes : null
   const shabbosFirst = candlesAt !== null && nowMinutes !== null && nowMinutes < candlesAt
   // Its date at its foot, with Still right? and Edit (the user, Oct 15:
   // "if it's editable then we should be having last updated and everything

@@ -1,16 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { businessClosure, dayAndMinutesInTimezone, effectiveBusinessStatus, fmt12, formatHoursSummary, formatTodayHours, getOpenStatus, hasAnyHours, hoursClosing, hoursNextOpening, hoursOpenNow, isStructuredHours, placesApiHoursToStructured, type StructuredHours } from './hours'
+import { placeTime } from '@/test/placeTime'
 
-// Everything here reads `new Date()`, so each test pins the clock. The local
-// timezone matters: hoursOpenNow uses getDay()/getHours(), i.e. the *viewer's*
-// clock, which is the intended behavior (a visitor standing outside the store
-// cares about their own wall time). Tests set a fixed instant and assert
-// against what that instant is locally.
+// Everything here reads `new Date()`, so each test pins the clock. Open/Closed
+// reads the place's own clock (the community's timezone, Nov 18 review item
+// 9), not the viewer's, so each instant is set on that clock with placeTime;
+// `new Date(y, m, d, h)` would be the machine's, and the suite runs in UTC.
 //
-// 2026-06-24 is a Wednesday. Times below are constructed with the local-time
-// `new Date(y, m, d, h, m)` form so they don't drift with the machine's zone.
-const WEDNESDAY = (h: number, m = 0) => new Date(2026, 5, 24, h, m, 0)
-const SUNDAY = (h: number, m = 0) => new Date(2026, 5, 28, h, m, 0)
+// 2026-06-24 is a Wednesday.
+const WEDNESDAY = (h: number, m = 0) => placeTime(2026, 5, 24, h, m)
+const SUNDAY = (h: number, m = 0) => placeTime(2026, 5, 28, h, m)
 
 const WEEKDAY_9_TO_5: StructuredHours = {
   sun: null,
@@ -281,7 +280,7 @@ describe('business closures outrank posted hours', () => {
     ...(status ? { businessStatus: status } : {}),
   })
   // A Monday, midday — the hours above say open.
-  const monday = new Date(2026, 7, 31, 12, 0)
+  const monday = placeTime(2026, 7, 31, 12, 0)
 
   it('reports a trading business as open', () => {
     const status = getOpenStatus(item('OPERATIONAL'), ['hours'], monday)
@@ -360,7 +359,7 @@ describe('an admin override outranks Google', () => {
     const status = getOpenStatus(
       { hours: { mon: { open: '00:00', close: '23:59' } }, businessStatusOverride: 'CLOSED_TEMPORARILY' },
       ['hours'],
-      new Date(2026, 7, 31, 12, 0),
+      placeTime(2026, 7, 31, 12, 0),
     )
     expect(status.isOpen).toBe(false)
     expect(status.closure).toBe('temporary')
@@ -413,7 +412,7 @@ describe('hoursNextOpening', () => {
   // Friday Oct 2 2026, 2 PM, local. Made in each test, not once here: a
   // test above changes the machine's timezone, and a Date made before that
   // is a different local time after it.
-  const friday2pm = () => new Date(2026, 9, 2, 14, 0)
+  const friday2pm = () => placeTime(2026, 9, 2, 14, 0)
 
   it('says the time for later today, and the day for any other', () => {
     expect(hoursNextOpening({ fri: { open: '16:00', close: '20:00' } }, friday2pm())).toBe('4 PM')
@@ -437,7 +436,7 @@ describe('a place saved as closed every day (fixes table, Sep 29)', () => {
   // Chalavita, The Brazilian BBQ and four more: almost always a form saved
   // empty. It said "Closed today", and Closed for every day of the week.
   const allClosed = { sun: null, mon: null, tue: null, wed: null, thu: null, fri: null, sat: null }
-  const tuesdayNoon = new Date(2026, 8, 29, 12, 0)
+  const tuesdayNoon = placeTime(2026, 8, 29, 12, 0)
 
   it('has no hours, the same as none saved, wherever hours are read', () => {
     expect(hasAnyHours(allClosed)).toBe(false)

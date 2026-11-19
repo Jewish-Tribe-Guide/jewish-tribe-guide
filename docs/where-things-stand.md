@@ -1043,9 +1043,11 @@ Done:
   ("Open until 2 AM", still open at 1 AM) instead of "11:59 PM" and
   Closed, and a lunch or dinner break shows Closed (Google's split hours
   are kept as `periods`; the old shape stays as it was for everything
-  else). Search's "open now" reads them the same way. The Shabbos card's
-  order and candle lighting still use the device clock; they agree with
-  each other, so they were left.
+  else). Search's "open now" reads them the same way, and so do tonight's
+  candle lighting and the Shabbos card's place on a Friday, so "closes
+  before candles" compares like with like (Nov 19, after CI failed them).
+  The unit suite runs in UTC, as CI does (`vitest.config.mts`); a test
+  sets its times with `placeTime`, on the community's clock.
 - A shul's weekday box no longer says "10 min before sunset: 4:32 PM
   today" on Friday or Shabbos (`ruleLinesToday` checks the rule's days).
 - The footer says "Tap Edit listing", the button's name.

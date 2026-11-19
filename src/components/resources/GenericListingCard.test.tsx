@@ -10,6 +10,7 @@ import { mockRouter } from '@/test/nextNavigationMock'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import { NextMinyansContext } from './nextMinyans'
+import { placeTime } from '@/test/placeTime'
 
 // The first component test built on the CommunityProvider/ContentProvider
 // harness (renderWithProviders) — this was the specific component the
@@ -214,7 +215,7 @@ describe('GenericListingCard — collapsed', () => {
     vi.useFakeTimers()
     try {
       // A Friday, mid-afternoon, for a place open 09:00–17:00 that day.
-      vi.setSystemTime(new Date('2026-08-28T14:00:00'))
+      vi.setSystemTime(placeTime(2026, 7, 28, 14, 0))
       const category = makeCategory({
         detailFields: [{ key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' }],
       })
@@ -249,7 +250,7 @@ describe('GenericListingCard — collapsed', () => {
   it('shows a closure on the collapsed card, and never an Open badge with it', () => {
     vi.useFakeTimers()
     try {
-      vi.setSystemTime(new Date('2026-08-31T12:00:00')) // a Monday, midday
+      vi.setSystemTime(placeTime(2026, 7, 31, 12, 0)) // a Monday, midday
       const category = makeCategory({
         detailFields: [{ key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' }],
       })
@@ -274,7 +275,7 @@ describe('GenericListingCard — collapsed', () => {
   it('goes back to open once the status is OPERATIONAL again', () => {
     vi.useFakeTimers()
     try {
-      vi.setSystemTime(new Date('2026-08-31T12:00:00'))
+      vi.setSystemTime(placeTime(2026, 7, 31, 12, 0))
       const category = makeCategory({
         detailFields: [{ key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' }],
       })
