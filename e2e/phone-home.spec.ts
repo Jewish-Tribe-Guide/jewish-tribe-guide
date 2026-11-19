@@ -50,7 +50,7 @@ async function openHome(page: Page, day: keyof typeof DAYS) {
   await page.goto(`/${community}`)
   // A phone's first render is the computer's layout, with the computer's
   // copy of Right now, until the screen is measured (useIsMobile, Oct 16).
-  // The location box's "Not now" used to buy that wait; it's gone (Nov 19).
+  // The location box's "Not now" used to buy that wait; it's gone (Nov 18).
   const phone = await page.evaluate(() => matchMedia('(max-width: 639px), (max-height: 639px)').matches)
   if (phone) await expect(page.locator('[data-testid="right-now"][data-wide]')).toHaveCount(0)
   return community

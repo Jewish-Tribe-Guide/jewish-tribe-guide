@@ -118,7 +118,7 @@ describe('SiteChrome', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/couldn.t load the list of categories/)
   })
 
-  // Nov 19 (the user): the site no longer asks for location when it opens.
+  // Nov 18 (the user): the site no longer asks for location when it opens.
   // It asks when the visitor reaches for it: "Use my location" above a list,
   // Set location in the header, or sorting by Distance with nothing to
   // measure from. Before, a "Share your live location?" box covered the

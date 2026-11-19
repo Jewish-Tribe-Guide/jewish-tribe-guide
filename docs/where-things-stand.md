@@ -1043,7 +1043,7 @@ Done:
   are kept as `periods`; the old shape stays as it was for everything
   else). Search's "open now" reads them the same way, and so do tonight's
   candle lighting and the Shabbos card's place on a Friday, so "closes
-  before candles" compares like with like (Nov 19, after CI failed them).
+  before candles" compares like with like (Nov 18, after CI failed them).
   The unit suite runs in UTC, as CI does (`vitest.config.mts`); a test
   sets its times with `placeTime`, on the community's clock.
 - A shul's weekday box no longer says "10 min before sunset: 4:32 PM
@@ -1091,7 +1091,7 @@ Done:
     centre, and the phone's lowered sheet says "137 places", not "137
     places nearby — drag up".
   - The "Share your live location?" box no longer opens with the site
-    (the user, Nov 19: "I think we can fix the location ask"). Location is
+    (the user, Nov 18: "I think we can fix the location ask"). Location is
     asked for when the visitor reaches for it: "Use my location" above a
     list, Set location in the header, or Distance with nothing to measure
     from, each of which opens the header's location menu. A visitor who
