@@ -966,9 +966,20 @@ it says otherwise:
 
 Still open:
 
-- **A dated shul week is still compared with the usual times**
-  (`shulWeekReading.ts`, `dropListed`), against the rule. The user, Nov
-  18: talk about it after the rest.
+- **Shul watches, to be rewritten rather than patched** (the user, Nov
+  19: "I don't want patches anymore"). A dated week is still compared
+  with and filled from the usual times (`keepUncovered`, `dropListed`,
+  `compareTimes` on weeks), because a week replaces its day and the
+  reader takes one highlighted time as a week. Decided Nov 19: we post
+  schedules, not highlights (see `docs/how-we-work.md`). A week only from
+  a whole-week source (calendar or newsletter); a highlighted time is
+  ignored (Mekor's homepage "Fri 4:25" box); usual times are compared
+  only with the shul's regular-schedule page. Found the same day: Lower
+  Merion's full calendar (lowermerionsynagogue.org/calendar, every
+  minyan every day) is never read; the watch reads its homepage. Mekor's
+  site has no calendar, so its week is the newsletter's. Approvals (about
+  40 a week for 14 shuls) left alone for now, to see if this brings
+  them down.
 - A listing list's scroll-to-a-row wait gives up after about 3 seconds
   and stops when the list goes away (`whenSettled`, Nov 19). It used to
   poll every 32ms forever for a row that never appeared, and one timer
