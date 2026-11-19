@@ -1000,9 +1000,13 @@ Done:
 
 - "Next:" and the minyan lists count public holidays and Rosh Chodesh
   (`dayKeysFor`). On Thanksgiving a shul said "Next: Shacharis 7 AM
-  tomorrow" right above "8:30 AM also on public holidays". Rosh Chodesh
-  is known for today only (the calendar's days ahead don't carry it), so
-  tomorrow's Rosh Chodesh minyan still isn't offered as Next. The unused
+  tomorrow" right above "8:30 AM also on public holidays". The days
+  ahead carry Rosh Chodesh too since Nov 19 (the calendar is asked with
+  `nx=on`; `roshChodeshDays`, `withRoshChodesh`), so tomorrow's Rosh
+  Chodesh minyan is offered as Next. Not checked against Hebcal itself
+  from here (its site was blocked to the session): the item category
+  `roshchodesh` is the one `dateZmanim.ts` already reads. A cached answer
+  from before it says nothing ahead, as before. The unused
   `calendarDaysFor` is gone.
 - What reaches the queue and the site from a visitor, tightened:
   - A sender is their email only. A name they typed ("Keystone-K

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calendarDaysFrom, readHebcalDay } from './jewishDays'
+import { calendarDaysFrom, readHebcalDay, roshChodeshDates } from './jewishDays'
 
 // Titles exactly as Hebcal sends them (checked against its API, Oct 1 2026),
 // curly apostrophes and all.
@@ -57,5 +57,25 @@ describe('the days ahead', () => {
       ['2026-10-03', 'Shemini Atzeres', true],
       ['2026-10-04', 'Simchas Torah', true],
     ])
+  })
+})
+
+describe('the days ahead that are Rosh Chodesh', () => {
+  // Rosh Chodesh Teves 5787 is two days, Dec 9 and 10 2026, during Chanukah.
+  const items = [
+    { category: 'holiday', title: 'Chanukah: 7 Candles', date: '2026-12-09' },
+    { category: 'roshchodesh', title: 'Rosh Chodesh Tevet', date: '2026-12-09' },
+    { category: 'roshchodesh', title: 'Rosh Chodesh Tevet', date: '2026-12-10' },
+    { category: 'roshchodesh', title: 'Rosh Chodesh Shvat', date: '2027-01-08' },
+    { category: 'holiday', title: 'Erev Rosh Chodesh', date: '2026-12-08' },
+  ]
+
+  it('each day of it in the range, and only its own items', () => {
+    expect(roshChodeshDates(items, '2026-12-07', '2026-12-14')).toEqual(['2026-12-09', '2026-12-10'])
+  })
+
+  it('nothing outside the range', () => {
+    expect(roshChodeshDates(items, '2026-12-10', '2026-12-14')).toEqual(['2026-12-10'])
+    expect(roshChodeshDates(items, '2026-12-11', '2027-01-07')).toEqual([])
   })
 })

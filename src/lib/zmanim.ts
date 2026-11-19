@@ -1,5 +1,5 @@
 import type { ZmanimData, ZmanEntry } from '@/types'
-import { calendarDaysFrom, readHebcalDay } from './jewishDays'
+import { roshChodeshDates, calendarDaysFrom, readHebcalDay } from './jewishDays'
 
 // ── Hebcal data layer ─────────────────────────────────────────────────────────
 //
@@ -409,7 +409,7 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
   // genuinely still in progress.
   const nowMs = Date.now()
   const windowEnd = addDays(dateStr, lookaheadDays(dayOfWeek))
-  const holidayUrl = `${HEBCAL_BASE}/hebcal?cfg=json&v=1&start=${addDays(dateStr, -1)}&end=${addDays(windowEnd, HOLIDAY_QUERY_PAD_DAYS)}&${geo}&c=on&maj=on&min=off&mod=off&s=off&mf=on&d=off&o=off&F=off&D=off`
+  const holidayUrl = `${HEBCAL_BASE}/hebcal?cfg=json&v=1&start=${addDays(dateStr, -1)}&end=${addDays(windowEnd, HOLIDAY_QUERY_PAD_DAYS)}&${geo}&c=on&maj=on&min=off&mod=off&s=off&mf=on&nx=on&d=off&o=off&F=off&D=off`
 
   const [zmanim, shabbat, converter, holidayCalendar] = await Promise.all([
     fetchJson<HebcalZmanim>(zmanimUrl),
@@ -471,6 +471,9 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
     // Yom Tov times can apply tomorrow too, not only today.
     days: calendarDaysFrom(holidayCalendar.items ?? [], dateStr, addDays(windowEnd, HOLIDAY_QUERY_PAD_DAYS)),
     daysThrough: addDays(windowEnd, HOLIDAY_QUERY_PAD_DAYS),
+    // The days ahead that are Rosh Chodesh (nx=on above), for a shul's Rosh
+    // Chodesh minyan tomorrow. Today's stays isRoshChodesh, the converter's.
+    roshChodeshDays: roshChodeshDates(holidayCalendar.items ?? [], dateStr, addDays(windowEnd, HOLIDAY_QUERY_PAD_DAYS)),
     fastPeriod: findFastPeriod(holidayCalendar.items ?? [], timezone, windowEnd, nowMs, dateStr),
   }
 }

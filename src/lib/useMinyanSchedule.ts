@@ -8,7 +8,7 @@ import { currentSeason, type Season } from '@/lib/season'
 import { DAY_KEYS, dayAndMinutesInTimezone, type DayKey } from '@/lib/hours'
 import type { MinyanDayKey } from '@/lib/davening'
 import { minyanimPage } from '@/lib/davening'
-import { dateKey, factsFor, readSchedules, regularMinyanim, schedulesKey, shabbosIsOver, withSchedules, type DateFacts, type DayPosting } from '@/lib/schedules'
+import { dateKey, factsFor, readSchedules, withRoshChodesh, regularMinyanim, schedulesKey, shabbosIsOver, withSchedules, type DateFacts, type DayPosting } from '@/lib/schedules'
 import { dayInTimezone } from '@/lib/activity'
 import { listMinyanim, minyanimOn, type ShulMinyanim } from '@/lib/upcomingDavening'
 import type { AnswerSchedule } from '@/lib/askAnswer'
@@ -95,7 +95,7 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
   // the day the clocks go back has 25, so just after midnight that week two
   // steps landed on it and the last day was never shown.
   const todayDate = now === null ? null : dayInTimezone(timezone, new Date(now))
-  const dates =
+  const onCalendar =
     todayDate === null
       ? []
       : Array.from({ length: 7 }, (_, i) =>
@@ -103,8 +103,8 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
         )
   // Today's Yom Tov answer is the converter's own (isYomTov); the days
   // ahead only fill in what it doesn't say.
-  if (dates[0] && typeof zmanimData?.isYomTov === 'boolean') dates[0] = { ...dates[0], yomTov: zmanimData.isYomTov }
-  if (dates[0] && zmanimData?.isRoshChodesh) dates[0] = { ...dates[0], roshChodesh: true }
+  if (onCalendar[0] && typeof zmanimData?.isYomTov === 'boolean') onCalendar[0] = { ...onCalendar[0], yomTov: zmanimData.isYomTov }
+  const dates = withRoshChodesh(onCalendar, zmanimData?.isRoshChodesh, zmanimData?.roshChodeshDays)
 
   const posting: Record<string, Record<string, DayPosting>> = {}
   const shuls: ShulMinyanim[] = (listings ?? [])
@@ -149,8 +149,8 @@ export function useMinyanSchedule(coords: LatLng | null, only?: readonly Directo
 /** The day keys a date's minyanim match: its weekday, its own date (a
  *  special schedule's), Yom Tov when the calendar says so, a public
  *  holiday (worked out here, so always known), and Rosh Chodesh when the
- *  calendar has said it is (today's only: the days ahead don't carry it,
- *  and "Next:" mustn't name a minyan that may not be running). */
+ *  calendar has said it is (withRoshChodesh). Unknown is not Rosh Chodesh:
+ *  "Next:" mustn't name a minyan that may not be running. */
 export function dayKeysFor(d: DateFacts): MinyanDayKey[] {
   const [y, m, day] = d.date.split('-').map(Number)
   return [

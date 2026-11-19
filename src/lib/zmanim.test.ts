@@ -237,6 +237,21 @@ describe('getZmanimData', () => {
       ])
       expect(data.daysThrough).toBe('2026-06-30')
     })
+
+    it('says which days ahead are Rosh Chodesh, asking the calendar for them', async () => {
+      // Wednesday 2026-06-24: the query reaches 2026-06-30.
+      const { calls } = mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'roshchodesh', title: 'Rosh Chodesh Tamuz', date: '2026-06-25' },
+            { category: 'roshchodesh', title: 'Rosh Chodesh Av', date: '2026-07-25' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(calls.find((u) => u.includes('/hebcal?'))).toContain('nx=on')
+      expect(data.roshChodeshDays).toEqual(['2026-06-25'])
+    })
   })
 
   describe('holidayPeriod', () => {

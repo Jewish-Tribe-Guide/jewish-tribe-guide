@@ -69,6 +69,11 @@ export type ZmanimData = {
   days?: CalendarDay[]
   /** The last date `days` speaks for, YYYY-MM-DD. */
   daysThrough?: string
+  /** Each date from today through `daysThrough` that is Rosh Chodesh, so a
+   *  shul's Rosh Chodesh minyan can be tomorrow's "Next", not only today's.
+   *  Absent in an older cached payload: not known, and nothing ahead is
+   *  read as Rosh Chodesh. */
+  roshChodeshDays?: string[]
   /** The next Yom Tov period landing within the lookahead window (see
    *  lib/zmanim.ts's own `lookaheadDays` doc for how far ahead that is) —
    *  `null` when there isn't one, which is the common case most weeks. */
