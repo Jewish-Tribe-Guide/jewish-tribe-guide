@@ -111,6 +111,22 @@ describe('listApprovedResources', () => {
     expect(mockGetVoteCounts).toHaveBeenCalledWith('philly')
   })
 
+  // Two Supabase trips, side by side rather than one after the other (Nov 20,
+  // the scale sweep): every page's listings wait on both.
+  it('asks for the votes while the listings are still coming', async () => {
+    let answer: (v: unknown) => void = () => {}
+    const builder = chainable(null)
+    builder.then = (resolve: (v: unknown) => void) => void (answer = resolve)
+    mockFrom.mockReturnValue(builder)
+    mockGetVoteCounts.mockResolvedValue(new Map())
+
+    const loading = listApprovedResources('philly')
+    await new Promise((r) => setTimeout(r, 0))
+    expect(mockGetVoteCounts).toHaveBeenCalledWith('philly')
+    answer({ data: [], error: null })
+    expect(await loading).toEqual([])
+  })
+
   it('further scopes by category when provided', async () => {
     const builder = chainable({ data: [], error: null })
     mockFrom.mockReturnValue(builder)

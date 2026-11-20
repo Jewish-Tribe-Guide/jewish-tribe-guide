@@ -38,11 +38,11 @@ export async function listApprovedResources(
     .eq('status', 'approved')
   if (opts.category) query = query.eq('category', opts.category)
 
-  const { data, error } = await query
+  // The votes alongside, not after: two trips at once (Nov 20).
+  const [{ data, error }, counts] = await Promise.all([query, getVoteCounts(community)])
   if (error) throw new Error(`Failed to load resources: ${error.message}`)
 
   const rows = (data as ResourceRow[]).map(normalizeRow)
-  const counts = await getVoteCounts(community)
   return rows.map((r) => ({ ...r, upvotes: counts.get(r.id) ?? 0 }))
 }
 

@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 19, 2026.
+Last updated: Nov 20, 2026.
 
 ## The branch
 
@@ -864,6 +864,67 @@ Nov 14, later, the user's yes to both:
   category pages, Browse, What changed, Feedback and You. The Add button
   sits beside Feedback · About · Privacy at the bottom now, in Safari as
   it already did in the home-screen app.
+
+## The speed and scale sweep (Nov 20, on `claude/bands-and-search`)
+
+The user (Nov 20): "I want the site to be a good site… with the ability
+to scale." Measured first, on the live site and in the code, nothing
+changed until the user picked an order: quick visitor fixes, then saves
+and scale, then the nightly jobs, then CI.
+
+Measured on live (phillyjewishguide.com, Nov 20): every page from the CDN
+in 40–100ms; on a phone the main content showed in 0.65s (Food) to 0.94s
+(home) on a fast connection; no layout shift; no Sentry errors; all seven
+nightly jobs fine for two weeks. The morning watches take 134s (median)
+to 170s of the 220s they may start in, with one community.
+
+Done (batch 1, each red against the old code first):
+
+- Photos at the size drawn. Unsplash photos are asked of Unsplash at each
+  width the page needs (`photoProps` in `src/lib/imageHosts.ts`), and
+  Storage photos of Storage while Vercel's optimizer is off, as it is on
+  live. The live phone home fetched a 2070px Unsplash photo (159 KB) for a
+  108px tile; the logo is Storage's 88px copy, not the 1024px file.
+  `photoSizes.test.tsx`: 4 of 4 red before.
+- The page search (`hoursJobRun.ts`) and Look again take the communities
+  in turn each night, so the first can't spend the whole time and leave
+  the second unsearched (1 of 1 red each).
+- robots.txt keeps every community's admin and inbox out, not only
+  Philly's, and the admin says noindex itself (2 of 2 red).
+- A page's listings and their vote counts are read side by side.
+
+Measured and dropped: leaving admin-only data out of the listings sent
+with each page. The home is 90 KB compressed, and the admin-only keys are
+about 5% of it; the bulk is schedules and hours. A slim index for the
+home's search would be the real saving, later.
+
+Still to do, in the user's order:
+
+1. **Saves.** An approval is 15–20 database trips one after another (the
+   category read up to 6 times; a new place waits on Google before the
+   screen answers). And every save expires every community's whole site
+   (`revalidatePublicContent` loops all communities; one `content_stamp`
+   row for all). Per community, and load once.
+2. **The nightly jobs per community**: the morning watches' AI caps and
+   220s are shared by all communities; the Google hours sync is one at a
+   time.
+3. **Housekeeping for growth**: the moderation History reads every
+   approved and rejected change ever (no limit); composite indexes on
+   `resource (community_id, status, category)`, `submission
+   (community_id, status, created_at)` and `vote (voter_token)` (a
+   migration: live needs a yes); per-category option renames write one
+   row at a time.
+4. **CI** (11.4 min average): cache `node_modules` and `.next/cache`,
+   balance the e2e shards (skipped tests count toward a shard), about
+   8 min. About 5.5 needs the write suites on a community of their own,
+   so e2e stops waiting on them.
+
+For the user: two home tiles link straight to a Google image thumbnail
+and an iStock photo (Mikvah's is the iStock one, on live). Either can vanish,
+and an iStock photo may need a licence. Left as they are.
+Left as they are, on purpose: the inbox link is Philly's (one inbox, by
+design), and notifications for a community with no admins go to the
+site's own address.
 
 ## The admin review (Nov 18, on `redesign/suite-rows`)
 
