@@ -989,9 +989,9 @@ Still open:
   KYnj9bnY5aY5qg7bp6ty5M: "ok so this is what I want"): four boxes,
   This week (weekday grid) / This Shabbos / Usual weekday times / Usual
   Shabbos times, each part shown once, the other folded; Shabbos first
-  after the last weekday minyan. Built first; the watch rebuild is next,
-  and is the more important of the two (the user: "way more important
-  and can go second"). Spec in the plan's "The listing".
+  after the last weekday minyan. The watch rebuild goes first (the user,
+  Nov 19: "watch first"), then the listing. Spec in the plan's "The
+  listing".
 - A listing list's scroll-to-a-row wait gives up after about 3 seconds
   and stops when the list goes away (`whenSettled`, Nov 19). It used to
   poll every 32ms forever for a row that never appeared, and one timer

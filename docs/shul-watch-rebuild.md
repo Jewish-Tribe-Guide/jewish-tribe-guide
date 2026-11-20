@@ -85,7 +85,7 @@ taken, and its website's weekday times stand (decided Nov 19).
 ## The listing (approved Nov 19)
 
 Boards 5e–7e on the "Shul schedules" canvas (KYnj9bnY5aY5qg7bp6ty5M).
-Built before the watch, which comes straight after it.
+Built after the watch (step 8 below); the watch goes first.
 
 - **Four boxes, one per part:** This week (weekdays), This Shabbos, Usual
   weekday times, Usual Shabbos times.
@@ -158,9 +158,6 @@ Each is tested, committed and pushed before the next.
 2. **Draw the "Their calendar / Their usual times / Their newsletter
    gives Shabbos / weekdays" rows** on a shul's Places page, for the user's OK.
    Drawn Nov 19 (board 4 on the canvas); not yet OK'd.
-2a. **Build the listing** (above), on today's stored data: a stored week
-   is split into its weekday and Shabbos parts for display. Comes first;
-   step 3 follows it.
 3. **`shulTimes.ts` and its tests**, written from the rule. Each real case
    is a test: Lower Merion's late Maariv on its homepage ignored and its
    calendar's week taken whole; Mekor's homepage Friday ignored; Society
@@ -178,6 +175,7 @@ Each is tested, committed and pushed before the next.
    some with usual times copied in. They're dated, so most pass within a
    week or two. Anything left after that is a live data change, shown to
    the user first.
+8. **Build the listing** ("The listing", above).
 
 ## Not in this rebuild
 
