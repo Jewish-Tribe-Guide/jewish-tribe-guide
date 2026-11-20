@@ -1,6 +1,6 @@
 import { reportServerError } from '@/lib/serverError'
 import { getAdminClient } from '@/lib/supabase/admin'
-import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
+import { enforceRateLimit, clientIp, photoReaderSpend } from '@/lib/rateLimit'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
 import { contributionsFor } from '@/lib/uiConfig'
@@ -77,6 +77,10 @@ export async function POST(request: Request) {
   if (!(await verifyTurnstile(field('turnstileToken') || undefined, clientIp(request)))) {
     return Response.json({ ok: false, code: 'turnstile', error: 'Verification failed. Please try again.' }, { status: 403 })
   }
+  // All the photo readers together, a day (rateLimit.ts): after the bot
+  // check, so a refused script doesn't use up the day.
+  const spend = await photoReaderSpend()
+  if (spend) return spend
 
   try {
     const [listings, categories] = await Promise.all([listApprovedResources(community.slug), listCategories(community.slug)])

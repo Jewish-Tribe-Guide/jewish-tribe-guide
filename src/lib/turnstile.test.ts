@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { turnstileEnabled, verifyTurnstile } from './turnstile'
 
+const report = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/serverError', () => ({ reportServerError: report }))
+
 // The failure policy here is deliberately asymmetric — see the file's own
 // comment — so these tests pin both halves: a bad/missing token blocks, but
 // Cloudflare being unreachable never blocks a real submission over it.
@@ -25,6 +28,18 @@ describe('turnstileEnabled', () => {
 describe('verifyTurnstile', () => {
   it('allows through when Turnstile is not configured, even with no token', async () => {
     vi.stubEnv('TURNSTILE_SECRET_KEY', '')
+    expect(await verifyTurnstile(undefined)).toBe(true)
+  })
+
+  // Live with no secret was the bot check silently off (Nov 20).
+  it('refuses on the live site when the secret is missing, and says so', async () => {
+    vi.stubEnv('TURNSTILE_SECRET_KEY', '')
+    vi.stubEnv('VERCEL_ENV', 'production')
+    report.mockClear()
+    expect(await verifyTurnstile('any-token')).toBe(false)
+    expect(report).toHaveBeenCalledWith(expect.stringContaining('TURNSTILE_SECRET_KEY'))
+    // A preview deployment is not the live site.
+    vi.stubEnv('VERCEL_ENV', 'preview')
     expect(await verifyTurnstile(undefined)).toBe(true)
   })
 

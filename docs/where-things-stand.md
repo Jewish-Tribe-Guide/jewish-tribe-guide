@@ -977,7 +977,16 @@ Soon:
   not checking the email is confirmed (depends on Supabase settings),
   a cross-community Google sync route, eruv fetchers with no SSRF guard.
 - Spend: no site-wide cap on the AI photo readers; Turnstile and rate
-  limits fail open when their keys are missing.
+  limits fail open when their keys are missing. **Built Nov 20**: the
+  two photo readers share a day of 300 reads (`PHOTO_READS_A_DAY` in
+  `rateLimit.ts`), and past it answer as reading off, so the box offers
+  typing. On the live site only (`VERCEL_ENV=production`), a missing
+  `TURNSTILE_SECRET_KEY` refuses every check, and missing Upstash keys
+  make the shared ceilings (this one and the question reader's) refuse;
+  per-visitor limits keep counting in memory. Each is reported to Sentry.
+  Local, previews and tests are unchanged. Red 6/6 against the old code.
+  **Needs the user**: confirm both keys are set on Vercel's Production
+  before this merges, or contributions and the readers stop on live.
 - Dependabot's one group can't pass CI (container tag) and has blocked
   updates since September; Playwright held at 1.63 for production's
   Chromium (PR 402); `npm audit fix` is free; Node declared four ways.
