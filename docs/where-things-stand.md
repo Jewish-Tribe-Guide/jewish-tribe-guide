@@ -866,14 +866,15 @@ Nov 14, later, the user's yes to both:
   sits beside Feedback · About · Privacy at the bottom now, in Safari as
   it already did in the home-screen app.
 
-## The health sweep (Nov 20, findings only, nothing changed yet)
+## The health sweep (Nov 20; fix-first 1-8 built on `claude/health-fixes`, Soon and Later not started)
 
 The user (Nov 20): use the lull to check the site is "actually being
 built/run the right way". Six read-only reviewers (dead code and
 structure, security, database, running the site, accessibility and
 robustness, dependencies), each finding checked before it went on the
 list. Marked **checked** where I confirmed it myself; the rest are read
-from code by a reviewer. Waiting on the user to pick an order.
+from code by a reviewer. The user's order (Nov 20): fix-first 1-8 as
+listed. All eight built; Soon and Later wait for the user to pick.
 
 Fix first:
 
