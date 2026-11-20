@@ -2280,9 +2280,9 @@ describe('ResourceMapView — eruv lines', () => {
 
   it('on a phone, raises the sheet to the eruvim, as a category chip raises it to its places', async () => {
     renderMobileMap(<ResourceMapView />, places, twoKinds)
-    expect(screen.getByRole('button', { name: 'Expand nearby list' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Expand nearby list$/ })).toBeInTheDocument()
     fireEvent.click(await eruvButton())
-    expect(screen.queryByRole('button', { name: 'Expand nearby list' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Expand nearby list$/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Drag to resize nearby list' })).toBeInTheDocument()
   })
 

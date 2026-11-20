@@ -143,7 +143,7 @@ describe('MobileNearbySheet', () => {
     fireEvent.pointerMove(content, { clientY: 100 })
     fireEvent.pointerCancel(content)
 
-    expect(screen.getByRole('button', { name: 'Expand nearby list' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Expand nearby list$/ })).toBeInTheDocument()
   })
 
   it('for comparison: the same drag, released instead of cancelled, does commit a snap-point change', () => {
@@ -476,7 +476,7 @@ describe('MobileNearbySheet', () => {
   it('lowered, is only its line, and names an open place in it', async () => {
     const user = userEvent.setup()
     render(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />)
-    expect(screen.getByRole('button', { name: 'Expand nearby list' })).toHaveStyle({ minHeight: '64px' })
+    expect(screen.getByRole('button', { name: /Expand nearby list$/ })).toHaveStyle({ minHeight: '64px' })
     await user.click(screen.getByRole('button', { name: /select Goldi Market/ }))
     const handle = screen.getByRole('button', { name: 'Drag to resize nearby list' })
     expect(handle.style.minHeight, 'raised, the list shows under it').toBe('')
@@ -510,5 +510,14 @@ describe('MobileNearbySheet', () => {
   it('peeks with a count of the places, not "nearby", and no instructions', () => {
     render(<MobileNearbySheet points={[point, { ...point, id: 'p2' }]} userLocation={null} categories={[category]} containerHeight={600} />)
     expect(screen.getByTestId('sheet-peek-line')).toHaveTextContent(/^2 places$/)
+  })
+
+  // WCAG 2.5.3, axe 4.14 (Nov 20): lowered, the handle shows a line, so its
+  // name must hold that line, or someone saying what they see (voice
+  // control) can't reach it. It was "Expand nearby list" alone.
+  it('lowered, names the handle with the line it shows', () => {
+    render(<MobileNearbySheet points={[point, { ...point, id: 'p2' }]} userLocation={null} categories={[category]} containerHeight={600} />)
+    const line = screen.getByTestId('sheet-peek-line').textContent!
+    expect(screen.getByRole('button', { name: /Expand nearby list$/ })).toHaveAccessibleName(`${line}. Expand nearby list`)
   })
 })
