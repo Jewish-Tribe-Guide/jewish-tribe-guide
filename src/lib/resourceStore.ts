@@ -9,6 +9,7 @@ import { getVoteCounts } from './voteStore'
 import type { ResourceRow, DirectoryResource, ResourceSubmission } from '@/types'
 import { normalizeRow } from './resourceShape'
 import type { AdminPlace } from './adminPlaces'
+import { readAll } from '@/lib/readAll'
 
 export { normalizeRow } from './resourceShape'
 
@@ -32,15 +33,18 @@ export async function listApprovedResources(
   // and making it live would mean giving up caching the listings themselves.
   cacheLife('hours')
 
-  let query = getAdminClient()
-    .from('resource')
-    .select('*')
-    .eq('community_id', community)
-    .eq('status', 'approved')
-  if (opts.category) query = query.eq('category', opts.category)
+  const page = (from: number, to: number) => {
+    let query = getAdminClient()
+      .from('resource')
+      .select('*')
+      .eq('community_id', community)
+      .eq('status', 'approved')
+    if (opts.category) query = query.eq('category', opts.category)
+    return query.order('id').range(from, to)
+  }
 
   // The votes alongside, not after: two trips at once (Nov 20).
-  const [{ data, error }, counts] = await Promise.all([query, getVoteCounts(community)])
+  const [{ data, error }, counts] = await Promise.all([readAll(page), getVoteCounts(community)])
   if (error) throw new Error(`Failed to load resources: ${error.message}`)
 
   const rows = (data as ResourceRow[]).map(normalizeRow)
@@ -92,12 +96,12 @@ export async function getResourceRowById(id: string, community: string): Promise
 // other than 'archived' is out of scope here — this is specifically the
 // cleanup queue.
 export async function listArchivedResources(community: string): Promise<ResourceRow[]> {
-  const { data, error } = await getAdminClient()
+  const { data, error } = await readAll((from, to) => getAdminClient()
     .from('resource')
     .select('*')
     .eq('community_id', community)
     .eq('status', 'archived')
-    .order('reviewed_at', { ascending: false })
+    .order('reviewed_at', { ascending: false }).order('id').range(from, to))
 
   if (error) throw new Error(`Failed to load archived listings: ${error.message}`)
   return data as ResourceRow[]
@@ -143,11 +147,11 @@ export async function hardDeleteArchivedResource(id: string, community: string):
 // Every listing an admin looks after, on the site or archived, for Places
 // (the admin redesign's step 3). Uncached: an admin's own edit shows at once.
 export async function listResourcesForAdmin(community: string): Promise<ResourceRow[]> {
-  const { data, error } = await getAdminClient()
+  const { data, error } = await readAll((from, to) => getAdminClient()
     .from('resource')
     .select('*')
     .eq('community_id', community)
-    .in('status', ['approved', 'archived'])
+    .in('status', ['approved', 'archived']).order('id').range(from, to))
 
   if (error) throw new Error(`Failed to load listings: ${error.message}`)
   return data as ResourceRow[]
@@ -156,11 +160,11 @@ export async function listResourcesForAdmin(community: string): Promise<Resource
 /** How many places each category has on the site, for Category pages' rows
  *  ("71 places"). Uncached, like Places. */
 export async function countApprovedByCategory(community: string): Promise<Record<string, number>> {
-  const { data, error } = await getAdminClient()
+  const { data, error } = await readAll((from, to) => getAdminClient()
     .from('resource')
     .select('category')
     .eq('community_id', community)
-    .eq('status', 'approved')
+    .eq('status', 'approved').order('id').range(from, to))
 
   if (error) throw new Error(`Failed to count listings: ${error.message}`)
   const counts: Record<string, number> = {}
@@ -274,11 +278,11 @@ export async function countCategoryFieldUsage(
   categoryId: string,
   opts: { address?: boolean; phone?: boolean; fieldKeys?: string[] },
 ): Promise<{ address: number; phone: number; fields: Record<string, number> }> {
-  const { data, error } = await getAdminClient()
+  const { data, error } = await readAll((from, to) => getAdminClient()
     .from('resource')
     .select('address, phone, details')
     .eq('community_id', community)
-    .eq('category', categoryId)
+    .eq('category', categoryId).order('id').range(from, to))
   if (error) throw new Error(`Failed to check existing listings: ${error.message}`)
 
   const rows = (data ?? []) as { address: string | null; phone: string | null; details: Record<string, unknown> }[]
@@ -312,11 +316,11 @@ export async function clearCategoryFieldData(
   opts: { address?: boolean; phone?: boolean; fieldKeys?: string[] },
 ): Promise<{ updated: number }> {
   const supabase = getAdminClient()
-  const { data, error } = await supabase
+  const { data, error } = await readAll((from, to) => supabase
     .from('resource')
     .select('id, address, phone, details')
     .eq('community_id', community)
-    .eq('category', categoryId)
+    .eq('category', categoryId).order('id').range(from, to))
   if (error) throw new Error(`Failed to load existing listings: ${error.message}`)
 
   const rows = (data ?? []) as { id: string; address: string | null; phone: string | null; details: Record<string, unknown> }[]
@@ -361,11 +365,11 @@ export async function countFieldOptionUsage(
   categoryId: string,
   renames: { fieldKey: string; oldValue: string; newValue: string }[],
 ): Promise<{ fieldKey: string; oldValue: string; newValue: string; count: number }[]> {
-  const { data, error } = await getAdminClient()
+  const { data, error } = await readAll((from, to) => getAdminClient()
     .from('resource')
     .select('details')
     .eq('community_id', community)
-    .eq('category', categoryId)
+    .eq('category', categoryId).order('id').range(from, to))
   if (error) throw new Error(`Failed to check existing listings: ${error.message}`)
 
   const rows = (data ?? []) as { details: Record<string, unknown> }[]
@@ -393,11 +397,11 @@ export async function applyFieldOptionRenames(
 ): Promise<{ updated: number }> {
   if (renames.length === 0) return { updated: 0 }
   const supabase = getAdminClient()
-  const { data, error } = await supabase
+  const { data, error } = await readAll((from, to) => supabase
     .from('resource')
     .select('id, details')
     .eq('community_id', community)
-    .eq('category', categoryId)
+    .eq('category', categoryId).order('id').range(from, to))
   if (error) throw new Error(`Failed to load existing listings: ${error.message}`)
 
   const rows = (data ?? []) as { id: string; details: Record<string, unknown> }[]

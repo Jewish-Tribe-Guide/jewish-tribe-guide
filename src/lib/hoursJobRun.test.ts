@@ -19,7 +19,7 @@ vi.mock('@/lib/supabase/admin', () => ({
         select: () => q,
         eq: () => q,
         in: (_col: string, vals: string[]) => ((only = vals), q),
-        then: (ok: (v: unknown) => unknown) =>
+        range: () => q, order: () => q, then: (ok: (v: unknown) => unknown) =>
           Promise.resolve({ data: table === 'community' ? m.communities : m.rows.filter((r) => !only || only.includes(r.category as string)), error: null }).then(ok),
       }
       return q

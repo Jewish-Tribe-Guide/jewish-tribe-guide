@@ -26,7 +26,7 @@ function chainable(result: unknown) {
     delete: vi.fn(self),
     single: vi.fn(self),
     maybeSingle: vi.fn(self),
-    then: (resolve: (v: unknown) => void) => resolve(result),
+    range: vi.fn(self), then: (resolve: (v: unknown) => void) => resolve(result),
   })
   return builder
 }

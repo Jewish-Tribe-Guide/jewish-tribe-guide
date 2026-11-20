@@ -955,6 +955,12 @@ Fix first:
 Soon:
 
 - Reads cut off at 1,000 rows with no error: vote counts first (checked).
+  **Built Nov 20**: every list read of a table that grows pages through
+  `readAll` (`src/lib/readAll.ts`), ordered to the key so pages don't
+  overlap; `readsArePaged.test.ts` scans the source and fails on a new
+  unpaged one (41 against the old code); a read that still comes back
+  at exactly 1,000 rows is reported to Sentry by table
+  (`src/lib/supabase/rowCap.ts`).
 - Migrations: nothing records which ran where; `contribution_note`
   drift; 16 "table missing" fallbacks hide a missed one; a fresh project
   can't be rebuilt from the folder (no grants since 056 was removed).

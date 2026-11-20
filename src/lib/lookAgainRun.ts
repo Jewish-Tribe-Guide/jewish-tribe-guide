@@ -14,6 +14,7 @@ import { jobsOff } from './jobOff'
 import { listLookRows, getNotThese, saveTry } from './lookAgainStore'
 import { dueQueue, lookItems, pickFound, pickPage, LOOKS_PER_NIGHT, type FoundPage, type FoundPlace, type LookAgainLoaded, type LookItem, type LookKind, type LookAgainRun } from './lookAgain'
 import type { NightKindId } from './jobRuns'
+import { readAll } from '@/lib/readAll'
 
 // Look again, on the server (lookAgain.ts): what it tries, each try, and the
 // night's run (/api/cron/look-again). Server-only.
@@ -36,7 +37,7 @@ export async function loadLookAgain(community: string, now = Date.now()): Promis
   const db = getAdminClient()
   const [names, leftOut] = await Promise.all([
     failed.length ? db.from('resource').select('id,name').eq('community_id', community).eq('status', 'approved').in('id', failed.map((r) => r.resourceId)) : Promise.resolve({ data: [], error: null }),
-    groups.length ? db.from('resource').select('name').eq('community_id', community).eq('status', 'approved').in('category', groups).order('name') : Promise.resolve({ data: [], error: null }),
+    groups.length ? readAll((from, to) => db.from('resource').select('name').eq('community_id', community).eq('status', 'approved').in('category', groups).order('name').order('id').range(from, to)) : Promise.resolve({ data: [], error: null }),
   ])
   if (names.error) throw new Error(`Failed to load the food places: ${names.error.message}`)
   if (leftOut.error) throw new Error(`Failed to load the groups: ${leftOut.error.message}`)

@@ -15,7 +15,7 @@ function chainable(result: unknown) {
     select: vi.fn(self),
     eq: vi.fn(self),
     in: vi.fn(self),
-    then: (resolve: (v: unknown) => void) => resolve(result),
+    range: vi.fn(self), order: vi.fn(self), then: (resolve: (v: unknown) => void) => resolve(result),
   })
   return builder
 }

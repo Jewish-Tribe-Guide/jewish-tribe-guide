@@ -25,6 +25,8 @@ vi.mock('@/lib/supabase/admin', () => ({
         update: (p: Record<string, unknown>) => ((patch = p), q),
         eq: (k: string, v: unknown) => ((where[k] = v), q),
         maybeSingle: async () => ({ data: hits()[0] ?? null, error: null }),
+        order: () => q,
+        range: () => q,
         then: (ok: (v: unknown) => unknown) => {
           if (patch) for (const r of hits()) Object.assign(r, structuredClone(patch))
           return Promise.resolve({ data: patch ? null : hits(), error: null }).then(ok)

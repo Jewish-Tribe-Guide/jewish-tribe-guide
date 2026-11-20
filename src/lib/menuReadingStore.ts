@@ -5,6 +5,7 @@ import type { MenuDish } from './menuReader'
 import { MENU_LINK_KEY } from './menuLink'
 import { MENU_CANT_READ_NOTE, READING_GIVES_UP_MS } from './watchJobs'
 import { noteValidated } from './validatedDuring'
+import { readAll } from '@/lib/readAll'
 
 // What the menu reader proposed for each food place, and what an admin
 // decided (menu_reading, migration 065). Uncached: an admin screen. A
@@ -81,7 +82,7 @@ export function fromRow(r: Row, now = Date.now()): StoredMenuReading {
 
 /** Every place's reading. `available` is false without migration 065. */
 export async function listMenuReadings(community: string): Promise<{ readings: StoredMenuReading[]; available: boolean }> {
-  const { data, error } = await getAdminClient().from('menu_reading').select(COLUMNS).eq('community_id', community)
+  const { data, error } = await readAll((from, to) => getAdminClient().from('menu_reading').select(COLUMNS).eq('community_id', community).order('resource_id').range(from, to))
   if (error) {
     if (tableMissing(error.message)) return { readings: [], available: false }
     throw new Error(`Failed to load menu readings: ${error.message}`)

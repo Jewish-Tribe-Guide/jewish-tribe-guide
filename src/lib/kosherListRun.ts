@@ -17,6 +17,7 @@ import { confirmFromSource } from '@/lib/sourceConfirm'
 import { KOSHER_SECTION } from '@/lib/boxDates'
 import { listDifference, type ListRead } from '@/lib/watches'
 import { pendingCreates, queuedPlaceIds, type PendingCreate } from '@/lib/mekorWatch'
+import { readAll } from '@/lib/readAll'
 
 /** `placeId`: the place Google found, to file with a new place, so
  *  approving it fills the listing from Google at once (the user, Nov 2). */
@@ -139,13 +140,13 @@ export async function runKosherListWatch<Entry, Finding extends { kind: string }
   const supabase = getAdminClient()
   // New places already in the queue, from anyone: the two lists file many
   // of the same places, and run side by side.
-  const { data: queued, error: queuedError } = await supabase
+  const { data: queued, error: queuedError } = await readAll((from, to) => supabase
     .from('submission')
     .select('id,payload')
     .eq('community_id', community)
     .eq('status', 'pending')
     .eq('operation', 'create')
-    .eq('target_type', 'listing')
+    .eq('target_type', 'listing').order('id').range(from, to))
   if (queuedError) return { ok: false, error: `Couldn’t read the queue: ${queuedError.message}` }
   const pending = pendingCreates(queued ?? [], list.categories)
 
@@ -155,11 +156,11 @@ export async function runKosherListWatch<Entry, Finding extends { kind: string }
 
   // Everything this watch has filed before, whatever became of it: a
   // suggestion an admin rejected isn't made again until the list changes.
-  const { data: earlier, error: earlierError } = await supabase
+  const { data: earlier, error: earlierError } = await readAll((from, to) => supabase
     .from('submission')
     .select('operation,target_id,payload,note')
     .eq('community_id', community)
-    .eq('submitted_by->>name', list.watchName)
+    .eq('submitted_by->>name', list.watchName).order('id').range(from, to))
   if (earlierError) return { ok: false, error: `Couldn’t read earlier suggestions: ${earlierError.message}` }
   const filed = new Set(((earlier ?? []) as EarlierRow[]).map(list.submissionKey).filter(Boolean))
   const waiting = (f: Finding) => !!list.waiting?.(f, pending)

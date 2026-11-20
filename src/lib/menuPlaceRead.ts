@@ -14,6 +14,7 @@ import { listedDishes, newDishes } from '@/lib/menuWatch'
 import { pageRenderer } from '@/lib/renderPage'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import type { DirectoryResource, ResourceRow } from '@/types'
+import { readAll } from '@/lib/readAll'
 
 // A food place's own menu, read by the AI and kept as its reading
 // (menu_reading) for the Main dishes page: by that page's "Read now", and
@@ -136,7 +137,7 @@ async function unreadMenus(slug: string): Promise<{ l: DirectoryResource; kind: 
   if (!kinds.length) return []
   const { readings, available } = await listMenuReadings(slug)
   if (!available) return []
-  const { data: rows, error } = await getAdminClient()
+  const { data: rows, error } = await readAll((from, to) => getAdminClient()
     .from('resource')
     .select('*')
     .eq('community_id', slug)
@@ -144,7 +145,7 @@ async function unreadMenus(slug: string): Promise<{ l: DirectoryResource; kind: 
     .in(
       'category',
       kinds.map((k) => k.category.id),
-    )
+    ).order('id').range(from, to))
   if (error) throw new Error(`Couldn’t list the food places: ${error.message}`)
   const read = new Set(readings.map((r) => r.resourceId))
   return ((rows ?? []) as ResourceRow[])

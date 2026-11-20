@@ -19,7 +19,7 @@ vi.mock('@/lib/supabase/admin', () => ({
         select: () => q,
         eq: () => q,
         in: () => q,
-        then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: table === 'community' ? [{ slug: 'philly' }] : m.rows, error: null }).then(ok),
+        range: () => q, order: () => q, then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: table === 'community' ? [{ slug: 'philly' }] : m.rows, error: null }).then(ok),
       }
       return q
     },

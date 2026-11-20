@@ -1,4 +1,5 @@
 import { getAdminClient } from './supabase/admin'
+import { readAll } from '@/lib/readAll'
 
 export type Tag = { slug: string; label: string; group: string }
 
@@ -7,12 +8,12 @@ const slugify = (s: string) =>
 
 // The tag vocabulary for a group (e.g. 'kosher_product'), alphabetical.
 export async function listTags(community: string, group: string): Promise<Tag[]> {
-  const { data, error } = await getAdminClient()
+  const { data, error } = await readAll((from, to) => getAdminClient()
     .from('tag')
     .select('slug,label,group')
     .eq('community_id', community)
     .eq('group', group)
-    .order('label', { ascending: true })
+    .order('label', { ascending: true }).order('slug').range(from, to))
 
   if (error) throw new Error(`Failed to load tags: ${error.message}`)
   return data as Tag[]

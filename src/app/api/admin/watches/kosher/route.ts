@@ -22,6 +22,7 @@ import { after } from 'next/server'
 import { approveSubmission, rejectSubmission, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
 import { kosherBoxKeys, renamedTo } from '@/lib/kosherBox'
 import type { ResourceSubmission } from '@/types'
+import { readAll } from '@/lib/readAll'
 
 // GET /api/admin/watches/kosher — the Watches tab's Kosher certification
 //     page (step 5, Oct 21): Keystone-K's, Mekor Habracha's and KCL's lists, as
@@ -95,23 +96,23 @@ export const GET = adminRead(async (request: Request, { community }) => {
     const supabase = getAdminClient()
     // What each list's read filed before, whatever became of it.
     const filedBy = async (name: string): Promise<Submission[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await readAll((from, to) => supabase
         .from('submission')
         .select('id,operation,target_id,payload,note,status')
         .eq('community_id', slug)
-        .eq('submitted_by->>name', name)
+        .eq('submitted_by->>name', name).order('id').range(from, to))
       if (error) throw new Error(error.message)
       return (data ?? []) as Submission[]
     }
     const [{ watches, available }, listReads, listingRows, keystoneFiled, mekorFiled, kclFiled, [categories, { findings, decided }]] = await Promise.all([
       listWatches(slug),
       getListReads(slug),
-      supabase
+      readAll((from, to) => supabase
         .from('resource')
         .select('id,category,name,address,phone,anchor_id,distance,details,status')
         .eq('community_id', slug)
         .in('status', ['approved', 'archived'])
-        .in('category', CATEGORIES),
+        .in('category', CATEGORIES).order('id').range(from, to)),
       filedBy(KEYSTONE_WATCH_NAME),
       filedBy(MEKOR_WATCH_NAME),
       filedBy(KCL_WATCH_NAME),

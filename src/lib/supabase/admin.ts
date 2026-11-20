@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { reportingRowCap } from './rowCap'
 import { sharedFetch } from './sharedReads'
 
 // Server-only Supabase client using the service-role key. It bypasses Row-Level
@@ -16,8 +17,9 @@ export function getAdminClient(): SupabaseClient {
 
   cached = createClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
-    // Plain fetch, except inside shareReads (the combined jobs read).
-    global: { fetch: sharedFetch },
+    // Plain fetch, except inside shareReads (the combined jobs read), and
+    // a read that comes back at the row cap is reported (rowCap.ts).
+    global: { fetch: reportingRowCap(sharedFetch) },
   })
   return cached
 }

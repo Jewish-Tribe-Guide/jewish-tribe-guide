@@ -13,7 +13,7 @@ vi.mock('@/lib/supabase/admin', () => ({
       const q = {
         select: () => q,
         eq: () => q,
-        then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: m.rows, error: null }).then(ok),
+        range: () => q, order: () => q, then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: m.rows, error: null }).then(ok),
       }
       return q
     },

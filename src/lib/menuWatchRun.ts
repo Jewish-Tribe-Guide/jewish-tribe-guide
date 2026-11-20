@@ -27,6 +27,7 @@ import { itemsField } from '@/lib/listingView'
 import type { Watch, WatchCheck, WatchOutcome } from '@/lib/watches'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource, ResourceRow } from '@/types'
+import { readAll } from '@/lib/readAll'
 
 // The menu watches' database and network half (menuWatch.ts has the rules).
 // Server-only.
@@ -98,7 +99,7 @@ export async function syncMenuWatches(only?: string): Promise<{ community: strin
     if (only && slug !== only) continue
     const categories = (await listCategoriesUncached(slug)).filter(keepsMenuLink)
     if (categories.length === 0) continue
-    const { data: rows, error: listError } = await supabase
+    const { data: rows, error: listError } = await readAll((from, to) => supabase
       .from('resource')
       .select('*')
       .eq('community_id', slug)
@@ -106,7 +107,7 @@ export async function syncMenuWatches(only?: string): Promise<{ community: strin
       .in(
         'category',
         categories.map((c) => c.id),
-      )
+      ).order('id').range(from, to))
     if (listError) throw new Error(`Couldn’t list the food places: ${listError.message}`)
     const { watches, available } = await listWatches(slug)
     if (!available) continue
@@ -399,7 +400,7 @@ async function dateFromMenu(watch: Pick<Watch, 'communityId' | 'url'>, listing: 
 
 /** The other live listings in its category whose menu link is this page. */
 async function branchesOn(watch: Pick<Watch, 'communityId' | 'url'>, listing: DirectoryResource, category: CategoryConfig): Promise<DirectoryResource[]> {
-  const { data, error } = await getAdminClient().from('resource').select('*').eq('community_id', watch.communityId).eq('status', 'approved').eq('category', category.id)
+  const { data, error } = await readAll((from, to) => getAdminClient().from('resource').select('*').eq('community_id', watch.communityId).eq('status', 'approved').eq('category', category.id).order('id').range(from, to))
   if (error) {
     console.error(`[menu-watch] couldn’t list ${listing.name}’s branches:`, error.message)
     return []

@@ -2,6 +2,7 @@ import type { DirectoryResource, ResourceRow } from '@/types'
 import { getAdminClient } from './supabase/admin'
 import { normalizeRow } from './resourceStore'
 import type { WalkRoute } from './walkRoutes'
+import { readAll } from '@/lib/readAll'
 
 // The walks worked out along the streets (walkRoutes.ts), in the
 // walk_route table (migration 080). Without the table, nothing is stored and
@@ -30,7 +31,7 @@ function fromRow(r: Row): WalkRoute {
 
 /** Every walk from one listing, by the place it goes to. */
 export async function walkRoutesFrom(community: string, fromId: string): Promise<Record<string, WalkRoute>> {
-  const { data, error } = await getAdminClient().from('walk_route').select(COLUMNS).eq('community_id', community).eq('from_id', fromId)
+  const { data, error } = await readAll((from, to) => getAdminClient().from('walk_route').select(COLUMNS).eq('community_id', community).eq('from_id', fromId).order('from_id').order('to_id').range(from, to))
   if (error) {
     if (walkRouteTableMissing(error.message)) return {}
     throw new Error(`Failed to load walks: ${error.message}`)
@@ -93,12 +94,12 @@ export async function saveWalkRoutes(
 /** A category's approved listings as the table has them this moment, not
  *  the site's cached read (walkRouteJob.ts). */
 export async function approvedListingsNow(community: string, category: string): Promise<DirectoryResource[]> {
-  const { data, error } = await getAdminClient()
+  const { data, error } = await readAll((from, to) => getAdminClient()
     .from('resource')
     .select('*')
     .eq('community_id', community)
     .eq('status', 'approved')
-    .eq('category', category)
+    .eq('category', category).order('id').range(from, to))
   if (error) throw new Error(`Failed to load listings: ${error.message}`)
   return ((data ?? []) as ResourceRow[]).map(normalizeRow)
 }

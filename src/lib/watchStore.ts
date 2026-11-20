@@ -1,6 +1,7 @@
 import { getAdminClient } from './supabase/admin'
 import type { SourceRead } from './shulTimes'
 import { withoutListRead, type ListRead, type Watch, type WatchCheck, type WatchKind } from './watches'
+import { readAll } from '@/lib/readAll'
 
 // The watch table (migration 070): the outside pages the guide reads on its
 // own, and how each run went. Uncached: the cron and an admin screen. A
@@ -97,7 +98,7 @@ export function tableMissing(message: string | undefined): boolean {
 /** Every community's watches, for the daily run. `available` is false
  *  without migration 070. */
 export async function listAllWatches(): Promise<{ watches: Watch[]; available: boolean }> {
-  const { data, error } = await withCheck((cols) => getAdminClient().from('watch').select(cols).order('created_at'))
+  const { data, error } = await withCheck((cols) => readAll((from, to) => getAdminClient().from('watch').select(cols).order('created_at').order('id').range(from, to)))
   if (error) {
     if (tableMissing(error.message)) return { watches: [], available: false }
     throw new Error(`Failed to load watches: ${error.message}`)
@@ -107,7 +108,7 @@ export async function listAllWatches(): Promise<{ watches: Watch[]; available: b
 
 /** One community's watches, for its admin tab. */
 export async function listWatches(community: string): Promise<{ watches: Watch[]; available: boolean }> {
-  const { data, error } = await withCheck((cols) => getAdminClient().from('watch').select(cols).eq('community_id', community).order('created_at'))
+  const { data, error } = await withCheck((cols) => readAll((from, to) => getAdminClient().from('watch').select(cols).eq('community_id', community).order('created_at').order('id').range(from, to)))
   if (error) {
     if (tableMissing(error.message)) return { watches: [], available: false }
     throw new Error(`Failed to load watches: ${error.message}`)
@@ -125,7 +126,7 @@ export async function otherShulReads(community: string, resourceId: string, exce
 /** Each watch's kosher list read, kept on it by its last run
  *  (WatchCheck.listRead), by watch id. Empty before migration 085. */
 export async function getListReads(community: string): Promise<Map<string, ListRead>> {
-  const { data, error } = await getAdminClient().from('watch').select('id, listRead:last_check->listRead').eq('community_id', community)
+  const { data, error } = await readAll((from, to) => getAdminClient().from('watch').select('id, listRead:last_check->listRead').eq('community_id', community).order('id').range(from, to))
   if (error) {
     if (checkColumnMissing(error.message) || tableMissing(error.message)) return new Map()
     throw new Error(`Failed to load the lists' reads: ${error.message}`)
