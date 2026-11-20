@@ -162,8 +162,6 @@ const READS: { [K in JobKey]-?: { take: (d: never) => Jobs[K] | undefined } } = 
   lookAgain: { take: (d: LookAgainLoaded) => (d.items ? d : undefined) },
 }
 export const ALL_JOBS = Object.keys(READS) as JobKey[]
-/** Every job the screens hold is one the combined read can return. */
-export const EVERY_JOB_READ: [Exclude<keyof Jobs, JobKey>] extends [never] ? true : never = true
 
 /** The jobs a write to `path` can change: what a save waits to see again
  *  before it's done (the rest are read again behind it). Nothing known:

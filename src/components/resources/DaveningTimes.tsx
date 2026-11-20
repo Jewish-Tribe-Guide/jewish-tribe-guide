@@ -13,12 +13,6 @@ import { useNow } from '@/lib/useNow'
 // don't need their own bespoke card. Prefers structured minyanim; falls back to
 // the legacy flat "Label: time • Label: time" text some older rows still carry.
 
-/** True when there's anything to render — lets the caller decide whether to
- *  show a section header around this component. */
-export function hasDaveningTimes(minyanim: unknown, legacyText?: string): boolean {
-  return (isMinyanim(minyanim) && (minyanim as Minyan[]).length > 0) || !!legacyText
-}
-
 export default function DaveningTimes({
   minyanim,
   legacyText,

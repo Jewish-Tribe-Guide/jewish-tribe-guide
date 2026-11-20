@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 // ── A place's boxes, opened on its own screen (OpenedPlace.tsx) ────────────
 // The pieces the Watches job pages shared (agreed Oct 21), kept for the
@@ -27,33 +27,6 @@ export function Pill({ tone, children, testId }: { tone: Tone; children: ReactNo
     <span className={`inline-block shrink-0 whitespace-nowrap rounded-full border px-2 py-px text-xs font-semibold ${TONE[tone]}`} data-testid={testId}>
       {children}
     </span>
-  )
-}
-
-function Chevron({ open }: { open: boolean }) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className={`shrink-0 text-slate-400 transition-transform ${open ? '' : '-rotate-90'}`}>
-      <path d="M4 6l4 4 4-4" />
-    </svg>
-  )
-}
-
-/** One part of the listing, as its listing has it. */
-export function Box({ name, pill, defaultOpen = false, children, testId = 'job-box' }: { name: string; pill?: { text: string; tone: Tone }; defaultOpen?: boolean; children: ReactNode; testId?: string }) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <section className="overflow-hidden rounded-[10px] border border-slate-200 bg-white" data-testid={testId} aria-label={name}>
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={`flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2.5 text-left ${open ? 'border-b border-slate-100' : ''}`}>
-        <span className="min-w-0 flex-1 text-[15px] font-bold text-slate-900">{name}</span>
-        {pill && (
-          <Pill tone={pill.tone} testId="box-pill">
-            {pill.text}
-          </Pill>
-        )}
-        <Chevron open={open} />
-      </button>
-      {open && <div className="grid gap-2.5 px-3.5 pb-3.5 pt-1">{children}</div>}
-    </section>
   )
 }
 

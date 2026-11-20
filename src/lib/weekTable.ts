@@ -7,7 +7,7 @@ import { clockMinutes, clockText, noteText, partOf, PART_ORDER, timeText, type S
 
 // Lifted into minyanText.ts so the shul's box editor can use them without
 // importing this file (see there); still exported from here as before.
-export { clockMinutes, clockText, noteText, PART_ORDER, SHABBOS_PART_LABELS, shabbosPartOf, timeText, type ShabbosPart } from './minyanText'
+export { clockMinutes, noteText, timeText, type ShabbosPart } from './minyanText'
 
 // ── A shul's usual times, as two boxes (agreed Oct 6) ───────────────────────
 // "Davening times" read as two lists that didn't match (Today and tomorrow,

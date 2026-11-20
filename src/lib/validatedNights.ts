@@ -1,5 +1,5 @@
 import type { JobId, KindCount, NightKindId } from './jobRuns'
-import { changeDay, changeTime } from './whatChanged'
+import { changeDay } from './whatChanged'
 
 // ── What each night validated, for Activity (the user, Nov 17) ──────────────
 // Each night is one quiet row in What changed, under its day at the time it
@@ -162,5 +162,3 @@ export function nightHours(night: Pick<Night, 'at' | 'until'>, timezone: string)
 export function nightWhen(night: Pick<Night, 'at' | 'until'>, now: number, timezone: string): string {
   return `${changeDay(night.at, now, timezone)}, ${nightHours(night, timezone)}`
 }
-
-export { changeTime as nightTime }

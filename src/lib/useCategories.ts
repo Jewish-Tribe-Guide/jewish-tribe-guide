@@ -5,4 +5,3 @@
 // a module so the ~20 components importing `useCategories` from here didn't
 // have to change when the data moved to the server.
 export { useCategories } from './contentContext'
-export { FALLBACK_CATEGORIES } from './categoryFallback'

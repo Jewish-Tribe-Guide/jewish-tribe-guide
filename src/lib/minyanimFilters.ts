@@ -72,12 +72,6 @@ export function listedMinyanim(schedule: MinyanSchedule, dayIndex: number): Miny
   return day.yomTov ? slots.filter((s) => schedule.posting[s.shulId ?? '']?.[day.date]?.kind !== 'not-posted') : slots
 }
 
-/** How many minyanim are still ahead today, for the Synagogues page's way
- *  in. */
-export function minyanimLeftToday(schedule: MinyanSchedule): number {
-  return minyanimAhead(schedule).today.length
-}
-
 /** What's still ahead today, and tomorrow's for when nothing is (a hotel's
  *  minyanim within a walk, Oct 15). */
 export function minyanimAhead(schedule: MinyanSchedule): { today: MinyanSlot[]; tomorrow: MinyanSlot[] } {

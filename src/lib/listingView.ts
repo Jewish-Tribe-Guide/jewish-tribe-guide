@@ -431,7 +431,7 @@ export function firstSentence(text: string): { first: string; rest: string } {
 }
 
 // A box's date: boxDates.ts, which the row's code reads too.
-export { sectionConfirmedAt, confirmedByFor, sectionSource, boxDate } from './boxDates'
+export { sectionConfirmedAt, confirmedByFor, boxDate } from './boxDates'
 
 /** A place's boxes (a hospital's "Who to call", "Kosher food", Oct 6): the
  *  admin's, then any list of contacts in none of them, or in the main card

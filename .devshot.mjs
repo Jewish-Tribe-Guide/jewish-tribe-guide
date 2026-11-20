@@ -1,4 +1,4 @@
-import { chromium } from 'playwright'
+import { chromium } from '@playwright/test'
 const [,, url, out, w = '390', h = '844'] = process.argv
 const b = await chromium.launch()
 const p = await b.newPage({ viewport: { width: +w, height: +h }, deviceScaleFactor: 1 })

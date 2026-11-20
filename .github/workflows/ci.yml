@@ -92,6 +92,9 @@ jobs:
       - uses: ./.github/actions/setup
       - run: npm run lint
       - run: npm run typecheck
+      # Unused files, exports and dependencies (knip.json). Clean since Nov 20,
+      # so anything it finds is new.
+      - run: npm run knip
       - run: npm run test:coverage
       - uses: actions/upload-artifact@v7
         if: always()

@@ -22,49 +22,6 @@ export function companionKeys(field: Pick<CategoryField, 'key' | 'type'>): strin
   return []
 }
 
-/** The field types offered in the editor's Type picker, most-common first. */
-export const FIELD_TYPES: { value: FieldType; label: string }[] = [
-  { value: 'text', label: 'Text' },
-  { value: 'textarea', label: 'Long text' },
-  { value: 'tel', label: 'Phone' },
-  { value: 'url', label: 'Link' },
-  { value: 'number', label: 'Number' },
-  { value: 'boolean', label: 'Yes / No' },
-  { value: 'select', label: 'Choice (dropdown)' },
-  { value: 'tags', label: 'Tags' },
-  { value: 'hours', label: 'Hours' },
-  { value: 'minyanim', label: 'Davening Times (Minyanim)' },
-  { value: 'contacts', label: 'List of contacts' },
-]
-
-/** Each type's natural display shape on a card — a `badge` (chip beside the
- *  name) or a `row` (labeled line). Used to set a sensible default when the type
- *  changes; the editor only offers a badge/row *choice* for the types where it's
- *  a real, effective decision (see TYPE_HAS_SHAPE_CHOICE). */
-export const FIELD_TYPE_SHAPE: Record<FieldType, 'badge' | 'row'> = {
-  boolean: 'badge',
-  select: 'badge',
-  tags: 'badge',
-  text: 'row',
-  textarea: 'row',
-  tel: 'row',
-  url: 'row',
-  number: 'row',
-  hours: 'row',
-  minyanim: 'row',
-  contacts: 'row',
-  // Never actually rendered as a card row (see the "Photo" toggle below) —
-  // this entry exists only because FIELD_TYPE_SHAPE is a Record over every
-  // FieldType.
-  image: 'row',
-}
-
-/** Types where badge-vs-row is a genuine, effective choice (a short categorical
- *  value that reads fine either way). Others are fixed: tags always render as
- *  chips, and text/phone/number/link/hours are always rows. */
-export const TYPE_HAS_SHAPE_CHOICE = (type: FieldType): boolean =>
-  type === 'boolean' || type === 'select'
-
 /** Types the directory can actually build a filter control for (see
  *  GenericDirectory) — so the editor only offers "filter by this" where it works. */
 export const TYPE_IS_FILTERABLE = (type: FieldType): boolean =>
@@ -325,15 +282,6 @@ export type CategoryCapabilities = {
    *  categories, which aren't tied to a physical location). */
   map: boolean
 }
-
-/** The ordered capability keys, for building the admin toggles. */
-export const CATEGORY_CAPABILITY_KEYS: (keyof CategoryCapabilities)[] = [
-  'add',
-  'edit',
-  'report',
-  'directorySearch',
-  'map',
-]
 
 /** Every capability defaults ON — an unset category behaves exactly as before
  *  this feature existed (the global `ui.*` flags alone decide). */

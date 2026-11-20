@@ -152,11 +152,6 @@ export type DesktopNavItem = {
  *  already applied. 'feedback' opens the feedback modal instead of
  *  navigating. */
 export const BUILT_IN_DESKTOP_LINK_TARGETS = ['map', 'you', 'about', 'privacy', 'feedback', 'changes'] as const
-export type BuiltInDesktopLinkTarget = (typeof BUILT_IN_DESKTOP_LINK_TARGETS)[number]
-
-export function isBuiltInDesktopLinkTarget(target: string): target is BuiltInDesktopLinkTarget {
-  return (BUILT_IN_DESKTOP_LINK_TARGETS as readonly string[]).includes(target)
-}
 
 /** What the desktop top nav has always been, as data — the fallback whenever
  *  nothing has been configured. Exactly today's hardcoded structure. */

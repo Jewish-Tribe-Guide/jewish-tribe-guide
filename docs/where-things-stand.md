@@ -993,7 +993,13 @@ Soon:
 - Two time parsers disagree ("8am" is Infinity in `parseTimeToMinutes`,
   checked); date helpers copied 8–9 times; `partDates` twice.
 - knip: a 4-line config takes it from 42 files / 243 exports to 0 / 31
-  real ones; put it in CI. Stale comments (11 names that no longer exist).
+  real ones; put it in CI. **Built Nov 20**: `knip.json` names the entry
+  points knip can't see (scripts, Playwright setup files, the service
+  worker), and counts an export used in its own file as used. All 23
+  candidates left were dead (nothing used them anywhere) and are gone,
+  259 lines. `npm run knip` runs in CI's lint job and fails on a new
+  unused file, export or dependency (checked with a planted export).
+  Still open: stale comments (11 names that no longer exist).
 - Preview emails go out without [DEV] (checked); `.env.example` has
   never been committed, `.gitignore` drops it (checked).
 
