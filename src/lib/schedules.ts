@@ -51,7 +51,7 @@ export type SpecialSchedule = {
   postedBy?: 'website'
   /** A week that is the shul's whole week: a day it has nothing for has no
    *  minyan, its usual times included. A calendar that lists the shul's
-   *  usual minyanim on their dates is (calendarIsWhole): the Little Shul's
+   *  usual minyanim on their dates is (calendarListsUsual): the Little Shul's
    *  and Leyv Ha-Ir's "first Shabbos of the month" showed every Shabbos
    *  (the user, Oct 23: "Not being able to read is different than reading
    *  and confirming there is nothing"). With no minyanim, no minyan that

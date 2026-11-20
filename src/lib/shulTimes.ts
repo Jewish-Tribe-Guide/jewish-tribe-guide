@@ -37,7 +37,7 @@ const RANK: readonly SourceKind[] = ['newsletter', 'calendar', 'schedule', 'page
  *  (a homepage box, "This Shabbat"), or an event (a talk, a party). */
 export type Shape = 'schedule' | 'highlight' | 'event'
 
-export type DatedTime = { date: string; tefillah: Tefillah; time: string; anchor?: ZmanAnchor; offsetMinutes?: number; notes?: string; quote?: string }
+export type DatedTime = { date: string; tefillah: Tefillah; time: string; anchor?: ZmanAnchor; offsetMinutes?: number; notes?: string; quote?: string; joinLink?: string }
 
 /** A cancellation in words ("No Shabbat Services!"), for a date, or one
  *  tefillah on it. */
@@ -307,6 +307,7 @@ export function fromReading(
       ...(t.anchor ? { anchor: t.anchor } : {}),
       ...(t.offsetMinutes != null ? { offsetMinutes: t.offsetMinutes } : {}),
       ...(t.notes ? { notes: t.notes } : {}),
+      ...(t.joinLink ? { joinLink: t.joinLink } : {}),
       quote: t.quote,
     }))
   })

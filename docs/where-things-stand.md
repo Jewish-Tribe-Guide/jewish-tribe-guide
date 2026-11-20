@@ -967,8 +967,11 @@ it says otherwise:
 Still open:
 
 - **Shul watches, to be rewritten rather than patched** (the user, Nov
-  19: "I don't want patches anymore"). The plan, waiting on the user:
-  `docs/shul-watch-rebuild.md`. A dated week is still compared
+  19: "I don't want patches anymore"). The plan:
+  `docs/shul-watch-rebuild.md`. Nov 19: the nightly run is switched to
+  the new rule on `claude/next-round` (unmerged); still to do there: the
+  dry run re-run, the live data cleanup (needs the user's yes), then the
+  listing's four boxes. What follows is the history. A dated week is still compared
   with and filled from the usual times (`keepUncovered`, `dropListed`,
   `compareTimes` on weeks), because a week replaces its day and the
   reader takes one highlighted time as a week. Decided Nov 19: we post

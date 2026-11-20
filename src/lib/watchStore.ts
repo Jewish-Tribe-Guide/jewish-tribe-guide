@@ -1,4 +1,5 @@
 import { getAdminClient } from './supabase/admin'
+import type { SourceRead } from './shulTimes'
 import { withoutListRead, type ListRead, type Watch, type WatchCheck, type WatchKind } from './watches'
 
 // The watch table (migration 070): the outside pages the guide reads on its
@@ -112,6 +113,13 @@ export async function listWatches(community: string): Promise<{ watches: Watch[]
     throw new Error(`Failed to load watches: ${error.message}`)
   }
   return { watches: ((data ?? []) as Row[]).map(fromRow), available: true }
+}
+
+/** A shul's other pages' last reads (WatchCheck.shulReads), for its page
+ *  being read now to weigh beside its own (shulPageRead.ts). */
+export async function otherShulReads(community: string, resourceId: string, exceptUrl: string): Promise<SourceRead[]> {
+  const { watches } = await listWatches(community)
+  return watches.filter((w) => w.active && w.resourceId === resourceId && w.url !== exceptUrl).flatMap((w) => w.lastCheck?.shulReads ?? [])
 }
 
 /** Each watch's kosher list read, kept on it by its last run

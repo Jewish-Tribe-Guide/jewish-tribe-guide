@@ -267,11 +267,13 @@ Each is tested, committed and pushed before the next.
    live", each red against the old code first.
 4. **The page search prefers a calendar**, and the watch's pick per part
    is built and shown on Places.
-5. **A read-only dry run on the 14 live shuls**: what the new code would
+5. **A read-only dry run on the 14 live shuls** (done Nov 19, below): what the new code would
    file, beside what the old code filed this week. Shown to the user
    before anything switches.
 6. **Switch the nightly run and the newsletter to it**, and change what
-   the site shows. Delete the old pieces in the same PR.
+   the site shows. Delete the old pieces in the same PR. Nightly run
+   switched Nov 19 ("The switch", below); the newsletter's run is left as
+   it is.
 7. **Data on live.** Weeks already stored were built under the old rules,
    some with usual times copied in. They're dated, so most pass within a
    week or two. Anything left after that is a live data change, shown to
@@ -326,6 +328,43 @@ Lines: the old shul logic is about 720 (431 in `listingPageRun.ts`, 155
 `shulWeekReading.ts`, 130 `websiteNotes.ts`); the new is 316 in
 `shulTimes.ts`, a third of it comments, plus the run, not written yet
 (about 150). About a third fewer, not half.
+
+## The switch: the nightly run (Nov 19)
+
+Built on `claude/next-round`. A shul's page is now read through the rule:
+
+- **`shulPageRead.ts`** reads the page (a calendar a week at a time, any
+  other page once over this week and next), turns the reply into
+  `SourceRead`s (`fromReading`), and per week weighs them with the shul's
+  other pages' last reads and the newsletter's weeks (`weekFrom`). Its
+  usual times still go through `compareTimes` as before.
+- **`shulWeekFiling.ts`** turns each take or ask into a week schedule for
+  its part (`parts`, `whole`, posted by the website), in place of the
+  website's earlier week for that part, and writes the admin's lines
+  ("Their whole schedule for Shabbos", "At another time: …").
+- **Each page's read is kept on its check** (`lastCheck.shulReads`), so the
+  shul's other pages are weighed without reading them again
+  (`otherShulReads`).
+- Deleted: `websiteNotes.ts`, and from `listingPageRun.ts`
+  `yieldToNewsletter`, `correctOlderWeeks`, `calendarIsWhole`,
+  `readCalendarWeeks`, `noMinyanWeeks`, `listedServices` and the rest of
+  the old week logic: about 630 lines out, 507 in (`shulPageRead.ts`,
+  `shulWeekFiling.ts`).
+
+Changes to earlier decisions, made under "take it from here":
+
+- **The website no longer corrects an older newsletter week** (Nov 11's
+  `correctOlderWeeks`). A newsletter's week wins its part; a page that
+  disagrees is asked about only once that week's newsletter is past due.
+- **A time the reader can't name ("other") is left out.** Rodeph
+  Shalom's potluck-adjacent 6pm, Mikveh Israel's pictured 6pm.
+- **The Little Shul's list of dates isn't read as its calendar** (open
+  above, now settled this way).
+- **The newsletter's run is unchanged.** Its weeks carry no `parts`; such a
+  week speaks for a part it gives times in, or whose every day it spans
+  (the Shtiebel's Friday-to-Saturday week is Shabbos only).
+
+Not yet: the dry run re-run on this code, step 7's live data, step 8.
 
 ## Not in this rebuild
 
