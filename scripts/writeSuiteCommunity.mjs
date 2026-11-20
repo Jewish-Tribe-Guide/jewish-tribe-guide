@@ -118,7 +118,7 @@ export function writeSuitePreviewCookie(baseURL) {
     name: `jpc_preview_${WRITE_SUITE_COMMUNITY}`,
     value: WRITE_SUITE_PREVIEW_TOKEN,
     domain: new URL(baseURL).hostname,
-    path: `/${WRITE_SUITE_COMMUNITY}`,
+    path: '/',
     expires: -1,
     httpOnly: true,
     secure: false,

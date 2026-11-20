@@ -964,7 +964,13 @@ Soon:
 - Migrations: nothing records which ran where; `contribution_note`
   drift; 16 "table missing" fallbacks hide a missed one; a fresh project
   can't be rebuilt from the folder (no grants since 056 was removed).
-- Hidden communities' data through the public API routes.
+- Hidden communities' data through the public API routes. **Built Nov
+  20**: the proxy now sees the public API routes too, and answers 404 to
+  `?community=<hidden>` without that community's preview cookie; the
+  cookie is set for the whole site (path `/`) so it reaches `/api`. Admin,
+  cron, inbound and inbox routes stay outside the proxy. Red 4/4 against
+  the old proxy. A preview cookie set before this only covers the pages:
+  reopen the preview link (an admin's console sets it again on load).
 - Focus in dialogs and sheets, drag handles keyboard can't use, search
   results silent to screen readers, swipe-only actions.
 - Eruv status set from an unauthenticated email (inferred), admin sign-in

@@ -8,12 +8,15 @@ export function previewCookieName(slug: string): string {
   return `jpc_preview_${slug}`
 }
 
-export function previewCookieOptions(slug: string) {
+export function previewCookieOptions() {
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
     secure: process.env.NODE_ENV === 'production',
-    path: `/${slug}`,
+    // "/", not "/<slug>": the public API routes are gated on it too
+    // (proxy.ts's gateCommunityApi), and they live under /api. The name
+    // already says which community it opens.
+    path: '/',
     maxAge: 60 * 60 * 24 * 30,
   }
 }
