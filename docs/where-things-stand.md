@@ -866,6 +866,76 @@ Nov 14, later, the user's yes to both:
   sits beside Feedback · About · Privacy at the bottom now, in Safari as
   it already did in the home-screen app.
 
+## The health sweep (Nov 20, findings only, nothing changed yet)
+
+The user (Nov 20): use the lull to check the site is "actually being
+built/run the right way". Six read-only reviewers (dead code and
+structure, security, database, running the site, accessibility and
+robustness, dependencies), each finding checked before it went on the
+list. Marked **checked** where I confirmed it myself; the rest are read
+from code by a reviewer. Waiting on the user to pick an order.
+
+Fix first:
+
+1. **The public key reads every community's admin emails and preview
+   tokens** (checked on the test project: all four communities, hidden
+   ones included). Migration 027's `public reads communities` policy is
+   `using (true)` and later columns joined it. Fix: a migration narrowing
+   it; live needs the user's yes.
+2. **Anyone can backdate or erase a listing's "Still right?" date**: the
+   confirm route has no Turnstile and `unconfirm_*` takes the caller's
+   `p_previous`. Cuts against "confirmed means a person confirmed it".
+3. **No backups or restore procedure** in the repo; the plan's backups
+   and PITR need the user to check in Supabase. Photos in Storage too.
+4. **A broken alert path is silent**: the nightly email is the only
+   alert and runs on what it watches; caught errors (AI reads, after()
+   work) never reach Sentry. Fix: an outside heartbeat per cron, and one
+   `reportError()`.
+5. **The community list caches its one-community fallback for days**
+   after any Supabase error (checked, `listCommunities`).
+6. **`community_id` still defaults to 'philly'** on 9 tables; 027 says
+   to drop it once a second community exists (checked).
+7. **`Map.groupBy` takes down a shul listing on iOS before 17.4**
+   (checked, `DaveningCard.tsx:396`), and the only error boundary is the
+   root one, so the header goes too.
+8. **If Turnstile can't load, a contributor's Send never enables** and
+   nothing says why (hospital wifi, blockers).
+
+Soon:
+
+- Reads cut off at 1,000 rows with no error: vote counts first (checked).
+- Migrations: nothing records which ran where; `contribution_note`
+  drift; 16 "table missing" fallbacks hide a missed one; a fresh project
+  can't be rebuilt from the folder (no grants since 056 was removed).
+- Hidden communities' data through the public API routes.
+- Focus in dialogs and sheets, drag handles keyboard can't use, search
+  results silent to screen readers, swipe-only actions.
+- Eruv status set from an unauthenticated email (inferred), admin sign-in
+  not checking the email is confirmed (depends on Supabase settings),
+  a cross-community Google sync route, eruv fetchers with no SSRF guard.
+- Spend: no site-wide cap on the AI photo readers; Turnstile and rate
+  limits fail open when their keys are missing.
+- Dependabot's one group can't pass CI (container tag) and has blocked
+  updates since September; Playwright held at 1.63 for production's
+  Chromium (PR 402); `npm audit fix` is free; Node declared four ways.
+- Two time parsers disagree ("8am" is Infinity in `parseTimeToMinutes`,
+  checked); date helpers copied 8–9 times; `partDates` twice.
+- knip: a 4-line config takes it from 42 files / 243 exports to 0 / 31
+  real ones; put it in CI. Stale comments (11 names that no longer exist).
+- Preview emails go out without [DEV] (checked); `.env.example` has
+  never been committed, `.gitignore` drops it (checked).
+
+Later or bigger: the two 2,000-line screens (map, category page);
+foreign keys and transactions for deletes and approvals; `details`
+holding app state; log retention; redundant indexes; an old-iOS floor
+decision; rem font sizes; `dir="auto"` for Hebrew; the parked Today
+features (keep or delete); `/inbox` per community; this file's size;
+Partial Prefetching before Next 17.
+
+Checked and not so: anon can't insert subscribers on the test project
+(RLS refused it). The nightly email does record a failed send, as a
+warning, not a failure.
+
 ## The speed and scale sweep (Nov 20, on `claude/bands-and-search`)
 
 The user (Nov 20): "I want the site to be a good site… with the ability
