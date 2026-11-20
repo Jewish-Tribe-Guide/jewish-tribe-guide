@@ -898,6 +898,12 @@ Fix first:
    save"). Route tests: 10 red against the old route.
 3. **No backups or restore procedure** in the repo; the plan's backups
    and PITR need the user to check in Supabase. Photos in Storage too.
+   **Built Nov 20**: `docs/backups.md` (the two copies, what to check,
+   how to get things back) and `npm run backup -- --prod`, a read-only
+   copy of every table and stored file (tried on dev: 29 tables, 152
+   files, ~2 min). `backups/` is in `.gitignore` now. **For the user:**
+   check Database → Backups on live (plan, how far back, PITR) and say
+   what's there; run the first live copy. No restore has been tried.
 4. **A broken alert path is silent**: the nightly email is the only
    alert and runs on what it watches; caught errors (AI reads, after()
    work) never reach Sentry. Fix: an outside heartbeat per cron, and one
