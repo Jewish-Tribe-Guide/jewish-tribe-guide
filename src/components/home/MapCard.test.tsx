@@ -74,7 +74,7 @@ describe('MapCard (board G3)', () => {
   it('is a 420px band from edge to edge, not an outlined card', () => {
     render(<MapCard href="/philly/map" photo={null} categoryNames={['Food']} />)
     const link = screen.getByTestId('home-map-card')
-    expect(link).toHaveClass('w-screen', 'h-[420px]', 'border-y')
+    expect(link).toHaveClass('w-page', 'h-[420px]', 'border-y')
     expect(link.className).not.toMatch(/\b(ring-1|rounded-\[18px\]|hover:-translate-y)/)
     expect(screen.getByText('Everything on one map').closest('.max-w-7xl')).not.toBeNull()
   })

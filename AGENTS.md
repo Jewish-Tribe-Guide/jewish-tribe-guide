@@ -249,7 +249,14 @@ layout, any of them can show what its tags hold, and `_N_T_/[community]/layout`
 is a tag no first pass uses (it is on every page entry's `x-next-cache-tags`;
 checked in the build's `.meta` files). `revalidateRouteAfterInFlightRenders`
 takes the type now — `'page'` for the pages route's one route, `'layout'` for
-this. Why that target and not the alternatives:
+this. **Since Nov 20 that is only the all-communities path** (the site
+owner's routes, cron jobs, the manual revalidate). A community admin's save
+names its community, and its second pass expires `community-pages:<slug>`
+instead (`communityPagesTag`, set by `getSiteSettings`, so every page of that
+community carries it and no other's does), through
+`revalidateTagsAfterInFlightRenders`. A concrete `_N_T_/philly/layout` tag
+doesn't exist to target: page entries carry the pattern tags and their own
+exact path only. Why the pattern and not the alternatives:
 
 - `revalidatePath('/', 'layout')` would also reach `/`, `/offline`, `/inbox`
   and the `/icons` route's cached renders, none of which show admin content
@@ -301,6 +308,8 @@ after the insert and reloads until the card shows. Any test that writes rows
 directly and then reads them through the site needs the same.
 
 **A test that uses an existing row must put that row into a known state first, and restore it after.** Two of the write suites create their own fixture (a category, a form) and delete it again, so nothing an admin does can reach them. The suites that edit a singleton — the `page` rows, `site_settings` — have no such luxury and must borrow the real record, which makes them the ones that break. `e2e-admin-write/pages-editor.spec.ts` broke three times this way: on a page being retitled, on its body gaining headings (which changed which HTML element the editor's caret landed in), and on a locator that matched a newly-added toolbar. Read what you need from the row, overwrite it with something known, then restore it in `finally`. Never assume what a real page contains.
+
+**The write suites change their own community, never the one e2e reads.** cache-roundtrip and admin-write work in `e2e-writes`, a hidden community in the test project (`scripts/writeSuiteCommunity.mjs`, created by the test server on start), so e2e and its build run beside them instead of after them (Nov 20). In those suites, use `WRITE_SUITE_COMMUNITY` for every path, query and row: an insert with no `community_id` lands in philly by the column's default, and `src/test/suiteRows.test.ts` fails on one. The `page` rows (About, Privacy) have no community and are still shared.
 
 **Claim every existing row a suite changes in `e2e/suiteRows.ts`, and never pick a claimed one.** The suites run as parallel CI jobs against the one test project, so a row one changes is a row another may be reading. PR 389 lost three CI runs on Nov 16 to tests that took "the first listing category" and got `cache-roundtrip-seed` mid-rename. Pick through `categories()` in `e2e/helpers.ts` (it skips claimed rows) or filter with `changedByTests`. `src/test/suiteRows.test.ts` reads every suite's source and fails on an unclaimed write, a row claimed twice, or an unfiltered pick. It reads source shapes (admin routes, `supabase.from(…).update`), so a write made by clicking Save in the admin isn't seen: claim those by hand.
 

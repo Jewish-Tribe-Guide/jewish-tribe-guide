@@ -8,7 +8,10 @@ import { NIGHTLY_JOBS, type JobId, type JobOutcome, type JobRun, type RunKinds }
 // nothing is saved. A job that just broke is told of in the next
 // nightly email (nightlyEmailRun.ts, jobAlert). What a run read of each kind of
 // source is saved too (`kinds`, migration 087); without that column, the
-// rest still is.
+// rest still is. Which community a run was for is saved too
+// (`community_id`, migration 101): the watches run once per community;
+// every other job's runs are the whole site's (null). Without that column,
+// runs save and read as one list.
 
 /** How long a job's runs are kept. */
 export const KEEP_DAYS = 60
@@ -36,6 +39,14 @@ export function runTableMissing(message: string | undefined): boolean {
   return !!message && /\bjob_run\b/.test(message) && /(does not exist|schema cache)/.test(message)
 }
 
+/** Migration 101 not run yet. */
+export function communityColumnMissing(message: string | undefined): boolean {
+  return !!message && /\bcommunity_id\b/.test(message) && /(does not exist|schema cache)/.test(message)
+}
+
+/** A community's runs and the whole site's: `community_id` null or its own. */
+export const ownOrSiteRuns = (community: string) => `community_id.is.null,community_id.eq."${community.replace(/["\\]/g, '')}"`
+
 /** Migration 087 not run yet. */
 export function kindsColumnMissing(message: string | undefined): boolean {
   return !!message && /\bkinds\b/.test(message) && /(does not exist|schema cache)/.test(message)
@@ -44,9 +55,12 @@ export function kindsColumnMissing(message: string | undefined): boolean {
 const quietly = (what: string) => (err: unknown) => console.error(`[job-run] ${what}:`, err)
 
 /** Saves that a run started: its id, or null when nothing could be saved. */
-async function startRun(job: JobId, now: Date): Promise<string | null> {
+async function startRun(job: JobId, now: Date, community?: string): Promise<string | null> {
   const db = getAdminClient()
-  const { data, error } = await db.from('job_run').insert({ job, started_at: now.toISOString() }).select('id').single()
+  const insert = (row: Record<string, unknown>) => db.from('job_run').insert(row).select('id').single()
+  const row = { job, started_at: now.toISOString() }
+  let { data, error } = await insert(community ? { ...row, community_id: community } : row)
+  if (error && community && communityColumnMissing(error.message)) ({ data, error } = await insert(row))
   if (error) {
     if (!runTableMissing(error.message)) console.error(`[job-run] couldn’t save ${job}’s start:`, error.message)
     return null
@@ -57,6 +71,25 @@ async function startRun(job: JobId, now: Date): Promise<string | null> {
 }
 
 const COLUMNS = 'id, job, started_at, finished_at, ok, summary, warning, error'
+
+/** Each job's latest `limit` runs, a query a job: a community's own and the
+ *  whole site's when `community` is given. Falls back without the columns
+ *  migrations 087 (kinds) and 101 (community_id) add. */
+async function latestRuns(limit: number, community: string | undefined, withKinds: boolean) {
+  const read = (kinds: boolean, own: boolean) =>
+    Promise.all(
+      NIGHTLY_JOBS.map((j) => {
+        const q = getAdminClient().from('job_run').select(kinds ? `${COLUMNS}, kinds` : COLUMNS).eq('job', j.id)
+        return (own && community ? q.or(ownOrSiteRuns(community)) : q).order('started_at', { ascending: false }).limit(limit)
+      }),
+    )
+  let kinds = withKinds
+  let own = !!community
+  let results = await read(kinds, own)
+  if (own && results.some((r) => communityColumnMissing(r.error?.message))) results = await read(kinds, (own = false))
+  if (kinds && results.some((r) => kindsColumnMissing(r.error?.message))) results = await read((kinds = false), own)
+  return results
+}
 
 async function finishRun(id: string, outcome: JobOutcome, now: Date): Promise<void> {
   const row = { finished_at: now.toISOString(), ok: outcome.ok, summary: outcome.summary, warning: outcome.warning ?? null, error: outcome.error ?? null }
@@ -79,8 +112,8 @@ async function finish(job: JobId, id: string, outcome: JobOutcome, now: Date): P
 /** Runs a job and saves how it went. `outcome` reads its result; a job
  *  that throws is saved as failed and the error passed on. A run the
  *  platform stops is left unfinished, which the tab shows as cut off. */
-export async function recordJobRun<T>(job: JobId, run: () => Promise<T>, outcome: (result: T) => JobOutcome, now: () => Date = () => new Date()): Promise<T> {
-  const id = await startRun(job, now()).catch((err) => (quietly(`couldn’t save ${job}’s start`)(err), null))
+export async function recordJobRun<T>(job: JobId, run: () => Promise<T>, outcome: (result: T) => JobOutcome, now: () => Date = () => new Date(), community?: string): Promise<T> {
+  const id = await startRun(job, now(), community).catch((err) => (quietly(`couldn’t save ${job}’s start`)(err), null))
   let result: T
   try {
     result = await run()
@@ -93,14 +126,12 @@ export async function recordJobRun<T>(job: JobId, run: () => Promise<T>, outcome
   return result
 }
 
-/** Each job's latest runs, newest first. `available` is false without
- *  migration 086. */
-export async function listJobRuns(): Promise<{ available: boolean; runs: Record<JobId, JobRun[]> }> {
+/** Each job's latest runs, newest first: with `community`, its own runs
+ *  and the whole site's, never another community's. `available` is false
+ *  without migration 086. */
+export async function listJobRuns(community?: string): Promise<{ available: boolean; runs: Record<JobId, JobRun[]> }> {
   const runs = Object.fromEntries(NIGHTLY_JOBS.map((j) => [j.id, [] as JobRun[]])) as Record<JobId, JobRun[]>
-  const read = (columns: string) =>
-    Promise.all(NIGHTLY_JOBS.map((j) => getAdminClient().from('job_run').select(columns).eq('job', j.id).order('started_at', { ascending: false }).limit(RUNS_SHOWN)))
-  let results = await read(`${COLUMNS}, kinds`)
-  if (results.some((r) => kindsColumnMissing(r.error?.message))) results = await read(COLUMNS)
+  const results = await latestRuns(RUNS_SHOWN, community, true)
   for (const [i, { data, error }] of results.entries()) {
     if (error) {
       if (runTableMissing(error.message)) return { available: false, runs }
@@ -111,11 +142,12 @@ export async function listJobRuns(): Promise<{ available: boolean; runs: Record<
   return { available: true, runs }
 }
 
-/** Each job's last three runs, newest first, for the nightly email to
- *  tell which broke (jobAlert). None without migration 086. */
-export async function recentJobRuns(): Promise<Map<JobId, JobRun[]>> {
+/** Each job's last three runs, newest first, for a community's nightly
+ *  email to tell which broke (jobAlert): its own and the whole site's.
+ *  None without migration 086. */
+export async function recentJobRuns(community?: string): Promise<Map<JobId, JobRun[]>> {
   const out = new Map<JobId, JobRun[]>()
-  const results = await Promise.all(NIGHTLY_JOBS.map((j) => getAdminClient().from('job_run').select(COLUMNS).eq('job', j.id).order('started_at', { ascending: false }).limit(3)))
+  const results = await latestRuns(3, community, false)
   for (const [i, { data, error }] of results.entries()) {
     if (error) {
       if (runTableMissing(error.message)) return new Map()

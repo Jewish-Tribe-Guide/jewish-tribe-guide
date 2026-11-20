@@ -19,11 +19,13 @@ const m = vi.hoisted(() => ({
   sendClosureNotification: vi.fn(),
   runWalkRoutesAfterChange: vi.fn(),
   readEruvNowById: vi.fn(),
+  revalidateTag: vi.fn(),
   afterCallbacks: [] as Array<() => unknown>,
   ReviewEditError: class ReviewEditError extends Error {},
 }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: m.revalidatePublicContent }))
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => void m.afterCallbacks.push(fn) }))
+vi.mock('next/cache', () => ({ revalidateTag: m.revalidateTag }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/submissionStore', () => ({
   approveSubmission: m.approveSubmission,
@@ -306,6 +308,7 @@ describe('PATCH /api/admin/submissions/:id — Google sync after approval', () =
     m.loadSyncableListing.mockResolvedValue(unsynced)
     m.syncOneListing.mockResolvedValue({ outcome: 'synced' })
     await patch({ status: 'approved' })
+    await runAfter()
     expect(m.loadSyncableListing).toHaveBeenCalledWith('res1')
     expect(m.syncOneListing).toHaveBeenCalledWith(unsynced)
   })
@@ -313,17 +316,20 @@ describe('PATCH /api/admin/submissions/:id — Google sync after approval', () =
   it('spends no Google call on a listing that already has googleSyncedAt', async () => {
     m.loadSyncableListing.mockResolvedValue({ details: { googleSyncedAt: '2026-01-01' } })
     await patch({ status: 'approved' })
+    await runAfter()
     expect(m.syncOneListing).not.toHaveBeenCalled()
   })
 
   it('never syncs an approved removal (it would ask Google about a place just taken down)', async () => {
     m.approveSubmission.mockResolvedValue(submission('delete'))
     await patch({ status: 'approved' })
+    await runAfter()
     expect(m.loadSyncableListing).not.toHaveBeenCalled()
   })
 
   it('never syncs a rejection', async () => {
     await patch({ status: 'rejected' })
+    await runAfter()
     expect(m.loadSyncableListing).not.toHaveBeenCalled()
   })
 
@@ -331,6 +337,7 @@ describe('PATCH /api/admin/submissions/:id — Google sync after approval', () =
     m.loadSyncableListing.mockResolvedValue(unsynced)
     m.syncOneListing.mockResolvedValue({ outcome: 'synced', statusChange: { name: 'Kosher Deli' } })
     await patch({ status: 'approved' })
+    await runAfter()
     expect(m.sendStatusChangeDigest).toHaveBeenCalledWith([{ name: 'Kosher Deli' }])
   })
 
@@ -340,6 +347,7 @@ describe('PATCH /api/admin/submissions/:id — Google sync after approval', () =
     await patch({ status: 'approved' })
     m.syncOneListing.mockResolvedValue({ outcome: 'skipped', statusChange: { name: 'x' } })
     await patch({ status: 'approved' })
+    await runAfter()
     expect(m.sendStatusChangeDigest).not.toHaveBeenCalled()
   })
 
@@ -347,8 +355,10 @@ describe('PATCH /api/admin/submissions/:id — Google sync after approval', () =
     m.loadSyncableListing.mockResolvedValue(unsynced)
     m.syncOneListing.mockRejectedValue(new Error('google unreachable'))
     const res = await patch({ status: 'approved' })
+    await runAfter()
     expect(res.status).toBe(200)
     expect(m.revalidatePublicContent).toHaveBeenCalled()
+    expect(m.revalidateTag).not.toHaveBeenCalled()
   })
 
   it('a failing digest email does not fail the approval either', async () => {
@@ -356,15 +366,39 @@ describe('PATCH /api/admin/submissions/:id — Google sync after approval', () =
     m.syncOneListing.mockResolvedValue({ outcome: 'synced', statusChange: { name: 'x' } })
     m.sendStatusChangeDigest.mockRejectedValue(new Error('resend'))
     expect((await patch({ status: 'approved' })).status).toBe(200)
+    await expect(runAfter()).resolves.toBeUndefined()
   })
 
-  it('syncs before publishing, so the cache refresh includes the synced values', async () => {
+  // Nov 20: the admin waited on Google for every new listing they approved.
+  it('answers before asking Google', async () => {
+    m.loadSyncableListing.mockResolvedValue(unsynced)
+    m.syncOneListing.mockResolvedValue({ outcome: 'synced' })
+    expect((await patch({ status: 'approved' })).status).toBe(200)
+    expect(m.loadSyncableListing).not.toHaveBeenCalled()
+    expect(m.syncOneListing).not.toHaveBeenCalled()
+    await runAfter()
+    expect(m.syncOneListing).toHaveBeenCalled()
+  })
+
+  // The wrapper's invalidation ran before the sync wrote, so the sync's
+  // values need their own — on a profile the wrapper's didn't use, or Next
+  // drops it as a repeat.
+  it('publishes what the sync wrote with an invalidation of its own', async () => {
     const order: string[] = []
     m.loadSyncableListing.mockResolvedValue(unsynced)
     m.syncOneListing.mockImplementation(async () => { order.push('sync'); return { outcome: 'synced' } })
-    m.revalidatePublicContent.mockImplementation(async () => { order.push('revalidate') })
+    m.revalidateTag.mockImplementation((tag: string, profile: unknown) => void order.push(`${tag} ${profile}`))
     await patch({ status: 'approved' })
-    expect(order).toEqual(['sync', 'revalidate'])
+    await runAfter()
+    expect(order).toEqual(['sync', 'resources:ues days'])
+  })
+
+  it('invalidates nothing when the sync wrote nothing', async () => {
+    m.loadSyncableListing.mockResolvedValue(unsynced)
+    m.syncOneListing.mockResolvedValue({ outcome: 'failed' })
+    await patch({ status: 'approved' })
+    await runAfter()
+    expect(m.revalidateTag).not.toHaveBeenCalled()
   })
 })
 

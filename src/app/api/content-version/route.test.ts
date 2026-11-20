@@ -21,7 +21,7 @@ describe('/api/content-version', () => {
     const source = here('src/lib/contentVersion.ts')
     const body = source.slice(source.indexOf('export async function currentContentVersion'))
     const fn = body.slice(0, body.indexOf('\n}\n'))
-    expect(fn).toContain('readContentStamp()')
+    expect(fn).toContain('readContentStamp(community)')
     expect(fn).not.toContain("'use cache'")
   })
 })

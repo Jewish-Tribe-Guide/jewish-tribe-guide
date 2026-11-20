@@ -89,11 +89,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:coverage
@@ -115,11 +111,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - run: npm run test:integration
         env:
           TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
@@ -137,11 +129,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+          next-dist-dir: .next-e2e-3211
       # This job ran on a bare runner while every test here took only the
       # `request` fixture. That stopped being true when "an already-open tab
       # picks up an admin edit when it regains focus" was added — it takes
@@ -177,11 +167,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+          next-dist-dir: .next-e2e-3212
       # Unlike cache-roundtrip, this suite drives a real browser (filling in
       # and submitting the wizard). Browsers + OS deps are already in the
       # container image, so no `playwright install` step is needed here.
@@ -224,11 +212,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+          next-dist-dir: .next-e2e-3213
       # Drives a real browser (clicking Approve/Reject in ModerationQueue),
       # same as form-roundtrip — no `playwright install` step needed, see
       # container image above.
@@ -244,8 +230,62 @@ jobs:
           path: playwright-report-admin-write/
           retention-days: 14
 
+  e2e-build:
+    name: Build for the end-to-end tests
+    # The app, built once for every e2e shard, which start it rather than
+    # each building their own (Nov 20): one artifact tested, not six
+    # identical builds. The same container as the shards, so the build's
+    # paths are the paths they run it at.
+    #
+    # Starts with everything else (Nov 20). It prerenders philly, and the
+    # write suites change a community of their own, never philly (see
+    # e2e's comment), so there is nothing of theirs for it to wait for.
+    if: github.event_name != 'push'
+    concurrency:
+      group: test-db-e2e-build
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
+    timeout-minutes: 15
+    # The shards reuse these (env: *e2e-env), so what they test is what
+    # was built: NEXT_PUBLIC_ values are fixed into the build.
+    env: &e2e-env
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+      SUPERADMIN_EMAILS: ${{ secrets.SUPERADMIN_EMAILS }}
+      INBOX_EMAILS: ${{ secrets.INBOX_EMAILS }}
+      # Cloudflare's published always-passes Turnstile test key (not a
+      # secret). Without any site key the widget renders nothing, so
+      # e2e/budgets.spec.ts's "browsing loads nothing from Turnstile" check
+      # could never fail in CI — it would skip. NEXT_PUBLIC_, so it has to be
+      # present at build time.
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      # The site's own Maps key, so the desktop map is tested drawing a
+      # real map (budgets.spec.ts, csp.spec.ts) rather than its "couldn't
+      # load" message. NEXT_PUBLIC_, so it's in the page anyway; it's a
+      # secret only to keep it out of the repo. Locally .env.local has it.
+      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
+      NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          next-dist-dir: .next
+      - run: npm run build
+      # Not .next/cache: the shards only start the build, and it's the
+      # setup action's cache, kept apart from the artifact.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: e2e-build
+          path: |
+            .next/
+            !.next/cache/
+          include-hidden-files: true
+          retention-days: 1
+
   e2e:
-    name: End-to-end tests (test project, ${{ matrix.shard }}/4)
+    name: End-to-end tests (test project, ${{ matrix.shard }}/6)
     # See "One copy of each test-project suite at a time" above.
     if: github.event_name != 'push'
     concurrency:
@@ -253,76 +293,57 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.63.0-noble
-    # Needs cache-roundtrip and admin-write first: both share
-    # this same TEST_SUPABASE_* project now that e2e points at it and both
-    # create/rename/delete categories and home-section rows — content e2e's
-    # own helpers (defaultCommunity, categoryWithListings) read via "pick
-    # some real category with listings", which can land on a temporary row
-    # one of them is mid-edit on (e.g. cache-roundtrip's "Cache Round-trip
-    # Seed" fixture), failing when it changes or vanishes underneath the
-    # assertion. Same underlying class of bug as 03c2e99; running after both
-    # removes it the same way. (A separate, now-fixed race used to force
-    # cache-roundtrip and admin-write to run sequentially too — see
-    # admin-write's own comment above. They run in parallel now, so this
-    # job's actual wait is max(cache-roundtrip, admin-write), not their sum —
-    # unlike that one, this row-contention race isn't fixed at the source,
-    # since e2e's helpers genuinely need real, varied seeded content rather
-    # than an isolated fixture of their own; ordering remains the fix here.)
+    # Runs beside cache-roundtrip and admin-write, on the same test project.
+    # It reads philly, the project's default community, and they change
+    # `e2e-writes`, a hidden community of their own
+    # (scripts/writeSuiteCommunity.mjs). Until Nov 20 they changed philly
+    # too, so e2e (and its build, which prerenders philly) had to wait for
+    # both to finish, and a PR's run was those two suites end to end. The
+    # `page` rows (About, Privacy) belong to no community and are still
+    # shared; e2e checks those pages' structure, never their words.
+    # src/test/suiteRows.test.ts fails if a write suite claims a row in
+    # philly or adds one with no community.
     #
-    # NOT form-roundtrip: it only creates/deletes form and submission rows
-    # (a seeded test form, its response), which nothing in e2e/ reads —
-    # api.spec.ts's own /api/admin/forms calls are unauthenticated requests
-    # against an id that can't exist, asserting they're refused before
-    # reaching the database, and offline.spec.ts's /api/requests probe just
-    # checks a GET to a write endpoint isn't cached, independent of what (if
-    # anything) it returns. Excluding it lets e2e start as soon as
-    # cache-roundtrip/admin-write finish rather than also waiting on however
-    # long form-roundtrip's own run takes.
+    # Nor form-roundtrip: it only creates/deletes form and submission rows
+    # (a seeded test form, its response), which nothing in e2e/ reads.
     #
-    # Split four ways, each shard on its own runner (Oct 19). The suite runs
+    # Split six ways (four until Nov 20), each shard on its own runner
+    # (Oct 19). Playwright splits by test count, not time, and a skipped
+    # test counts, so four shards ran 150–208s of tests each; six, with the
+    # build cached (see .github/actions/setup), cost one more cold start
+    # each and take ~70s off the slowest. The suite runs
     # one test at a time per runner (playwright.config.ts's `workers` — a
     # 4-vCPU runner shared with the server and Chromium flaked with more),
     # so on one runner it took ~10 minutes, half of every PR's wait. Four
     # runners keep one worker each, so the per-runner contention that comment
-    # describes is unchanged. Each shard builds the app itself (~1 min) and
+    # describes is unchanged. Each shard starts the one build e2e-build
+    # made (until Nov 20 each built its own, six identical builds a run) and
     # runs the `warmup` project first; Playwright puts a dependency project in
     # every shard whose tests need it. Public repo: the extra runners are free.
-    needs: [cache-roundtrip, admin-write]
+    needs: [e2e-build]
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
+    # The same settings the build had (the anchor on e2e-build): the
+    # tests read the test project with them, and the server reads its
+    # runtime ones.
+    env: *e2e-env
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/setup
+      - uses: actions/download-artifact@v8
         with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+          name: e2e-build
+          path: .next
       # Only the two engines the config actually uses (Desktop Chrome + Pixel 7
       # device emulation are both Chromium) — no `playwright install` step
       # needed, see container image above. It ships every engine, but we
       # only invoke Chromium via test:e2e.
-      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
+      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/6
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
-          SUPERADMIN_EMAILS: ${{ secrets.SUPERADMIN_EMAILS }}
-          INBOX_EMAILS: ${{ secrets.INBOX_EMAILS }}
-          # Cloudflare's published always-passes Turnstile test key (not a
-          # secret). Without any site key the widget renders nothing, so
-          # e2e/budgets.spec.ts's "browsing loads nothing from Turnstile" check
-          # could never fail in CI — it would skip. NEXT_PUBLIC_, so it has to be
-          # present at build time, which is when this step's webServer builds.
-          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
-          # The site's own Maps key, so the desktop map is tested drawing a
-          # real map (budgets.spec.ts, csp.spec.ts) rather than its "couldn't
-          # load" message. NEXT_PUBLIC_, so it's in the page anyway; it's a
-          # secret only to keep it out of the repo. Locally .env.local has it.
-          NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
-          NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID }}
+          E2E_PREBUILT: '1'
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
@@ -339,11 +360,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+      # No build cache: this build has production's values baked in, and
+      # its cache would be main's, which every PR's e2e build restores from.
+      - uses: ./.github/actions/setup
       - run: npm run test:e2e
         continue-on-error: true
         env:

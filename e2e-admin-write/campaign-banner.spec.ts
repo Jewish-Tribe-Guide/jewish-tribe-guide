@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Locator } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
+import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives the Campaigns tab's real create flow, specifically the case that
@@ -55,7 +56,7 @@ test('a hidden, not-yet-promoted category can still be linked to a future campai
 
   // Create the category hidden — the state a not-yet-launched seasonal
   // category (Sukkahs, ahead of Sukkot) is meant to sit in.
-  await page.goto('/philly/admin/categories')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/categories`)
   await visible(page.getByRole('button', { name: '+ New category page' })).click()
   await visible(page.getByRole('button', { name: 'Make your own page' })).click()
   await visible(page.getByLabel('Name', { exact: true })).fill(categoryName)
@@ -71,7 +72,7 @@ test('a hidden, not-yet-promoted category can still be linked to a future campai
   // Now link it to a campaign whose window hasn't started yet — the category
   // has no live campaign promoting it, so this is exactly the case the fix
   // covers: it must still be a selectable option, not filtered out.
-  await page.goto('/philly/admin/campaigns')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/campaigns`)
   await visible(page.getByRole('button', { name: 'Add a campaign' })).click()
 
   // Scoped to the form itself (data-testid="campaign-banner-form") and

@@ -6,7 +6,9 @@ const m = vi.hoisted(() => ({
   getCommunityDefaultLocation: vi.fn(),
   setCommunityDefaultLocation: vi.fn(),
   revalidatePublicContent: vi.fn(),
+  revalidateTag: vi.fn(),
 }))
+vi.mock('next/cache', () => ({ revalidateTag: m.revalidateTag }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({
   communitySlugFromRequest: (r: Request) => new URL(r.url).searchParams.get('community'),
@@ -50,6 +52,9 @@ describe('PUT /api/admin/default-location', () => {
     expect(res.status).toBe(200)
     expect(m.setCommunityDefaultLocation).toHaveBeenCalledWith('pgh', squirrelHill)
     expect(m.revalidatePublicContent).toHaveBeenCalled()
+    // The location lives in the community list, which a community's own
+    // save leaves alone (Nov 20).
+    expect(m.revalidateTag).toHaveBeenCalledWith('communities', 'max')
     expect(await res.json()).toMatchObject({ ok: true, label: squirrelHill.label, timezone: 'America/New_York' })
   })
 

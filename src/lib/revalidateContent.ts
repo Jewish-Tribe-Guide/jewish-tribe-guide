@@ -1,8 +1,8 @@
 import { revalidateTag } from 'next/cache'
 import { listCommunities } from './communityStore'
-import { allCommunityTags, TAGS } from './cacheTags'
+import { allCommunityTags, communityPagesTag, TAGS } from './cacheTags'
 import { bumpContentStamp } from './contentStamp'
-import { revalidateRouteAfterInFlightRenders } from './revalidateAfterInFlightRenders'
+import { revalidateRouteAfterInFlightRenders, revalidateTagsAfterInFlightRenders } from './revalidateAfterInFlightRenders'
 import { routes } from './routes'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -12,13 +12,13 @@ import { routes } from './routes'
 // listing, reloads the site, and doesn't see it — the worst kind of bug,
 // because it looks like the save failed and invites them to do it again.
 //
-// Deliberately blunt. It invalidates every content tag for every community
-// rather than working out precisely what changed. Communities number in the
-// handful, so the cost of over-invalidating is a few refetches; the cost of
-// under-invalidating is an admin staring at a change that didn't take. The
-// write paths also mostly don't know which community they touched — the admin
-// console edits one, and several store functions take only a row id — so
-// precision here would be guesswork wearing a confident face.
+// Per community when the caller knows which (Nov 20): an admin's save names
+// its own, and only that community's content and pages go stale; the
+// others keep serving from the cache. Every community when it doesn't — a
+// nightly job, the site owner's console, the manual revalidate — as it all
+// was before. Within a community it is still blunt: every content tag, not
+// the one the write touched. Over-invalidating costs a refetch; under-
+// invalidating costs an admin staring at a change that didn't take.
 //
 // Call from a Route Handler (or Server Action) after the write succeeds — an
 // ADMIN one (or a cron job). It schedules a second pass that keeps the
@@ -45,7 +45,16 @@ import { routes } from './routes'
 // at most, before the admin is sent to the new address.
 const NEW_COMMUNITY_READS = 5
 
-export async function revalidatePublicContent({ newCommunity }: { newCommunity?: string } = {}): Promise<void> {
+type Options = {
+  /** The communities the write changed. Left out: every community. */
+  communities?: string[]
+  /** A community just created: the community list is expired outright. */
+  newCommunity?: string
+}
+
+export async function revalidatePublicContent({ communities: named, newCommunity }: Options = {}): Promise<void> {
+  if (named) return revalidateCommunities(named)
+
   // The stamp first, so a page regenerated after the invalidation below is
   // built with the new one and an open tab's check sees it once (Nov 16).
   const [communities] = await Promise.all([listCommunities().catch(() => []), bumpContentStamp()])
@@ -77,4 +86,17 @@ export async function revalidatePublicContent({ newCommunity }: { newCommunity?:
   // settings, home sections, forms and hospitals). It is also a tag nothing
   // above used, which it has to be — Next drops a repeat within one request.
   revalidateRouteAfterInFlightRenders(routes.home('[community]'), 'layout')
+}
+
+/** One community's save (or a few). Leaves the community list alone: every
+ *  page of every community carries its tag, so touching it would make them
+ *  all stale again. The one admin write that changes the list's rows (the
+ *  default location) invalidates it itself. */
+async function revalidateCommunities(communities: string[]): Promise<void> {
+  await bumpContentStamp(communities)
+  for (const community of communities) {
+    for (const tag of allCommunityTags(community)) revalidateTag(tag, 'max')
+  }
+  // The second pass, as above, on a tag only these communities' pages carry.
+  revalidateTagsAfterInFlightRenders(communities.map(communityPagesTag))
 }

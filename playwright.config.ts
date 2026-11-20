@@ -116,7 +116,11 @@ export default defineConfig({
   webServer: {
     // Its own port, so a dev server left running on 3000 doesn't get tested by
     // accident — which would silently test the wrong build.
-    command: `npm run build && npx next start --port ${PORT}`,
+    //
+    // E2E_PREBUILT: CI builds once and every shard starts that build
+    // (ci.yml's e2e-build), so the shards test one artifact instead of each
+    // building its own. `next start` refuses outright if there's no build.
+    command: process.env.E2E_PREBUILT ? `npx next start --port ${PORT}` : `npm run build && npx next start --port ${PORT}`,
     // Never the question reader: a test run mustn't spend on OpenAI or write
     // readings (see src/app/api/ask/read/route.ts). The page answers with
     // today's search alone, as it does whenever the reader is off.

@@ -1,5 +1,5 @@
 import { cacheLife, cacheTag } from 'next/cache'
-import { TAGS } from './cacheTags'
+import { communityPagesTag, TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { resolveCommunity } from './communityStore'
 import {
@@ -241,7 +241,8 @@ async function settingsFrom(row: Row | null, community: string): Promise<SiteSet
 // Same as getSiteSettingsUncached, but cached for the public site.
 export async function getSiteSettings(community: string): Promise<SiteSettings> {
   'use cache'
-  cacheTag(TAGS.siteSettings(community))
+  // communityPagesTag: so the page entries built from it carry it too.
+  cacheTag(TAGS.siteSettings(community), communityPagesTag(community))
   cacheLife('days')
   return getSiteSettingsUncached(community)
 }

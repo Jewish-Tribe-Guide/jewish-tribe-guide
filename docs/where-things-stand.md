@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 19, 2026.
+Last updated: Nov 20, 2026.
 
 ## The branch
 
@@ -406,6 +406,21 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   with no navigation. New test "keeps the category's address after Back,
   through a refresh": red 5 of 5 before, green 10 of 10 after; the old
   test 40 of 40 after.
+- Fixed Nov 20 (CI on PR 400, Nov 19-20): `listing-detail.spec.ts:196`
+  desktop, "the search stays put when a listing opens", read the search
+  up to 6px low. The test's fault: a category screen arrives rising 6px
+  (fadeIn, 180ms) and its "before" read landed mid-rise. It now waits for
+  the arrival (`settled` in e2e/helpers.ts). Red 7 of 20 before, 0 of 20
+  after. Found on the way, a real bug: on Windows and Linux, where the
+  scrollbar takes room, the full-width bands (a category's photo, the
+  computer home's hero and map, the map page's band) were `100vw` wide,
+  so they ran under the scrollbar, lost half its width off the left, and
+  made the page 8px wider than the window. They take the scrollbar off
+  now (`bleed-x` / `w-page`, sized in `cqw` with <html> as the page's
+  container; first by a script measuring the scrollbar, which on CI read
+  0px on a category page and left it 8px too wide again).
+  New `e2e/full-bleed.spec.ts`: red 6 of 6 on the old bands, 20 of 20 on
+  the new.
 - Found Nov 17, not fixed: `FindResourcesConnected`'s `replace` sync (the
   search box, Open now, filters, `?item=`) writes the address the same
   way, so Next never learns those either: by the same mechanism a refresh
@@ -851,6 +866,159 @@ Nov 14, later, the user's yes to both:
   category pages, Browse, What changed, Feedback and You. The Add button
   sits beside Feedback · About · Privacy at the bottom now, in Safari as
   it already did in the home-screen app.
+
+## The speed and scale sweep (Nov 20, on `claude/bands-and-search`)
+
+The user (Nov 20): "I want the site to be a good site… with the ability
+to scale." Measured first, on the live site and in the code, nothing
+changed until the user picked an order: quick visitor fixes, then saves
+and scale, then the nightly jobs, then CI.
+
+Measured on live (phillyjewishguide.com, Nov 20): every page from the CDN
+in 40–100ms; on a phone the main content showed in 0.65s (Food) to 0.94s
+(home) on a fast connection; no layout shift; no Sentry errors; all seven
+nightly jobs fine for two weeks. The morning watches take 134s (median)
+to 170s of the 220s they may start in, with one community.
+
+Done (batch 1, each red against the old code first):
+
+- Photos at the size drawn. Unsplash photos are asked of Unsplash at each
+  width the page needs (`photoProps` in `src/lib/imageHosts.ts`), and
+  Storage photos of Storage while Vercel's optimizer is off, as it is on
+  live. The live phone home fetched a 2070px Unsplash photo (159 KB) for a
+  108px tile; the logo is Storage's 88px copy, not the 1024px file.
+  `photoSizes.test.tsx`: 4 of 4 red before.
+- The page search (`hoursJobRun.ts`) and Look again take the communities
+  in turn each night, so the first can't spend the whole time and leave
+  the second unsearched (1 of 1 red each).
+- robots.txt keeps every community's admin and inbox out, not only
+  Philly's, and the admin says noindex itself (2 of 2 red).
+- A page's listings and their vote counts are read side by side.
+
+Measured and dropped: leaving admin-only data out of the listings sent
+with each page. The home is 90 KB compressed, and the admin-only keys are
+about 5% of it; the bulk is schedules and hours. A slim index for the
+home's search would be the real saving, later.
+
+Done (batch 2, saves, each red against the old code first):
+
+- A community admin's save makes only its own community stale: its
+  content tags, its own `content_stamp` row (`c:<slug>`, no migration;
+  a tab reads the later of it and `all`), and a second pass on
+  `community-pages:<slug>`, which the site settings read carries onto
+  every page of that community. Before, one save sent every community's
+  pages back to the database and told every open tab to re-render. The
+  site owner's routes, the nightly jobs and the manual revalidate still
+  reach every community. Default location invalidates the community list
+  itself (11 of 11 red).
+- An approval reads its category once (it read it 4 to 6 times), and its
+  independent last steps run side by side. Measured on the test project
+  from here: a new listing 1.0s → 0.6s (9 → 6 requests), an edit
+  1.35s → 0.8s (12 → 8). A category with tag fields saves more.
+- Approving a new listing answers before Google: the sync runs after the
+  response and refreshes the listings itself (2 of 2 red). Not timed:
+  the test project has no Google key.
+
+Done (batch 3, nightly jobs, each red against the old code first):
+
+- The morning watches take the communities in turn within each kind
+  (kosher lists, hospitals, overdue, then by priority), a different
+  community first each night, and each community has its own AI reads
+  (`orderForRun`, `budgetOf` in the watches route).
+- The Google hours sync refreshes only the communities it changed, and
+  says its 300s outright. Not made parallel: live it asks about 132
+  listings in 15s, so its 500 cap fits in a minute one at a time.
+
+- **A morning watches run per community** (Nov 20, the user: "if that's
+  something we could do now"). `/api/cron/watches` starts a call per
+  community (`?community=slug`), each answered at once and run in
+  `after()` with its own 300s; the run lives in `src/lib/watchesRun.ts`.
+  Each run is saved under its community (`job_run.community_id`,
+  migration 101, run on dev and live by the user Nov 20). The Watches
+  tab, look-again, main dishes, the nightly email and Activity read
+  their community's runs and the whole site's.
+  To check on the first live morning after deploy: each community's run
+  shows in its own tab, and Vercel's log has no "run didn't start" (the
+  call reaches the site through its own address; a 401 or a Vercel
+  protection page there would show as that). Two communities' runs can
+  each read a site they share at the same moment; within one run, never.
+
+Done (batch 4, housekeeping, each red against the old code first):
+
+- **History fifty at a time** (`/api/admin/submissions`, Show older). It
+  read every decided change (live Philly: 1,253 approved), and on dev it
+  had stopped loading at all: every listing id went into one request,
+  refused as too long. Live, with more, likely the same (not checked:
+  needs the live admin).
+- **Migration 102, composite indexes** (listings by community, status
+  and category; To do; History; a browser's votes). Run on dev and live
+  by the user Nov 20.
+- **Option renames and field clears** write a category's listings ten
+  at a time (`atMostAtOnce`), each scoped to its community.
+
+Done (batch 5, CI, Nov 20): a PR's run is 8–9 min, from 11.4.
+`.github/actions/setup` restores `node_modules` (keyed on the lock file;
+`npm ci` only on a miss) and each build's `<dist>/cache/turbopack` (not
+the fetch cache beside it; production's smoke build caches none), and
+e2e runs in six shards, not four. `ciWorkflow.test.ts` checks each build
+job caches its own dist dir. A PR's first run builds cold (the suites
+don't run on main, so there's no main cache to start from); its later
+pushes start warm. Two failures it turned up along the way:
+
+- `todo-scroll.spec.ts` failed 4 runs in 5 on CI, never locally. The
+  open area's link now leaves the scroll alone (`scroll={false}`), and
+  the test prints the window's scrolls if it fails again; not proven to
+  be the cause.
+- `full-bleed.spec.ts`: the bands' scrollbar script measured 0px on CI's
+  category page. The bands are sized in `cqw` now, no script; green on CI.
+
+Then, the user's steer (Nov 20): "a healthy system that is built right
+and is fast and can scale", no patches to hit a number. Two structural
+reasons CI is ~9 min, fixed in that order:
+
+1. **Built once** (done, Nov 20). The six e2e shards each built the app;
+   now `e2e-build` builds once in the shards' container, hands `.next`
+   over as an artifact, and the shards start it (`E2E_PREBUILT=1`), with
+   the build's settings by YAML anchor. Measured: build job 1.8 min (38s
+   building, warm), shards 2.5–3 min each (1.8–2.7 min of tests). No
+   wall-time gain yet: the build still waits for the write suites.
+2. **The write suites on a community of their own** (done, Nov 20). cache-roundtrip and admin-write change
+   `e2e-writes`, a hidden community in the test project
+   (`scripts/writeSuiteCommunity.mjs`: made by the test server on
+   start, its shape copied once from philly, both suites' admins on its
+   own list). So e2e-build no longer waits for them, and each suite signs
+   in as its own admin, never philly's real one (the two used to cancel
+   each other's sign-in links). `suiteRows.test.ts` fails if a write
+   suite claims a row in philly or adds one with no community (7 did; it
+   went red on the old todo-scroll), and `ciWorkflow.test.ts` if
+   e2e-build waits again. Still shared: the About and Privacy rows, which
+   belong to no community; e2e checks only those pages' structure.
+   Local: cache-roundtrip 6/6, admin-write 58 passed, form-roundtrip 1/1.
+   First CI run (44797579727), all green: **5.6 min**, from 8–9. Everything
+   starts at once; the build takes 2.1 min, the shards 2.6–3.5 after it,
+   admin-write 4.4 and unit 4.0 beside them. The slowest path is now the
+   build plus the slowest shard (5.6), with admin-write and unit a minute
+   under it.
+   Left in the test project (it's also dev): philly still has the old
+   `Cache Round-trip Seed` category and its `E2E Fixtures` section. Old
+   code on other branches recreates them, so they go once those branches
+   have merged main.
+
+Flakes seen this batch, to watch: `category-open.spec.ts` (a click asked
+the server once, the re-run passed), the mobile prefetch budget (once).
+`todo-scroll.spec.ts` has passed every run since its fix.
+
+Still to do:
+
+1. Nothing left in batch 5. Leftovers in the test project are listed
+   under step 2.
+
+For the user: two home tiles link straight to a Google image thumbnail
+and an iStock photo (Mikvah's is the iStock one, on live). Either can vanish,
+and an iStock photo may need a licence. Left as they are.
+Left as they are, on purpose: the inbox link is Philly's (one inbox, by
+design), and notifications for a community with no admins go to the
+site's own address.
 
 ## The admin review (Nov 18, on `redesign/suite-rows`)
 
@@ -1762,7 +1930,9 @@ The user's answers on Nov 10, evening, and what was done with them:
   way a changed time shows what it was. Two admin-write flakes seen while
   running it, each green alone: todo-scroll's resize line and
   category-open's no-request check. todo-scroll's "keeps the row you
-  clicked" failed once more on Nov 19 (562px off), green 3 of 3 alone.
+  clicked" failed once more on Nov 19 (562px off), green 3 of 3 alone,
+  and again Nov 20 under the full run ("the list came back somewhere
+  else"), green 4 of 4 alone. Third time: worth a look of its own.
 - **A shul's week read again with its notes only reworded files nothing**
   (fixed Nov 11, South Philadelphia Shtiebel). Its calendar is read twice
   a week, and the AI wrote "until 8:00 AM" one time and "until 8:00 AM;

@@ -1,6 +1,7 @@
 import { test as setup } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { ADMIN_WRITE_TEST_ADMIN_EMAIL, resolveDefaultCommunityAdminEmail, mintMagicLinkSession } from '../scripts/cacheE2eAdmin.mjs'
+import { ADMIN_WRITE_TEST_ADMIN_EMAIL, mintMagicLinkSession } from '../scripts/cacheE2eAdmin.mjs'
+import { WRITE_SUITE_COMMUNITY, writeSuitePreviewCookie } from '../scripts/writeSuiteCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mints a real, full-browser admin session against the disposable test
@@ -9,19 +10,15 @@ import { ADMIN_WRITE_TEST_ADMIN_EMAIL, resolveDefaultCommunityAdminEmail, mintMa
 // is all e2e-cache/auth.setup.ts's sibling needed for its own suite. Same
 // mechanism as e2e/auth.setup.ts (generateLink + verifyOtp, reproducing
 // /api/admin/dev-login's approach without its production-build refusal —
-// see that file's own comments for the full why), against whichever email
-// resolveDefaultCommunityAdminEmail resolves (see its own comment — not
-// always ADMIN_WRITE_TEST_ADMIN_EMAIL, once philly/[default community] gets
-// a real admin_email configured on a shared project), and with an explicit
-// createUser step first (a brand-new email's magic link was unreliable to
-// redeem without it).
+// see that file's own comments for the full why), as this suite's own admin,
+// with an explicit createUser step first (a brand-new email's magic link
+// was unreliable to redeem without it).
 //
-// Passes its own fallback identity (ADMIN_WRITE_TEST_ADMIN_EMAIL), distinct
-// from e2e-cache/auth.setup.ts's CACHE_TEST_ADMIN_EMAIL — see
-// cacheE2eAdmin.mjs's own comment on why these two must never be the same
-// address on a pristine (CI) test project: this suite's and cache-
-// roundtrip's auth.setup.ts both mint a magic link before either job's
-// tests run, and used to collide on the same shared identity.
+// Always ADMIN_WRITE_TEST_ADMIN_EMAIL: the community this suite changes
+// lists it by name (scripts/writeSuiteCommunity.mjs). It used to be philly's
+// real admin whenever philly had one, the same person cache-roundtrip
+// signed in as, and the two cancelled each other's magic links (see
+// cacheE2eAdmin.mjs).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const authFile = 'e2e-admin-write/.auth/admin.json'
@@ -37,7 +34,7 @@ setup('authenticate as the disposable test-project admin', async ({ page, baseUR
     )
   }
 
-  const testAdminEmail = await resolveDefaultCommunityAdminEmail(supabaseUrl, serviceRoleKey, ADMIN_WRITE_TEST_ADMIN_EMAIL)
+  const testAdminEmail = ADMIN_WRITE_TEST_ADMIN_EMAIL
   const admin = createClient(supabaseUrl, serviceRoleKey)
 
   const { error: createError } = await admin.auth.admin.createUser({
@@ -60,11 +57,13 @@ setup('authenticate as the disposable test-project admin', async ({ page, baseUR
     token_type,
     type: 'magiclink',
   })
-  // /philly/admin, not bare /admin — /admin is the standalone superadmin
-  // console now (src/app/admin/page.tsx), a different page with no
-  // "Signed in as" moderation-queue text to wait for.
-  await page.goto(`${baseURL}/philly/admin#${hash.toString()}`)
+  // The community's own console, not bare /admin — /admin is the standalone
+  // superadmin console now (src/app/admin/page.tsx), a different page with
+  // no "Signed in as" moderation-queue text to wait for.
+  await page.goto(`${baseURL}/${WRITE_SUITE_COMMUNITY}/admin#${hash.toString()}`)
   await page.getByText(`Signed in as ${testAdminEmail}`).waitFor()
 
+  // The community is hidden; this opens its public pages for every test.
+  await page.context().addCookies([writeSuitePreviewCookie(baseURL!)])
   await page.context().storageState({ path: authFile })
 })

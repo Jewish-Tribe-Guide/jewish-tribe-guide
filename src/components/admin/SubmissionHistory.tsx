@@ -26,18 +26,39 @@ export default function SubmissionHistory({ token, status }: { token: string; st
   const api = useAdminApi(token)
   const [items, setItems] = useState<EnrichedSubmission[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Fifty at a time (Nov 20): older ones on asking.
+  const [more, setMore] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
   const categoriesById = new Map(useCategories().map((c) => [c.id, c]))
 
   const load = useCallback(async () => {
     setError(null)
     setItems(null)
     try {
-      const body = await api.get<{ submissions: EnrichedSubmission[] }>(`/api/admin/submissions?status=${status}`, 'Failed to load.')
+      const body = await api.get<{ submissions: EnrichedSubmission[]; more?: boolean }>(`/api/admin/submissions?status=${status}`, 'Failed to load.')
       setItems(body.submissions)
+      setMore(!!body.more)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
   }, [api, status])
+
+  async function older() {
+    const last = items?.[items.length - 1]
+    if (!last?.reviewed_at) return
+    setError(null)
+    setLoadingOlder(true)
+    try {
+      const q = new URLSearchParams({ status, before: last.reviewed_at, beforeId: last.id })
+      const body = await api.get<{ submissions: EnrichedSubmission[]; more?: boolean }>(`/api/admin/submissions?${q}`, 'Failed to load.')
+      setItems((had) => [...(had ?? []), ...body.submissions])
+      setMore(!!body.more)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.')
+    } finally {
+      setLoadingOlder(false)
+    }
+  }
 
   useLoadOnMount(load)
 
@@ -74,6 +95,16 @@ export default function SubmissionHistory({ token, status }: { token: string; st
           {items.map((s) => (
             <SubmissionCard key={s.id} submission={s} categoriesById={categoriesById} />
           ))}
+          {more && (
+            <button
+              type="button"
+              onClick={older}
+              disabled={loadingOlder}
+              className="w-full min-h-11 rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-700 disabled:opacity-60"
+            >
+              {loadingOlder ? 'Loading…' : 'Show older'}
+            </button>
+          )}
         </div>
       )}
     </div>

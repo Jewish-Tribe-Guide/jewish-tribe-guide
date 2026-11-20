@@ -34,6 +34,12 @@ describe('/api/admin/watches/runs', () => {
     expect(body.kinds.find((k: { name: string }) => k.name === 'Links')).toMatchObject({ count: '1 link · first check Sunday', tracked: [{ name: 'Sababa · Kosher certificate', status: 'Not checked yet' }] })
   })
 
+  // Nov 20: the watches run a community at a time; another's isn't shown.
+  it('reads this community’s runs', async () => {
+    await get()
+    expect(m.listJobRuns).toHaveBeenCalledWith('philly')
+  })
+
   it('admins only', async () => {
     m.getAdminUserForCommunity.mockResolvedValue(null)
     expect((await get()).status).toBe(401)

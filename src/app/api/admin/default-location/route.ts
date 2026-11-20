@@ -1,4 +1,6 @@
+import { revalidateTag } from 'next/cache'
 import { adminRead, adminWrite } from '@/lib/adminRoute'
+import { TAGS } from '@/lib/cacheTags'
 import { getCommunityDefaultLocation, setCommunityDefaultLocation } from '@/lib/communityStore'
 
 // Settings › Default location (Nov 19): where a visitor is taken to be until
@@ -33,10 +35,12 @@ export const PUT = adminWrite(async (request: Request, { community }) => {
   }
 
   try {
-    // The wrapper refreshes the public site after it: every public screen
-    // reads the community (its layout), and the communities list is cached
-    // for days.
+    // The wrapper refreshes this community's content after it, but not the
+    // communities list, where the location lives (cached for days, and read
+    // by every public screen's layout): the one admin save that changes it
+    // says so itself.
     const saved = await setCommunityDefaultLocation(community.slug, { lat: body.lat, lng: body.lng, label: body.label })
+    revalidateTag(TAGS.communities, 'max')
     return Response.json({ ok: true, ...saved })
   } catch (err) {
     if (err instanceof RangeError) return Response.json({ ok: false, errors: [err.message] }, { status: 400 })

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
+import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives the Missed searches tab for real: a counted search shows up under
@@ -25,17 +26,17 @@ const term = `qqzv ${suffix}`
 
 test.afterEach(async () => {
   const supabase = getAdminClient()
-  await supabase.from('daily_count').delete().eq('community_id', 'philly').eq('kind', 'search_miss').eq('key', term)
-  await supabase.from('search_miss_dismissal').delete().eq('community_id', 'philly').eq('key', term)
+  await supabase.from('daily_count').delete().eq('community_id', WRITE_SUITE_COMMUNITY).eq('kind', 'search_miss').eq('key', term)
+  await supabase.from('search_miss_dismissal').delete().eq('community_id', WRITE_SUITE_COMMUNITY).eq('key', term)
 })
 
 test('a missed search is listed, dismissed for real, and restored', async ({ page }) => {
   const supabase = getAdminClient()
   const today = new Date().toISOString().slice(0, 10)
-  const { error } = await supabase.from('daily_count').insert({ community_id: 'philly', kind: 'search_miss', key: term, day: today, count: 3 })
+  const { error } = await supabase.from('daily_count').insert({ community_id: WRITE_SUITE_COMMUNITY, kind: 'search_miss', key: term, day: today, count: 3 })
   expect(error).toBeNull()
 
-  await page.goto('/philly/admin/searches')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/searches`)
   await page.getByRole('button', { name: 'Show Every search' }).click({ timeout: 20_000 })
   const missing = page.locator('section', { has: page.getByRole('heading', { name: /^Not in the guide/ }) })
   const row = missing.getByTestId('missed-search').filter({ hasText: `“${term}”` })
@@ -45,7 +46,7 @@ test('a missed search is listed, dismissed for real, and restored', async ({ pag
   await row.getByRole('button', { name: 'Dismiss' }).click()
   await expect(row).not.toBeVisible()
   await expect
-    .poll(async () => (await supabase.from('search_miss_dismissal').select('key').eq('community_id', 'philly').eq('key', term)).data?.length)
+    .poll(async () => (await supabase.from('search_miss_dismissal').select('key').eq('community_id', WRITE_SUITE_COMMUNITY).eq('key', term)).data?.length)
     .toBe(1)
 
   await page.getByRole('button', { name: 'Show Dismissed' }).click()
@@ -53,17 +54,17 @@ test('a missed search is listed, dismissed for real, and restored', async ({ pag
   await dismissed.getByRole('button', { name: 'Restore' }).click()
   await expect(row).toBeVisible()
   await expect
-    .poll(async () => (await supabase.from('search_miss_dismissal').select('key').eq('community_id', 'philly').eq('key', term)).data?.length)
+    .poll(async () => (await supabase.from('search_miss_dismissal').select('key').eq('community_id', WRITE_SUITE_COMMUNITY).eq('key', term)).data?.length)
     .toBe(0)
 })
 
 test('a search asked more than once leads the page, and Dismiss there is the same dismissal', async ({ page }) => {
   const supabase = getAdminClient()
   const today = new Date().toISOString().slice(0, 10)
-  const { error } = await supabase.from('daily_count').insert({ community_id: 'philly', kind: 'search_miss', key: term, day: today, count: 3 })
+  const { error } = await supabase.from('daily_count').insert({ community_id: WRITE_SUITE_COMMUNITY, kind: 'search_miss', key: term, day: today, count: 3 })
   expect(error).toBeNull()
 
-  await page.goto('/philly/admin/searches')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/searches`)
   const searches = page.getByRole('region', { name: 'Asked more than once' })
   await expect(searches).toBeVisible({ timeout: 20_000 })
   // Five show; the test project may hold more searches than that.
@@ -75,6 +76,6 @@ test('a search asked more than once leads the page, and Dismiss there is the sam
   await row.getByRole('button', { name: 'Dismiss' }).click()
   await expect(row).not.toBeVisible()
   await expect
-    .poll(async () => (await supabase.from('search_miss_dismissal').select('key').eq('community_id', 'philly').eq('key', term)).data?.length)
+    .poll(async () => (await supabase.from('search_miss_dismissal').select('key').eq('community_id', WRITE_SUITE_COMMUNITY).eq('key', term)).data?.length)
     .toBe(1)
 })

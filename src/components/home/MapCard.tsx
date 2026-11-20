@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { isOptimizableImage } from '@/lib/imageHosts'
+import { photoProps } from '@/lib/imageHosts'
 import { useIsDesktop } from '@/lib/useIsMobile'
 import type { MapCardPhoto } from '@/lib/siteSettings'
 
@@ -57,7 +57,7 @@ export default function MapCard({ href, photo, categoryNames, onOpen }: Props) {
       onClick={onOpen}
       data-testid="home-map-card"
       // Full width as the hero is (HeroHeading).
-      className="group relative left-1/2 block h-[420px] w-screen -translate-x-1/2 overflow-hidden border-y border-slate-200 bg-primary/[0.06]"
+      className="group relative left-1/2 block h-[420px] w-page -translate-x-1/2 overflow-hidden border-y border-slate-200 bg-primary/[0.06]"
     >
       <div data-testid="home-map-card-picture" aria-hidden={photo ? undefined : true} className="absolute inset-0">
         {photo ? (
@@ -69,7 +69,7 @@ export default function MapCard({ href, photo, categoryNames, onOpen }: Props) {
               fill
               sizes="100vw"
               className="object-cover"
-              unoptimized={!isOptimizableImage(photo.url)}
+              {...photoProps(photo.url)}
             />
             <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(248,250,252,0.97)_0%,rgba(248,250,252,0.9)_36%,rgba(248,250,252,0.25)_56%,rgba(248,250,252,0)_66%)]" />
           </>

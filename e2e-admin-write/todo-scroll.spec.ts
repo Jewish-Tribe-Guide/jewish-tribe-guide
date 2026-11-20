@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
+import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // To do keeps your spot (the user, Nov 2: "when I scroll on to do and then
@@ -25,6 +26,7 @@ test.beforeAll(async () => {
     .from('submission')
     .insert(
       names.map((name) => ({
+        community_id: WRITE_SUITE_COMMUNITY,
         operation: 'create',
         target_type: 'listing',
         target_id: null,
@@ -54,7 +56,7 @@ async function openTodo(page: Page) {
   page.on('requestfinished', (r) => void inFlight.delete(r))
   page.on('requestfailed', (r) => void inFlight.delete(r))
   await page.setViewportSize({ width: 1280, height: 700 })
-  await page.goto('/philly/admin')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin`)
   // The same 30s as the wait below: on CI To do was still "Loading
   // submissions…" when a 5s wait ran out (PR 387, Nov 16; main, Nov 14).
   await expect(page.getByRole('button', { name: `Open ${names[9]}` })).toBeVisible({ timeout: 30_000 })
@@ -90,9 +92,26 @@ test('opening a place and closing it keeps the row you clicked where it was', as
     el.closest<HTMLElement>('.md\\:overflow-y-auto')!.scrollTop += 90
   })
   const scrolled = await top(page, name)
+  await page.evaluate(() => {
+    const w = window as unknown as { scrolls: string[] }
+    const t0 = performance.now()
+    w.scrolls = []
+    window.addEventListener('scroll', () => w.scrolls.push(`${Math.round(performance.now() - t0)}ms y=${Math.round(window.scrollY)} h=${document.documentElement.scrollHeight}`))
+  })
   await page.locator('nav a:visible', { hasText: /^To do/ }).first().click()
   await expect(page).not.toHaveURL(/[?&]open=/)
-  await expect.poll(async () => Math.abs((await top(page, name)) - scrolled), { message: 'the list came back somewhere else' }).toBeLessThan(6)
+  // On CI this failed 4 runs in 5 on Nov 20, the row 562px off (the page
+  // scrolled to its top), and never locally, even with the CPU slowed. One
+  // suspect was fixed (the To do link's own navigation scrolling to the
+  // page's top, AdminFrame.tsx); if it fails again, the window's scrolls
+  // since the tap say whether it was scrolled back to the top later or
+  // never got down (the page still a screen tall when the list was put back).
+  try {
+    await expect.poll(async () => Math.abs((await top(page, name)) - scrolled), { message: 'the list came back somewhere else' }).toBeLessThan(6)
+  } catch (err) {
+    const scrolls = await page.evaluate(() => (window as unknown as { scrolls: string[] }).scrolls)
+    throw new Error(`${(err as Error).message}\nthe window's scrolls since the tap: ${scrolls.join(', ') || 'none'}`)
+  }
 })
 
 // The user, Nov 2: "Should there be a way to x out of the to do listings?"

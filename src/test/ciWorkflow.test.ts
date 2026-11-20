@@ -119,6 +119,13 @@ describe('a PR’s checks start at once and e2e is split', () => {
     })
   }
 
+  // The write suites change a community of their own (scripts/
+  // writeSuiteCommunity.mjs), so e2e's build has nothing to wait for. A
+  // `needs` back on them is the ~4 minutes this took off every PR (Nov 20).
+  it('e2e’s build starts at once, beside the write suites', () => {
+    expect(needs('e2e-build')).toBe('')
+  })
+
   it('e2e runs as shards, each running its own share', () => {
     const e2e = job('e2e')
     const shards = e2e.match(/shard:\s*\[([^\]]+)\]/)?.[1].split(',').map((s) => s.trim()) ?? []
@@ -173,5 +180,86 @@ describe('test-project suites never run two copies at once', () => {
   it('each suite has a group of its own', () => {
     const groups = usesTestProject.map((n) => field(jobs[n], /\n {4}concurrency:\n {6}group:\s*(.+)/))
     expect(new Set(groups).size).toBe(groups.length)
+  })
+})
+
+// Each build-and-start suite restores Turbopack's build cache for its own
+// dist dir (.github/actions/setup, Nov 20). A dist dir named wrong caches a
+// folder no build writes, and nothing fails: the job just builds cold again,
+// a minute a run, which is how a cache quietly stops paying. Derived from
+// each suite's Playwright config, so a moved port moves the expectation too.
+describe('each build restores its own build cache', () => {
+  const body = WORKFLOW.slice(WORKFLOW.indexOf('\njobs:'))
+  const jobs = Object.fromEntries(
+    body
+      .split(/\n {2}(?=[a-z][\w-]*:\n)/)
+      .slice(1)
+      .map((b) => [b.match(/^([\w-]+):/)![1], b] as const),
+  )
+  const ACTION = readFileSync('.github/actions/setup/action.yml', 'utf-8')
+
+  /** The dist dir a suite's build writes: run-test-project-server.mjs builds
+   *  into `.next-e2e-<port>`; the plain `npm run build` into `.next`. */
+  function distDirFor(script: string): string {
+    const config = SCRIPTS[script].match(/--config\s+(\S+)/)?.[1] ?? 'playwright.config.ts'
+    const src = readFileSync(config, 'utf-8')
+    if (!src.includes('run-test-project-server.mjs')) return '.next'
+    const port = src.match(/const PORT = process\.env\.CACHE_E2E_PORT \|\| '(\d+)'/)?.[1]
+    expect(port, `${config}: no default port found`).toBeDefined()
+    return `.next-e2e-${port}`
+  }
+
+  const building = Object.entries(jobs).flatMap(([name, block]) => {
+    const script = block.match(/npm run (test:[\w-]+)/)?.[1]
+    return script && testDirFor(script) ? [{ name, block, script }] : []
+  })
+
+  it('finds the build jobs at all', () => {
+    expect(building.length).toBeGreaterThanOrEqual(5)
+  })
+
+  for (const { name, block, script } of building) {
+    // Production's smoke build has production's values baked in, and its
+    // cache would be main's, which every PR's e2e build restores from.
+    // The e2e shards build nothing: they start e2e-build's.
+    const prebuilt = block.includes('E2E_PREBUILT')
+    const want = name === 'e2e-prod-smoke' || prebuilt ? '' : distDirFor(script)
+    it(`${name} caches ${want || 'no build'}`, () => {
+      expect(block).toContain('uses: ./.github/actions/setup')
+      expect(block.match(/next-dist-dir:\s*(\S+)/)?.[1] ?? '').toBe(want)
+    })
+  }
+
+  // e2e's shards start one build instead of each making their own (Nov 20),
+  // so the build must be what they'd have built: the same dist dir, the
+  // same settings (NEXT_PUBLIC_ values are fixed into a build), and
+  // handed over whole.
+  describe('the e2e shards start the one build', () => {
+    const build = jobs['e2e-build'] ?? ''
+    const shards = jobs['e2e'] ?? ''
+
+    it('e2e-build builds into the dist dir e2e starts, cached, and hands it over', () => {
+      expect(build).toMatch(/run: npm run build\n/)
+      expect(build.match(/next-dist-dir:\s*(\S+)/)?.[1]).toBe(distDirFor('test:e2e'))
+      expect(build).toMatch(/name: e2e-build\n\s+path: \|\n\s+\.next\/\n\s+!\.next\/cache\/\n\s+include-hidden-files: true/)
+    })
+
+    it('every shard waits for it, downloads it, and starts it unbuilt', () => {
+      expect(shards).toMatch(/\n {4}needs: \[e2e-build\]/)
+      expect(shards).toMatch(/download-artifact@v\d+\n\s+with:\n\s+name: e2e-build\n\s+path: \.next\n/)
+      expect(shards).toMatch(/npm run test:e2e[^\n]*\n\s+env:\n\s+E2E_PREBUILT: '1'/)
+      expect(readFileSync('playwright.config.ts', 'utf-8')).toMatch(/process\.env\.E2E_PREBUILT \? `npx next start/)
+    })
+
+    it('the shards run with exactly the build’s settings', () => {
+      expect(build).toMatch(/\n {4}env: &e2e-env\n/)
+      expect(shards).toMatch(/\n {4}env: \*e2e-env\n/)
+      // And nowhere else gives a shard a setting of its own beside them.
+      expect(shards.match(/\n {10}[A-Z0-9_]+:/g) ?? []).toEqual(['\n          E2E_PREBUILT:'])
+    })
+  })
+
+  it('caches only Turbopack’s part, never the fetch cache beside it', () => {
+    expect(ACTION).toMatch(/path:\s*\$\{\{ inputs\.next-dist-dir \}\}\/cache\/turbopack\s*\n/)
   })
 })

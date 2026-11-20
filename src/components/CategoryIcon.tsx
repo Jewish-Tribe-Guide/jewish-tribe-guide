@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 import Image from 'next/image'
-import { isOptimizableImage, storageThumbnailUrl } from '@/lib/imageHosts'
+import { isOptimizableImage, photoProps, storageThumbnailUrl } from '@/lib/imageHosts'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { categoryTint, categoryRing } from '@/lib/categoryColor'
 
@@ -95,7 +95,7 @@ export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, cl
           className={wholePicture ? 'object-contain p-1' : 'object-cover'}
           // The thumbnail is already the right size, so it never goes through
           // Vercel's optimizer (which is the whole point).
-          unoptimized={useThumb || !isOptimizableImage(iconImageUrl!)}
+          {...(useThumb ? { unoptimized: true } : thumb ? { unoptimized: !isOptimizableImage(iconImageUrl!) } : photoProps(iconImageUrl!))}
           onError={useThumb ? () => setFailedThumb(thumb) : undefined}
         />
       ) : glyph ? (

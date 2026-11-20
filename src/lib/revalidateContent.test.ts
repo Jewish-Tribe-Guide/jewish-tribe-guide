@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { allCommunityTags, TAGS } from './cacheTags'
+import { allCommunityTags, communityPagesTag, TAGS } from './cacheTags'
 import { IN_FLIGHT_RENDER_GRACE_MS } from './inFlightRenderGrace'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,8 +38,9 @@ vi.mock('./communityStore', () => ({
 }))
 
 const order: string[] = []
+const bumped: (string[] | undefined)[] = []
 vi.mock('./contentStamp', () => ({
-  bumpContentStamp: async () => void order.push('bump'),
+  bumpContentStamp: async (communities?: string[]) => void (order.push('bump'), bumped.push(communities)),
 }))
 
 const { revalidatePublicContent } = await import('./revalidateContent')
@@ -51,6 +52,7 @@ beforeEach(() => {
   revalidatePath.mockClear()
   listCommunities.mockReset()
   afterTasks.length = 0
+  bumped.length = 0
 })
 
 /** Just the tag names passed to revalidateTag, in call order. */
@@ -149,10 +151,8 @@ describe('revalidatePublicContent', () => {
     expect(invalidated()).toContain(TAGS.communities)
   })
 
-  // The blunt-instrument decision in revalidateContent.ts, pinned: over-
-  // invalidating costs a refetch, under-invalidating costs an admin their
-  // afternoon. If this ever becomes precise, it should be a deliberate change
-  // with its own tests, not a silent one.
+  // Named nothing (a nightly job, the site owner's console): every
+  // community, rather than a guess at which one changed.
   it('does not try to guess which community changed', async () => {
     listCommunities.mockResolvedValue([community('philly'), community('baltimore')])
 
@@ -210,6 +210,71 @@ describe('revalidatePublicContent', () => {
     await revalidatePublicContent()
 
     expect(afterTasks).toHaveLength(1)
+  })
+})
+
+// Nov 20: every save made every community's pages stale, and every open
+// tab of every community re-render on its return. A community admin's save
+// names its community now; only the site owner's routes and the nightly
+// jobs reach them all.
+describe('one community’s save', () => {
+  it('invalidates that community’s content and no other’s', async () => {
+    listCommunities.mockResolvedValue([community('philly'), community('ues')])
+
+    await revalidatePublicContent({ communities: ['philly'] })
+
+    expect(new Set(invalidated())).toEqual(new Set(allCommunityTags('philly')))
+    for (const [, profile] of revalidateTag.mock.calls) expect(profile).toBe('max')
+  })
+
+  // Every page of every community carries `communities`: touching it would
+  // make them all stale again. The default location's route, the one
+  // community save that changes that list, invalidates it itself.
+  it('leaves the community list alone', async () => {
+    await revalidatePublicContent({ communities: ['philly'] })
+    expect(invalidated()).not.toContain(TAGS.communities)
+  })
+
+  it('moves that community’s stamp only', async () => {
+    listCommunities.mockResolvedValue([community('philly')])
+    await revalidatePublicContent({ communities: ['philly'] })
+    await revalidatePublicContent()
+    expect(bumped).toEqual([['philly'], undefined])
+  })
+
+  it('invalidates that community’s pages again once in-flight renders have finished', async () => {
+    vi.useFakeTimers()
+    try {
+      await revalidatePublicContent({ communities: ['philly'] })
+      expect(afterTasks).toHaveLength(1)
+      revalidateTag.mockClear()
+
+      const task = afterTasks[0]()
+      await vi.advanceTimersByTimeAsync(IN_FLIGHT_RENDER_GRACE_MS)
+      await task
+      // Expired outright, as the pattern pass was, on a tag the first pass
+      // didn't use (Next drops a repeat within one request).
+      expect(revalidateTag).toHaveBeenCalledExactlyOnceWith(communityPagesTag('philly'), { expire: 0 })
+      expect(allCommunityTags('philly')).not.toContain(communityPagesTag('philly'))
+      expect(revalidatePath).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+// The pages carry the tag the second pass expires because the one cached
+// read every public screen makes, the layout's site settings, is tagged
+// with it. Built pages are checked by e2e-cache; this pins the wiring.
+describe('communityPagesTag', () => {
+  it('is on the site settings every public page reads', () => {
+    const src = readFileSync('src/lib/siteSettingsStore.ts', 'utf-8')
+    const fn = src.slice(src.indexOf('export async function getSiteSettings('))
+    expect(fn.slice(0, fn.indexOf('\n}\n'))).toMatch(/cacheTag\(.*communityPagesTag\(community\)/)
+  })
+
+  it('is one community’s', () => {
+    expect(communityPagesTag('philly')).not.toBe(communityPagesTag('ues'))
   })
 })
 

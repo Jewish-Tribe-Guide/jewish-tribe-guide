@@ -1,6 +1,8 @@
 import { readEruvNowById } from '@/lib/eruvReadNow'
 import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
+import { revalidateTag } from 'next/cache'
 import { after, type NextRequest } from 'next/server'
+import { TAGS } from '@/lib/cacheTags'
 import { adminWrite, unchanged } from '@/lib/adminRoute'
 import { approveSubmission, decidePart, rejectSubmission, ReviewEditError } from '@/lib/submissionStore'
 import { sendDecisionEmail } from '@/lib/confirmationEmail'
@@ -161,28 +163,16 @@ export const PATCH = adminWrite(async (request: NextRequest, { community, admin 
   // straight back in the queue. loadSyncableListing filters on `approved` as
   // well, so this holds even if another caller forgets.
   //
-  // Awaited rather than fired off, so the wrapper's revalidate publishes the
-  // synced values too — but never allowed to fail the approval, which has
-  // already happened by this point and must not be reported as failed because
-  // Google was unreachable. It's just late instead: tonight's run picks it up.
+  // After the response (Nov 20): it was awaited so the wrapper's invalidation
+  // would publish the synced values too, and kept the admin waiting on Google
+  // for every new listing. The listing goes on at once with what was
+  // approved, and the sync's hours and phone follow it. Never allowed to fail
+  // the approval, which has already happened: Google unreachable only means
+  // tonight's run picks it up.
   // Not an eruv suggestion: an eruv has no Google place.
   if (decision === 'approved' && submission.operation !== 'delete' && submission.target_type !== 'eruv') {
-    try {
-      const row = await loadSyncableListing(submission.target_id ?? '')
-      if (row && !row.details.googleSyncedAt) {
-        const result = await syncOneListing(row)
-        // The cron digests these for a whole run; a sync that happens here
-        // would otherwise discover a closure and tell nobody. A permanent one
-        // still files its own submission from inside syncOneListing.
-        if (result.outcome === 'synced' && result.statusChange) {
-          await sendStatusChangeDigest([result.statusChange]).catch((err) =>
-            console.error('[admin/submissions/:id] Status digest failed:', err),
-          )
-        }
-      }
-    } catch (err) {
-      console.error('[admin/submissions/:id] Post-approval sync failed:', err)
-    }
+    const listingId = submission.target_id ?? ''
+    after(() => syncApprovedListing(community.slug, listingId))
   }
 
   // A new or moved listing's walks along the streets, now rather than
@@ -190,3 +180,35 @@ export const PATCH = adminWrite(async (request: NextRequest, { community, admin 
   if (decision === 'approved' && submission.target_type !== 'eruv') after(() => runWalkRoutesAfterChange(community.slug))
   return Response.json({ ok: true, submission })
 })
+
+/** The Google sync of a listing just approved, after the response. What it
+ *  writes reaches the site by its own invalidation: the wrapper's ran before
+ *  the response. Its listings' tag with 'days', not 'max' — the same tag and
+ *  profile as the wrapper's would be dropped, as Next runs only the
+ *  revalidations an after() callback adds that weren't already pending
+ *  (revalidation-utils' diffRevalidationState). Either profile marks it
+ *  stale at once and serves the old copy while the new one renders.
+ *
+ *  The page entries come round again with the save's second pass, 5s after
+ *  the response (revalidateAfterInFlightRenders.ts), which catches a render
+ *  in flight at this invalidation when Google answers within it, as it
+ *  does; tonight's run settles one that doesn't. */
+async function syncApprovedListing(community: string, listingId: string): Promise<void> {
+  try {
+    const row = await loadSyncableListing(listingId)
+    if (!row || row.details.googleSyncedAt) return
+    const result = await syncOneListing(row)
+    if (result.outcome !== 'synced') return
+    revalidateTag(TAGS.resources(community), 'days')
+    // The cron digests these for a whole run; a sync that happens here
+    // would otherwise discover a closure and tell nobody. A permanent one
+    // still files its own submission from inside syncOneListing.
+    if (result.statusChange) {
+      await sendStatusChangeDigest([result.statusChange]).catch((err) =>
+        console.error('[admin/submissions/:id] Status digest failed:', err),
+      )
+    }
+  } catch (err) {
+    console.error('[admin/submissions/:id] Post-approval sync failed:', err)
+  }
+}

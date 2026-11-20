@@ -18,6 +18,8 @@ function chainable(result: unknown) {
     eq: vi.fn(self),
     in: vi.fn(self),
     order: vi.fn(self),
+    or: vi.fn(self),
+    limit: vi.fn(self),
     upsert: vi.fn(self),
     insert: vi.fn(self),
     update: vi.fn(self),
@@ -288,6 +290,32 @@ describe('listSubmissionsByStatus', () => {
 
     expect(builder.eq).toHaveBeenCalledWith('status', 'rejected')
     expect(builder.order).toHaveBeenCalledWith('reviewed_at', { ascending: false })
+  })
+
+  // Nov 20: History read every decided change ever (1,253 approved on
+  // live Philly), each matched to its listing. Now a page at a time.
+  it('reads a page of History: so many, older than the last shown, ties broken by id', async () => {
+    const builder = chainable({ data: [], error: null })
+    mockFrom.mockReturnValue(builder)
+    mockListCategories.mockResolvedValue([])
+
+    await listSubmissionsByStatus('philly', 'approved', { limit: 51, before: { at: '2026-11-19T10:00:00.000Z', id: 'b1c2' } })
+
+    expect(builder.order).toHaveBeenNthCalledWith(1, 'reviewed_at', { ascending: false })
+    expect(builder.order).toHaveBeenNthCalledWith(2, 'id', { ascending: false })
+    expect(builder.limit).toHaveBeenCalledWith(51)
+    expect(builder.or).toHaveBeenCalledWith('reviewed_at.lt."2026-11-19T10:00:00.000Z",and(reviewed_at.eq."2026-11-19T10:00:00.000Z",id.lt."b1c2")')
+  })
+
+  it('the queue is never cut short', async () => {
+    const builder = chainable({ data: [], error: null })
+    mockFrom.mockReturnValue(builder)
+    mockListCategories.mockResolvedValue([])
+
+    await listSubmissionsByStatus('philly', 'pending')
+
+    expect(builder.limit).not.toHaveBeenCalled()
+    expect(builder.or).not.toHaveBeenCalled()
   })
 
   it('enriches results the same way as listPendingSubmissions (category label, current row)', async () => {
@@ -978,6 +1006,21 @@ describe('approveSubmission: Google-sync field ownership', () => {
     const written = lastCallArg(resourceInsertBuilder.insert)
     expect(written.details.googleFields).toContain('phone')
     expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
+  // Nov 20: the Google fields, the item dates, the tag vocabulary and what
+  // changed each read the category again, a round trip apiece.
+  it('reads the category once per approval, and again for the next one', async () => {
+    const sub = baseSubmission({ operation: 'create', payload: listingPayload({ details: { placeId: 'place-1', googleAutofill: { name: 'Test Shul' } } }) as unknown as Record<string, unknown> })
+    mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+
+    await approveSubmission('sub-1')
+    expect(mockGetCategoryById).toHaveBeenCalledTimes(1)
+
+    mockCreateFlow(sub)
+    await approveSubmission('sub-1')
+    expect(mockGetCategoryById, 'nothing outlives its approval').toHaveBeenCalledTimes(2)
   })
 
   it('never resolves googleFields for a sync-ineligible category', async () => {

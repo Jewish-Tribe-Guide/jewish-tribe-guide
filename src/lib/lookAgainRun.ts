@@ -1,5 +1,6 @@
 import { getAdminClient } from './supabase/admin'
 import { withinOrLate } from './lateWork'
+import { dayNumber, inTurn } from './inTurn'
 import { listCategoriesUncached } from './categoryStore'
 import { isCategorySyncEligible } from './categories'
 import { listEruvimForAdmin } from './eruvStore'
@@ -104,7 +105,10 @@ export async function lookAgainNight(
   const { data: communities, error } = await getAdminClient().from('community').select('slug')
   if (error) throw new Error(`Couldn’t list the communities: ${error.message}`)
   const out = []
-  for (const { slug } of (communities ?? []) as { slug: string }[]) {
+  // In turn, as their items are: the 200 seconds are for every community,
+  // and the first in a fixed order could spend them all (Nov 20).
+  const ordered = [...((communities ?? []) as { slug: string }[])].sort((a, b) => a.slug.localeCompare(b.slug))
+  for (const { slug } of inTurn(ordered, dayNumber())) {
     const { available, items } = await loadLookAgain(slug, now())
     if (!available) return { skipped: 'migration 092 (look_again) not run' }
     // Without the AI, menus wait: the rest needs none.

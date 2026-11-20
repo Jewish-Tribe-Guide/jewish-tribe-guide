@@ -32,6 +32,22 @@ describe('watchPriority', () => {
 const ids = (ws: readonly W[]) => ws.map((x) => x.id)
 
 describe('orderForRun: the order the night’s run checks the watches in', () => {
+  // Nov 20: sorted only, a community with a backlog of overdue sites took
+  // the run ahead of another community's, night after night.
+  it('takes the communities in turn within each kind, a different one first each night', () => {
+    const at = (id: string, communityId: string, hours: number) => ({ ...w(id), communityId, lastRunAt: hoursAgo(hours) })
+    const philly = [at('p1', 'philly', 50), at('p2', 'philly', 49), at('p3', 'philly', 48)]
+    const ues = [at('u1', 'ues', 40)]
+    const tonight = ids(orderForRun([...philly, ...ues], NOW))
+    const tomorrow = ids(orderForRun([...philly, ...ues], NOW + 86_400_000))
+    expect(tonight.slice(0, 2).sort()).toEqual(['p1', 'u1'])
+    expect(tonight.slice(2)).toEqual(['p2', 'p3'])
+    expect(tomorrow[0]).not.toBe(tonight[0])
+    // Still the more important first: ues's kosher list ahead of philly's sites.
+    const kosher = { ...KOSHER, communityId: 'ues' }
+    expect(ids(orderForRun([...philly, kosher], NOW))[0]).toBe('kosher')
+  })
+
   it('most important first when all ran last night, whatever order they were added in', () => {
     expect(ids(orderForRun([MENU, SITE, MIKVAH, ERUV, HOSPITAL, KOSHER], NOW))).toEqual(['kosher', 'hospital', 'eruv', 'mikvah', 'site', 'menu'])
   })

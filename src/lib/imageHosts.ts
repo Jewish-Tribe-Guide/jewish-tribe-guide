@@ -136,3 +136,72 @@ export function storageThumbnailUrl(src: string, px: number): string | null {
     return null
   }
 }
+
+/** The width a host-resized copy is asked for, at most: the largest of
+ *  next.config.ts's deviceSizes. A 3840 request for a hero would be bytes no
+ *  screen here shows. */
+const LARGEST_COPY = 1920
+
+/** Unsplash serves through imgix, which resizes on its own CDN: `w` sets the
+ *  width (height follows the photo's shape, so a pasted `h` is dropped) and
+ *  `auto=format` picks WebP or AVIF for the browser. */
+function unsplashCopy({ src, width, quality }: { src: string; width: number; quality?: number }): string {
+  const url = new URL(src)
+  url.searchParams.delete('h')
+  url.searchParams.set('w', String(Math.min(width, LARGEST_COPY)))
+  url.searchParams.set('q', String(quality ?? 60))
+  url.searchParams.set('auto', 'format')
+  return url.toString()
+}
+
+/** Supabase Storage's own resize (the render endpoint storageThumbnailUrl
+ *  uses), by width alone so the photo keeps its shape. */
+function storageCopy({ src, width, quality }: { src: string; width: number; quality?: number }): string {
+  const url = new URL(src)
+  url.pathname = url.pathname.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
+  url.search = ''
+  url.searchParams.set('width', String(Math.min(width, LARGEST_COPY)))
+  url.searchParams.set('quality', String(quality ?? 70))
+  return url.toString()
+}
+
+const UNSPLASH_HOSTS = new Set(['images.unsplash.com', 'plus.unsplash.com'])
+
+/** How next/image should fetch `src`, as props to spread onto it.
+ *
+ *  A photo whose own host resizes (Unsplash, our Storage) gets a `loader`
+ *  that asks that host for each width in the srcset: the browser fetches a
+ *  copy the size it draws, and Vercel's optimizer, metered and sometimes
+ *  switched off (above), is never involved. Until Nov 20 these went through
+ *  the optimizer or, with it off, whole: a 2070px Unsplash photo for a 108px
+ *  home tile, 159 KB, on the live site's phone home.
+ *
+ *  Storage photos go to the optimizer while it's on, and to Storage's own
+ *  copies (honouring STORAGE_THUMBNAILS_DISABLED) while it's off. Anything
+ *  else is as before: the optimizer for a listed host, the original for the
+ *  rest. */
+export function photoProps(src: string): { loader?: (p: { src: string; width: number; quality?: number }) => string; unoptimized?: boolean } {
+  try {
+    const url = new URL(src)
+    if (url.protocol === 'https:') {
+      if (UNSPLASH_HOSTS.has(url.hostname)) return { loader: unsplashCopy }
+      const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
+      // Storage only stands in for the optimizer when it's off: its WebP is
+      // heavier than the optimizer's copy (the desktop home's map photo,
+      // 1280px: 207 KB against under 150), though far lighter than the
+      // original (475 KB).
+      if (
+        !isOptimizableImage(src) &&
+        process.env.NEXT_PUBLIC_STORAGE_THUMBNAILS_DISABLED !== '1' &&
+        supabase &&
+        url.hostname === new URL(supabase).hostname &&
+        url.pathname.startsWith('/storage/v1/object/public/')
+      ) {
+        return { loader: storageCopy }
+      }
+    }
+  } catch {
+    // Not a URL: next/image is handed it as it is, unoptimized, below.
+  }
+  return { unoptimized: !isOptimizableImage(src) }
+}

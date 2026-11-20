@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 
 // The Home page settings light up, in the preview beside them, the part of
 // the real page each box changes. Only a real browser lays the page out.
@@ -6,7 +7,7 @@ import { expect, test } from '@playwright/test'
 
 test('hovering a box lights its part of the preview, and Phone shows the phoneâ€™s', async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 700 })
-  await page.goto('/philly/admin/home')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/home`)
   const frame = page.frameLocator('iframe[title="Preview"]')
   const lit = frame.locator('[data-spot-lit]')
 
@@ -31,7 +32,7 @@ test('hovering a box lights its part of the preview, and Phone shows the phoneâ€
 
 test('the computer preview shows the whole page, and opens full size on a click', async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 })
-  await page.goto('/philly/admin/home')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/home`)
   const shown = page.getByRole('button', { name: 'Open the preview' })
   const frame = page.frameLocator('iframe[title="Preview"]')
   await expect(frame.locator('body')).toBeVisible({ timeout: 20_000 })
@@ -73,7 +74,7 @@ test('the computer preview shows the whole page, and opens full size on a click'
   await expect(full).toBeVisible()
   await page.goBack()
   await expect(shown).toBeVisible()
-  await expect(page).toHaveURL(/\/philly\/admin\/home$/)
+  await expect(page).toHaveURL(new RegExp(`/${WRITE_SUITE_COMMUNITY}/admin/home$`))
   await page.goForward()
   await expect(full).toBeVisible()
 })

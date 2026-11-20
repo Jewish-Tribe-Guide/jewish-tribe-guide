@@ -43,17 +43,20 @@ export function unchanged(response: Response): Response {
   return response
 }
 
-async function afterWrite(run: () => Promise<Response>, label: string): Promise<Response> {
+/** `community`: the one the write was for, so only its pages go stale;
+ *  left out (the site owner's routes), every community's. */
+async function afterWrite(run: () => Promise<Response>, label: string, community?: string): Promise<Response> {
+  const invalidate = () => revalidatePublicContent(community ? { communities: [community] } : {})
   let response: Response
   try {
     response = await run()
   } catch (err) {
     console.error(`[${label}] failed:`, err)
-    await revalidatePublicContent()
+    await invalidate()
     return Response.json({ ok: false, errors: ['Something went wrong. Try again.'] }, { status: 502 })
   }
   const refused = response.status >= 400 && response.status < 500
-  if (!refused && !nothingWritten.has(response)) await revalidatePublicContent()
+  if (!refused && !nothingWritten.has(response)) await invalidate()
   return response
 }
 
@@ -78,7 +81,7 @@ export function adminWrite<R extends Request, P>(handler: (request: R, admin: Ad
     const community = await resolveCommunity(communitySlugFromRequest(request))
     const admin = await getAdminUserForCommunity(request, community.slug)
     if (!admin) return NOT_AUTHORIZED()
-    return afterWrite(() => handler(request, { community, admin }, ctx as P), labelOf(request))
+    return afterWrite(() => handler(request, { community, admin }, ctx as P), labelOf(request), community.slug)
   }
 }
 

@@ -12,6 +12,14 @@ vi.mock('@/lib/communityContext', () => ({ useCommunitySlug: () => 'philly' }))
 vi.mock('@/lib/contentContext', () => ({ useSiteSettings: () => ({ name: 'Philly Jewish Guide' }) }))
 vi.mock('@/lib/features', () => ({ features: { todayHome: false, whatChanged: false } }))
 vi.mock('@/lib/useTodo', () => ({ useTodoCount: () => nav.count }))
+// Next's Link, with whether it keeps Next's scroll on navigation shown.
+vi.mock('next/link', () => ({
+  default: ({ scroll, children, ...rest }: { scroll?: boolean; children?: React.ReactNode } & React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a data-scroll={scroll === false ? 'kept' : 'next'} {...rest}>
+      {children}
+    </a>
+  ),
+}))
 
 afterEach(() => {
   cleanup()
@@ -191,6 +199,16 @@ describe('AdminFrame', () => {
     fireEvent.click(bar.getByRole('link', { name: 'To do' }))
     expect(heard).toHaveBeenCalledTimes(1)
     window.removeEventListener(ADMIN_AREA_TAPPED, heard)
+  })
+
+  it('leaves the scroll alone when the open area is tapped, so To do can put its list back', () => {
+    show('/philly/admin')
+    for (const name of ['Admin', 'Admin areas']) {
+      const links = within(screen.getByRole('navigation', { name })).getAllByRole('link')
+      const scroll = Object.fromEntries(links.map((a) => [a.textContent, a.getAttribute('data-scroll')]))
+      expect(scroll['To do'], name).toBe('kept')
+      expect(scroll['Places'], name).toBe('next')
+    }
   })
 
   // The user, Nov 5: on an iPhone, Site → Home page with Phone picked jumped

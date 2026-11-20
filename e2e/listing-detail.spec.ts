@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, listingWithFourActions, openListingEditor, ready } from './helpers'
+import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, listingWithFourActions, openListingEditor, ready, settled } from './helpers'
 import { changedByTests } from './suiteRows'
 
 // Desktop opens a listing in the list's own column, the map staying beside
@@ -203,12 +203,17 @@ test.describe('listing detail — desktop', () => {
     await ready(page)
     const search = page.getByRole('searchbox', { name: `Search ${category.pluralLabel}` })
     await expect(search).toBeVisible()
+    // And with its arrival over: the screen fades in rising 6px (fadeIn,
+    // 180ms), and a "before" read mid-rise found the search up to 6px
+    // low (CI, Nov 19-20; locally 4 runs in 10).
+    await settled(page)
     const before = (await search.boundingBox())!
 
     await page.getByRole('button', { name: /^Show details for / }).first().click()
     const column = page.getByTestId('listing-column')
     await expect(column).toBeVisible()
     await expect(search).toBeVisible()
+    await settled(page)
     const after = (await search.boundingBox())!
     expect(Math.abs(after.y - before.y), 'the search moved when the listing opened').toBeLessThanOrEqual(1)
     expect((await column.boundingBox())!.y, 'the listing starts under the search').toBeGreaterThan(after.y + after.height)

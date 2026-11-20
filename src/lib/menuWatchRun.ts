@@ -87,13 +87,15 @@ export function newMenuReadBudget(): MenuReadBudget {
 /** Gives every food place its menu watch, on its menu link or else the page
  *  its latest reading found the menu on (menuWatch.ts), and takes away the
  *  run's own watches on pages no place's menu is on any more. Never touches
- *  a watch an admin added. Returns what it did, for the run's log. */
-export async function syncMenuWatches(): Promise<{ community: string; added: number; removed: number }[]> {
+ *  a watch an admin added. Returns what it did, for the run's log. `only`:
+ *  that community's alone (the watches run a community at a time). */
+export async function syncMenuWatches(only?: string): Promise<{ community: string; added: number; removed: number }[]> {
   const supabase = getAdminClient()
   const { data: communities, error } = await supabase.from('community').select('slug')
   if (error) throw new Error(`Couldn’t list the communities: ${error.message}`)
   const out = []
   for (const { slug } of (communities ?? []) as { slug: string }[]) {
+    if (only && slug !== only) continue
     const categories = (await listCategoriesUncached(slug)).filter(keepsMenuLink)
     if (categories.length === 0) continue
     const { data: rows, error: listError } = await supabase

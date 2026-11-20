@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import type { ReactNode } from 'react'
-import { isOptimizableImage } from '@/lib/imageHosts'
+import { photoProps } from '@/lib/imageHosts'
 import { categoryTint, categoryRing } from '@/lib/categoryColor'
 import { useIsMobile } from '@/lib/useIsMobile'
 
@@ -65,9 +65,9 @@ export function HeroTitle({ eyebrow, title, line }: { eyebrow?: string | null; t
  *  already communicates hierarchy on its own.
  *
  *  The frame breaks out to the full viewport width the same way
- *  ResourceMapView's mobile map band does (relative left-1/2 w-screen
+ *  ResourceMapView's mobile map band does (relative left-1/2 w-page
  *  -translate-x-1/2 — safe against horizontal scroll because the element is
- *  exactly 100vw, same reasoning as globals.css's html{overflow-x:hidden});
+ *  exactly the page's width, same reasoning as globals.css's html{overflow-x:hidden});
  *  the photo fills it edge to edge, while a nested max-w-6xl/px-4 column
  *  keeps `children` aligned with the rest of the page.
  *
@@ -103,11 +103,11 @@ export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, 
       // branch too, and there it should look like the phone page (which
       // has its own short picture, GenericDirectory) rather than flash a
       // computer's photo.
-      <div className="relative desktop:-mt-8 mx-[calc(50%-50vw)]" data-testid="category-hero">
+      <div className="relative desktop:-mt-8 bleed-x" data-testid="category-hero">
         <div className="relative hidden desktop:block" style={{ height: heroOverlap ? HERO_PHOTO_PX : HERO_TITLE_PHOTO_PX, marginBottom: heroOverlap ? -HERO_OVERLAP_PX : undefined }}>
           <div className="absolute inset-0 overflow-hidden" style={{ backgroundColor: color }}>
             {bandImage && (
-              <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover object-[center_55%]" unoptimized={!isOptimizableImage(bandImage)} />
+              <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover object-[center_55%]" {...photoProps(bandImage)} />
             )}
           </div>
           <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.78)_0%,rgba(15,23,42,0.55)_45%,rgba(15,23,42,0.15)_80%)]" />
@@ -124,7 +124,7 @@ export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, 
   }
 
   return (
-    // Full-bleed breakout via the calc(50% - 50vw) margin trick, not
+    // Full-bleed breakout via margins (`bleed-x`), not
     // left-1/2 + -translate-x-1/2 (what this used to do, and what
     // ResourceMapView's mobile band still does): a `translate` is a CSS
     // transform, and a transform on an ancestor creates a new containing
@@ -139,7 +139,7 @@ export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, 
     // Margins achieve the identical full-bleed layout without ever setting
     // a transform, so nothing downstream loses the viewport as its
     // containing block.
-    <div className="relative -mt-12 mx-[calc(50%-50vw)] border-t border-slate-200">
+    <div className="relative -mt-12 bleed-x border-t border-slate-200">
       <div
         // 132px, down from 224: short enough that the list and the map
         // beside it start above the fold on a 1440x900 screen.
@@ -147,7 +147,7 @@ export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, 
         style={!bandImage ? { backgroundColor: categoryTint(color) } : undefined}
       >
         {bandImage && (
-          <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover" unoptimized={!isOptimizableImage(bandImage)} />
+          <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover" {...photoProps(bandImage)} />
         )}
       </div>
       <div className="border-x border-slate-200">

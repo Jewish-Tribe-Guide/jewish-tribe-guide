@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   resources: [] as Record<string, unknown>[],
   watches: [] as Partial<Watch>[],
   runs: new Map<string, JobRun[]>(),
+  runsFor: [] as (string | undefined)[],
   google: [] as unknown[],
   sent: [] as { slug: string; subject: string; html: string }[],
 }))
@@ -38,7 +39,7 @@ vi.mock('./categoryStore', () => ({
   listCategoriesUncached: async () => [{ id: 'shul', label: 'Shul', pluralLabel: 'Synagogues', detailFields: [{ key: 'hechsher', label: 'Hechsher', type: 'text' }] }],
 }))
 vi.mock('./watchStore', () => ({ listWatches: async () => ({ watches: m.watches, available: true }) }))
-vi.mock('./jobRunStore', () => ({ recentJobRuns: async () => m.runs }))
+vi.mock('./jobRunStore', () => ({ recentJobRuns: async (community?: string) => (m.runsFor.push(community), m.runs) }))
 vi.mock('./nightNoteStore', () => ({ statusChangesSince: async () => m.google }))
 vi.mock('./email', () => ({
   adminAppUrl: () => 'https://guide.example',
@@ -117,6 +118,14 @@ describe('what stopped working', () => {
     expect(m.sent[0].html).toContain('South Philadelphia Shtiebel’s website')
     expect(m.sent[0].html).toContain('href="https://guide.example/philly/admin/watches/place/r2"')
     expect(m.sent[0].html.match(/Stopped working · (\d)/)?.[1]).toBe('1')
+  })
+
+  // Nov 20: the watches run a community at a time; another community's
+  // run breaking isn't this community's job stopping.
+  it('reads the community’s own job runs', async () => {
+    m.runsFor.length = 0
+    await sendNightlyEmails(NOW)
+    expect(m.runsFor).toEqual(['philly'])
   })
 
   it('a watch by what it is', () => {

@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js'
 import {
   ADMIN_WRITE_TEST_ADMIN_EMAIL,
   CACHE_TEST_ADMIN_EMAIL,
-  resolveDefaultCommunityAdminEmail,
 } from '../scripts/cacheE2eAdmin.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -14,7 +13,7 @@ import {
 // suite (see playwright.admin-write.config.ts).
 //
 // The "clone from" case seeds its own source community + category directly
-// via the service-role key rather than depending on whatever 'philly'
+// via the service-role key rather than depending on whatever a real community
 // happens to hold in this shared test project at the moment — that state is
 // mutated by every other spec in this suite and isn't this test's to assume.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -96,16 +95,9 @@ test('creating a community through the real UI, starting empty, makes it live wi
   // process.env.SUPERADMIN_EMAILS here — that's set inside the webServer's
   // own child process (run-test-project-server.mjs), not visible to this
   // Playwright test process — so it's recomputed the same way instead.
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  // resolveDefaultCommunityAdminEmail's fallback matters here: this suite's
-  // own server process (run-test-project-server.mjs) authorizes BOTH
-  // CACHE_TEST_ADMIN_EMAIL and ADMIN_WRITE_TEST_ADMIN_EMAIL (see that
-  // script's own comment on why it lists both regardless of which suite is
-  // actually running), so both are genuine superadmins here, not just the
-  // one this suite happens to authenticate as.
-  const testAdminEmail = await resolveDefaultCommunityAdminEmail(supabaseUrl, serviceRoleKey, ADMIN_WRITE_TEST_ADMIN_EMAIL)
-  const expectedSuperadmins = Array.from(new Set([CACHE_TEST_ADMIN_EMAIL, ADMIN_WRITE_TEST_ADMIN_EMAIL, testAdminEmail]))
+  // Both suites' admins: run-test-project-server.mjs lists both, whichever
+  // suite started it.
+  const expectedSuperadmins = [CACHE_TEST_ADMIN_EMAIL, ADMIN_WRITE_TEST_ADMIN_EMAIL]
   for (const email of expectedSuperadmins) {
     expect(created!.admin_emails).toContain(email)
   }

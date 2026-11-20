@@ -9,8 +9,12 @@
 // tests that picked `cache-roundtrip-seed` — "the first listing category" —
 // while the cache suite was renaming it.
 //
-// So every existing row a suite changes is claimed here, by one suite only,
-// and every test that picks "a category" skips the claimed ones.
+// The two write suites change their own community, `e2e-writes`
+// (scripts/writeSuiteCommunity.mjs), never the one e2e reads, so e2e and
+// its build can run beside them. They still share it with each other, and
+// integration still writes where it likes, so every existing row a suite
+// changes is claimed here, by one suite only, and every test that picks "a
+// category" skips the claimed ones.
 // `src/test/suiteRows.test.ts` reads every suite's source and fails when a
 // test writes a row its suite hasn't claimed, when two suites claim the
 // same row, or when a test picks from the category list without skipping
@@ -26,16 +30,16 @@ export const SUITE_ROWS = {
     // Renamed and restored over and over to prove a save reaches the page.
     'category:cache-roundtrip-seed',
     'page:about',
-    'site_settings:philly',
+    'site_settings:e2e-writes',
   ],
   'admin-write': [
     // Pages its tests make in the admin and delete again, all named `e2e-…`.
     'category:e2e-*',
     'page:privacy',
     // The team list: an admin is added, and removed in `finally`.
-    'community:philly',
+    'community:e2e-writes',
     // job-off turns a watch job off and on again.
-    'watch_job:philly',
+    'watch_job:e2e-writes',
   ],
   'form-roundtrip': [],
   integration: [

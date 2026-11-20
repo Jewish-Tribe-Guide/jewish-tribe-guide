@@ -19,6 +19,10 @@ describe('admin tab title', () => {
     expect((await meta('philly')).title).toBe('Admin · Philly Jewish Guide')
   })
 
+  it('keeps every community’s console out of search results', async () => {
+    expect((await meta('riverton')).robots).toEqual({ index: false, follow: false })
+  })
+
   it('leaves an unknown community to the 404', async () => {
     expect(await meta('nowhere')).toEqual({})
   })

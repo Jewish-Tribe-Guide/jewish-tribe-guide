@@ -19,6 +19,29 @@
  * empty box centred on it catches the touch (Nov 18, review item 39). It
  * needs room around it: a parent that clips (overflow) clips the box too,
  * and a neighbour's box closer than 44px overlaps it. */
+/* Full width, as wide as the page and no wider. `100vw` counts the
+ * scrollbar, which takes room on Windows and Linux (globals.css keeps it
+ * reserved on every page), so a band that was `100vw` overhung the page by
+ * the scrollbar's width: cut off on the left, the page nudgeable sideways
+ * (Nov 20). `cqw` is <html>'s width (it's the page's container, below),
+ * which is the page's, scrollbar or not. A script measuring the scrollbar
+ * did this first and missed it on CI's Linux browser (measured 0px, the
+ * band 7.5px over each edge). Browsers without container units (Safari
+ * before 16) keep `100vw`. In @supports, as two plain declarations get
+ * merged into the last by the CSS build. */
+@utility bleed-x {
+  margin-inline: calc(50% - 50vw);
+  @supports (width: 1cqw) {
+    margin-inline: calc(50% - 50cqw);
+  }
+}
+@utility w-page {
+  width: 100vw;
+  @supports (width: 1cqw) {
+    width: 100cqw;
+  }
+}
+
 @utility tap-44 {
   position: relative;
   &::after {
@@ -47,10 +70,10 @@
  *
  * This is the backstop: cap the page itself at the viewport width, so no
  * fix elsewhere in the tree can regress into a repeat of that. It doesn't
- * conflict with the app's one legitimate full-bleed technique (the mobile
- * map's edge-to-edge band, `w-screen` + `left-1/2` + `-translate-x-1/2` in
- * ResourceMapView) — that trick centers an element that's exactly 100vw wide,
- * so it never actually extends past the viewport edge either. */
+ * conflict with the app's full-bleed bands (`bleed-x`, or `w-page` +
+ * `left-1/2` + `-translate-x-1/2`): they are exactly the page's width, so
+ * they never extend past its edge. (They used `100vw`, which counts the
+ * scrollbar, and did, by its width, until Nov 20.) */
 /* The admin's pages don't bounce past their ends. On an iPhone, a short one
  * (Site → Home page, Phone) pulled past its bottom jumped back to the top:
  * the browser bar's height flickers a pixel during the bounce, and that
@@ -97,6 +120,10 @@ html {
    * where this is simply a no-op (the flash this fixes elsewhere still
    * happens there, not a regression from adding this). */
   scrollbar-gutter: stable;
+  /* The page's container, so `cqw` is the page's width without the
+   * scrollbar (bleed-x, w-page). <html>, not <body>: body has the notch's
+   * safe-area padding, and a band reaches under it. */
+  container-type: inline-size;
 }
 
 @theme {

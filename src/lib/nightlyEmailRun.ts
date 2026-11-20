@@ -51,7 +51,8 @@ export function stoppedWatch(w: Watch, names: ReadonlyMap<string, string>, slug:
 }
 
 /** The jobs that stopped working last night: their latest run, since
- *  `since`, broke them (jobAlert). The jobs run for the whole site. */
+ *  `since`, broke them (jobAlert). `runs` are the community's own and
+ *  the whole site's (recentJobRuns). */
 export function stoppedJobs(runs: ReadonlyMap<string, readonly JobRun[]>, since: string, slug: string, now = Date.parse(since) + NIGHT_MS): StoppedRow[] {
   return NIGHTLY_JOBS.flatMap((job) => {
     const row = (why: string) => [{ name: `${job.name} (nightly job)`, why: why.charAt(0).toUpperCase() + why.slice(1), kind: 'job' as const, path: `/${encodeURIComponent(slug)}/admin/watches` }]
@@ -168,11 +169,12 @@ export type NightlyEmailRun = { communities: { slug: string; sent: boolean; wait
 
 /** Every community's email for last night; one failing doesn't stop the rest. */
 export async function sendNightlyEmails(now: Date = new Date()): Promise<NightlyEmailRun> {
-  const [communities, runs] = await Promise.all([listCommunities(), recentJobRuns()])
+  const communities = await listCommunities()
   const out: NightlyEmailRun['communities'] = []
   for (const c of communities) {
     try {
-      const night = await gatherNight(c, now, runs)
+      // Its own runs and the whole site's: the watches run a community at a time.
+      const night = await gatherNight(c, now, await recentJobRuns(c.slug))
       const email = buildNightlyEmail(night)
       if (email) await sendNightlyEmail(c.slug, email)
       out.push({ slug: c.slug, sent: !!email, waiting: night.waiting.length, stopped: night.stopped.length })

@@ -4,7 +4,7 @@ import { getAdminClient } from './supabase/admin'
 import { listApprovedResources } from './resourceStore'
 import { listEruvim } from './eruvStore'
 import { resolveCommunity } from './communityStore'
-import { runTableMissing, kindsColumnMissing } from './jobRunStore'
+import { runTableMissing, kindsColumnMissing, communityColumnMissing, ownOrSiteRuns } from './jobRunStore'
 import { nameNight, nightsFrom, NIGHT_JOBS, type NamedNight, type NightRun } from './validatedNights'
 import type { JobId, RunKinds } from './jobRuns'
 
@@ -20,13 +20,15 @@ export async function listNights(community: string): Promise<NamedNight[]> {
   'use cache'
   cacheTag(TAGS.changes(community), TAGS.resources(community))
   cacheLife('hours')
-  const { data, error } = await getAdminClient()
-    .from('job_run')
-    .select('job, started_at, finished_at, kinds')
-    .in('job', NIGHT_JOBS as JobId[])
-    .not('finished_at', 'is', null)
-    .order('started_at', { ascending: false })
-    .limit(RUNS_READ)
+  // Its own runs and the whole site's: another community's watches run of
+  // the same night would otherwise stand in for its own (nightsFrom keeps
+  // a night's latest). Without migration 101, every run, as before.
+  const read = (own: boolean) => {
+    const q = getAdminClient().from('job_run').select('job, started_at, finished_at, kinds').in('job', NIGHT_JOBS as JobId[]).not('finished_at', 'is', null)
+    return (own ? q.or(ownOrSiteRuns(community)) : q).order('started_at', { ascending: false }).limit(RUNS_READ)
+  }
+  let { data, error } = await read(true)
+  if (error && communityColumnMissing(error.message)) ({ data, error } = await read(false))
   // Before migrations 086 and 087 there's nothing to show.
   if (error) {
     if (runTableMissing(error.message) || kindsColumnMissing(error.message)) return []

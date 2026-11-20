@@ -12,7 +12,7 @@ import DirectoryHeader from './DirectoryHeader'
 import { TellAboutContext } from './tellAbout'
 import DistanceNote from './DistanceNote'
 import Image from 'next/image'
-import { isOptimizableImage } from '@/lib/imageHosts'
+import { photoProps } from '@/lib/imageHosts'
 import { NextMinyans } from './nextMinyans'
 import { CategoryBandFrame } from './CategoryBandFrame'
 import FiltersSheet from './FiltersSheet'
@@ -1716,8 +1716,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           edge, in the gap under the header (32px on a phone: -mt-8). Its
           title is the header's. */}
       {tilePhoto && !phonePage && (
-        <div className="relative -mt-8 mb-3 mx-[calc(50%-50vw)] h-[120px] overflow-hidden desktop:hidden" data-testid="category-phone-picture">
-          <Image src={tilePhoto} alt="" fill sizes="100vw" className="object-cover object-[center_55%]" unoptimized={!isOptimizableImage(tilePhoto)} />
+        <div className="relative -mt-8 mb-3 bleed-x h-[120px] overflow-hidden desktop:hidden" data-testid="category-phone-picture">
+          <Image src={tilePhoto} alt="" fill sizes="100vw" className="object-cover object-[center_55%]" {...photoProps(tilePhoto)} />
         </div>
       )}
       {addressPrompt && !anchorLabel && !phonePage && <DistanceNote className="desktop:hidden pb-3" />}

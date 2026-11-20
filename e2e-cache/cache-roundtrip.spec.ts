@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import { previewSettings } from '../e2e/helpers'
 import { IN_FLIGHT_RENDER_GRACE_MS } from '../src/lib/inFlightRenderGrace'
+import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The other half of caching.spec.ts.
@@ -50,21 +51,21 @@ test('an admin save reaches the cached public page', async ({ request }) => {
   }
   const authHeaders = { Authorization: `Bearer ${accessToken}` }
 
-  const initialPage = await request.get('/')
-  const community = new URL(initialPage.url()).pathname.split('/').filter(Boolean)[0]
-  expect(community, 'the "/" redirect should land on a community').toBeTruthy()
+  // The write suites' own community (scripts/writeSuiteCommunity.mjs),
+  // never the one the read-only e2e suite reads.
+  const community = WRITE_SUITE_COMMUNITY
 
-  const beforeRes = await request.get('/api/admin/site-settings', { headers: authHeaders })
+  const beforeRes = await request.get(`/api/admin/site-settings?community=${community}`, { headers: authHeaders })
   expect(beforeRes.ok(), 'GET /api/admin/site-settings should succeed with the minted admin token').toBe(true)
   const before = await beforeRes.json()
   expect(before.ok).toBe(true)
   const originalName: string = before.settings.name
 
   const newName = `Cache round-trip check ${Date.now()}`
-  expect(titleTag(await initialPage.text())).not.toBe(newName)
+  expect(titleTag(await (await request.get(`/${community}`)).text())).not.toBe(newName)
 
   try {
-    const patchRes = await request.patch('/api/admin/site-settings', {
+    const patchRes = await request.patch(`/api/admin/site-settings?community=${community}`, {
       headers: authHeaders,
       data: { name: newName },
     })
@@ -90,7 +91,7 @@ test('an admin save reaches the cached public page', async ({ request }) => {
   } finally {
     // site_settings is a singleton row, not something this test created — put
     // it back even if an assertion above failed.
-    await request.patch('/api/admin/site-settings', {
+    await request.patch(`/api/admin/site-settings?community=${community}`, {
       headers: authHeaders,
       data: { name: originalName },
     })
@@ -118,14 +119,12 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
   const authHeaders = { Authorization: `Bearer ${accessToken}` }
 
   // /about moved under /[community] (for the header/footer that comes with
-  // living there — see AboutPage's own doc) — same "/" redirect trick the
-  // site-settings test above uses to find which community this project's
-  // seed data actually uses.
-  const initialPage = await request.get('/')
-  const community = new URL(initialPage.url()).pathname.split('/').filter(Boolean)[0]
-  expect(community, 'the "/" redirect should land on a community').toBeTruthy()
+  // living there — see AboutPage's own doc).
+  // The write suites' own community (scripts/writeSuiteCommunity.mjs),
+  // never the one the read-only e2e suite reads.
+  const community = WRITE_SUITE_COMMUNITY
 
-  const beforeRes = await request.get('/api/admin/pages', { headers: authHeaders })
+  const beforeRes = await request.get(`/api/admin/pages?community=${community}`, { headers: authHeaders })
   expect(beforeRes.ok(), 'GET /api/admin/pages should succeed with the minted admin token').toBe(true)
   const before = await beforeRes.json()
   expect(before.ok).toBe(true)
@@ -137,7 +136,7 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
   expect(await (await request.get(`/${community}/about`)).text()).not.toContain(newBody)
 
   try {
-    const patchRes = await request.patch('/api/admin/pages/about', {
+    const patchRes = await request.patch(`/api/admin/pages/about?community=${community}`, {
       headers: authHeaders,
       data: { body: newBody },
     })
@@ -159,7 +158,7 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
     // Worth its own assertion because the sanitizer rewrites what it stores
     // (see the PATCH route), so "what I sent" and "what was saved" are not the
     // same claim.
-    const savedRes = await request.get('/api/admin/pages', { headers: authHeaders })
+    const savedRes = await request.get(`/api/admin/pages?community=${community}`, { headers: authHeaders })
     const saved = (await savedRes.json()).pages.find((p: { slug: string }) => p.slug === 'about')
     expect(
       saved?.body,
@@ -201,7 +200,7 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
         throw new Error(`${err.message}\n\nlast ${Math.min(seen.length, 12)} of ${seen.length} polls: ${tail}`)
       })
   } finally {
-    await request.patch('/api/admin/pages/about', {
+    await request.patch(`/api/admin/pages/about?community=${community}`, {
       headers: authHeaders,
       data: { body: originalBody },
     })
@@ -241,13 +240,14 @@ test('an admin save lands even when /about is mid-regeneration', async ({ reques
   }
   const authHeaders = { Authorization: `Bearer ${accessToken}` }
 
-  const community = new URL((await request.get('/')).url()).pathname.split('/').filter(Boolean)[0]
-  expect(community, 'the "/" redirect should land on a community').toBeTruthy()
+  // The write suites' own community (scripts/writeSuiteCommunity.mjs),
+  // never the one the read-only e2e suite reads.
+  const community = WRITE_SUITE_COMMUNITY
 
-  const pagesRes = await request.get('/api/admin/pages', { headers: authHeaders })
+  const pagesRes = await request.get(`/api/admin/pages?community=${community}`, { headers: authHeaders })
   expect(pagesRes.ok()).toBe(true)
   const originalBody: string = (await pagesRes.json()).pages.find((p: { slug: string }) => p.slug === 'about').body
-  const settingsRes = await request.get('/api/admin/site-settings', { headers: authHeaders })
+  const settingsRes = await request.get(`/api/admin/site-settings?community=${community}`, { headers: authHeaders })
   expect(settingsRes.ok()).toBe(true)
   // Re-saved unchanged: the point is the invalidation the save performs, not
   // the value, so there is nothing to restore.
@@ -271,7 +271,7 @@ test('an admin save lands even when /about is mid-regeneration', async ({ reques
         })
         .toBe('HIT')
 
-      const settingsPatch = await request.patch('/api/admin/site-settings', {
+      const settingsPatch = await request.patch(`/api/admin/site-settings?community=${community}`, {
         headers: authHeaders,
         data: { name: siteName },
       })
@@ -287,7 +287,7 @@ test('an admin save lands even when /about is mid-regeneration', async ({ reques
       ).toBe('STALE')
 
       const marker = `Mid-regeneration check ${Date.now()} round ${round}`
-      const patchRes = await request.patch('/api/admin/pages/about', {
+      const patchRes = await request.patch(`/api/admin/pages/about?community=${community}`, {
         headers: authHeaders,
         data: { body: marker },
       })
@@ -316,7 +316,7 @@ test('an admin save lands even when /about is mid-regeneration', async ({ reques
         })
     }
   } finally {
-    await request.patch('/api/admin/pages/about', {
+    await request.patch(`/api/admin/pages/about?community=${community}`, {
       headers: authHeaders,
       data: { body: originalBody },
     })
@@ -343,8 +343,9 @@ test('two admin saves in quick succession both reach a category page mid-regener
   }
   const authHeaders = { Authorization: `Bearer ${accessToken}` }
 
-  const community = new URL((await request.get('/')).url()).pathname.split('/').filter(Boolean)[0]
-  expect(community, 'the "/" redirect should land on a community').toBeTruthy()
+  // The write suites' own community (scripts/writeSuiteCommunity.mjs),
+  // never the one the read-only e2e suite reads.
+  const community = WRITE_SUITE_COMMUNITY
 
   const slug = 'cache-roundtrip-seed'
   // The fixture's name, by the UNCACHED admin read and the cached public one.
@@ -497,9 +498,9 @@ test('an already-open tab picks up an admin edit when it regains focus', async (
   }
   const authHeaders = { Authorization: `Bearer ${accessToken}` }
 
-  const initialPage = await request.get('/')
-  const community = new URL(initialPage.url()).pathname.split('/').filter(Boolean)[0]
-  expect(community, 'the "/" redirect should land on a community').toBeTruthy()
+  // The write suites' own community (scripts/writeSuiteCommunity.mjs),
+  // never the one the read-only e2e suite reads.
+  const community = WRITE_SUITE_COMMUNITY
 
   const catsRes = await request.get(`/api/categories?community=${community}`)
   expect(catsRes.ok(), 'GET /api/categories should succeed').toBe(true)
