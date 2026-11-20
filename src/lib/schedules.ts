@@ -57,7 +57,16 @@ export type SpecialSchedule = {
    *  and confirming there is nothing"). With no minyanim, no minyan that
    *  week. */
   whole?: true
+  /** A week's parts it speaks for (shulTimes.ts): the weekdays, Sunday to
+   *  Friday morning, and Shabbos, Friday night on. A week with only
+   *  Shabbos leaves Friday's Shacharis as it was, and one with only the
+   *  weekdays leaves Friday night. Absent: all of each day it covers. */
+  parts?: WeekPart[]
 }
+
+/** The two parts of a shul's week (shulTimes.ts has the rule). */
+export type WeekPart = 'weekdays' | 'shabbos'
+const WEEK_PARTS: readonly WeekPart[] = ['weekdays', 'shabbos']
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 const isDate = (s: unknown): s is string => typeof s === 'string' && DATE.test(s)
@@ -97,6 +106,7 @@ export function readSchedules(raw: unknown): SpecialSchedule[] {
         ...(typeof x.postedAt === 'string' && !Number.isNaN(Date.parse(x.postedAt)) ? { postedAt: x.postedAt } : {}),
         ...(x.postedBy === 'website' ? { postedBy: 'website' as const } : {}),
         ...(x.whole === true && x.kind === 'week' ? { whole: true as const } : {}),
+        ...(Array.isArray(x.parts) && x.kind === 'week' && x.parts.length && x.parts.every((p) => WEEK_PARTS.includes(p as WeekPart)) ? { parts: [...new Set(x.parts as WeekPart[])] } : {}),
       },
     ]
   })
@@ -238,6 +248,12 @@ function rowsOn(s: SpecialSchedule, d: DateFacts): ScheduledMinyan[] {
     })
 }
 
+/** Friday's halves: Shacharis is the weekdays' part, the rest Shabbos's. */
+const FRIDAY_HALVES: readonly { part: WeekPart; has: (t: Minyan['tefillah']) => boolean }[] = [
+  { part: 'weekdays', has: (t) => t === 'shacharis' },
+  { part: 'shabbos', has: (t) => t !== 'shacharis' },
+]
+
 /**
  * A shul's minyanim with its schedules applied for the given dates: the
  * regular rows (skipping the dates a schedule replaces them on) and each
@@ -248,17 +264,29 @@ export function withSchedules(
   schedules: readonly SpecialSchedule[],
   dates: readonly DateFacts[],
 ): { minyanim: ScheduledMinyan[]; posting: Record<string, DayPosting> } {
-  const skip: string[] = []
+  const skip = new Map<Minyan, string[]>()
   const extra: ScheduledMinyan[] = []
   const posting: Record<string, DayPosting> = {}
   for (const d of dates) {
-    const r = resolveDay(regular, schedules, d)
-    if (r.skip) skip.push(d.date)
-    extra.push(...r.rows)
-    posting[d.date] = r.posting
+    // Friday is two halves: its Shacharis is the weekdays', its evening
+    // Shabbos's, each taken from a schedule speaking for that part. A
+    // Shabbos-only week used to put the usual Friday Shacharis off.
+    const covered = d.weekday === 'fri' && schedules.some((s) => s.from <= d.date && d.date <= s.to)
+    const halves = covered ? FRIDAY_HALVES : [null]
+    const found: DayPosting[] = []
+    for (const half of halves) {
+      const own = (t: Minyan['tefillah']) => !half || half.has(t)
+      const reg = regular.filter((m) => own(m.tefillah))
+      const sch = half ? schedules.filter((s) => !s.parts || s.parts.includes(half.part)).map((s) => ({ ...s, minyanim: s.minyanim.filter((m) => own(m.tefillah)) })) : schedules
+      const r = resolveDay(reg, sch, d)
+      if (r.skip) for (const m of reg) skip.set(m, [...(skip.get(m) ?? []), d.date])
+      extra.push(...r.rows)
+      found.push(r.posting)
+    }
+    posting[d.date] = found.find((p) => p.kind === 'schedule' && p.thisWeek) ?? found.find((p) => p.kind === 'schedule') ?? found.at(-1)!
   }
   return {
-    minyanim: [...regular.map((m): ScheduledMinyan => (skip.length ? { ...m, skipDates: skip } : m)), ...extra],
+    minyanim: [...regular.map((m): ScheduledMinyan => (skip.has(m) ? { ...m, skipDates: skip.get(m)! } : m)), ...extra],
     posting,
   }
 }
@@ -298,7 +326,8 @@ export function formatSchedulesSummary(schedules: readonly SpecialSchedule[]): s
   if (schedules.length === 0) return '—'
   return schedules
     .map((s) => {
-      const head = `${s.name} · ${dateText(s.from)} – ${dateText(s.to)} · ${s.whole ? (s.minyanim.length ? 'their whole week' : 'no minyan') : s.mode === 'replace' ? 'in place of the regular times' : 'as well as the regular times'}`
+      const scope = s.parts?.length === 1 ? (s.parts[0] === 'shabbos' ? ' · Shabbos only' : ' · weekdays only') : ''
+      const head = `${s.name} · ${dateText(s.from)} – ${dateText(s.to)} · ${s.whole ? (s.minyanim.length ? 'their whole week' : 'no minyan') : s.mode === 'replace' ? 'in place of the regular times' : 'as well as the regular times'}${scope}`
       const lines = [...s.minyanim]
         .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time))
         .map((m) => [TEFILLAH_LABELS[m.tefillah], m.on.map(scheduleDayText).join(', '), m.time, m.season && SEASON_LABELS[m.season], m.signUp && signUpText(m.signUp), m.joinLink && joinText(m.joinLink), m.notes].filter(Boolean).join(' · '))

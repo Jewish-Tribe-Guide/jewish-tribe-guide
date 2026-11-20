@@ -518,3 +518,31 @@ describe('weekByDates', () => {
     expect(weekByDates({ name: 'Friday night', from: '2026-10-30', to: '2026-10-30' })).toBe(false)
   })
 })
+
+describe('Friday is two halves: its Shacharis the weekdays’, its evening Shabbos’s', () => {
+  // A plain week in November: Friday Nov 20, Shabbos Nov 21.
+  const nov = [factsFor('2026-11-19', [], '2026-11-21'), factsFor('2026-11-20', [], '2026-11-21'), factsFor('2026-11-21', [], '2026-11-21')]
+  const usual: Minyan[] = [m('sh', 'shacharis', ['thu', 'fri'], '7:00am'), m('ks', 'kabbalas_shabbos', ['fri'], '6:00pm'), m('ss', 'shacharis', ['sat'], '9:30am')]
+  const week = (over: Partial<SpecialSchedule>, minyanim: SpecialSchedule['minyanim']): SpecialSchedule => ({ id: 'w', name: 'This week', from: '2026-11-20', to: '2026-11-21', mode: 'replace', kind: 'week', whole: true, minyanim, ...over })
+  const onFriday = (sched: SpecialSchedule[]) => {
+    const w = withSchedules(usual, sched, nov)
+    return w.minyanim.filter((x) => (x.days.includes('fri') && !x.skipDates?.includes('2026-11-20')) || x.days.includes(dateKey('2026-11-20'))).map((x) => `${x.tefillah} ${x.time}`)
+  }
+
+  it('the Shtiebel: a Shabbos-only week leaves Friday’s usual Shacharis and replaces Friday night', () => {
+    expect(onFriday([week({ parts: ['shabbos'] }, [{ id: 'a', tefillah: 'kabbalas_shabbos', on: ['2026-11-20'], time: '4:30pm' }])])).toEqual(['shacharis 7:00am', 'kabbalas_shabbos 4:30pm'])
+  })
+
+  it('a weekdays-only week gives Friday’s Shacharis and leaves Friday night as it was', () => {
+    expect(onFriday([week({ parts: ['weekdays'], from: '2026-11-15', to: '2026-11-20' }, [{ id: 'a', tefillah: 'shacharis', on: ['2026-11-20'], time: '7:30am' }])])).toEqual(['kabbalas_shabbos 6:00pm', 'shacharis 7:30am'])
+  })
+
+  it('a week of both parts with no Friday Shacharis has none', () => {
+    expect(onFriday([week({ parts: ['weekdays', 'shabbos'], from: '2026-11-15' }, [{ id: 'a', tefillah: 'kabbalas_shabbos', on: ['2026-11-20'], time: '4:30pm' }])])).toEqual(['kabbalas_shabbos 4:30pm'])
+  })
+
+  it('a week’s parts are kept when read back, and nothing else is', () => {
+    expect(readSchedules([{ ...week({}, []), parts: ['shabbos', 'shabbos'] }])[0].parts).toEqual(['shabbos'])
+    expect(readSchedules([{ ...week({}, []), parts: ['monday'] }])[0]).not.toHaveProperty('parts')
+  })
+})
