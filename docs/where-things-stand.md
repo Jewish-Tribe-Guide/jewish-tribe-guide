@@ -890,6 +890,12 @@ Fix first:
 2. **Anyone can backdate or erase a listing's "Still right?" date**: the
    confirm route has no Turnstile and `unconfirm_*` takes the caller's
    `p_previous`. Cuts against "confirmed means a person confirmed it".
+   **Built Nov 20**: the server reads the date before a Yes and hands the
+   browser a signed note of it (`src/lib/confirmUndo.ts`, keyed off the
+   service-role key, one listing and box, a day); the undo restores only
+   what the note says and ignores dates from the browser. No migration.
+   An undo from a tab opened before the deploy fails once ("couldn't
+   save"). Route tests: 10 red against the old route.
 3. **No backups or restore procedure** in the repo; the plan's backups
    and PITR need the user to check in Supabase. Photos in Storage too.
 4. **A broken alert path is silent**: the nightly email is the only

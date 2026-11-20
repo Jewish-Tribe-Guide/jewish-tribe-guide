@@ -151,23 +151,18 @@ describe('FreshnessFooter', () => {
     expect(screen.queryByRole('button', { name: /suggest/i })).toBeNull()
   })
 
-  // Undo sends back what this browser was handed, so the server can refuse to
-  // undo a confirmation someone else made since, and take this one back out
-  // of the activity log.
-  it('on undo, sends back its own stamp and log id along with the previous stamp', async () => {
+  // Undo sends back the server's signed note and the log id, and nothing
+  // of its own: the date an undo restores is the server's to say (Nov 20).
+  it('on undo, sends back the server’s undo note and log id, and no dates', async () => {
     const spy = mockFetch(
-      { ok: true, confirmedAt: '2026-09-25T15:00:00.000Z', changed: true, activityId: 42 },
+      { ok: true, confirmedAt: '2026-09-25T15:00:00.000Z', changed: true, activityId: 42, undo: 'note.sig' },
       { ok: true, confirmedAt: '2026-05-01T00:00:00.000Z', changed: true },
     )
     render(<FreshnessFooter resourceId="r1" confirmedAt="2026-05-01T00:00:00.000Z" />)
     fireEvent.click(await screen.findByRole('button', { name: 'Yes' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Undo' }))
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(2))
-    expect(JSON.parse(spy.mock.calls[1][1]!.body as string)).toEqual({
-      previousConfirmedAt: '2026-05-01T00:00:00.000Z',
-      confirmedAt: '2026-09-25T15:00:00.000Z',
-      activityId: 42,
-    })
+    expect(JSON.parse(spy.mock.calls[1][1]!.body as string)).toEqual({ undo: 'note.sig', activityId: 42 })
   })
 
   // The listing on screen came with the page, before the Yes: closing it and

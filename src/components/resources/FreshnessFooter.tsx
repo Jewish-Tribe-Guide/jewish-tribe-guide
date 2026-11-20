@@ -83,12 +83,13 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
   const [previousConfirmedAt, setPreviousConfirmedAt] = useState<string | undefined>(undefined)
   const [justConfirmedNow, setJustConfirmedNow] = useState(false)
   // What the server handed back for this browser's own confirmation, sent
-  // back on undo: the stamp lets the server refuse to undo if someone else
-  // has confirmed since, and the activity id takes it back out of the log.
+  // back on undo: `undo` is the server's signed note of the date before
+  // (only the server says what an undo restores, src/lib/confirmUndo.ts),
+  // and the activity id takes it back out of the log.
   // `undoable` is false when the tap landed inside the server's cooldown
   // (someone confirmed minutes ago): nothing changed, so there's nothing to
   // undo, and offering Undo would restore a stamp this browser never set.
-  const [mine, setMine] = useState<{ confirmedAt: string; activityId: number | null; undoable: boolean } | null>(null)
+  const [mine, setMine] = useState<{ undo: string | null; activityId: number | null; undoable: boolean } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
 
@@ -101,12 +102,12 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
         section ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ section }) } : { method: 'POST' },
         { confirmedAt: new Date().toISOString(), changed: true, activityId: null },
       )
-      const json = (await res.json()) as { ok: boolean; confirmedAt?: string; changed?: boolean; activityId?: number | null }
+      const json = (await res.json()) as { ok: boolean; confirmedAt?: string; changed?: boolean; activityId?: number | null; undo?: string | null }
       if (json.ok && json.confirmedAt) {
         setPreviousConfirmedAt(confirmedAt)
         setConfirmedAt(json.confirmedAt)
         recordConfirmed(resourceId, section, json.confirmedAt)
-        setMine({ confirmedAt: json.confirmedAt, activityId: json.activityId ?? null, undoable: json.changed !== false })
+        setMine({ undo: json.undo ?? null, activityId: json.activityId ?? null, undoable: json.changed !== false })
         setJustConfirmedNow(true)
       } else {
         setError(true)
@@ -127,7 +128,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
         {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ previousConfirmedAt, confirmedAt: mine?.confirmedAt, activityId: mine?.activityId, ...(section ? { section } : {}) }),
+          body: JSON.stringify({ undo: mine?.undo, activityId: mine?.activityId, ...(section ? { section } : {}) }),
         },
         { confirmedAt: previousConfirmedAt ?? null },
       )
