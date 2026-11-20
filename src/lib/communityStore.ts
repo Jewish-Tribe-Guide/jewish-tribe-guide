@@ -129,17 +129,21 @@ export async function listCommunities(): Promise<Community[]> {
   cacheTag(TAGS.communities)
   cacheLife('days')
 
-  try {
-    const { data, error } = await getAdminClient()
-      .from('community')
-      .select('*')
-      .order('sort_order', { ascending: true })
-      .order('name', { ascending: true })
-    if (error || !data?.length) return [communityFromConfig()]
-    return (data as Row[]).map(toCommunity)
-  } catch {
-    return [communityFromConfig()]
-  }
+  // A failed read throws, and is never cached (Nov 20, the health sweep).
+  // It used to return the one community in the config, and 'use cache'
+  // kept that for days: one Supabase blip and every other community's
+  // pages sent visitors to the default for the rest of the cache's life.
+  // Thrown, the next request asks again, and a page being refreshed in the
+  // background keeps its last good copy. The config's community stays for
+  // a project with no communities yet: no table, or an empty one.
+  const { data, error } = await getAdminClient()
+    .from('community')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true })
+  if (error && !tableMissing('community', error.message)) throw new Error(`Couldn’t list the communities: ${error.message}`)
+  if (error || !data?.length) return [communityFromConfig()]
+  return (data as Row[]).map(toCommunity)
 }
 
 /** The community served when the visitor hasn't picked one — the row flagged

@@ -918,7 +918,10 @@ Fix first:
    bills monitors past its free allowance, so check the plan first. Red
    3/3 against the old code (the route guard, the job report, the email).
 5. **The community list caches its one-community fallback for days**
-   after any Supabase error (checked, `listCommunities`).
+   after any Supabase error (checked, `listCommunities`). **Built
+   Nov 20**: a failed read throws, so nothing is cached and the next
+   request asks again; the config's community only for a missing or empty
+   table. Red 2/2 against the old code.
 6. **`community_id` still defaults to 'philly'** on 9 tables; 027 says
    to drop it once a second community exists (checked).
 7. **`Map.groupBy` takes down a shul listing on iOS before 17.4**

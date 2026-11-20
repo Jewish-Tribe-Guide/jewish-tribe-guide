@@ -115,18 +115,25 @@ describe('listCommunities', () => {
     expect(result).toEqual([expect.objectContaining({ slug: CONFIG_COMMUNITY_SLUG, isDefault: true })])
   })
 
-  it('falls back to the config community on a Supabase error', async () => {
-    mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'down' } }))
+  it('falls back to the config community when the table isn’t there yet', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'relation "public.community" does not exist' } }))
     const result = await listCommunities()
     expect(result).toEqual([expect.objectContaining({ slug: CONFIG_COMMUNITY_SLUG, isDefault: true })])
   })
 
-  it('falls back to the config community if the query throws outright', async () => {
+  // A fallback returned here was cached for days: every other community's
+  // pages went to the default after one blip (Nov 20, the health sweep).
+  // Thrown, 'use cache' keeps nothing and the next request asks again.
+  it('throws on a Supabase error, so the fallback is never cached', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'down' } }))
+    await expect(listCommunities()).rejects.toThrow('Couldn’t list the communities: down')
+  })
+
+  it('throws when the query throws outright', async () => {
     mockFrom.mockImplementation(() => {
       throw new Error('connection refused')
     })
-    const result = await listCommunities()
-    expect(result).toEqual([expect.objectContaining({ slug: CONFIG_COMMUNITY_SLUG, isDefault: true })])
+    await expect(listCommunities()).rejects.toThrow('connection refused')
   })
 })
 
