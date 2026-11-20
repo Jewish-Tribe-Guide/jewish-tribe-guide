@@ -38,6 +38,14 @@ export const SUITE_ROWS = {
     'watch_job:philly',
   ],
   'form-roundtrip': [],
+  integration: [
+    // Its own pages, `Integration Test <id>`, deleted after each test. Not a
+    // borrowed row, but a run cancelled mid-test leaves one behind, and
+    // e2e's "every category with a map" walked into one with no Filters
+    // (PR 400, Nov 20).
+    'category:integration-test-*',
+    'category:vote-test-*',
+  ],
 } as const satisfies Record<string, readonly string[]>
 
 export type Suite = keyof typeof SUITE_ROWS
