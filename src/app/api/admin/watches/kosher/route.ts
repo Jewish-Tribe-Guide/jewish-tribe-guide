@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead, adminWrite } from '@/lib/adminRoute'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { getListReads, listWatches } from '@/lib/watchStore'
@@ -213,7 +214,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
       others,
     })
   } catch (err) {
-    console.error('[admin/watches/kosher] GET failed:', err)
+    reportServerError('[admin/watches/kosher] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the kosher lists.'] }, { status: 502 })
   }
 })
@@ -253,7 +254,7 @@ async function restore(slug: string, body: Record<string, unknown> | null, admin
     after(() => runWalkRoutesAfterChange(slug))
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[admin/watches/kosher] restore failed:', err)
+    reportServerError('[admin/watches/kosher] restore failed:', err)
     return Response.json({ ok: false, errors: ['Could not bring it back.'] }, { status: 502 })
   }
 }
@@ -338,7 +339,7 @@ export const POST = adminWrite(async (request: Request, { community, admin }) =>
     if (!(action === 'archive' && found.operation === 'delete')) await rejectSubmission(found.id, slug, admin.email)
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[admin/watches/kosher] POST failed:', err)
+    reportServerError('[admin/watches/kosher] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })
   }
 })

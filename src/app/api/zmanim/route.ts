@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { getZmanimData } from '@/lib/zmanim'
 import { parseZmanimRequest, zmanimDateCheck } from '@/lib/zmanimRequest'
 import { enforceRateLimit } from '@/lib/rateLimit'
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
     const data = await getZmanimData({ latitude: parsed.latitude, longitude: parsed.longitude, timezone: parsed.timezone })
     return Response.json({ ok: true, data }, { headers: { 'Cache-Control': cacheControl } })
   } catch (err) {
-    console.error('[zmanim] fetch failed:', err)
+    reportServerError('[zmanim] fetch failed:', err)
     return Response.json({ ok: false, error: 'Could not load zmanim right now.' }, { status: 502 })
   }
 }

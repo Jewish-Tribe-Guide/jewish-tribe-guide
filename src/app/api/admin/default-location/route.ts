@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { revalidateTag } from 'next/cache'
 import { adminRead, adminWrite } from '@/lib/adminRoute'
 import { TAGS } from '@/lib/cacheTags'
@@ -16,7 +17,7 @@ export const GET = adminRead(async (_request: Request, { community }) => {
     if (!location) return Response.json({ ok: false, errors: ['No such community.'] }, { status: 404 })
     return Response.json({ ok: true, ...location })
   } catch (err) {
-    console.error('[admin/default-location] GET failed:', err)
+    reportServerError('[admin/default-location] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the default location.'] }, { status: 502 })
   }
 })
@@ -44,7 +45,7 @@ export const PUT = adminWrite(async (request: Request, { community }) => {
     return Response.json({ ok: true, ...saved })
   } catch (err) {
     if (err instanceof RangeError) return Response.json({ ok: false, errors: [err.message] }, { status: 400 })
-    console.error('[admin/default-location] PUT failed:', err)
+    reportServerError('[admin/default-location] PUT failed:', err)
     return Response.json({ ok: false, errors: ['Could not save the default location.'] }, { status: 502 })
   }
 })

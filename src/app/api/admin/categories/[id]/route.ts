@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminWrite, unchanged } from '@/lib/adminRoute'
 import { isPlaceKind, type PlaceKind } from '@/lib/placeKinds'
 import type { NextRequest } from 'next/server'
@@ -144,7 +145,7 @@ export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx:
     }
     return Response.json({ ok: true, category, cleared, renamed })
   } catch (err) {
-    console.error('[admin/categories/:id] PATCH failed:', err)
+    reportServerError('[admin/categories/:id] PATCH failed:', err)
     // The columns a save can reach before the database has them.
     if (body.placeKind !== undefined && err instanceof Error && /place_kind/.test(err.message)) {
       return Response.json(
@@ -196,7 +197,7 @@ export const DELETE = adminWrite(async (request: NextRequest, { community }, ctx
     removeLaterIfUnused(before, 'category')
     return Response.json({ ok: true, ...counts })
   } catch (err) {
-    console.error('[admin/categories/:id] DELETE failed:', err)
+    reportServerError('[admin/categories/:id] DELETE failed:', err)
     return Response.json({ ok: false, errors: ['Could not delete category.'] }, { status: 502 })
   }
 })

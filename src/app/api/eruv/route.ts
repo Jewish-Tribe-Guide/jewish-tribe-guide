@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { eruvMapsVersion, listEruvim, saveStatusRead } from '@/lib/eruvStore'
 import { candlesToday, refreshStale } from '@/lib/eruvReader'
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
     const eruvimForVisitors = read.map(({ statusError: _why, ...e }) => e)
     return Response.json({ ok: true, available: true, timezone: community.timezone, candles, eruvim: eruvimForVisitors, mapsVersion }, { headers: { 'Cache-Control': CACHE_CONTROL } })
   } catch (err) {
-    console.error('[eruv] GET failed:', err)
+    reportServerError('[eruv] GET failed:', err)
     return Response.json({ ok: false, eruvim: [] }, { status: 502 })
   }
 }

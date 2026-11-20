@@ -18,10 +18,12 @@
 //
 // Auth: as sync-hours (cronAuth.ts); the calls it makes send the secret.
 
+import { reportServerError } from '@/lib/serverError'
 import { after, NextRequest, NextResponse } from 'next/server'
 import { cronAuthorized } from '@/lib/cronAuth'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { runWatches } from '@/lib/watchesRun'
+import { cronHeartbeat } from '@/lib/cronHeartbeat'
 
 export const maxDuration = 300
 
@@ -46,10 +48,10 @@ async function startEach(req: NextRequest): Promise<NextResponse> {
       url.searchParams.set('community', slug)
       try {
         const res = await fetch(url, { method: 'POST', headers, cache: 'no-store', signal: AbortSignal.timeout(START_WAIT_MS) })
-        if (!res.ok) console.error(`[cron/watches] ${slug}’s run didn’t start: ${res.status}`)
+        if (!res.ok) reportServerError(`[cron/watches] ${slug}’s run didn’t start: ${res.status}`)
         return { community: slug, started: res.ok, status: res.status }
       } catch (err) {
-        console.error(`[cron/watches] ${slug}’s run didn’t start:`, err)
+        reportServerError(`[cron/watches] ${slug}’s run didn’t start:`, err)
         return { community: slug, started: false, error: err instanceof Error ? err.message : String(err) }
       }
     }),
@@ -60,7 +62,7 @@ async function startEach(req: NextRequest): Promise<NextResponse> {
 async function handle(req: NextRequest): Promise<NextResponse> {
   if (!cronAuthorized(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   const community = req.nextUrl.searchParams.get('community')
-  if (!community) return await startEach(req)
+  if (!community) return await cronHeartbeat('watches', () => startEach(req))
   if (!(await communitySlugs()).includes(community)) return NextResponse.json({ ok: false, error: 'No such community' }, { status: 404 })
   // Its five minutes count from now; the call that started it is answered
   // at once, so it isn't held open for the run.
@@ -68,7 +70,7 @@ async function handle(req: NextRequest): Promise<NextResponse> {
   after(() =>
     runWatches(community, started).then(
       () => undefined,
-      (err) => console.error(`[cron/watches] ${community}’s run failed:`, err),
+      (err) => reportServerError(`[cron/watches] ${community}’s run failed:`, err),
     ),
   )
   return NextResponse.json({ ok: true, community, started: true }, { status: 202 })

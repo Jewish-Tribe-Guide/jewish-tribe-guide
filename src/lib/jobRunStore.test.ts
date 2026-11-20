@@ -56,6 +56,9 @@ vi.mock('./supabase/admin', () => ({
 const sent = vi.hoisted(() => [] as unknown[])
 vi.mock('./email', () => ({ sendJobAlert: async (alert: unknown) => void sent.push(alert), sendNightlyEmail: async (_slug: string, e: unknown) => void sent.push(e) }))
 
+const reported = vi.hoisted(() => [] as unknown[][])
+vi.mock('./serverError', () => ({ reportServerError: (...args: unknown[]) => void reported.push(args) }))
+
 const { recordJobRun, listJobRuns, recentJobRuns } = await import('./jobRunStore')
 
 const START = new Date('2026-10-24T07:47:00.000Z')
@@ -113,6 +116,20 @@ describe('recordJobRun', () => {
   it('a job that throws is saved as failed, and the error passed on', async () => {
     await expect(recordJobRun('sync-hours', async () => Promise.reject(new Error('Google answered 403')), () => ({ ok: true, summary: '' }), clock())).rejects.toThrow('Google answered 403')
     expect(db.calls.find((c) => c.op === 'update')!.values).toMatchObject({ ok: false, error: 'Google answered 403' })
+  })
+
+  // The Watches tab and the nightly email were the only places a broken
+  // job showed, and the email is a job too (Nov 20, the health sweep).
+  it('a job that throws, or says it failed, is reported to Sentry; one that works isn’t', async () => {
+    reported.length = 0
+    const boom = new Error('Google answered 403')
+    await expect(recordJobRun('sync-hours', async () => Promise.reject(boom), () => ({ ok: true, summary: '' }), clock())).rejects.toThrow()
+    await recordJobRun('nightly-email', async () => null, () => ({ ok: false, summary: 'Sent to 1 community', error: 'ues: couldn’t send' }), clock())
+    await recordJobRun('watches', async () => null, () => ({ ok: true, summary: 'Checked 1', warning: 'one site down' }), clock(), 'philly')
+    expect(reported).toEqual([
+      ['[job sync-hours] stopped with an error:', boom],
+      ['[job nightly-email] failed:', 'ues: couldn’t send'],
+    ])
   })
 
   // Before migration 086, or with the database down: the job runs as

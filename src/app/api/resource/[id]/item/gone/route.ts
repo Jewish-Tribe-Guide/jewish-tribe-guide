@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { revalidateTag } from 'next/cache'
 import { after } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/admin'
@@ -43,7 +44,7 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
     const community = await editableCommunity(id)
     if (community instanceof Response) return community
   } catch (err) {
-    console.error('[item/gone] could not read the listing:', err)
+    reportServerError('[item/gone] could not read the listing:', err)
     return Response.json(FAILED, { status: 502 })
   }
 
@@ -56,7 +57,7 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
     p_now: new Date().toISOString(),
   })
   if (error) {
-    console.error('[item/gone] mark_item failed:', error)
+    reportServerError('[item/gone] mark_item failed:', error)
     return Response.json(FAILED, { status: 502 })
   }
   const row = ((data ?? []) as MarkRow[])[0]
@@ -95,9 +96,9 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
       null,
     )
     submissionId = submission.id
-    after(() => sendSubmissionNotification(submission).catch((err) => console.error('[item/gone] Admin notification failed:', err)))
+    after(() => sendSubmissionNotification(submission).catch((err) => reportServerError('[item/gone] Admin notification failed:', err)))
   } catch (err) {
-    console.error('[item/gone] could not file the removal:', err)
+    reportServerError('[item/gone] could not file the removal:', err)
     await undoMark()
     return Response.json(FAILED, { status: 502 })
   }
@@ -133,7 +134,7 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
   try {
     withdrawn = await withdrawPending(submissionId, id)
   } catch (err) {
-    console.error('[item/gone] could not withdraw the removal:', err)
+    reportServerError('[item/gone] could not withdraw the removal:', err)
     return Response.json({ ok: false, error: 'Could not undo that.' }, { status: 502 })
   }
   // Already reviewed (or too late): the admin's decision stands.
@@ -149,7 +150,7 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
     p_previous: null,
     p_restore_gone: null,
   })
-  if (error) console.error('[item/gone] unmark_item failed:', error)
+  if (error) reportServerError('[item/gone] unmark_item failed:', error)
   const row = ((data ?? []) as { out_community: string; out_changed: boolean }[])[0]
   if (typeof body.activityId === 'number' && Number.isSafeInteger(body.activityId)) {
     await removeVisitorActivity(body.activityId, id, 'item_reported_gone')

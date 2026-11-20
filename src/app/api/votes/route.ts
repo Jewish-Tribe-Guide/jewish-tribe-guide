@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { canVote, toggleVote, getVotedResourceIds } from '@/lib/voteStore'
 import { enforceRateLimit } from '@/lib/rateLimit'
 
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
     const resourceIds = await getVotedResourceIds(token)
     return Response.json({ ok: true, resourceIds })
   } catch (err) {
-    console.error('[votes] lookup failed:', err)
+    reportServerError('[votes] lookup failed:', err)
     return Response.json({ ok: false, error: 'Could not load your votes.' }, { status: 502 })
   }
 }
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
     // client-side — see UpvoteButton.tsx's remembered-count comment.
     return Response.json({ ok: true, ...result })
   } catch (err) {
-    console.error('[votes] toggle failed:', err)
+    reportServerError('[votes] toggle failed:', err)
     return Response.json({ ok: false, error: 'Could not record your vote.' }, { status: 502 })
   }
 }

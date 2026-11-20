@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { REPORT_PERIODS, type ReportPeriod } from '@/lib/reports'
 import { getReport } from '@/lib/reportsStore'
@@ -15,7 +16,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     const report = await getReport(community, asked as ReportPeriod)
     return Response.json({ ok: true, report })
   } catch (err) {
-    console.error('[admin/reports] GET failed:', err)
+    reportServerError('[admin/reports] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the reports.'] }, { status: 502 })
   }
 })

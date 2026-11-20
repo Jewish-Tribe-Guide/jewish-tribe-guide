@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { listArchivedResources } from '@/lib/resourceStore'
 import { listCategoriesUncached } from '@/lib/categoryStore'
@@ -16,7 +17,7 @@ export const GET = adminRead(async (_request: Request, { community }) => {
     const enriched = listings.map((l) => ({ ...l, categoryLabel: labelById.get(l.category) ?? l.category }))
     return Response.json({ ok: true, listings: enriched })
   } catch (err) {
-    console.error('[admin/archived-listings] GET failed:', err)
+    reportServerError('[admin/archived-listings] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load archived listings.'] }, { status: 502 })
   }
 })

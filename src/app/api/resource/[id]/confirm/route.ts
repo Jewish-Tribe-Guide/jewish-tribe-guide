@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { revalidateTag } from 'next/cache'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit } from '@/lib/rateLimit'
@@ -69,7 +70,7 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
     ? await getAdminClient().rpc('confirm_section', { p_id: id, p_section: section, p_now: now, p_cooldown_seconds: COOLDOWN_SECONDS })
     : await getAdminClient().rpc('confirm_resource', { p_id: id, p_now: now, p_cooldown_seconds: COOLDOWN_SECONDS })
   if (error) {
-    console.error('[confirm] rpc failed:', error)
+    reportServerError('[confirm] rpc failed:', error)
     return Response.json({ ok: false, error: 'Could not save confirmation.' }, { status: 502 })
   }
   const row = ((data ?? []) as RpcRow[])[0]
@@ -116,7 +117,7 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
     ? await getAdminClient().rpc('unconfirm_section', { p_id: id, p_section: section, p_expected: expected, p_previous: previous })
     : await getAdminClient().rpc('unconfirm_resource', { p_id: id, p_expected: expected, p_previous: previous })
   if (error) {
-    console.error('[confirm] undo rpc failed:', error)
+    reportServerError('[confirm] undo rpc failed:', error)
     return Response.json({ ok: false, error: 'Could not undo confirmation.' }, { status: 502 })
   }
   const row = ((data ?? []) as RpcRow[])[0]

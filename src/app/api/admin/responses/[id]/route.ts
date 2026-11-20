@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import type { NextRequest } from 'next/server'
 import { adminWrite, unchanged } from '@/lib/adminRoute'
 import { updateFormResponse, deleteFormResponse } from '@/lib/formResponseStore'
@@ -43,7 +44,7 @@ export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx:
     const res = Response.json({ ok: true, response })
     return body.contact !== undefined || body.data !== undefined ? res : unchanged(res)
   } catch (err) {
-    console.error('[admin/responses/:id] PATCH failed:', err)
+    reportServerError('[admin/responses/:id] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not update the request.'] }, { status: 502 })
   }
 })
@@ -56,7 +57,7 @@ export const DELETE = adminWrite(async (_request: NextRequest, { community }, ct
     if (!deleted) return Response.json({ ok: false, errors: ['Request not found.'] }, { status: 404 })
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[admin/responses/:id] DELETE failed:', err)
+    reportServerError('[admin/responses/:id] DELETE failed:', err)
     return Response.json({ ok: false, errors: ['Could not delete the request.'] }, { status: 502 })
   }
 })

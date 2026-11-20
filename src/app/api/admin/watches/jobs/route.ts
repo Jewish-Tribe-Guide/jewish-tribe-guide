@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { shareReads } from '@/lib/supabase/sharedReads'
 import { JOB_READS, type JobKey } from '@/lib/watchJobReads'
@@ -65,7 +66,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
           const res = await handler(new Request(url, { headers: request.headers }))
           return [key, res.ok ? await res.json() : null] as const
         } catch (err) {
-          console.error(`[admin/watches/jobs] ${key} failed:`, err)
+          reportServerError(`[admin/watches/jobs] ${key} failed:`, err)
           return [key, null] as const
         }
       }),

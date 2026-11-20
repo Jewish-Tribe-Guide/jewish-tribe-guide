@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminWrite } from '@/lib/adminRoute'
 import { getAdminClient } from '@/lib/supabase/admin'
 
@@ -59,7 +60,7 @@ export const POST = adminWrite(async (request: Request) => {
     const { data } = getAdminClient().storage.from(BUCKET).getPublicUrl(path)
     return Response.json({ ok: true, url: data.publicUrl })
   } catch (err) {
-    console.error('[admin/site-settings/logo] upload failed:', err)
+    reportServerError('[admin/site-settings/logo] upload failed:', err)
     return Response.json({ ok: false, errors: ['Upload failed. Please try again.'] }, { status: 502 })
   }
 })

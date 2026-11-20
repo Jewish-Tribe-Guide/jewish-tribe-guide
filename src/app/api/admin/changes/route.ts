@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead, adminWrite } from '@/lib/adminRoute'
 import { MissingHiddenColumnError, listChangeLogUncached, setChangeHidden } from '@/lib/changesStore'
 import { whatChanged } from '@/lib/whatChanged'
@@ -11,7 +12,7 @@ export const GET = adminRead(async (_request: Request, { community }) => {
     const rows = await listChangeLogUncached(community.slug)
     return Response.json({ ok: true, changes: whatChanged(rows, community.timezone, { includeHidden: true }), timezone: community.timezone })
   } catch (err) {
-    console.error('[admin/changes] GET failed:', err)
+    reportServerError('[admin/changes] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the changes.'] }, { status: 502 })
   }
 })
@@ -34,7 +35,7 @@ export const PATCH = adminWrite(async (request: Request, { community }) => {
     await setChangeHidden(community.slug, rowIds as number[], hidden)
   } catch (err) {
     if (err instanceof MissingHiddenColumnError) return Response.json({ ok: false, errors: [err.message] }, { status: 409 })
-    console.error('[admin/changes] PATCH failed:', err)
+    reportServerError('[admin/changes] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not save.'] }, { status: 502 })
   }
   return Response.json({ ok: true })

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { getSetupState } from '@/lib/setupStore'
 
@@ -8,7 +9,7 @@ export const GET = adminRead(async (_request: Request, { community }) => {
   try {
     return Response.json({ ok: true, setup: await getSetupState(community) })
   } catch (err) {
-    console.error('[admin/setup] GET failed:', err)
+    reportServerError('[admin/setup] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the setup.'] }, { status: 502 })
   }
 })

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { updateSubscriberByToken } from '@/lib/subscriberStore'
 
 type Body = {
@@ -42,7 +43,7 @@ export async function PATCH(request: Request) {
     }
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[subscribers/manage] update failed:', err)
+    reportServerError('[subscribers/manage] update failed:', err)
     return Response.json({ ok: false, errors: ['Something went wrong. Please try again.'] }, { status: 502 })
   }
 }

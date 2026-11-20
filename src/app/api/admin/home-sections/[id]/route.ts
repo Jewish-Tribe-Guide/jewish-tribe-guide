@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminWrite } from '@/lib/adminRoute'
 import type { NextRequest } from 'next/server'
 import { updateHomeSection, deleteHomeSection } from '@/lib/homeSectionStore'
@@ -36,7 +37,7 @@ export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx:
     }
     return Response.json({ ok: true, section })
   } catch (err) {
-    console.error('[admin/home-sections/:id] PATCH failed:', err)
+    reportServerError('[admin/home-sections/:id] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not update section.'] }, { status: 502 })
   }
 })
@@ -50,7 +51,7 @@ export const DELETE = adminWrite(async (request: NextRequest, { community }, ctx
     await deleteHomeSection(community.slug, id)
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[admin/home-sections/:id] DELETE failed:', err)
+    reportServerError('[admin/home-sections/:id] DELETE failed:', err)
     return Response.json({ ok: false, errors: ['Could not delete section.'] }, { status: 502 })
   }
 })

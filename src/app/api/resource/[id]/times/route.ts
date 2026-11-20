@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { after } from 'next/server'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
@@ -59,10 +60,10 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
       note,
       null,
     )
-    after(() => sendSubmissionNotification(submission).catch((err) => console.error('[times] Admin notification failed:', err)))
+    after(() => sendSubmissionNotification(submission).catch((err) => reportServerError('[times] Admin notification failed:', err)))
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[times] could not file the update:', err)
+    reportServerError('[times] could not file the update:', err)
     return Response.json(FAILED, { status: 502 })
   }
 }

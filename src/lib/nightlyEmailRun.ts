@@ -1,3 +1,4 @@
+import { reportServerError } from './serverError'
 import type { ResourceRow, SubmissionRow } from '@/types'
 import { getAdminClient } from './supabase/admin'
 import { listCommunities } from './communityStore'
@@ -179,7 +180,7 @@ export async function sendNightlyEmails(now: Date = new Date()): Promise<Nightly
       if (email) await sendNightlyEmail(c.slug, email)
       out.push({ slug: c.slug, sent: !!email, waiting: night.waiting.length, stopped: night.stopped.length })
     } catch (err) {
-      console.error(`[nightly-email] ${c.slug} failed:`, err)
+      reportServerError(`[nightly-email] ${c.slug} failed:`, err)
       out.push({ slug: c.slug, sent: false, waiting: 0, stopped: 0, error: err instanceof Error ? err.message : String(err) })
     }
   }

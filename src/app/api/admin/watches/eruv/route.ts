@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { listEruvimForAdmin } from '@/lib/eruvStore'
 import { addWatch, listWatches } from '@/lib/watchStore'
@@ -43,7 +44,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     const body: EruvJobLoaded = { available, timezone: community.timezone, eruvim, findings, watches: watches.filter(isEruvWebsiteWatch) }
     return Response.json({ ok: true, ...body })
   } catch (err) {
-    console.error('[admin/watches/eruv] GET failed:', err)
+    reportServerError('[admin/watches/eruv] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the eruvim.'] }, { status: 502 })
   }
 })
@@ -69,7 +70,7 @@ export const POST = adminRead(async (request: Request, { community }) => {
     const { watch: read } = await runAndRecord(watch)
     return Response.json({ ok: true, watch: read })
   } catch (err) {
-    console.error('[admin/watches/eruv] POST failed:', err)
+    reportServerError('[admin/watches/eruv] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not read its website.'] }, { status: 502 })
   }
 })

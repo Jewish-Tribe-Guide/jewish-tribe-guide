@@ -258,7 +258,11 @@ export function nightlyEmailOutcome(run: NightlyEmailRun): JobOutcome {
   const sent = run.communities.filter((c) => c.sent).length
   const failed = run.communities.filter((c) => c.error)
   const summary = sent ? `Sent to ${plural(sent, 'community', 'communities')}` : 'Nothing to send'
-  return { ok: true, summary, warning: failed.length ? `${failed.map((c) => c.slug).join(', ')}: couldn’t send` : null }
+  // A send that failed is a failed run, not a warning (Nov 20): the email is
+  // how admins hear of everything else, so its own failure must not read
+  // as fine.
+  if (failed.length) return { ok: false, summary, error: `${failed.map((c) => c.slug).join(', ')}: couldn’t send` }
+  return { ok: true, summary, warning: null }
 }
 
 // ── Telling the admins (Oct 24) ─────────────────────────────────────────────

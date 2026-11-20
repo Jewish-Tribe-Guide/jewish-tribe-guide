@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import {
   addCommunityAdminEmail,
@@ -25,7 +26,7 @@ export const GET = adminRead(async (_request: Request, { community, admin }) => 
     ])
     return Response.json({ ok: true, adminEmails, myNotify, myReviewNotify })
   } catch (err) {
-    console.error('[admin/team] GET failed:', err)
+    reportServerError('[admin/team] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the team list.'] }, { status: 502 })
   }
 })
@@ -60,7 +61,7 @@ export const PATCH = adminRead(async (request: Request, { community, admin }) =>
     ])
     return Response.json({ ok: true, myNotify, myReviewNotify })
   } catch (err) {
-    console.error('[admin/team] PATCH failed:', err)
+    reportServerError('[admin/team] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not update your notification preference.'] }, { status: 502 })
   }
 })
@@ -87,7 +88,7 @@ export const POST = adminRead(async (request: Request, { community }) => {
     const adminEmails = await addCommunityAdminEmail(community.slug, email)
     return Response.json({ ok: true, adminEmails })
   } catch (err) {
-    console.error('[admin/team] POST failed:', err)
+    reportServerError('[admin/team] POST failed:', err)
     const message = err instanceof Error ? err.message : 'Could not add that email.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }
@@ -116,7 +117,7 @@ export const DELETE = adminRead(async (request: Request, { community, admin }) =
     const adminEmails = await removeCommunityAdminEmail(community.slug, email)
     return Response.json({ ok: true, adminEmails })
   } catch (err) {
-    console.error('[admin/team] DELETE failed:', err)
+    reportServerError('[admin/team] DELETE failed:', err)
     return Response.json({ ok: false, errors: ['Could not remove that admin.'] }, { status: 502 })
   }
 })

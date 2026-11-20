@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminWrite } from '@/lib/adminRoute'
 import type { NextRequest } from 'next/server'
 import { saveDraft, deleteForm } from '@/lib/formStore'
@@ -44,7 +45,7 @@ export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx:
     if (!form) return Response.json({ ok: false, errors: ['Form not found.'] }, { status: 404 })
     return Response.json({ ok: true, form })
   } catch (err) {
-    console.error('[admin/forms/:id] PATCH failed:', err)
+    reportServerError('[admin/forms/:id] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not save draft.'] }, { status: 502 })
   }
 })
@@ -60,7 +61,7 @@ export const DELETE = adminWrite(async (request: NextRequest, { community }, ctx
     const { responses } = await deleteForm(community.slug, id)
     return Response.json({ ok: true, responses })
   } catch (err) {
-    console.error('[admin/forms/:id] DELETE failed:', err)
+    reportServerError('[admin/forms/:id] DELETE failed:', err)
     const message = err instanceof Error ? err.message : 'Could not delete form.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }

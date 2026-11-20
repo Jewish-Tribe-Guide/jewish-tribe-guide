@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { addEruv, listEruvimForAdmin, removeEruv, saveEmailRead, updateEruv, type AdminEruv } from '@/lib/eruvStore'
 import { keptEmailSays } from '@/lib/eruvEmail'
@@ -31,7 +32,7 @@ export const GET = adminRead(async (_request: Request, { community }) => {
     const { eruvim, available } = await listEruvimForAdmin(community.slug)
     return Response.json({ ok: true, available, timezone: community.timezone, eruvim })
   } catch (err) {
-    console.error('[admin/eruvim] GET failed:', err)
+    reportServerError('[admin/eruvim] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the eruvim.'] }, { status: 502 })
   }
 })
@@ -92,7 +93,7 @@ export const POST = adminRead(async (request: Request, { community }) => {
     }
     return bad('Unknown action.')
   } catch (err) {
-    console.error('[admin/eruvim] POST failed:', err)
+    reportServerError('[admin/eruvim] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })
   }
 })

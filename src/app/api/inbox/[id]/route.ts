@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import type { NextRequest } from 'next/server'
 import { getInboxViewer } from '@/lib/inboxAuth'
 import { updateFormResponse, deleteFormResponse } from '@/lib/formResponseStore'
@@ -34,7 +35,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/inbox/
     if (!response) return Response.json({ ok: false, errors: ['Request not found.'] }, { status: 404 })
     return Response.json({ ok: true, response })
   } catch (err) {
-    console.error('[inbox/:id] PATCH failed:', err)
+    reportServerError('[inbox/:id] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not update the request.'] }, { status: 502 })
   }
 }
@@ -50,7 +51,7 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/inbox
     if (!deleted) return Response.json({ ok: false, errors: ['Request not found.'] }, { status: 404 })
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[inbox/:id] DELETE failed:', err)
+    reportServerError('[inbox/:id] DELETE failed:', err)
     return Response.json({ ok: false, errors: ['Could not delete the request.'] }, { status: 502 })
   }
 }

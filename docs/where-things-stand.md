@@ -907,7 +907,16 @@ Fix first:
 4. **A broken alert path is silent**: the nightly email is the only
    alert and runs on what it watches; caught errors (AI reads, after()
    work) never reach Sentry. Fix: an outside heartbeat per cron, and one
-   `reportError()`.
+   `reportError()`. **Built Nov 20**: every caught error in `src/app/api`
+   (180 places, after() work included) goes through `reportServerError`
+   (`src/lib/serverError.ts`): logged as before and sent to Sentry, one
+   issue per place. A job that throws or says it failed is reported too,
+   and the nightly email counts a send that failed as a failed run (it was
+   a warning). The heartbeat is Sentry's cron monitors
+   (`src/lib/cronHeartbeat.ts`), one per job, **off until the user sets
+   `SENTRY_CRON_MONITORS=on`** in Vercel's production settings: Sentry
+   bills monitors past its free allowance, so check the plan first. Red
+   3/3 against the old code (the route guard, the job report, the email).
 5. **The community list caches its one-community fallback for days**
    after any Supabase error (checked, `listCommunities`).
 6. **`community_id` still defaults to 'philly'** on 9 tables; 027 says

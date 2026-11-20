@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { siteAdminRead } from '@/lib/adminRoute'
 import { TAGS } from '@/lib/cacheTags'
@@ -77,7 +78,7 @@ export const PATCH = siteAdminRead(async (request: Request, _admin, { params }: 
     revalidateRouteAfterInFlightRenders(routes[slug]('[community]'), 'page')
     return Response.json({ ok: true, page })
   } catch (err) {
-    console.error('[admin/pages] PATCH failed:', err)
+    reportServerError('[admin/pages] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not save page.'] }, { status: 502 })
   }
 })

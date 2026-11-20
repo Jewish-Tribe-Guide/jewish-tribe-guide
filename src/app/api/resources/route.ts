@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
       const resources = await listApprovedResources(community.slug, { category })
     return Response.json({ ok: true, resources })
   } catch (err) {
-    console.error('[resources] GET failed:', err)
+    reportServerError('[resources] GET failed:', err)
     return Response.json(
       { ok: false, errors: ['Could not load resources. Please try again.'] },
       { status: 502 },

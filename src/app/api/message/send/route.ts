@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { after } from 'next/server'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { isHoneypotTripped } from '@/lib/honeypot'
@@ -158,12 +159,12 @@ export async function POST(request: Request) {
     }
 
     after(async () => {
-      for (const s of filed) await sendSubmissionNotification(s).catch((err) => console.error('[message/send] Admin notification failed:', err))
+      for (const s of filed) await sendSubmissionNotification(s).catch((err) => reportServerError('[message/send] Admin notification failed:', err))
     })
     // The ids, for the email asked once at the end (/api/message/email).
     return Response.json({ ok: true, filed: filed.length, ids: filed.map((f) => f.id) })
   } catch (err) {
-    console.error('[message/send] could not file:', err)
+    reportServerError('[message/send] could not file:', err)
     return Response.json(FAILED, { status: 502 })
   }
 }

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { isAllowedAdminEmail, isAllowedForCommunity } from '@/lib/adminAuth'
 import { listCommunities } from '@/lib/communityStore'
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
 
     await sendAdminMagicLink(email, data.properties.action_link)
   } catch (err) {
-    console.error('[admin/request-link] failed:', err)
+    reportServerError('[admin/request-link] failed:', err)
     return Response.json({ ok: false, error: 'Could not send the sign-in link.' }, { status: 502 })
   }
 

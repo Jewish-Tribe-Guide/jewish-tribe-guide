@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { after, type NextRequest } from 'next/server'
 import { adminWrite } from '@/lib/adminRoute'
@@ -17,7 +18,7 @@ export const PATCH = adminWrite(async (_request: NextRequest, { community }, ctx
     after(() => runWalkRoutesAfterChange(community.slug))
     return Response.json({ ok: true, resource })
   } catch (err) {
-    console.error('[admin/archived-listings/:id] PATCH failed:', err)
+    reportServerError('[admin/archived-listings/:id] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not restore listing.'] }, { status: 502 })
   }
 })
@@ -33,7 +34,7 @@ export const DELETE = adminWrite(async (_request: NextRequest, { community }, ct
     }
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[admin/archived-listings/:id] DELETE failed:', err)
+    reportServerError('[admin/archived-listings/:id] DELETE failed:', err)
     return Response.json({ ok: false, errors: ['Could not permanently delete listing.'] }, { status: 502 })
   }
 })

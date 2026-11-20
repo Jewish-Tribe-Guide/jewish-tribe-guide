@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkLinksOutcome, jobAlert, jobHealth, LATE_AFTER_MS, lookAgainOutcome, needsLook, NIGHTLY_JOBS, nextRunAt, readMenusOutcome, syncHoursOutcome, walkRoutesOutcome, watchesOutcome, type JobRun } from './jobRuns'
+import { checkLinksOutcome, jobAlert, jobHealth, LATE_AFTER_MS, lookAgainOutcome, needsLook, NIGHTLY_JOBS, nextRunAt, nightlyEmailOutcome, readMenusOutcome, syncHoursOutcome, walkRoutesOutcome, watchesOutcome, type JobRun } from './jobRuns'
 
 const NOW = Date.parse('2026-10-24T12:00:00Z')
 const ago = (ms: number) => new Date(NOW - ms).toISOString()
@@ -137,6 +137,20 @@ describe('Look again’s run, in a line', () => {
     expect(lookAgainOutcome({ communities: [c({ tried: 0, found: 0, left: 0 })] })).toMatchObject({ summary: 'Nothing due', warning: null })
     expect(lookAgainOutcome({ communities: [c({ found: 0, failed: 2, left: 0 })] })).toEqual({ ok: true, summary: 'Tried 5 again', warning: '2 tries stopped with an error' })
     expect(lookAgainOutcome({ skipped: 'migration 092 (look_again) not run' })).toMatchObject({ warning: 'Not set up: migration 092 (look_again) not run' })
+  })
+})
+
+// The email is how admins hear of everything else, so a send that fails
+// is a failed run, not a warning that reads as fine (Nov 20).
+describe('the nightly email’s run, in a line', () => {
+  it('fails when a community’s email couldn’t be sent', () => {
+    const c = (slug: string, sent: boolean, error?: string) => ({ slug, sent, ...(error ? { error } : {}) })
+    expect(nightlyEmailOutcome({ communities: [c('philly', true), c('ues', false, 'Resend 500')] } as never)).toEqual({
+      ok: false,
+      summary: 'Sent to 1 community',
+      error: 'ues: couldn’t send',
+    })
+    expect(nightlyEmailOutcome({ communities: [c('philly', true), c('ues', false)] } as never)).toEqual({ ok: true, summary: 'Sent to 1 community', warning: null })
   })
 })
 

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import type { NextRequest } from 'next/server'
 import { adminRead } from '@/lib/adminRoute'
 import { countFieldOptionUsage } from '@/lib/resourceStore'
@@ -29,7 +30,7 @@ export const POST = adminRead(async (request: NextRequest, { community }, ctx: R
     const usage = await countFieldOptionUsage(community.slug, id, body.renames)
     return Response.json({ ok: true, usage })
   } catch (err) {
-    console.error('[admin/categories/:id/option-usage] POST failed:', err)
+    reportServerError('[admin/categories/:id/option-usage] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not check existing listings.'] }, { status: 502 })
   }
 })

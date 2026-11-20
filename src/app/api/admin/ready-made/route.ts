@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { listListingPagesEverywhere } from '@/lib/categoryStore'
 
@@ -11,7 +12,7 @@ export const GET = adminRead(async () => {
     const pages = await listListingPagesEverywhere()
     return Response.json({ ok: true, pages })
   } catch (err) {
-    console.error('[admin/ready-made] GET failed:', err)
+    reportServerError('[admin/ready-made] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the ready-made pages.'] }, { status: 502 })
   }
 })

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { revalidateTag } from 'next/cache'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit } from '@/lib/rateLimit'
@@ -33,7 +34,7 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
     p_cooldown_seconds: ITEM_COOLDOWN_SECONDS,
   })
   if (error) {
-    console.error('[item] mark_item failed:', error)
+    reportServerError('[item] mark_item failed:', error)
     return Response.json({ ok: false, error: 'Could not save that.' }, { status: 502 })
   }
   const row = ((data ?? []) as MarkRow[])[0]
@@ -87,7 +88,7 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
     try {
       if (await goneReportWaiting(id, tap.field, tap.item)) restoreGone = clearedGone as string
     } catch (err) {
-      console.error('[item] could not read the queue:', err)
+      reportServerError('[item] could not read the queue:', err)
     }
   }
 
@@ -101,7 +102,7 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
     p_restore_gone: restoreGone,
   })
   if (error) {
-    console.error('[item] unmark_item failed:', error)
+    reportServerError('[item] unmark_item failed:', error)
     return Response.json({ ok: false, error: 'Could not undo that.' }, { status: 502 })
   }
   const row = ((data ?? []) as { out_community: string; out_changed: boolean }[])[0]

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { listTags } from '@/lib/tagStore'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
     const tags = await listTags(community.slug, group)
     return Response.json({ ok: true, tags })
   } catch (err) {
-    console.error('[tags] GET failed:', err)
+    reportServerError('[tags] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load tags.'] }, { status: 502 })
   }
 }

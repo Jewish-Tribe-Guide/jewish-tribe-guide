@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { isAllowedInboxEmail } from '@/lib/inboxAuth'
 import { sendInboxMagicLink } from '@/lib/email'
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
 
     await sendInboxMagicLink(email, data.properties.action_link)
   } catch (err) {
-    console.error('[inbox/request-link] failed:', err)
+    reportServerError('[inbox/request-link] failed:', err)
     return Response.json({ ok: false, error: 'Could not send the sign-in link.' }, { status: 502 })
   }
 

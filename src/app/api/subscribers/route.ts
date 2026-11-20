@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { after } from 'next/server'
 import { createSubscriber } from '@/lib/subscriberStore'
 import { sendSubscribeConfirmation } from '@/lib/subscriberEmail'
@@ -74,11 +75,11 @@ export async function POST(request: Request) {
     // immediately and the platform tear the invocation down mid-send, same
     // as never scheduling it at all.
     after(async () => {
-      await sendSubscribeConfirmation(subscriber).catch((err) => console.error('[subscribers] confirmation email failed:', err))
+      await sendSubscribeConfirmation(subscriber).catch((err) => reportServerError('[subscribers] confirmation email failed:', err))
     })
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[subscribers] create failed:', err)
+    reportServerError('[subscribers] create failed:', err)
     return Response.json({ ok: false, errors: ['Something went wrong. Please try again.'] }, { status: 502 })
   }
 }

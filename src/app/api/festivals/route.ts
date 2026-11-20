@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { fetchFestivals } from '@/lib/festivals'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
     const festivals = await fetchFestivals(timezone)
     return Response.json({ ok: true, festivals }, { headers: { 'Cache-Control': CACHE_CONTROL } })
   } catch (err) {
-    console.error('[festivals] fetch failed:', err)
+    reportServerError('[festivals] fetch failed:', err)
     return Response.json({ ok: false, error: 'Could not load the calendar right now.' }, { status: 502 })
   }
 }

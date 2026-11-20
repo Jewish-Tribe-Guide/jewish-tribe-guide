@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { getCategoryById } from '@/lib/categoryStore'
 import { readEruvPage } from '@/lib/eruvReader'
@@ -77,7 +78,7 @@ export const POST = adminRead(async (request: Request, { community }) => {
     if (body?.slot === 'refuah') return Response.json({ ok: true, ...(await readRefuahNow(category, draft, url)) })
     return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
   } catch (err) {
-    console.error('[admin/read-now] failed:', err)
+    reportServerError('[admin/read-now] failed:', err)
     return Response.json({ ok: true, state: 'failed' })
   }
 })

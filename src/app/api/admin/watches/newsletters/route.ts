@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { listCategories } from '@/lib/categoryStore'
 import { listWatches } from '@/lib/watchStore'
@@ -42,7 +43,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
       { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (err) {
-    console.error('[admin/watches/newsletters] GET failed:', err)
+    reportServerError('[admin/watches/newsletters] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the newsletters.'] }, { status: 502 })
   }
 })
@@ -61,7 +62,7 @@ export const POST = adminRead(async (request: Request, { community }) => {
     if (!(await saveNewsletterWebApp(community.slug, link))) return Response.json({ ok: false, errors: ['Read now can’t be turned on here yet.'] }, { status: 503 })
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[admin/watches/newsletters] POST failed:', err)
+    reportServerError('[admin/watches/newsletters] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })
   }
 })

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { listHomeSections } from '@/lib/homeSectionStore'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
     const sections = await listHomeSections(community.slug)
     return Response.json({ ok: true, sections })
   } catch (err) {
-    console.error('[home-sections] GET failed:', err)
+    reportServerError('[home-sections] GET failed:', err)
     return Response.json(
       { ok: false, errors: ['Could not load home sections. Please try again.'] },
       { status: 502 },

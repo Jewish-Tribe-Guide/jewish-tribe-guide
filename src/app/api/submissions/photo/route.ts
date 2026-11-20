@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { imageTypeOf } from '@/lib/imageBytes'
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
     const { data } = getAdminClient().storage.from(BUCKET).getPublicUrl(path)
     return Response.json({ ok: true, url: data.publicUrl })
   } catch (err) {
-    console.error('[submissions/photo] upload failed:', err, 'ip:', clientIp(request))
+    reportServerError('[submissions/photo] upload failed:', err, 'ip:', clientIp(request))
     return Response.json({ ok: false, errors: ['Upload failed. Please try again.'] }, { status: 502 })
   }
 }

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAllowedAdminEmails } from '@/lib/adminAuth'
 import { siteAdminRead } from '@/lib/adminRoute'
@@ -41,7 +42,7 @@ export const GET = siteAdminRead(async () => {
     }))
     return Response.json({ ok: true, communities: withExtras })
   } catch (err) {
-    console.error('[admin/communities] GET failed:', err)
+    reportServerError('[admin/communities] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load communities.'] }, { status: 502 })
   }
 })
@@ -128,7 +129,7 @@ export const POST = siteAdminRead(async (request: Request) => {
 
     return Response.json({ ok: true, community })
   } catch (err) {
-    console.error('[admin/communities] POST failed:', err)
+    reportServerError('[admin/communities] POST failed:', err)
     const message = err instanceof Error ? err.message : 'Could not create community.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }

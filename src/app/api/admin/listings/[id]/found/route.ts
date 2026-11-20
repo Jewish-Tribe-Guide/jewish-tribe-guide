@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import type { NextRequest } from 'next/server'
 import { adminRead, adminWrite, unchanged } from '@/lib/adminRoute'
 import { latestEmailFrom } from '@/lib/gmailNow'
@@ -26,7 +27,7 @@ export const GET = adminRead(async (_request: NextRequest, { community }, ctx: R
   try {
     return Response.json({ ok: true, found: await pendingForListing(community.slug, id) })
   } catch (err) {
-    console.error('[admin/listings/found] GET failed:', err)
+    reportServerError('[admin/listings/found] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not see what it found.'] }, { status: 502 })
   }
 })
@@ -57,7 +58,7 @@ export const POST = adminWrite(async (request: NextRequest, { community, admin }
     for (const f of found) await approveSubmission(f.id, community.slug, admin.email)
     return Response.json({ ok: true, taken: found.length })
   } catch (err) {
-    console.error('[admin/listings/found] POST failed:', err)
+    reportServerError('[admin/listings/found] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not add that to the listing.'] }, { status: 502 })
   }
 })

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import type { NextRequest } from 'next/server'
 import { siteAdminWrite } from '@/lib/adminRoute'
 import {
@@ -96,7 +97,7 @@ export const PATCH = siteAdminWrite(async (request: NextRequest, _admin, ctx: Ro
       },
     })
   } catch (err) {
-    console.error('[admin/communities/:slug] PATCH failed:', err)
+    reportServerError('[admin/communities/:slug] PATCH failed:', err)
     const message = err instanceof Error ? err.message : 'Could not update the community.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }
@@ -136,7 +137,7 @@ export const DELETE = siteAdminWrite(async (request: NextRequest, _admin, ctx: R
     await deleteCommunity(slug)
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[admin/communities/:slug] DELETE failed:', err)
+    reportServerError('[admin/communities/:slug] DELETE failed:', err)
     const message = err instanceof Error ? err.message : 'Could not delete community.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }

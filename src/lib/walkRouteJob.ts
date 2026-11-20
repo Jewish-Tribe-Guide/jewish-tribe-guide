@@ -1,3 +1,4 @@
+import { reportServerError } from './serverError'
 import { listCommunities } from './communityStore'
 import { listCategoriesUncached } from './categoryStore'
 import { approvedListingsNow, saveWalkRoutes, walkRoutesOf } from './walkRouteStore'
@@ -54,6 +55,6 @@ export async function runWalkRoutes({ communities, budget }: { communities?: rea
 export function runWalkRoutesAfterChange(community: string): Promise<void> {
   return runWalkRoutes({ communities: [community], budget: 20 }).then(
     () => undefined,
-    (err) => console.error('[walk-routes] after a change failed:', err),
+    (err) => reportServerError('[walk-routes] after a change failed:', err),
   )
 }

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { GUIDE_PAGE_ERROR, isGuidePage } from '@/lib/guidePage'
 import { adminRead } from '@/lib/adminRoute'
 import { resolveCommunity } from '@/lib/communityStore'
@@ -179,7 +180,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     })
     return Response.json({ ok: true, available, name: hoursJobName(categories, job), places: rows })
   } catch (err) {
-    console.error('[admin/watches/hours] GET failed:', err)
+    reportServerError('[admin/watches/hours] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the places.'] }, { status: 502 })
   }
 })
@@ -309,7 +310,7 @@ export const POST = adminRead(async (request: Request, { community }) => {
     }
     return reply(on, stopped, { read: toRead(on) })
   } catch (err) {
-    console.error('[admin/watches/hours] POST failed:', err)
+    reportServerError('[admin/watches/hours] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })
   }
 })

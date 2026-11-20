@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { listChangeLog } from '@/lib/changesStore'
 import { whatChanged } from '@/lib/whatChanged'
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
     const rows = await listChangeLog(community.slug)
     return Response.json({ ok: true, latest: latestChangeByListing(whatChanged(rows, community.timezone)) })
   } catch (err) {
-    console.error('[changes] GET failed:', err)
+    reportServerError('[changes] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load what changed.'] }, { status: 502 })
   }
 }

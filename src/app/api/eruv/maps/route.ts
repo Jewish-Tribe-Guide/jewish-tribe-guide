@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { listEruvMapSources } from '@/lib/eruvStore'
 import { savedMap } from '@/lib/eruvLines'
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
     const maps = sources.map((source) => ({ id: source.id, map: savedMap(source, source.rawLine) }))
     return Response.json({ ok: true, maps: maps.filter((m) => m.map) }, { headers: { 'Cache-Control': CACHE_CONTROL } })
   } catch (err) {
-    console.error('[eruv/maps] GET failed:', err)
+    reportServerError('[eruv/maps] GET failed:', err)
     return Response.json({ ok: false, maps: [] }, { status: 502 })
   }
 }

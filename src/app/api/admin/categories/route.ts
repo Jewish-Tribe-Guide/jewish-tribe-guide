@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead, adminWrite } from '@/lib/adminRoute'
 import { isPlaceKind, type PlaceKind } from '@/lib/placeKinds'
 import { parseListingParts, type ListingParts } from '@/lib/listingParts'
@@ -21,7 +22,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     ])
     return Response.json({ ok: true, categories, ...(placeCounts && { placeCounts }) })
   } catch (err) {
-    console.error('[admin/categories] GET failed:', err)
+    reportServerError('[admin/categories] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load categories.'] }, { status: 502 })
   }
 })
@@ -98,7 +99,7 @@ export const POST = adminWrite(async (request: Request, { community }) => {
     })
     return Response.json({ ok: true, category })
   } catch (err) {
-    console.error('[admin/categories] POST failed:', err)
+    reportServerError('[admin/categories] POST failed:', err)
     const message = err instanceof Error ? err.message : 'Could not create category.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }

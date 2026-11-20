@@ -20,6 +20,7 @@
 // If CRON_SECRET is unset, the route runs unauthenticated — fine for local dev,
 // but set it in production so the endpoint can't be triggered by anyone.
 
+import { reportServerError } from '@/lib/serverError'
 import { jobsOffByCommunity } from '@/lib/jobOff'
 import { listAllWatches } from '@/lib/watchStore'
 import { NextRequest, NextResponse } from 'next/server'
@@ -135,7 +136,7 @@ async function runSync(): Promise<SyncHoursRun> {
   try {
     if (!(await keepStatusChanges(statusChanges))) await sendStatusChangeDigest(statusChanges)
   } catch (err) {
-    console.error('[sync-hours] status changes failed:', err)
+    reportServerError('[sync-hours] status changes failed:', err)
   }
 
   await pingHealthcheck(true)
