@@ -9,8 +9,9 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 // what the site should show instead of hardcoding it, and warm the cache
 // through it (Nov 18, review item 43). Read by e2e/warmup.setup.ts.
 export async function GET(request: Request) {
+  const slug = communitySlugFromRequest(request)
   try {
-    const community = await resolveCommunity(communitySlugFromRequest(request))
+    const community = await resolveCommunity(slug)
     const banners = await listCampaignBanners(community.slug)
     return Response.json({ ok: true, banners })
   } catch (err) {

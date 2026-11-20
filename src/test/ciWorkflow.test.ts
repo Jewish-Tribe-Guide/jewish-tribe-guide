@@ -126,6 +126,14 @@ describe('a PR’s checks start at once and e2e is split', () => {
     expect(needs('e2e-build')).toBe('')
   })
 
+  // A route that swallows Next's prerender stop still builds, so nothing
+  // else fails on it (scripts/buildLog.mjs, Nov 20).
+  it('e2e’s build fails on a prerender stop our code caught', () => {
+    const build = job('e2e-build')
+    expect(build).toMatch(/npm run build 2>&1 \| tee build\.log\n\s+shell: bash/)
+    expect(build).toContain('node scripts/buildLog.mjs build.log')
+  })
+
   it('e2e runs as shards, each running its own share', () => {
     const e2e = job('e2e')
     const shards = e2e.match(/shard:\s*\[([^\]]+)\]/)?.[1].split(',').map((s) => s.trim()) ?? []
@@ -239,7 +247,7 @@ describe('each build restores its own build cache', () => {
     const shards = jobs['e2e'] ?? ''
 
     it('e2e-build builds into the dist dir e2e starts, cached, and hands it over', () => {
-      expect(build).toMatch(/run: npm run build\n/)
+      expect(build).toMatch(/run: npm run build 2>&1 \| tee build\.log\n/)
       expect(build.match(/next-dist-dir:\s*(\S+)/)?.[1]).toBe(distDirFor('test:e2e'))
       expect(build).toMatch(/name: e2e-build\n\s+path: \|\n\s+\.next\/\n\s+!\.next\/cache\/\n\s+include-hidden-files: true/)
     })

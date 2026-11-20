@@ -10,8 +10,9 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 // through it (Nov 18, review item 43). Read by e2e/warmup.setup.ts,
 // e2e-form/form-submission.spec.ts.
 export async function GET(request: Request) {
+  const slug = communitySlugFromRequest(request)
   try {
-    const community = await resolveCommunity(communitySlugFromRequest(request))
+    const community = await resolveCommunity(slug)
     const forms = await listPublishedForms(community.slug)
     return Response.json({ ok: true, forms })
   } catch (err) {

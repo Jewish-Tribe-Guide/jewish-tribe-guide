@@ -10,8 +10,9 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 // through it (Nov 18, review item 43). Read by e2e/helpers.ts,
 // e2e/warmup.setup.ts.
 export async function GET(request: Request) {
+  const slug = communitySlugFromRequest(request)
   try {
-    const community = await resolveCommunity(communitySlugFromRequest(request))
+    const community = await resolveCommunity(slug)
     const sections = await listHomeSections(community.slug)
     return Response.json({ ok: true, sections })
   } catch (err) {

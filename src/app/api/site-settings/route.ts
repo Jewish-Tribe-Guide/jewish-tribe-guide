@@ -10,8 +10,9 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 // through it (Nov 18, review item 43). Read by e2e/helpers.ts,
 // warmup.setup.ts, budgets.spec.ts, share.spec.ts, admin.spec.ts.
 export async function GET(request: Request) {
+  const slug = communitySlugFromRequest(request)
   try {
-    const community = await resolveCommunity(communitySlugFromRequest(request))
+    const community = await resolveCommunity(slug)
     const settings = await getSiteSettings(community.slug)
     return Response.json({ ok: true, settings })
   } catch (err) {
