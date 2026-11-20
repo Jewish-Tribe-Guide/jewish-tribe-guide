@@ -917,18 +917,32 @@ Done (batch 2, saves, each red against the old code first):
   response and refreshes the listings itself (2 of 2 red). Not timed:
   the test project has no Google key.
 
+Done (batch 3, nightly jobs, each red against the old code first):
+
+- The morning watches take the communities in turn within each kind
+  (kosher lists, hospitals, overdue, then by priority), a different
+  community first each night, and each community has its own AI reads
+  (`orderForRun`, `budgetOf` in the watches route).
+- The Google hours sync refreshes only the communities it changed, and
+  says its 300s outright. Not made parallel: live it asks about 132
+  listings in 15s, so its 500 cap fits in a minute one at a time.
+
+Open, the user's call: the morning watches still share one run's 220s.
+Turns split it fairly, but a second community Philly's size (134–170s
+now) would leave both short each night. The fix is a run per community
+(the cron starting one per community, each its own 300s), which needs
+`job_run` to say which community a run was (a migration: live needs a
+yes) and the Watches tab to read its own community's runs.
+
 Still to do, in the user's order:
 
-1. **The nightly jobs per community**: the morning watches' AI caps and
-   220s are shared by all communities; the Google hours sync is one at a
-   time.
-2. **Housekeeping for growth**: the moderation History reads every
+1. **Housekeeping for growth**: the moderation History reads every
    approved and rejected change ever (no limit); composite indexes on
    `resource (community_id, status, category)`, `submission
    (community_id, status, created_at)` and `vote (voter_token)` (a
    migration: live needs a yes); per-category option renames write one
    row at a time.
-3. **CI** (11.4 min average): cache `node_modules` and `.next/cache`,
+2. **CI** (11.4 min average): cache `node_modules` and `.next/cache`,
    balance the e2e shards (skipped tests count toward a shard), about
    8 min. About 5.5 needs the write suites on a community of their own,
    so e2e stops waiting on them.
