@@ -37,7 +37,7 @@ import { cronAuthorized } from '@/lib/cronAuth'
 import { listAllWatches } from '@/lib/watchStore'
 import { BUILT_IN_WATCHES, runAndRecord, runWatch } from '@/lib/watchRunner'
 import { runEruvLines } from '@/lib/eruvLineRun'
-import { newMenuReadBudget, syncMenuWatches } from '@/lib/menuWatchRun'
+import { newMenuReadBudget, syncMenuWatches, type MenuReadBudget } from '@/lib/menuWatchRun'
 import { syncRefuahWatches } from '@/lib/refuahMatchRun'
 import { syncHoursWatches } from '@/lib/hoursJobRun'
 import { syncEruvWebsiteWatches } from '@/lib/eruvWebsiteRun'
@@ -115,7 +115,10 @@ async function runAll(started = Date.now()): Promise<Body> {
     return { ok: true, recorded: false, results, eruvLines: await lines, run }
   }
 
-  const budget = newMenuReadBudget()
+  // Each community its own AI reads (Nov 20): shared, the first community's
+  // pages could spend them all and leave another's changed menu unread.
+  const budgets = new Map<string, MenuReadBudget>()
+  const budgetOf = (community: string) => budgets.get(community) ?? budgets.set(community, newMenuReadBudget()).get(community)!
   // Without them, a listing's page goes by its label (watchGroupOf).
   const listings = await step('reading the listings', failedBefore, loadListings(watches.map((w) => w.communityId)), undefined)
   // What a community turned off isn't read, so it costs nothing (jobOff.ts).
@@ -135,7 +138,7 @@ async function runAll(started = Date.now()): Promise<Body> {
       // A watch that breaks is told of in the nightly email (nightlyEmail.ts).
       // What it found agreeing is kept for Activity (validatedDuring.ts).
       try {
-        const { result, validated: found } = await validatedDuring(() => runAndRecord(watch, undefined, budget))
+        const { result, validated: found } = await validatedDuring(() => runAndRecord(watch, undefined, budgetOf(watch.communityId)))
         if (found.length) validated.set(watch.id, found)
         return { id: watch.id, url: watch.url, ...result.outcome }
       } catch (err) {

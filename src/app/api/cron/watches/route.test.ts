@@ -101,7 +101,7 @@ describe('/api/cron/watches', () => {
   })
 
   // Oct 17: each food place's menu link has a watch, made by the run itself.
-  it('gives the menu links their watches first, then runs them on one shared AI budget', async () => {
+  it('gives the menu links their watches first, then runs a community’s on one shared AI budget', async () => {
     const order: string[] = []
     mockSyncMenus.mockImplementationOnce(async () => (order.push('sync'), [{ community: 'philly', added: 1, removed: 0 }]))
     mockList.mockImplementation(async () => (order.push('list'), {
@@ -119,6 +119,21 @@ describe('/api/cron/watches', () => {
     expect(mockMenu.mock.calls[0][0]).toMatchObject({ url: 'https://judah.example/menu', resourceId: 'r1', pageHash: 'old' })
     expect(mockMenu.mock.calls[0][1]).toBe(mockMenu.mock.calls[1][1])
     expect(mockWebsite).not.toHaveBeenCalled()
+  })
+
+  // Nov 20: one budget for every community let the first spend it all.
+  it('gives each community its own AI budget', async () => {
+    mockList.mockResolvedValue({
+      available: true,
+      watches: [
+        watch({ id: 'm1', url: 'https://judah.example/menu', resourceId: 'r1', createdBy: 'menu links' }),
+        watch({ id: 'm2', communityId: 'ues', url: 'https://sweetbox.example/menu', resourceId: 'r2', createdBy: 'menu links' }),
+      ],
+    })
+    mockMenu.mockResolvedValue({ ok: true, filed: 0, pageHash: 'h' })
+    await GET(request())
+    expect(mockMenu).toHaveBeenCalledTimes(2)
+    expect(mockMenu.mock.calls[0][1]).not.toBe(mockMenu.mock.calls[1][1])
   })
 
   // Oct 21: each hospital is matched to Refuah by the run itself.

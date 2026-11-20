@@ -4,6 +4,7 @@ import { refuahHospitalId } from './refuahWatch'
 import { isEruvWebsiteWatch } from './eruvWebsite'
 import { isListingPageWatch } from './listingPageWatch'
 import { isNewsletterWatch } from './newsletter'
+import { dayNumber, inTurn } from './inTurn'
 
 // ── The order the nightly run checks the watches in (Oct 24) ────────────────
 // They used to run in the order they were added, inside a minute, so on
@@ -45,15 +46,37 @@ const ALWAYS_FIRST: readonly WatchPriority[] = ['kosher', 'hospital']
 /** The active watches, in the order the night's run checks them: the
  *  kosher lists and hospitals, then any that missed a night (or never
  *  ran), then by priority, and the one checked longest ago first within
- *  each. */
-export function orderForRun<W extends Pick<Watch, 'active' | 'kind' | 'url' | 'createdBy' | 'lastRunAt'>>(watches: readonly W[], now: number): W[] {
+ *  each.
+ *
+ *  Communities take turns within each of those (Nov 20): one watch of
+ *  each in turn, a different community first each night. Sorted only, a
+ *  community with a backlog of overdue watches would take the run's time
+ *  and AI reads ahead of another's ordinary ones, night after night. */
+export function orderForRun<W extends Pick<Watch, 'active' | 'kind' | 'url' | 'createdBy' | 'lastRunAt'> & Partial<Pick<Watch, 'communityId'>>>(watches: readonly W[], now: number): W[] {
   const ran = (w: W) => (w.lastRunAt ? Date.parse(w.lastRunAt) : 0)
   const overdue = (w: W) => now - ran(w) > OVERDUE_AFTER_MS
-  return watches
+  const sorted = watches
     .filter((w) => w.active)
     .map((w) => ({ w, first: ALWAYS_FIRST.includes(watchPriority(w)), overdue: overdue(w), rank: WATCH_PRIORITY.indexOf(watchPriority(w)), ran: ran(w) }))
     .sort((a, b) => Number(b.first) - Number(a.first) || Number(b.overdue) - Number(a.overdue) || a.rank - b.rank || a.ran - b.ran)
-    .map((x) => x.w)
+  const communities = inTurn([...new Set(sorted.map((x) => x.w.communityId ?? ''))].sort(), dayNumber(now))
+  const out: W[] = []
+  for (let i = 0; i < sorted.length; ) {
+    const tier = (x: (typeof sorted)[number]) => `${x.first}|${x.overdue}|${x.rank}`
+    let end = i
+    while (end < sorted.length && tier(sorted[end]) === tier(sorted[i])) end++
+    out.push(...takeTurns(sorted.slice(i, end).map((x) => x.w), communities))
+    i = end
+  }
+  return out
+}
+
+/** One of each community in turn, each community's own in their order. */
+function takeTurns<W extends Partial<Pick<Watch, 'communityId'>>>(watches: readonly W[], communities: readonly string[]): W[] {
+  const lines = communities.map((c) => watches.filter((w) => (w.communityId ?? '') === c))
+  const out: W[] = []
+  for (let n = 0; out.length < watches.length; n++) for (const line of lines) if (n < line.length) out.push(line[n])
+  return out
 }
 
 // ── Six at once (Oct 25) ────────────────────────────────────────────────────
