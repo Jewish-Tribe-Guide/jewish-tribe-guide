@@ -103,6 +103,12 @@ export default function AdminFrame({
   // A screen with the whole pane on a computer (To do with a place open).
   const [fullPanes, setFullPanes] = useState(0)
   const fullPane = useCallback((by: number) => setFullPanes((n) => n + by), [])
+  // The open area tapped is the screen's own business (ADMIN_AREA_TAPPED:
+  // To do closes its place and puts the list back where you left it), so
+  // its link leaves the scroll alone. With Next's default, the navigation
+  // landing after the list was put back scrolled to the page's top
+  // whenever that was off screen, a race todo-scroll.spec.ts lost in CI
+  // (Nov 20, 562px off).
   const tapped = (area: AdminArea) => () => {
     if (area === open?.area) window.dispatchEvent(new Event(ADMIN_AREA_TAPPED))
   }
@@ -152,7 +158,7 @@ export default function AdminFrame({
           <span className="text-[12.5px] text-slate-500">Admin</span>
         </div>
         {main.map((a) => (
-          <Link key={a.area} href={a.href} onClick={tapped(a.area)} aria-current={a.area === open?.area ? 'page' : undefined} className={sideLink(a.area === open?.area)}>
+          <Link key={a.area} href={a.href} onClick={tapped(a.area)} scroll={a.area !== open?.area} aria-current={a.area === open?.area ? 'page' : undefined} className={sideLink(a.area === open?.area)}>
             <Icon name={a.area} />
             <span className="flex-1">{a.label}</span>
             {a.area === 'todo' && !!count && (
@@ -219,6 +225,7 @@ export default function AdminFrame({
               key={a.area}
               href={a.area === 'site' ? siteList : a.href}
               onClick={tapped(a.area)}
+              scroll={!current}
               aria-current={current ? 'page' : undefined}
               className={`flex flex-col items-center gap-[3px] py-1.5 min-h-11 text-xs ${current ? 'text-primary font-bold' : 'text-slate-600 font-semibold'}`}
             >
