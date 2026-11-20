@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 20, 2026.
+Last updated: Nov 20, 2026 (after PR 401 merged).
 
 ## The branch
 
@@ -46,9 +46,8 @@ targets agreed and written down in `docs/speed-targets.md` (≤0.1s to a
 visible response, ≤1s to the answer on a phone, Core Web Vitals at p75).
 The first tap on a place on a phone no longer slides up an empty sheet:
 its code loads once a category page is idle (`src/lib/preloadable.tsx`),
-checked by `e2e/first-tap.spec.ts`. Still open: make PR builds faster
-(10–13 min, checked Nov 19 on that day's green PR runs). The e2e shards wait for cache-roundtrip and admin-write and
-are unbalanced; about 6–7 min looks reachable.
+checked by `e2e/first-tap.spec.ts`. PR builds made faster
+Nov 20 (PR 401): 10–13 min down to 5.6, see "The speed and scale sweep".
 
 **Nov 16, the user's notes after the release:**
 
@@ -1007,6 +1006,14 @@ reasons CI is ~9 min, fixed in that order:
 Flakes seen this batch, to watch: `category-open.spec.ts` (a click asked
 the server once, the re-run passed), the mobile prefetch budget (once).
 `todo-scroll.spec.ts` has passed every run since its fix.
+The test database was slow once since step 2 (run 44798511406, Nov 20,
+19:05): integration's `rejecting a create submission…` timed out at 25s,
+and cache-roundtrip's /about race test waited past 15s for a HIT, in the
+same minute; both re-ran green. Integration takes 40–175s across the day
+on old code too, so one slow run says nothing yet. But every suite now
+hits the one test project at once, so watch for it: if it repeats, size
+those waits to the database's slow spells, or separate the test project
+from dev's (the user's call, see Nov 17 above). Not retries.
 
 Still to do:
 
