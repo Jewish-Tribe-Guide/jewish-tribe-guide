@@ -272,7 +272,12 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           next-dist-dir: .next
-      - run: npm run build
+      # bash for pipefail, so a failed build still fails here. Then the
+      # log is checked for Next's prerender stops our code caught and
+      # logged as errors (scripts/buildLog.mjs).
+      - run: npm run build 2>&1 | tee build.log
+        shell: bash
+      - run: node scripts/buildLog.mjs build.log
       # Not .next/cache: the shards only start the build, and it's the
       # setup action's cache, kept apart from the artifact.
       - uses: actions/upload-artifact@v7

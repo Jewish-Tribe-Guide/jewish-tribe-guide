@@ -577,6 +577,16 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     </div>
   )
 
+  // A count, not "nearby" (near nothing with no location set), and no
+  // "drag up": the handle says that (Nov 18).
+  const peekLine = selected
+    ? // A place open, lowered: which, since none of it shows.
+      selected.name
+    : eruvim && eruvim.length > 0
+      ? // The eruvim lead the list, places or none (Oct 15).
+        `${eruvim.length} ${eruvim.length === 1 ? 'eruv' : 'eruvim'}${points.length > 0 ? ` · ${points.length} place${points.length !== 1 ? 's' : ''}` : ''}`
+      : `${points.length} place${points.length !== 1 ? 's' : ''}`
+
   return (
     // overflow-hidden: lowered, the list's element is squeezed to nothing
     // under the handle, but its bottom padding would still poke out below.
@@ -600,20 +610,15 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
         // Not mid-drag, so dragging it up shows the list coming.
         style={peeked ? { minHeight: PEEK_PX } : undefined}
         role="button"
-        aria-label={snap === 'peek' ? 'Expand nearby list' : 'Drag to resize nearby list'}
+        // Lowered, its name starts with the line it shows, so someone who
+        // says what they see (voice control) reaches it (WCAG 2.5.3; axe
+        // 4.14 flags it, Nov 20).
+        aria-label={snap === 'peek' ? `${peekLine}. Expand nearby list` : 'Drag to resize nearby list'}
       >
         <span className="h-1 w-9 rounded-full bg-slate-300" aria-hidden="true" />
         {snap === 'peek' && (
           <span className="max-w-full truncate px-4 text-xs font-medium text-slate-500" data-testid="sheet-peek-line">
-            {/* A count, not "nearby" (near nothing with no location set),
-                and no "drag up": the handle says that (Nov 18). */}
-            {selected
-              ? // A place open, lowered: which, since none of it shows.
-                selected.name
-              : eruvim && eruvim.length > 0
-                ? // The eruvim lead the list, places or none (Oct 15).
-                  `${eruvim.length} ${eruvim.length === 1 ? 'eruv' : 'eruvim'}${points.length > 0 ? ` · ${points.length} place${points.length !== 1 ? 's' : ''}` : ''}`
-                : `${points.length} place${points.length !== 1 ? 's' : ''}`}
+            {peekLine}
           </span>
         )}
       </div>

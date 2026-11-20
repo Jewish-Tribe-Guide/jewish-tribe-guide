@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
+import { withSentryConfig } from "@sentry/nextjs/config";
 import { optimizedImagePatterns } from "./src/lib/imageHosts";
 import { buildCsp } from "./src/lib/csp";
 
@@ -124,6 +124,11 @@ const nextConfig: NextConfig = {
   // back, which it didn't before. Anything that relied on unmounting to reset
   // needs to say so explicitly — see the wizard and dropdown reset patterns.
   cacheComponents: true,
+  // Unset behaves the same (the old per-link prefetch) but logs a warning
+  // on every build and start since Next 16.4. Adopting Partial
+  // Prefetching changes what every <Link> downloads, so it is its own
+  // change, measured against docs/speed-targets.md, not part of a bump.
+  partialPrefetching: false,
   allowedDevOrigins: ['192.168.1.176', '*.ngrok-free.dev', '*.ngrok-free.app', '*.ngrok.io'],
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];

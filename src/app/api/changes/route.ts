@@ -9,8 +9,9 @@ import { latestChangeByListing } from '@/lib/youChanges'
 // cached log What changed and You read, cut down to a time per listing.
 // Public read; it says nothing the listings themselves don't.
 export async function GET(request: Request) {
+  const slug = communitySlugFromRequest(request)
   try {
-    const community = await resolveCommunity(communitySlugFromRequest(request))
+    const community = await resolveCommunity(slug)
     const rows = await listChangeLog(community.slug)
     return Response.json({ ok: true, latest: latestChangeByListing(whatChanged(rows, community.timezone)) })
   } catch (err) {

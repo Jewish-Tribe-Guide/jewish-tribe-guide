@@ -456,7 +456,13 @@ export async function getCommunityPreviewToken(slug: string): Promise<string | n
 
 /** Reads the requested community slug off an incoming request. Query param
  *  only for now — the URL/subdomain shape is still undecided, and keeping the
- *  read in one place means changing it later touches this function alone. */
+ *  read in one place means changing it later touches this function alone.
+ *
+ *  Call it before a GET handler's `try`, never inside it. Reading
+ *  `request.url` while Next prerenders a GET route throws Next's own
+ *  "bail out of prerendering" error (Next 16.4); a `catch` that logs and
+ *  answers 502 swallows it, and every build logs a "GET failed" that
+ *  isn't one. scripts/buildLog.mjs fails CI's build if that comes back. */
 export function communitySlugFromRequest(request: Request): string | null {
   return new URL(request.url).searchParams.get('community')
 }

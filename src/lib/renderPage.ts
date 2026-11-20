@@ -20,7 +20,10 @@ import { dnsLookup, htmlToText, isOrderingApp, MENU_FETCH_HEADERS, publicUrl, re
 // loaded; nothing is downloaded; nothing is kept.
 //
 // On Vercel the browser is @sparticuz/chromium (a Chromium built for
-// serverless functions, matching Playwright's version); anywhere else,
+// serverless functions), driven by playwright-core. Moving playwright-core
+// changes how production draws pages, and no suite runs this path, so a
+// Playwright bump is checked here, on a preview, not just in CI (it was
+// held at 1.63.0 with Chromium 153 on Nov 20 for that reason). Anywhere else,
 // Playwright's own (`npx playwright install chromium`, as the e2e suites
 // use). MENU_RENDER=off turns it off.
 

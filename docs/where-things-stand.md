@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 20, 2026.
+Last updated: Nov 20, 2026 (after PR 401 merged).
 
 ## The branch
 
@@ -34,8 +34,8 @@ Small open items from Nov 9:
   screen. Fixed: `MapBoundary` keeps a broken map in its own box on the Map
   page too, as on the category page. A real visitor whose map Google
   refuses now keeps the search, chips and list.
-- Dev's pretend Riverton community has no pages left and can be deleted
-  (dev only; no yes needed).
+- ~~Dev's pretend Riverton community~~ Deleted Nov 20 (the user's yes),
+  with philly's old `Cache Round-trip Seed` category and section.
 - "How it looks" isn't built for the phone (nothing sits beside a field
   there).
 - The Denomination/Nusach script is still a dry run (see "Waiting for a yes
@@ -46,9 +46,8 @@ targets agreed and written down in `docs/speed-targets.md` (≤0.1s to a
 visible response, ≤1s to the answer on a phone, Core Web Vitals at p75).
 The first tap on a place on a phone no longer slides up an empty sheet:
 its code loads once a category page is idle (`src/lib/preloadable.tsx`),
-checked by `e2e/first-tap.spec.ts`. Still open: make PR builds faster
-(10–13 min, checked Nov 19 on that day's green PR runs). The e2e shards wait for cache-roundtrip and admin-write and
-are unbalanced; about 6–7 min looks reachable.
+checked by `e2e/first-tap.spec.ts`. PR builds made faster
+Nov 20 (PR 401): 10–13 min down to 5.6, see "The speed and scale sweep".
 
 **Nov 16, the user's notes after the release:**
 
@@ -867,6 +866,76 @@ Nov 14, later, the user's yes to both:
   sits beside Feedback · About · Privacy at the bottom now, in Safari as
   it already did in the home-screen app.
 
+## The health sweep (Nov 20, findings only, nothing changed yet)
+
+The user (Nov 20): use the lull to check the site is "actually being
+built/run the right way". Six read-only reviewers (dead code and
+structure, security, database, running the site, accessibility and
+robustness, dependencies), each finding checked before it went on the
+list. Marked **checked** where I confirmed it myself; the rest are read
+from code by a reviewer. Waiting on the user to pick an order.
+
+Fix first:
+
+1. **The public key reads every community's admin emails and preview
+   tokens** (checked on the test project: all four communities, hidden
+   ones included). Migration 027's `public reads communities` policy is
+   `using (true)` and later columns joined it. Fix: a migration narrowing
+   it; live needs the user's yes.
+2. **Anyone can backdate or erase a listing's "Still right?" date**: the
+   confirm route has no Turnstile and `unconfirm_*` takes the caller's
+   `p_previous`. Cuts against "confirmed means a person confirmed it".
+3. **No backups or restore procedure** in the repo; the plan's backups
+   and PITR need the user to check in Supabase. Photos in Storage too.
+4. **A broken alert path is silent**: the nightly email is the only
+   alert and runs on what it watches; caught errors (AI reads, after()
+   work) never reach Sentry. Fix: an outside heartbeat per cron, and one
+   `reportError()`.
+5. **The community list caches its one-community fallback for days**
+   after any Supabase error (checked, `listCommunities`).
+6. **`community_id` still defaults to 'philly'** on 9 tables; 027 says
+   to drop it once a second community exists (checked).
+7. **`Map.groupBy` takes down a shul listing on iOS before 17.4**
+   (checked, `DaveningCard.tsx:396`), and the only error boundary is the
+   root one, so the header goes too.
+8. **If Turnstile can't load, a contributor's Send never enables** and
+   nothing says why (hospital wifi, blockers).
+
+Soon:
+
+- Reads cut off at 1,000 rows with no error: vote counts first (checked).
+- Migrations: nothing records which ran where; `contribution_note`
+  drift; 16 "table missing" fallbacks hide a missed one; a fresh project
+  can't be rebuilt from the folder (no grants since 056 was removed).
+- Hidden communities' data through the public API routes.
+- Focus in dialogs and sheets, drag handles keyboard can't use, search
+  results silent to screen readers, swipe-only actions.
+- Eruv status set from an unauthenticated email (inferred), admin sign-in
+  not checking the email is confirmed (depends on Supabase settings),
+  a cross-community Google sync route, eruv fetchers with no SSRF guard.
+- Spend: no site-wide cap on the AI photo readers; Turnstile and rate
+  limits fail open when their keys are missing.
+- Dependabot's one group can't pass CI (container tag) and has blocked
+  updates since September; Playwright held at 1.63 for production's
+  Chromium (PR 402); `npm audit fix` is free; Node declared four ways.
+- Two time parsers disagree ("8am" is Infinity in `parseTimeToMinutes`,
+  checked); date helpers copied 8–9 times; `partDates` twice.
+- knip: a 4-line config takes it from 42 files / 243 exports to 0 / 31
+  real ones; put it in CI. Stale comments (11 names that no longer exist).
+- Preview emails go out without [DEV] (checked); `.env.example` has
+  never been committed, `.gitignore` drops it (checked).
+
+Later or bigger: the two 2,000-line screens (map, category page);
+foreign keys and transactions for deletes and approvals; `details`
+holding app state; log retention; redundant indexes; an old-iOS floor
+decision; rem font sizes; `dir="auto"` for Hebrew; the parked Today
+features (keep or delete); `/inbox` per community; this file's size;
+Partial Prefetching before Next 17.
+
+Checked and not so: anon can't insert subscribers on the test project
+(RLS refused it). The nightly email does record a failed send, as a
+warning, not a failure.
+
 ## The speed and scale sweep (Nov 20, on `claude/bands-and-search`)
 
 The user (Nov 20): "I want the site to be a good site… with the ability
@@ -999,14 +1068,21 @@ reasons CI is ~9 min, fixed in that order:
    admin-write 4.4 and unit 4.0 beside them. The slowest path is now the
    build plus the slowest shard (5.6), with admin-write and unit a minute
    under it.
-   Left in the test project (it's also dev): philly still has the old
-   `Cache Round-trip Seed` category and its `E2E Fixtures` section. Old
-   code on other branches recreates them, so they go once those branches
-   have merged main.
+   philly's old `Cache Round-trip Seed` category and `E2E Fixtures`
+   section were deleted Nov 20. A branch still on the old code (the
+   Dependabot PRs) puts them back when its CI runs.
 
 Flakes seen this batch, to watch: `category-open.spec.ts` (a click asked
 the server once, the re-run passed), the mobile prefetch budget (once).
 `todo-scroll.spec.ts` has passed every run since its fix.
+The test database was slow once since step 2 (run 44798511406, Nov 20,
+19:05): integration's `rejecting a create submission…` timed out at 25s,
+and cache-roundtrip's /about race test waited past 15s for a HIT, in the
+same minute; both re-ran green. Integration takes 40–175s across the day
+on old code too, so one slow run says nothing yet. But every suite now
+hits the one test project at once, so watch for it: if it repeats, size
+those waits to the database's slow spells, or separate the test project
+from dev's (the user's call, see Nov 17 above). Not retries.
 
 Still to do:
 
