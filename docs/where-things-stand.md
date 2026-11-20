@@ -880,8 +880,13 @@ Fix first:
 1. **The public key reads every community's admin emails and preview
    tokens** (checked on the test project: all four communities, hidden
    ones included). Migration 027's `public reads communities` policy is
-   `using (true)` and later columns joined it. Fix: a migration narrowing
-   it; live needs the user's yes.
+   `using (true)` and later columns joined it. **Built Nov 20**: migration
+   103 drops all twelve public policies (nothing in the site reads with
+   the anon key; it only signs admins in), which also closes hidden
+   communities' listings and the anon subscriber insert (an earlier
+   "refused" test of that was wrong: it asked for the row back, which
+   needs a read policy). `noPublicPolicies.test.ts`, red 1/1 without 103.
+   **To run: dev, then live (the user).**
 2. **Anyone can backdate or erase a listing's "Still right?" date**: the
    confirm route has no Turnstile and `unconfirm_*` takes the caller's
    `p_previous`. Cuts against "confirmed means a person confirmed it".
@@ -932,8 +937,7 @@ decision; rem font sizes; `dir="auto"` for Hebrew; the parked Today
 features (keep or delete); `/inbox` per community; this file's size;
 Partial Prefetching before Next 17.
 
-Checked and not so: anon can't insert subscribers on the test project
-(RLS refused it). The nightly email does record a failed send, as a
+Checked and not so: the nightly email does record a failed send, as a
 warning, not a failure.
 
 ## The speed and scale sweep (Nov 20, on `claude/bands-and-search`)
