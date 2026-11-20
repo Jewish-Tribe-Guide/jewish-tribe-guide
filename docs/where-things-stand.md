@@ -1133,6 +1133,28 @@ hits the one test project at once, so watch for it: if it repeats, size
 those waits to the database's slow spells, or separate the test project
 from dev's (the user's call, see Nov 17 above). Not retries.
 
+CI time, looked at again Nov 20 (the user: "the PR still took about 10
+minutes"). PR 402's checks took 7m20s, not 10. The rest was a second push
+restarting them and the merge after. They were slow because 402 changed the
+lock file: no package cache, so every job ran `npm ci`, and the build was
+cold. A PR that leaves the lock file alone runs in about 5.6 min. Three
+changes (`ciWorkflow.test.ts`, 3 red against the old files):
+
+- **Production's smoke run finishes again.** It ran all 582 tests on one
+  runner, took 13–15 min, and hit its 15-minute timeout on most pushes to
+  main since Nov 16, so it reported nothing. It now builds once
+  (`e2e-prod-build`) and runs six shards of that build, like e2e. Its
+  report upload was behind `if: failure()`, which a continue-on-error
+  step never sets; it now uses the step's own outcome.
+- **The build cache is saved once per PR**, keyed on the lock file, not
+  on every run (keyed on the commit, it cost 18–23s at the end of each
+  build job).
+- **e2e has seven shards**, from six; the slowest ran 168s of tests.
+
+Not changed: lint and typecheck still run before the unit tests in one
+job (4–6.5 min). On a warm run that is under the e2e path, so splitting
+them saves nothing yet.
+
 Still to do:
 
 1. Nothing left in batch 5. Leftovers in the test project are listed
