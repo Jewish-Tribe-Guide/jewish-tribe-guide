@@ -65,6 +65,16 @@ not highlights" and "Shul watches, in short").
   The usual times are compared only to sort these, never to fill a
   week. This comes up for a shul with no calendar and no newsletter for
   that part, or a week the newsletter skips.
+- **A highlight never removes a minyan** (the user, Nov 19). The reader
+  says what kind of thing each source is (schedule, calendar,
+  highlight, event), quoting the heading it sits under, and quotes any
+  cancellation ("No Shabbat Services!"). Only a cancellation in words,
+  or a whole source, takes a minyan away: in a month of six shuls'
+  emails every cancellation was said out loud, none by leaving it out.
+  So a highlight that agrees with what we show is ignored, and one with
+  a different or extra time goes to the admin, the item saying how it
+  was read ("read as a highlight, under 'This Shabbat'"). The step 5 dry
+  run is where a shul that cancels by omission would show up.
 - **The goal is for the watch to find the answer, the admin to check
   it** (the user, Nov 19: "Admins are really just there to validate,
   not to answer"). So each admin answer on a short source is kept with
