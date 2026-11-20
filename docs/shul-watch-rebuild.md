@@ -29,9 +29,11 @@ not highlights" and "Shul watches, in short").
 ## Settled (the user, Nov 19)
 
 - **A shul's calendar is whole.** Seeing its calendar means seeing its
-  schedule. Which page is the calendar is confirmed once by an admin (the
-  page search suggests it), so an events page is never taken for it. A
-  day on the confirmed calendar with nothing has no minyan. The old guess
+  schedule. Which page is the calendar is the watch's pick, shown to the
+  admin to check ("One pick per part", below), so an events page is never
+  taken for it unseen. A day on the calendar with nothing has no minyan,
+  within the days it shows and up to its last entry (cases 5 and 6
+  below). The old guess
   (`calendarIsWhole`, which checked the calendar against the usual times)
   goes.
 - **A newsletter's regular times are that week's** (BZBI's "Regular
@@ -117,8 +119,50 @@ nothing about services.
 - **Sons of Israel:** nothing but the sign-up confirmation (Oct 20).
 
 So four give both parts and one gives only Shabbos. Which parts a newsletter
-gives is a fact about that shul's newsletter, confirmed once, as
-a calendar page is; not guessed each email.
+gives is a fact about that shul's newsletter, kept by the watch from
+what it has read and shown to the admin with its pick ("One pick per
+part", below); not guessed fresh each email.
+
+## One pick per part (the user, Nov 19)
+
+Replaces the one-time admin setup drawn as board 4, which is dropped. A
+shul can have several sources for the same thing (Kol Tzedek: four pages
+and a newsletter; Sons of Israel: two pages both giving usual times), and
+"newer wins" between them means they overwrite each other nightly. So
+the watch picks one source for each of usual weekdays, usual Shabbos,
+this week's weekdays and this week's Shabbos, ranked: a calendar, then a
+newsletter, then a regular-schedule page, then anything else. Its pick
+shows on the shul's Places page and in each To do item; the admin can
+change it. The watch answers; the admin checks.
+
+## Cases from live (Nov 19)
+
+Every automated To do item from Nov 5–19, run through the rules above.
+Each is a test in step 3.
+
+1. **A short source before the whole one arrives.** Mekor's homepage shows
+   next Shabbos from Saturday; its newsletter comes Friday. When a shul's
+   newsletter normally gives that part, short sources for it wait until
+   the newsletter is late. Kol Tzedek's (Wednesdays) the same.
+2. **Notes compared by what they say, not their wording.** Rodeph
+   Shalom's Thursday Shacharis was filed four times in a week as
+   "Online; until 8:40" / "Online" / "until 8:40; Online" / "Online only".
+   Reordered or restated, it is the same note. Kol Tzedek the same.
+3. **Several whole sources for one part:** the watch's pick (above). Kol
+   Tzedek, BZBI's worship page and newsletter, Mikveh Israel's homepage and
+   calendar.
+4. **Two pages giving usual times:** the watch's pick. Sons of Israel's
+   tefillot page dropped Sunday 8 AM (Nov 12), its homepage added it back
+   (Nov 18), both approved.
+5. **An empty future week** counts as no minyan only if the calendar has
+   something posted after it; otherwise it isn't posted yet. The Little
+   Shul and Leyv Ha-Ir each filed "Nov 22–28: no minyan" on Nov 19.
+6. **A source is whole only for the days it shows.** Sons of Israel's
+   calendar filed "Nov 12–14" and Lower Merion's homepage "Nov 11–13";
+   the days outside are not cancelled.
+7. **What isn't a minyan isn't counted.** Society Hill's Kristallnacht
+   email and BZBI's Hanukkah email each filed an event; it is neither a
+   week nor "something extra" for the admin.
 
 The Shtiebel's gives all of Shabbos and no weekdays: its Shabbos is
 taken, and its website's weekday times stand (decided Nov 19).
@@ -177,7 +221,7 @@ These work, and have nothing to do with the old approach.
     gives, compared with our copy of that week; the newer source wins.
   Never reads the usual times when answering the second. A unit test
   fails if it does.
-- **`src/lib/shulTimesRun.ts`**: reads a shul's confirmed pages and its
+- **`src/lib/shulTimesRun.ts`**: reads a shul's picked sources and its
   newsletter through `shulTimes.ts`, and files one suggestion. The
   newsletter goes through the same code as the website.
 - **What the site shows** (`resolveDay` in `schedules.ts`): a week we
@@ -196,9 +240,9 @@ Mikvah hours and contact details stay in `listingPageRun.ts`.
 Each is tested, committed and pushed before the next.
 
 1. **Newsletters:** a month of each shul's, marked by which parts it gives, for the user. Done Nov 19 (above).
-2. **Draw the "Their calendar / Their usual times / Their newsletter
-   gives Shabbos / weekdays" rows** on a shul's Places page, for the user's OK.
-   Drawn Nov 19 (board 4 on the canvas); not yet OK'd.
+2. ~~Draw a one-time admin setup of sources~~ (board 4). Dropped Nov 19
+   for the watch's own pick ("One pick per part"); how the pick shows on
+   Places is drawn before step 4 builds it.
 3. **`shulTimes.ts` and its tests**, written from the rule. Each real case
    is a test: Lower Merion's late Maariv on its homepage ignored and its
    calendar's week taken whole; Mekor's homepage Friday ignored; Society
@@ -209,8 +253,10 @@ Each is tested, committed and pushed before the next.
    a short source not looked at when a whole source covers that part
    that week (Mekor's homepage box beside its newsletter); with none, one
    matching every usual minyan taken, and one with anything extra,
-   different or missing sent to the admin.
-4. **The page search prefers a calendar**, and the confirm rows are built.
+   different or missing sent to the admin; and the seven "Cases from
+   live", each red against the old code first.
+4. **The page search prefers a calendar**, and the watch's pick per part
+   is built and shown on Places.
 5. **A read-only dry run on the 14 live shuls**: what the new code would
    file, beside what the old code filed this week. Shown to the user
    before anything switches.

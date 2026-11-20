@@ -996,7 +996,11 @@ Still open:
   one matching every usual minyan is taken, and anything extra,
   different or missing goes to the admin. Each admin
   answer is kept so the watch can learn to propose it ("Admins are
-  really just there to validate, not to answer").
+  really just there to validate, not to answer"). Also agreed Nov 19:
+  board 4's one-time setup is dropped; the watch picks one source per
+  part (calendar, newsletter, schedule page, then anything else) and the
+  admin checks it; and seven cases from live To do items go in as
+  tests (plan, "Cases from live").
 - A listing list's scroll-to-a-row wait gives up after about 3 seconds
   and stops when the list goes away (`whenSettled`, Nov 19). It used to
   poll every 32ms forever for a row that never appeared, and one timer
