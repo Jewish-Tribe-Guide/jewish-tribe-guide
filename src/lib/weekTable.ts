@@ -94,7 +94,10 @@ export type WeekdayTable = {
 const onWeekday = (m: Minyan, day: DayKey) => m.days.includes(day) && (day !== 'fri' || m.tefillah === 'shacharis')
 
 /** The weekday table, or null when the shul has no weekday minyan. */
-export function weekdayTable(minyanim: readonly Minyan[], season: Season | null, anchors?: AnchorTimes): WeekdayTable | null {
+/** `perDay`: a row a day, as a shul's listing draws it (board 7e, Nov 19:
+ *  Mon to Thu the same still four rows, so a day is found by reading down,
+ *  never worked out from "Sun–Thu"). */
+export function weekdayTable(minyanim: readonly Minyan[], season: Season | null, anchors?: AnchorTimes, { perDay = false }: { perDay?: boolean } = {}): WeekdayTable | null {
   const out = (m: Minyan) => outOfSeason(m, minyanim, season, anchors)
   const now = minyanim.filter((m) => !out(m) && WEEKDAYS.some((d) => onWeekday(m, d)))
   if (now.length === 0) return null
@@ -125,7 +128,7 @@ export function weekdayTable(minyanim: readonly Minyan[], season: Season | null,
     const cells = parts.map((p) => p.map((x) => x.text).join(', '))
     if (cells.every((c) => c === '—')) continue
     const key = JSON.stringify(parts)
-    const same = rows.find((r) => JSON.stringify(r.parts) === key)
+    const same = perDay ? undefined : rows.find((r) => JSON.stringify(r.parts) === key)
     if (same) same.days.push(day)
     else rows.push({ days: [day], label: '', cells, parts })
   }
@@ -224,4 +227,71 @@ export function ruleLinesToday(rules: WeekdayTable['rules'], today: DayKey | nul
     const at = resolveAnchorTime(r.row, anchors)
     return at ? [`${r.text.charAt(0).toUpperCase()}${r.text.slice(1)}: ${at} today.`] : []
   })
+}
+
+// ── This week's weekdays, as a grid (board 5e, approved Nov 19) ────────────
+// The same shape as the usual weekday table, but a row a date: Sun to Fri,
+// days gone by kept (the card greys them), today marked. A column a
+// tefillah the week has. A time with its own place or note gets a mark
+// (†) and the note goes once under the grid, so the cells stay times.
+
+export type WeekGridRow = {
+  date: string
+  /** "Thanksgiving": a day's own name, under its date. */
+  occasion?: string | null
+  /** The cells, a column each: the times, empty for none. */
+  cells: { text: string; mark?: string; signUp?: boolean }[][]
+}
+
+export type WeekGrid = {
+  columns: Tefillah[]
+  rows: WeekGridRow[]
+  /** "† At 1818 Market or Mikveh Israel", one per distinct note. */
+  notes: { mark: string; text: string }[]
+}
+
+const MARKS = ['†', '‡', '§', '¶']
+
+/** `days`: a week's dates, each with its minyanim on that date. Null when
+ *  none has any. */
+/** "7, 8 AM", as the usual table runs clock times together (joinTimes): a
+ *  plain time drops its AM or PM when the next one in the cell says it. */
+function sharedMeridiem<C extends { text: string; mark?: string; signUp?: boolean }>(cell: C, i: number, cells: readonly C[]): C {
+  const next = cells[i + 1]
+  const clock = /^(\d{1,2}(?::\d\d)?) ([AP]M)$/
+  const own = cell.text.match(clock)
+  const theirs = next?.text.match(clock)
+  return own && theirs && own[2] === theirs[2] && !cell.mark && !cell.signUp ? { ...cell, text: own[1] } : cell
+}
+
+export function weekGrid(days: readonly { date: string; occasion?: string | null; rows: readonly Minyan[] }[]): WeekGrid | null {
+  const all = days.flatMap((d) => d.rows)
+  if (!all.length) return null
+  const columns = TEFILLAH_ORDER.filter((t) => all.some((m) => m.tefillah === t))
+  const notes: WeekGrid['notes'] = []
+  const markOf = (m: Minyan) => {
+    const text = noteText(m.notes)
+    if (!text) return undefined
+    const had = notes.find((n) => n.text.toLowerCase() === text.toLowerCase())
+    if (had) return had.mark
+    const i = notes.length
+    const mark = i < MARKS.length ? MARKS[i] : `${MARKS[i % MARKS.length]}${MARKS[i % MARKS.length]}`
+    notes.push({ mark, text })
+    return mark
+  }
+  const rows = days.map((d) => ({
+    date: d.date,
+    occasion: d.occasion ?? null,
+    cells: columns.map((t) =>
+      d.rows
+        .filter((m) => m.tefillah === t)
+        .sort((a, b) => (clockMinutes(a.time) ?? 1440) - (clockMinutes(b.time) ?? 1440))
+        .map((m) => {
+          const mark = markOf(m)
+          return { text: timeText(m), ...(mark ? { mark } : {}), ...(m.signUp ? { signUp: true } : {}) }
+        })
+        .map(sharedMeridiem),
+    ),
+  }))
+  return { columns, rows, notes }
 }

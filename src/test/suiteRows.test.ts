@@ -134,6 +134,24 @@ describe('the suites never change a row another reads', () => {
     expect(changedByTests({ id: 'restaurant' })).toBe(false)
     expect(changedByTests({ id: 'cache-roundtrip-seed-2' })).toBe(false)
   })
+
+  // A page a suite makes for itself is left behind when its job is
+  // cancelled mid-test, and e2e then walks into it (PR 400, Nov 20:
+  // `Integration Test 84ffbdbf`, no Filters, in "every category with a
+  // map"). So every label a suite creates a page under is claimed.
+  it('claims every page a suite creates under a label of its own', () => {
+    const integration = files(join(ROOT, 'src'))
+      .filter((f) => f.endsWith('.integration.test.ts'))
+      .map((path) => ({ text: readFileSync(path, 'utf8') }))
+    const made = [...sources, ...integration].flatMap(({ text }) =>
+      [...text.matchAll(/createCategory\([^)]*?label:\s*`([^`$]+?)\s*\$\{/g)].map((m) => m[1]),
+    )
+    expect(made.length, 'found no createCategory labels to check').toBeGreaterThan(0)
+    for (const label of made) {
+      const id = `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-84ffbdbf`
+      expect(changedByTests({ id }), `${label} … (${id}) is made by a suite but not claimed`).toBe(true)
+    }
+  })
 })
 
 describe('the scans themselves', () => {

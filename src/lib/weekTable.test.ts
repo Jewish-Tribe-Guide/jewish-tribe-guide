@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
-import { clockMinutes, noteText, ruleLinesToday, shabbosList, timeText, weekdayTable } from './weekTable'
+import { clockMinutes, noteText, ruleLinesToday, shabbosList, timeText, weekdayTable, weekGrid } from './weekTable'
 
 let n = 0
 const m = (over: Partial<Minyan>): Minyan => ({ id: `m${n++}`, tefillah: 'shacharis', days: [], time: '', ...over })
@@ -107,6 +107,59 @@ describe('the usual weekday times, as one table', () => {
 
   it('none for a shul that only davens on Shabbos; Friday night isn’t a weekday', () => {
     expect(weekdayTable([m({ days: ['sat'], time: '10:45am' }), m({ tefillah: 'kabbalas_shabbos', days: ['fri'], time: '6:00pm' })], null)).toBeNull()
+  })
+})
+
+// Nov 19 (board 7e): the listing's usual weekday box, a row a day.
+describe('the usual weekday table, a row a day', () => {
+  it('keeps days with the same times apart, Sunday to Friday', () => {
+    const t = weekdayTable(lowerMerion, 'summer', undefined, { perDay: true })!
+    expect(t.rows.map((r) => [r.label, ...r.cells])).toEqual([
+      ['Sun', '7:30, 8:30 AM', '10 min before sunset'],
+      ['Mon', '6:45, 8 AM', '10 min before sunset'],
+      ['Tue', '7, 8 AM', '10 min before sunset'],
+      ['Wed', '7, 8 AM', '10 min before sunset'],
+      ['Thu', '6:45, 8 AM', '10 min before sunset'],
+      ['Fri', '7, 8 AM', '—'],
+    ])
+  })
+})
+
+// Nov 19 (board 5e): this week's weekdays, a row a date.
+describe('this week’s grid', () => {
+  const day = (date: string, rows: Minyan[], occasion?: string) => ({ date, rows, occasion })
+
+  it('a row a date, a column a tefillah, times run together as the usual table does', () => {
+    const g = weekGrid([
+      day('2026-11-16', [m({ time: '7:00am' }), m({ time: '8:00am' }), m({ tefillah: 'maariv', time: '7:45pm' })]),
+      day('2026-11-17', [m({ time: '6:45am' }), m({ time: '1:00pm' })]),
+      day('2026-11-18', []),
+    ])!
+    expect(g.columns).toEqual(['shacharis', 'maariv'])
+    expect(g.rows.map((r) => [r.date, ...r.cells.map((c) => c.map((x) => x.text).join(', '))])).toEqual([
+      ['2026-11-16', '7, 8 AM', '7:45 PM'],
+      ['2026-11-17', '6:45 AM, 1 PM', ''],
+      ['2026-11-18', '', ''],
+    ])
+  })
+
+  it('marks a note once, however many days carry it, and keeps a day’s name', () => {
+    const g = weekGrid([
+      day('2026-11-26', [m({ time: '8:00am', notes: 'Followed by breakfast' })], 'Thanksgiving'),
+      day('2026-11-27', [m({ time: '8:00am', notes: 'followed by breakfast' }), m({ time: '9:00am' })]),
+    ])!
+    expect(g.rows[0].occasion).toBe('Thanksgiving')
+    expect(g.rows[1].cells[0]).toEqual([{ text: '8 AM', mark: '†' }, { text: '9 AM' }])
+    expect(g.notes).toEqual([{ mark: '†', text: 'Followed by breakfast' }])
+  })
+
+  it('a sign-up time keeps its own AM or PM, to carry its mark', () => {
+    const g = weekGrid([day('2026-11-16', [m({ time: '7:00am', signUp: { link: 'https://chat.whatsapp.com/x' } }), m({ time: '8:00am' })])])!
+    expect(g.rows[0].cells[0]).toEqual([{ text: '7 AM', signUp: true }, { text: '8 AM' }])
+  })
+
+  it('nothing at all: no grid', () => {
+    expect(weekGrid([day('2026-11-16', [])])).toBeNull()
   })
 })
 

@@ -53,6 +53,23 @@ name: CI
 # preinstalled, version-matched to package.json's @playwright/test), so no
 # apt-get ever runs in CI and that mirror can't be hit. Keep the image tag
 # in sync with @playwright/test's version in package.json.
+#
+# One copy of each test-project suite at a time (Nov 20). The workflow-level
+# `concurrency` below is per ref, so two branches' runs — or a PR's and
+# main's — ran the same suite at the same moment against the one test
+# project. Row claims (e2e/suiteRows.ts) keep DIFFERENT suites off each
+# other's rows; they can't stop two copies of the SAME suite renaming the
+# same fixture or minting the same admin's magic link, which is how PR 400's
+# admin-write failed alongside main's on Nov 19. So each suite job queues in
+# a repo-wide `test-db-<suite>` group (cancel-in-progress: false — wait,
+# never kill). GitHub keeps one waiting job per group: if a third run
+# arrives while one runs and one waits, the waiting one is cancelled, and
+# that PR needs a re-run. Rare with one PR at a time; a re-run fixes it.
+#
+# And they don't run on push to main at all. main requires a branch to be
+# up to date before merging, so the tree a push to main builds is the tree
+# its PR already passed these suites on; running them again only doubled
+# the collisions. `unit` still runs there, and `e2e-prod-smoke`.
 on:
   push:
     branches: [main]
@@ -89,6 +106,11 @@ jobs:
 
   integration:
     name: Integration tests (real Supabase reads/writes)
+    # See "One copy of each test-project suite at a time" above.
+    if: github.event_name != 'push'
+    concurrency:
+      group: test-db-integration
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -105,6 +127,11 @@ jobs:
 
   cache-roundtrip:
     name: Cache round-trip (admin save reaches the cached page)
+    # See "One copy of each test-project suite at a time" above.
+    if: github.event_name != 'push'
+    concurrency:
+      group: test-db-cache-roundtrip
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.63.0-noble
     timeout-minutes: 15
@@ -140,6 +167,11 @@ jobs:
 
   form-roundtrip:
     name: Form submission (wizard reaches the database)
+    # See "One copy of each test-project suite at a time" above.
+    if: github.event_name != 'push'
+    concurrency:
+      group: test-db-form-roundtrip
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.63.0-noble
     timeout-minutes: 15
@@ -167,6 +199,11 @@ jobs:
 
   admin-write:
     name: Admin console write behavior (approve/reject via the real UI)
+    # See "One copy of each test-project suite at a time" above.
+    if: github.event_name != 'push'
+    concurrency:
+      group: test-db-admin-write
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.63.0-noble
     # Used to need cache-roundtrip too (not just unit): both suites'
@@ -209,6 +246,11 @@ jobs:
 
   e2e:
     name: End-to-end tests (test project, ${{ matrix.shard }}/4)
+    # See "One copy of each test-project suite at a time" above.
+    if: github.event_name != 'push'
+    concurrency:
+      group: test-db-e2e-${{ matrix.shard }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.63.0-noble
     # Needs cache-roundtrip and admin-write first: both share

@@ -205,6 +205,34 @@ Built after the watch (step 8 below); the watch goes first.
 - Not drawn yet: the desktop listing; "+ Add this week's schedule" needs
   a new home.
 
+**Built Nov 20** (branch `claude/shul-listing`, on top of the watch's
+PR 399), checked beside boards 5e–7e on a phone and a computer.
+Decided while building, each a change to name:
+
+- **No box waits for this week's.** The usual times stay open until it
+  comes, and adding it is each box's own "Update their times" (the
+  board's open question, "a new home"). Oct 26 had drawn a "Not on the
+  guide yet" box with "Add this week's schedule".
+- **No candle lighting or havdalah**, though the board draws them: the
+  user, Nov 20, "don't want candle lighting", as on Oct 27, then "remove
+  havdalah too".
+- **The usual weekday table has a row a day**, Sunday to Friday, as the
+  board does; it used to merge days with the same times ("Mon, Thu").
+- **This Shabbos is dated, not named** ("Nov 21–22", not "Shabbos
+  Vayeitzei"), and This week's box is titled "This week".
+- **A sunset time shows the rule until the day itself.** The site knows
+  only today's sunset, so on a Tuesday "30 min before sunset" stays the
+  rule; the board drew 4:35 PM. As the site has done since Oct 6, and
+  kept so (the user, Nov 20: "keep it as is"): no lookup of Shabbos's
+  own sunset.
+- **A week whose days have all gone by has no box** (on Shabbos before
+  havdalah), as before.
+- Kept from the site, not the board: Edit under each box (Oct 15), the
+  footer's divider, "2 PM" rather than "2:00 PM", a join link under the
+  grid naming its minyan ("Join Thu Shacharis on Zoom"), an occasion's
+  name under its date in the grid.
+- The desktop listing isn't drawn; it shows the same boxes.
+
 ## What stays as it is
 
 These work, and have nothing to do with the old approach.
@@ -278,7 +306,7 @@ Each is tested, committed and pushed before the next.
    some with usual times copied in. They're dated, so most pass within a
    week or two. Anything left after that is a live data change, shown to
    the user first.
-8. **Build the listing** ("The listing", above).
+8. **Build the listing** ("The listing", above). Built Nov 20.
 
 ## Dry run (Nov 19)
 
@@ -397,7 +425,7 @@ and Mikveh Israel's Thanksgiving Shacharis at 8:15 and its Friday
 Kabbalat Shabbat. Since Nov 20, a week matching the usual times goes to
 To do too (the Shtiebel's weekdays), marked as usual. The old watch filed 17 items since Nov 15.
 
-Not yet: step 7's live data, step 8.
+Not yet: step 7's live data. Step 8 built Nov 20 ("The listing").
 
 ## Not in this rebuild
 

@@ -141,9 +141,12 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
   await expect(row('same')).toHaveText([/^Shawarma“Chicken Shawarma Plate”/, /^Laffa/])
 
   await group.getByRole('button', { name: 'Accept' }).click()
-  // Nothing left to decide, straight away; it stays open, since nothing
-  // reads its hours or phone (it's on no Google).
-  await expect(open.getByTestId('waiting-group')).toHaveCount(0)
+  // Nothing left to decide once the save answers; it stays open, since
+  // nothing reads its hours or phone (it's on no Google). The save writes,
+  // then refreshes the site's cache before it answers: past expect's 5s in
+  // CI (PR 400, Nov 20, the request still open at the timeout). Edit's Save
+  // below already allowed 15s for the same.
+  await expect(open.getByTestId('waiting-group')).toHaveCount(0, { timeout: 15_000 })
   // Its Dishes, with what the menu read made of the one added by hand (the
   // user, Oct 26: "see or know if the AI reader is picking things up").
   await expect(async () => {
