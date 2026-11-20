@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { walkRoutesFrom } from '@/lib/walkRouteStore'
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
     const routes = await walkRoutesFrom(community.slug, from)
     return Response.json({ ok: true, routes }, { headers: { 'Cache-Control': CACHE_CONTROL } })
   } catch (err) {
-    console.error('[walk-routes] GET failed:', err)
+    reportServerError('[walk-routes] GET failed:', err)
     return Response.json({ ok: false, routes: {} }, { status: 502 })
   }
 }

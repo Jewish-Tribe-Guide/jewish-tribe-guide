@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { readEruvNowById } from '@/lib/eruvReadNow'
 import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { revalidateTag } from 'next/cache'
@@ -70,7 +71,7 @@ export const PATCH = adminWrite(async (request: NextRequest, { community, admin 
       }
     } catch (err) {
       if (err instanceof ReviewEditError) return Response.json({ ok: false, errors: [err.message] }, { status: 400 })
-      console.error('[admin/submissions/:id] PATCH part failed:', err)
+      reportServerError('[admin/submissions/:id] PATCH part failed:', err)
       return Response.json({ ok: false, errors: ['Could not update submission.'] }, { status: 502 })
     }
   }
@@ -85,7 +86,7 @@ export const PATCH = adminWrite(async (request: NextRequest, { community, admin 
     if (err instanceof ReviewEditError) {
       return Response.json({ ok: false, errors: [err.message] }, { status: 400 })
     }
-    console.error('[admin/submissions/:id] PATCH failed:', err)
+    reportServerError('[admin/submissions/:id] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not update submission.'] }, { status: 502 })
   }
 
@@ -97,10 +98,10 @@ export const PATCH = adminWrite(async (request: NextRequest, { community, admin 
     await Promise.all([
       // Some of it went on: not "it wasn't used".
       (decision === 'rejected' && (submission.payload as { someApproved?: boolean } | null)?.someApproved ? Promise.resolve() : sendDecisionEmail(submission, decision, reason)).catch((err) =>
-        console.error('[admin/submissions/:id] Decision email failed:', err),
+        reportServerError('[admin/submissions/:id] Decision email failed:', err),
       ),
       sendReviewActionNotification(submission, decision, admin.email).catch((err) =>
-        console.error('[admin/submissions/:id] Review-action notification failed:', err),
+        reportServerError('[admin/submissions/:id] Review-action notification failed:', err),
       ),
     ])
   })
@@ -109,7 +110,7 @@ export const PATCH = adminWrite(async (request: NextRequest, { community, admin 
   // next turn (Fridays, for its status). Best-effort, as the emails are.
   if (decision === 'approved' && submission.target_type === 'eruv' && submission.operation === 'create') {
     const id = (submission.payload as { eruvId?: string }).eruvId
-    if (id) after(() => readEruvNowById(community.slug, community.timezone, id).catch((err) => console.error('[admin/submissions/:id] Reading the new eruv failed:', err)))
+    if (id) after(() => readEruvNowById(community.slug, community.timezone, id).catch((err) => reportServerError('[admin/submissions/:id] Reading the new eruv failed:', err)))
   }
 
   // Notify category subscribers (see SubscribeSection.tsx / subscriberStore.ts)
@@ -137,7 +138,7 @@ export const PATCH = adminWrite(async (request: NextRequest, { community, admin 
           await sendClosureNotification(subscribers, { name: resource.name }, category.pluralLabel)
         }
       } catch (err) {
-        console.error('[admin/submissions/:id] Subscriber notification failed:', err)
+        reportServerError('[admin/submissions/:id] Subscriber notification failed:', err)
       }
     })
   }
@@ -205,10 +206,10 @@ async function syncApprovedListing(community: string, listingId: string): Promis
     // still files its own submission from inside syncOneListing.
     if (result.statusChange) {
       await sendStatusChangeDigest([result.statusChange]).catch((err) =>
-        console.error('[admin/submissions/:id] Status digest failed:', err),
+        reportServerError('[admin/submissions/:id] Status digest failed:', err),
       )
     }
   } catch (err) {
-    console.error('[admin/submissions/:id] Post-approval sync failed:', err)
+    reportServerError('[admin/submissions/:id] Post-approval sync failed:', err)
   }
 }

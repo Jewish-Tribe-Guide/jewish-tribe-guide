@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
       clearTimeout(timer)
     }
   } catch (err) {
-    console.error('[question-reader] failed:', err instanceof Error ? err.message : err)
+    reportServerError('[question-reader] failed:', err instanceof Error ? err.message : err)
     return Response.json({ ok: false, reason: 'failed' })
   }
 }

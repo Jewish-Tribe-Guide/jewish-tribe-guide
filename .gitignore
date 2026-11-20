@@ -63,3 +63,6 @@ next-env.d.ts
 
 # JetBrains IDE
 .idea/
+
+# Copies of a database (scripts/backup.mjs): private rows, never committed
+backups/

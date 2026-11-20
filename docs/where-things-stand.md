@@ -866,40 +866,91 @@ Nov 14, later, the user's yes to both:
   sits beside Feedback · About · Privacy at the bottom now, in Safari as
   it already did in the home-screen app.
 
-## The health sweep (Nov 20, findings only, nothing changed yet)
+## The health sweep (Nov 20; fix-first 1-8 built on `claude/health-fixes`, Soon and Later not started)
 
 The user (Nov 20): use the lull to check the site is "actually being
 built/run the right way". Six read-only reviewers (dead code and
 structure, security, database, running the site, accessibility and
 robustness, dependencies), each finding checked before it went on the
 list. Marked **checked** where I confirmed it myself; the rest are read
-from code by a reviewer. Waiting on the user to pick an order.
+from code by a reviewer. The user's order (Nov 20): fix-first 1-8 as
+listed. All eight built; Soon and Later wait for the user to pick.
 
 Fix first:
 
 1. **The public key reads every community's admin emails and preview
    tokens** (checked on the test project: all four communities, hidden
    ones included). Migration 027's `public reads communities` policy is
-   `using (true)` and later columns joined it. Fix: a migration narrowing
-   it; live needs the user's yes.
+   `using (true)` and later columns joined it. **Built Nov 20**: migration
+   103 drops all twelve public policies (nothing in the site reads with
+   the anon key; it only signs admins in), which also closes hidden
+   communities' listings and the anon subscriber insert (an earlier
+   "refused" test of that was wrong: it asked for the row back, which
+   needs a read policy). `noPublicPolicies.test.ts`, red 1/1 without 103.
+   **To run: dev, then live (the user).**
 2. **Anyone can backdate or erase a listing's "Still right?" date**: the
    confirm route has no Turnstile and `unconfirm_*` takes the caller's
    `p_previous`. Cuts against "confirmed means a person confirmed it".
+   **Built Nov 20**: the server reads the date before a Yes and hands the
+   browser a signed note of it (`src/lib/confirmUndo.ts`, keyed off the
+   service-role key, one listing and box, a day); the undo restores only
+   what the note says and ignores dates from the browser. No migration.
+   An undo from a tab opened before the deploy fails once ("couldn't
+   save"). Route tests: 10 red against the old route.
 3. **No backups or restore procedure** in the repo; the plan's backups
    and PITR need the user to check in Supabase. Photos in Storage too.
+   **Built Nov 20**: `docs/backups.md` (the two copies, what to check,
+   how to get things back) and `npm run backup -- --prod`, a read-only
+   copy of every table and stored file (tried on dev: 29 tables, 152
+   files, ~2 min). `backups/` is in `.gitignore` now. **For the user:**
+   check Database → Backups on live (plan, how far back, PITR) and say
+   what's there; run the first live copy. No restore has been tried.
 4. **A broken alert path is silent**: the nightly email is the only
    alert and runs on what it watches; caught errors (AI reads, after()
    work) never reach Sentry. Fix: an outside heartbeat per cron, and one
-   `reportError()`.
+   `reportError()`. **Built Nov 20**: every caught error in `src/app/api`
+   (180 places, after() work included) goes through `reportServerError`
+   (`src/lib/serverError.ts`): logged as before and sent to Sentry, one
+   issue per place. A job that throws or says it failed is reported too,
+   and the nightly email counts a send that failed as a failed run (it was
+   a warning). The heartbeat is Sentry's cron monitors
+   (`src/lib/cronHeartbeat.ts`), one per job, **off until the user sets
+   `SENTRY_CRON_MONITORS=on`** in Vercel's production settings: Sentry
+   bills monitors past its free allowance, so check the plan first. Red
+   3/3 against the old code (the route guard, the job report, the email).
 5. **The community list caches its one-community fallback for days**
-   after any Supabase error (checked, `listCommunities`).
+   after any Supabase error (checked, `listCommunities`). **Built
+   Nov 20**: a failed read throws, so nothing is cached and the next
+   request asks again; the config's community only for a missing or empty
+   table. Red 2/2 against the old code.
 6. **`community_id` still defaults to 'philly'** on 9 tables; 027 says
-   to drop it once a second community exists (checked).
+   to drop it once a second community exists (checked). **Built Nov 20**:
+   migration 104 drops it. Every insert in the site already named its
+   community; the setup, seed and import scripts didn't, and now all go
+   through `scripts/seedCommunity.mjs` (`COMMUNITY=<slug>`, default the
+   config's). Also fixed on the way: their upserts keyed on `id` alone
+   (already failing against the composite keys), and `FORCE=1 npm run
+   seed` deleted every community's listings, now only its own. The form
+   round-trip's test form names Philly. `noDefaultCommunity.test.ts`, red
+   3/3 against the old code. **To run: dev, then live (the user), after
+   this deploys.**
 7. **`Map.groupBy` takes down a shul listing on iOS before 17.4**
    (checked, `DaveningCard.tsx:396`), and the only error boundary is the
-   root one, so the header goes too.
+   root one, so the header goes too. **Built Nov 20**: a plain `groupBy`
+   (`src/lib/groupBy.ts`); `browserSupport.test.ts` fails on any built-in
+   past Safari 16.4 (Next's build target), red 1/1 against the old card.
+   `[community]/error.tsx` shares the root's screen and keeps the header,
+   Go home going to the community. Checked in a real browser with a page
+   made to throw: header kept and Go home `/philly`; without it, no header
+   and Go home `/`. Not automated (it needs a page that always throws).
 8. **If Turnstile can't load, a contributor's Send never enables** and
-   nothing says why (hospital wifi, blockers).
+   nothing says why (hospital wifi, blockers). **Built Nov 20**: the
+   widget says "The spam check didn't load. Try again" after a failed
+   load, a script not there after 10s, or a challenge Cloudflare says
+   failed; a failed load is no longer kept, so Try again fetches it
+   again. Red 3/3 against the old widget. Seen in a real browser on
+   localhost, where Cloudflare refuses the check (600010), so local dev
+   shows the line on every form now.
 
 Soon:
 
@@ -932,8 +983,7 @@ decision; rem font sizes; `dir="auto"` for Hebrew; the parked Today
 features (keep or delete); `/inbox` per community; this file's size;
 Partial Prefetching before Next 17.
 
-Checked and not so: anon can't insert subscribers on the test project
-(RLS refused it). The nightly email does record a failed send, as a
+Checked and not so: the nightly email does record a failed send, as a
 warning, not a failure.
 
 ## The speed and scale sweep (Nov 20, on `claude/bands-and-search`)
@@ -1083,6 +1133,28 @@ on old code too, so one slow run says nothing yet. But every suite now
 hits the one test project at once, so watch for it: if it repeats, size
 those waits to the database's slow spells, or separate the test project
 from dev's (the user's call, see Nov 17 above). Not retries.
+
+CI time, looked at again Nov 20 (the user: "the PR still took about 10
+minutes"). PR 402's checks took 7m20s, not 10. The rest was a second push
+restarting them and the merge after. They were slow because 402 changed the
+lock file: no package cache, so every job ran `npm ci`, and the build was
+cold. A PR that leaves the lock file alone runs in about 5.6 min. Three
+changes (`ciWorkflow.test.ts`, 3 red against the old files):
+
+- **Production's smoke run finishes again.** It ran all 582 tests on one
+  runner, took 13–15 min, and hit its 15-minute timeout on most pushes to
+  main since Nov 16, so it reported nothing. It now builds once
+  (`e2e-prod-build`) and runs six shards of that build, like e2e. Its
+  report upload was behind `if: failure()`, which a continue-on-error
+  step never sets; it now uses the step's own outcome.
+- **The build cache is saved once per PR**, keyed on the lock file, not
+  on every run (keyed on the commit, it cost 18–23s at the end of each
+  build job).
+- **e2e has seven shards**, from six; the slowest ran 168s of tests.
+
+Not changed: lint and typecheck still run before the unit tests in one
+job (4–6.5 min). On a warm run that is under the e2e path, so splitting
+them saves nothing yet.
 
 Still to do:
 

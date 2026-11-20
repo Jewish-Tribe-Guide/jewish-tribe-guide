@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { listSubmissionsByStatus } from '@/lib/submissionStore'
 import type { SubmissionStatus } from '@/types'
@@ -38,7 +39,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     const page = await listSubmissionsByStatus(community.slug, status, { limit: HISTORY_PAGE + 1, before: at && id ? { at, id } : undefined })
     return Response.json({ ok: true, submissions: page.slice(0, HISTORY_PAGE), more: page.length > HISTORY_PAGE })
   } catch (err) {
-    console.error('[admin/submissions] GET failed:', err)
+    reportServerError('[admin/submissions] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load submissions.'] }, { status: 502 })
   }
 })

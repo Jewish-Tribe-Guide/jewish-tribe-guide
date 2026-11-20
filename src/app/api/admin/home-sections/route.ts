@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead, adminWrite } from '@/lib/adminRoute'
 import { listHomeSectionsUncached, createHomeSection } from '@/lib/homeSectionStore'
 import { BUILT_IN_BLOCKS, type HomeBlockKind } from '@/lib/homeSections'
@@ -11,7 +12,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     const sections = await listHomeSectionsUncached(community.slug)
     return Response.json({ ok: true, sections })
   } catch (err) {
-    console.error('[admin/home-sections] GET failed:', err)
+    reportServerError('[admin/home-sections] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load sections.'] }, { status: 502 })
   }
 })
@@ -59,7 +60,7 @@ export const POST = adminWrite(async (request: Request, { community }) => {
     })
     return Response.json({ ok: true, section })
   } catch (err) {
-    console.error('[admin/home-sections] POST failed:', err)
+    reportServerError('[admin/home-sections] POST failed:', err)
     const message = err instanceof Error ? err.message : 'Could not create section.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }

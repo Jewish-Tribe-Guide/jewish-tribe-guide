@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { listJobRuns } from '@/lib/jobRunStore'
 import { listWatches } from '@/lib/watchStore'
@@ -30,7 +31,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     ])
     return Response.json({ ok: true, available, off: jobsOff(watches), kinds: nightKinds(community.slug, runs, watches, google, now, unread, listings, links) })
   } catch (err) {
-    console.error('[admin/watches/runs] GET failed:', err)
+    reportServerError('[admin/watches/runs] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the nightly runs.'] }, { status: 502 })
   }
 })

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { deleteSubscriberByToken } from '@/lib/subscriberStore'
 
 // GET /api/subscribers/unsubscribe?token=... — the link every subscriber
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
   try {
     await deleteSubscriberByToken(token)
   } catch (err) {
-    console.error('[subscribers] unsubscribe failed:', err)
+    reportServerError('[subscribers] unsubscribe failed:', err)
     return htmlResponse('Something went wrong. Please try again.', 502)
   }
 

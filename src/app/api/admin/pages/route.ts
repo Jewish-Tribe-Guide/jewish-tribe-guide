@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { siteAdminRead } from '@/lib/adminRoute'
 import { listPagesUncached } from '@/lib/pagesStore'
 
@@ -8,7 +9,7 @@ export const GET = siteAdminRead(async () => {
     const pages = await listPagesUncached()
     return Response.json({ ok: true, pages })
   } catch (err) {
-    console.error('[admin/pages] GET failed:', err)
+    reportServerError('[admin/pages] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load pages.'] }, { status: 502 })
   }
 })

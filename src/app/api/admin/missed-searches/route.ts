@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
@@ -37,7 +38,7 @@ export const GET = adminRead(async (_request: Request, { community }) => {
       .map((c) => ({ id: c.id, label: c.label }))
     return Response.json({ ok: true, searches, total: tallies.length, addable, dismissalsAvailable: available })
   } catch (err) {
-    console.error('[admin/missed-searches] GET failed:', err)
+    reportServerError('[admin/missed-searches] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load missed searches.'] }, { status: 502 })
   }
 })
@@ -59,7 +60,7 @@ export const POST = adminRead(async (request: Request, { community }) => {
     await setSearchMissDismissed(community.slug, term, body.dismissed)
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[admin/missed-searches] POST failed:', err)
+    reportServerError('[admin/missed-searches] POST failed:', err)
     return Response.json(
       { ok: false, errors: ['Could not save.'] },
       { status: 502 },

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { after } from 'next/server'
 import { adminRead, adminWrite, unchanged } from '@/lib/adminRoute'
 import { listCategories } from '@/lib/categoryStore'
@@ -248,7 +249,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     places.sort((a, b) => a.name.localeCompare(b.name))
     return Response.json({ ok: true, available, readerOn: !!process.env.OPENAI_API_KEY, places })
   } catch (err) {
-    console.error('[admin/main-dishes] GET failed:', err)
+    reportServerError('[admin/main-dishes] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the food places.'] }, { status: 502 })
   }
 })
@@ -308,7 +309,7 @@ export const POST = adminWrite(async (request: Request, { community, admin }) =>
       const started = await startMenuReading(community.slug, resourceId, url)
       after(() =>
         readIt().then(async ({ wrote }) => { if (wrote) await revalidatePublicContent({ communities: [community.slug] }) }).catch(async (err) => {
-          console.error('[admin/main-dishes] reading a menu link failed:', err)
+          reportServerError('[admin/main-dishes] reading a menu link failed:', err)
           await saveMenuReading(community.slug, resourceId, { status: 'failed', sourceUrl: url, dishes: [], note: 'Saved as its menu link, but it couldn’t be read. Read it again.', model: null }).catch(() => {})
         }),
       )
@@ -391,7 +392,7 @@ export const POST = adminWrite(async (request: Request, { community, admin }) =>
     const dishes = [...lists.always, ...lists.sometimes]
     return Response.json({ ok: true, dishes, sometimes: lists.sometimes, menuDated: dishes.filter((n) => menuDated.has(n.toLowerCase())) })
   } catch (err) {
-    console.error('[admin/main-dishes] POST failed:', err)
+    reportServerError('[admin/main-dishes] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not do that.'] }, { status: 502 })
   }
 })

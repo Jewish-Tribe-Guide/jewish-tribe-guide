@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { listCommunities } from '@/lib/communityStore'
 
 // GET /api/communities — every community this site hosts, in display order.
@@ -18,7 +19,7 @@ export async function GET() {
     const communities = (await listCommunities()).filter((c) => c.visible)
     return Response.json({ ok: true, communities })
   } catch (err) {
-    console.error('[communities] GET failed:', err)
+    reportServerError('[communities] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load communities.'] }, { status: 502 })
   }
 }

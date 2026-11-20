@@ -189,10 +189,13 @@ async function ensureCacheRoundtripFixtureCategory(supabase) {
 // already on the last step) — appending a plain final text step is what
 // gives this form an actual, clickable way to submit.
 async function ensureTestForm(supabase) {
-  const { data: existing } = await supabase.from('form').select('id').eq('id', FORM_E2E_FORM_ID).maybeSingle()
+  const { data: existing } = await supabase.from('form').select('id').eq('community_id', 'philly').eq('id', FORM_E2E_FORM_ID).maybeSingle()
   if (existing) return
 
+  // Philly's, where "/" lands the suite: said outright since migration 104
+  // took community_id's default away.
   const { error } = await supabase.from('form').insert({
+    community_id: 'philly',
     id: FORM_E2E_FORM_ID,
     title: 'E2E Test Form',
     submit_label: 'Submit',

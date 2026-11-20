@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { listCampaignBanners } from '@/lib/campaignBannerStore'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
     const banners = await listCampaignBanners(community.slug)
     return Response.json({ ok: true, banners })
   } catch (err) {
-    console.error('[campaign-banners] GET failed:', err)
+    reportServerError('[campaign-banners] GET failed:', err)
     return Response.json(
       { ok: false, errors: ['Could not load campaign banners. Please try again.'] },
       { status: 502 },

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead, adminWrite } from '@/lib/adminRoute'
 import { listCampaignBannersUncached, createCampaignBanner } from '@/lib/campaignBannerStore'
 
@@ -9,7 +10,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     const banners = await listCampaignBannersUncached(community.slug)
     return Response.json({ ok: true, banners })
   } catch (err) {
-    console.error('[admin/campaign-banners] GET failed:', err)
+    reportServerError('[admin/campaign-banners] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load campaign banners.'] }, { status: 502 })
   }
 })
@@ -59,7 +60,7 @@ export const POST = adminWrite(async (request: Request, { community }) => {
     })
     return Response.json({ ok: true, banner })
   } catch (err) {
-    console.error('[admin/campaign-banners] POST failed:', err)
+    reportServerError('[admin/campaign-banners] POST failed:', err)
     const message = err instanceof Error ? err.message : 'Could not create campaign banner.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }

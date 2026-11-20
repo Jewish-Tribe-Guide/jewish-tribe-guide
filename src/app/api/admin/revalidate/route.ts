@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { revalidateTag } from 'next/cache'
 import { siteAdminRead } from '@/lib/adminRoute'
 import { TAGS } from '@/lib/cacheTags'
@@ -42,7 +43,7 @@ export const POST = siteAdminRead(async () => {
     revalidateTag(TAGS.pages, 'max')
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[admin/revalidate] failed:', err)
+    reportServerError('[admin/revalidate] failed:', err)
     return Response.json({ ok: false, errors: ['Could not revalidate.'] }, { status: 502 })
   }
 })

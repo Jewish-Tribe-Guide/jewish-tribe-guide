@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead, adminWrite, unchanged } from '@/lib/adminRoute'
 import { UUID } from '@/lib/itemMarkRoutes'
 import { listCategories } from '@/lib/categoryStore'
@@ -67,7 +68,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     if (params.has('counts')) return Response.json({ ok: true, counts: googleCounts(places), total: places.length })
     return Response.json({ ok: true, counts: googleCounts(places), places })
   } catch (err) {
-    console.error('[admin/watches/google] GET failed:', err)
+    reportServerError('[admin/watches/google] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the listings.'] }, { status: 502 })
   }
 })
@@ -116,7 +117,7 @@ export const POST = adminWrite(async (request: Request, { community, admin }) =>
     return action === 'check' || action === 'stop_field' ? unchanged(saved) : saved
   } catch (err) {
     if (err instanceof GoogleJobError) return Response.json({ ok: false, errors: [err.message] }, { status: err.status })
-    console.error('[admin/watches/google] POST failed:', err)
+    reportServerError('[admin/watches/google] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })
   }
 })

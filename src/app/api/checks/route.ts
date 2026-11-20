@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { listCategories } from '@/lib/categoryStore'
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
     const checks = available ? checksRun(watches, listings, categories) : []
     return Response.json({ ok: true, checks }, { headers: { 'Cache-Control': CACHE_CONTROL } })
   } catch (err) {
-    console.error('[checks] GET failed:', err)
+    reportServerError('[checks] GET failed:', err)
     return Response.json({ ok: false, checks: [] }, { status: 502 })
   }
 }

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead, adminWrite } from '@/lib/adminRoute'
 import { listFormsForAdmin, createForm } from '@/lib/formStore'
 import type { FormContent } from '@/lib/forms'
@@ -9,7 +10,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     const forms = await listFormsForAdmin(community.slug)
     return Response.json({ ok: true, forms })
   } catch (err) {
-    console.error('[admin/forms] GET failed:', err)
+    reportServerError('[admin/forms] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load forms.'] }, { status: 502 })
   }
 })
@@ -42,7 +43,7 @@ export const POST = adminWrite(async (request: Request, { community }) => {
     })
     return Response.json({ ok: true, form })
   } catch (err) {
-    console.error('[admin/forms] POST failed:', err)
+    reportServerError('[admin/forms] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not create form.'] }, { status: 502 })
   }
 })

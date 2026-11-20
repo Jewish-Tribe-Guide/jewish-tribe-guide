@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { listPublishedForms } from '@/lib/formStore'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
     const forms = await listPublishedForms(community.slug)
     return Response.json({ ok: true, forms })
   } catch (err) {
-    console.error('[forms] GET failed:', err)
+    reportServerError('[forms] GET failed:', err)
     return Response.json(
       { ok: false, errors: ['Could not load forms. Please try again.'] },
       { status: 502 },

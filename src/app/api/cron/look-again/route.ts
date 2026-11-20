@@ -9,6 +9,7 @@
 // Each run is recorded for the Watches tab (jobRunStore.ts).
 //
 // Auth: as sync-hours (cronAuth.ts).
+import { reportServerError } from '@/lib/serverError'
 import { NextRequest, NextResponse } from 'next/server'
 import { cronAuthorized } from '@/lib/cronAuth'
 import { lookAgainNight } from '@/lib/lookAgainRun'
@@ -22,7 +23,7 @@ async function run(): Promise<NextResponse> {
     const body = await recordJobRun('look-again', () => lookAgainNight(process.env.OPENAI_API_KEY), lookAgainOutcome)
     return NextResponse.json({ ok: true, ...body })
   } catch (err) {
-    console.error('[cron/look-again] failed:', err)
+    reportServerError('[cron/look-again] failed:', err)
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 })
   }
 }

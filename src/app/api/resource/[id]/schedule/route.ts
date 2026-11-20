@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { after } from 'next/server'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
@@ -51,10 +52,10 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
       ...(sourceUrl ? [`Read from their photo or PDF: ${sourceUrl}`] : []),
     ].join('\n\n')
     const submission = await submitListingUpdate(community.slug, id, editSubmission(category, listing, { [key]: schedules }), note, null)
-    after(() => sendSubmissionNotification(submission).catch((err) => console.error('[schedule] Admin notification failed:', err)))
+    after(() => sendSubmissionNotification(submission).catch((err) => reportServerError('[schedule] Admin notification failed:', err)))
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[schedule] could not file the schedule:', err)
+    reportServerError('[schedule] could not file the schedule:', err)
     return Response.json(FAILED, { status: 502 })
   }
 }

@@ -39,7 +39,7 @@ const REQUIRED = {
   SUPABASE_SERVICE_ROLE_KEY: 'Supabase service-role key (server-side writes)',
 }
 const RECOMMENDED = {
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'browser reads from Supabase',
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'admin sign-in in the browser (it reads no table, migration 103)',
   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: 'address autocomplete + the resource map',
   GOOGLE_MAPS_SERVER_KEY: 'server-side geocoding / travel-time scripts',
   RESEND_API_KEY: 'confirmation + notification emails',

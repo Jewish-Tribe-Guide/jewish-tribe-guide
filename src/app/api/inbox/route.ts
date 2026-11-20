@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { getInboxViewer } from '@/lib/inboxAuth'
 import { listFormResponses } from '@/lib/formResponseStore'
 import { INBOX_TAB_REQUEST_TYPES } from '@/lib/inbox'
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
     const responses = await listFormResponses({ requestTypes: INBOX_REQUEST_TYPES })
     return Response.json({ ok: true, responses })
   } catch (err) {
-    console.error('[inbox] GET failed:', err)
+    reportServerError('[inbox] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the inbox.'] }, { status: 502 })
   }
 }

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { getResourceById } from '@/lib/resourceStore'
 import { getCategoryById, listCategories } from '@/lib/categoryStore'
 import { resolveCapabilities } from '@/lib/categories'
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
     try {
       submission = await submitEruvCreate(community.slug, read.suggestion, note?.trim() || null, submittedBy)
     } catch (err) {
-      console.error('[submissions] new eruv insert failed:', err)
+      reportServerError('[submissions] new eruv insert failed:', err)
       return Response.json({ ok: false, errors: ['Could not save your submission. Please try again.'] }, { status: 502 })
     }
     after(() => notify(submission))
@@ -121,7 +122,7 @@ export async function POST(request: Request) {
     try {
       submission = await submitEruvUpdate(community.slug, read.suggestion, note?.trim() || null, submittedBy)
     } catch (err) {
-      console.error('[submissions] eruv insert failed:', err)
+      reportServerError('[submissions] eruv insert failed:', err)
       return Response.json({ ok: false, errors: ['Could not save your submission. Please try again.'] }, { status: 502 })
     }
     after(() => notify(submission))
@@ -228,7 +229,7 @@ export async function POST(request: Request) {
       submission = await submitListingDelete(community.slug, targetId!, note ?? null, submittedBy)
     }
   } catch (err) {
-    console.error('[submissions] insert failed:', err)
+    reportServerError('[submissions] insert failed:', err)
     return Response.json(
       { ok: false, errors: ['Could not save your submission. Please try again.'] },
       { status: 502 },
@@ -256,10 +257,10 @@ export async function POST(request: Request) {
 async function notify(submission: SubmissionRow): Promise<void> {
   await Promise.all([
     sendSubmissionNotification(submission).catch((err) =>
-      console.error('[submissions] Admin notification failed:', err),
+      reportServerError('[submissions] Admin notification failed:', err),
     ),
     sendSubmissionConfirmation(submission).catch((err) =>
-      console.error('[submissions] Confirmation email failed:', err),
+      reportServerError('[submissions] Confirmation email failed:', err),
     ),
   ])
 }

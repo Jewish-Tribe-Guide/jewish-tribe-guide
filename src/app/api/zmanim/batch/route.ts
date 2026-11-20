@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { getZmanimData } from '@/lib/zmanim'
 import { parseZmanimBatchRequest, zmanimDateCheck } from '@/lib/zmanimRequest'
 import { enforceRateLimit } from '@/lib/rateLimit'
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
   const results = settled.map((r, i) => {
     const { lat, lng } = parsed.points[i]
     if (r.status === 'fulfilled') return { lat, lng, ok: true as const, data: r.value }
-    console.error('[zmanim/batch] fetch failed:', r.reason)
+    reportServerError('[zmanim/batch] fetch failed:', r.reason)
     return { lat, lng, ok: false as const }
   })
 

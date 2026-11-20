@@ -6,6 +6,7 @@
 //
 //   node --env-file=.env.local scripts/seed-categories.mjs
 
+import { SEED_COMMUNITY } from './seedCommunity.mjs'
 import { createClient } from '@supabase/supabase-js'
 import { categories } from '../src/data/categories.js'
 
@@ -23,7 +24,7 @@ if (categories.length === 0) {
   process.exit(0)
 }
 
-const { error } = await supabase.from('category').upsert(categories, { onConflict: 'id' })
+const { error } = await supabase.from('category').upsert(categories.map((c) => ({ ...c, community_id: SEED_COMMUNITY })), { onConflict: 'community_id,id' })
 if (error) {
   console.error('❌ Seed failed:', error.message)
   process.exit(1)

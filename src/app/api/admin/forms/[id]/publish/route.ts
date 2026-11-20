@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminWrite } from '@/lib/adminRoute'
 import type { NextRequest } from 'next/server'
 import { publishDraft } from '@/lib/formStore'
@@ -11,7 +12,7 @@ export const POST = adminWrite(async (request: NextRequest, { community }, ctx: 
     if (!form) return Response.json({ ok: false, errors: ['Form not found.'] }, { status: 404 })
     return Response.json({ ok: true, form })
   } catch (err) {
-    console.error('[admin/forms/:id/publish] POST failed:', err)
+    reportServerError('[admin/forms/:id/publish] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not publish form.'] }, { status: 502 })
   }
 })

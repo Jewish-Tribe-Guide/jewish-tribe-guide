@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { isHoneypotTripped } from '@/lib/honeypot'
@@ -100,11 +101,11 @@ export async function POST(request: Request) {
       const storage = getAdminClient().storage.from(BUCKET)
       const { error } = await storage.upload(path, bytes, { contentType: mime, upsert: false })
       if (!error) sourceUrl = storage.getPublicUrl(path).data.publicUrl
-      else console.error('[schedule/read] could not keep the file:', error.message)
+      else reportServerError('[schedule/read] could not keep the file:', error.message)
     }
     return Response.json({ ok: true, ...result, sourceUrl })
   } catch (err) {
-    console.error('[schedule/read] failed:', err instanceof Error ? err.message : err)
+    reportServerError('[schedule/read] failed:', err instanceof Error ? err.message : err)
     return Response.json({ ok: false, error: 'Couldn’t read it right now. Type the times in instead, or try again.' }, { status: 502 })
   }
 }

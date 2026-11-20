@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
     const settings = await getSiteSettings(community.slug)
     return Response.json({ ok: true, settings })
   } catch (err) {
-    console.error('[site-settings] GET failed:', err)
+    reportServerError('[site-settings] GET failed:', err)
     return Response.json(
       { ok: false, errors: ['Could not load site settings. Please try again.'] },
       { status: 502 },

@@ -271,3 +271,54 @@ describe('each build restores its own build cache', () => {
     expect(ACTION).toMatch(/path:\s*\$\{\{ inputs\.next-dist-dir \}\}\/cache\/turbopack\s*\n/)
   })
 })
+
+// Production's smoke run (push to main only, never gating) ran the whole
+// suite on one runner and outgrew its 15-minute timeout: cancelled on most
+// pushes from Nov 16, so production drift went unreported. And its report
+// upload was `if: failure()` behind a continue-on-error step, which never
+// fires. Both Nov 20.
+describe('production’s smoke run finishes and keeps its report', () => {
+  const body = WORKFLOW.slice(WORKFLOW.indexOf('\njobs:'))
+  const jobs = Object.fromEntries(
+    body
+      .split(/\n {2}(?=[a-z][\w-]*:\n)/)
+      .slice(1)
+      .map((b) => [b.match(/^([\w-]+):/)![1], b] as const),
+  )
+
+  it('builds once, without the PR builds’ cache, and runs as shards of that build', () => {
+    const build = jobs['e2e-prod-build'] ?? ''
+    const smoke = jobs['e2e-prod-smoke'] ?? ''
+    expect(build).toMatch(/\n {6}- run: npm run build\n/)
+    expect(build).not.toMatch(/next-dist-dir/)
+    expect(build).toMatch(/name: e2e-prod-build\n\s+path: \|\n\s+\.next\/\n\s+!\.next\/cache\/\n\s+include-hidden-files: true/)
+    expect(build).toMatch(/\n {4}env: &prod-env\n/)
+    expect(smoke).toMatch(/\n {4}env: \*prod-env\n/)
+    expect(smoke).toMatch(/\n {4}needs: \[e2e-prod-build\]/)
+    expect(smoke).toMatch(/download-artifact@v\d+\n\s+with:\n\s+name: e2e-prod-build\n\s+path: \.next\n/)
+    const shards = smoke.match(/shard:\s*\[([^\]]+)\]/)?.[1].split(',') ?? []
+    expect(shards.length).toBeGreaterThan(1)
+    expect(smoke).toMatch(new RegExp(`--shard=\\$\\{\\{ matrix\\.shard \\}\\}/${shards.length}\\b`))
+    expect(smoke).toMatch(/E2E_PREBUILT: '1'/)
+    for (const job of [build, smoke]) expect(job).toMatch(/\n {4}if: github\.event_name == 'push'/)
+  })
+
+  it('no job hides its report behind failure() after a continue-on-error step', () => {
+    const offenders = Object.entries(jobs)
+      .filter(([, b]) => /continue-on-error:\s*true/.test(b) && /if:\s*failure\(\)/.test(b))
+      .map(([n]) => n)
+    expect(offenders).toEqual([])
+  })
+})
+
+// The build cache used to be keyed on the commit, so every run missed and
+// saved a fresh copy, 18–23s at the end of each build job that e2e's shards
+// wait on (Nov 20). Keyed on the lock file, a PR saves it once.
+describe('the build cache is saved once, not every run', () => {
+  const ACTION = readFileSync('.github/actions/setup/action.yml', 'utf-8')
+  it('isn’t keyed on the commit', () => {
+    const turbopack = ACTION.slice(ACTION.indexOf('/cache/turbopack'))
+    expect(turbopack).toMatch(/key: turbopack-/)
+    expect(turbopack).not.toMatch(/github\.sha|restore-keys/)
+  })
+})

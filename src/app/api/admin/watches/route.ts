@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { GUIDE_PAGE_ERROR, isGuidePage } from '@/lib/guidePage'
 import { adminRead } from '@/lib/adminRoute'
 import { listApprovedResources } from '@/lib/resourceStore'
@@ -71,7 +72,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
         .sort((a, b) => a.name.localeCompare(b.name)),
     })
   } catch (err) {
-    console.error('[admin/watches] GET failed:', err)
+    reportServerError('[admin/watches] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the watches.'] }, { status: 502 })
   }
 })
@@ -191,7 +192,7 @@ export const POST = adminRead(async (request: Request, { community, admin }) => 
     const { watch } = await runAndRecord(existing, undefined, undefined, { full: true })
     return Response.json({ ok: true, watch })
   } catch (err) {
-    console.error('[admin/watches] POST failed:', err)
+    reportServerError('[admin/watches] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })
   }
 })

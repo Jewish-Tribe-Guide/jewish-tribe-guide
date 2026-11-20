@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 
 // Cloudflare Turnstile widget. Renders nothing unless NEXT_PUBLIC_TURNSTILE_SITE_KEY
 // is set, so forms work normally before the keys are configured (and on preview
@@ -29,8 +29,18 @@ export type TurnstileHandle = {
   reset: () => void
 }
 
+// When the check doesn't come (Nov 20, the health sweep): a blocked or
+// failed script used to leave the form without a word, its Send waiting on
+// a token that would never arrive, and the failed load was kept, so nothing
+// short of a reload could try again. Now the visitor is told, with a Try
+// again, after a failed load, a script still not there after LOAD_WAIT_MS,
+// or a challenge Cloudflare says went wrong.
+
+/** How long the script may take before the visitor is told. */
+export const LOAD_WAIT_MS = 10_000
+
 let scriptPromise: Promise<void> | null = null
-function loadTurnstileScript(): Promise<void> {
+export function loadTurnstileScript(): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve()
   if (window.turnstile) return Promise.resolve()
   if (scriptPromise) return scriptPromise
@@ -40,7 +50,12 @@ function loadTurnstileScript(): Promise<void> {
     s.async = true
     s.defer = true
     s.onload = () => resolve()
-    s.onerror = () => reject(new Error('Failed to load Turnstile'))
+    s.onerror = () => {
+      // Forgotten, so Try again fetches it again rather than the failure.
+      s.remove()
+      scriptPromise = null
+      reject(new Error('Failed to load Turnstile'))
+    }
     document.head.appendChild(s)
   })
   return scriptPromise
@@ -62,6 +77,53 @@ const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
     const cbRef = useRef(onVerify)
     cbRef.current = onVerify
     const widgetId = useRef<string | null>(null)
+    const [trouble, setTrouble] = useState<'load' | 'challenge' | null>(null)
+    const cancelled = useRef(false)
+
+    const mount = useCallback(() => {
+      if (!SITE_KEY) return
+      setTrouble(null)
+      const late = setTimeout(() => {
+        if (!cancelled.current && !widgetId.current) setTrouble('load')
+      }, LOAD_WAIT_MS)
+      loadTurnstileScript()
+        .then(() => {
+          clearTimeout(late)
+          if (cancelled.current || !containerRef.current || !window.turnstile || widgetId.current) return
+          setTrouble(null)
+          widgetId.current = window.turnstile.render(containerRef.current, {
+            sitekey: SITE_KEY,
+            callback: (token: string) => {
+              setTrouble(null)
+              cbRef.current(token)
+            },
+            'error-callback': () => {
+              setTrouble('challenge')
+              cbRef.current('')
+            },
+            'expired-callback': () => cbRef.current(''),
+            ...(appearanceRef.current ? { appearance: appearanceRef.current } : {}),
+          })
+        })
+        .catch((err) => {
+          clearTimeout(late)
+          console.error('[turnstile]', err)
+          if (!cancelled.current) setTrouble('load')
+        })
+    }, [])
+
+    const tryAgain = () => {
+      if (widgetId.current && window.turnstile) {
+        setTrouble(null)
+        try {
+          window.turnstile.reset(widgetId.current)
+        } catch {
+          // widget already gone
+        }
+      } else {
+        mount()
+      }
+    }
 
     useImperativeHandle(ref, () => ({
       reset: () => {
@@ -76,22 +138,10 @@ const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
     }))
 
     useEffect(() => {
-      if (!SITE_KEY) return
-      let cancelled = false
-      loadTurnstileScript()
-        .then(() => {
-          if (cancelled || !containerRef.current || !window.turnstile) return
-          widgetId.current = window.turnstile.render(containerRef.current, {
-            sitekey: SITE_KEY,
-            callback: (token: string) => cbRef.current(token),
-            'error-callback': () => cbRef.current(''),
-            'expired-callback': () => cbRef.current(''),
-            ...(appearanceRef.current ? { appearance: appearanceRef.current } : {}),
-          })
-        })
-        .catch((err) => console.error('[turnstile]', err))
+      cancelled.current = false
+      mount()
       return () => {
-        cancelled = true
+        cancelled.current = true
         if (widgetId.current && window.turnstile) {
           try {
             window.turnstile.remove(widgetId.current)
@@ -99,13 +149,26 @@ const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
             // widget already gone
           }
         }
+        widgetId.current = null
       }
-    }, [])
+    }, [mount])
 
     if (!SITE_KEY) return null
     // No margin when it only shows for an interaction: an empty box would
     // still push the field below it down.
-    return <div ref={containerRef} className={appearance ? undefined : 'my-2'} />
+    return (
+      <>
+        <div ref={containerRef} className={appearance ? undefined : 'my-2'} />
+        {trouble && (
+          <p role="alert" className="my-2 text-sm text-slate-700">
+            The spam check didn’t load.{' '}
+            <button type="button" onClick={tryAgain} className="cursor-pointer font-medium text-primary underline">
+              Try again
+            </button>
+          </p>
+        )}
+      </>
+    )
   },
 )
 

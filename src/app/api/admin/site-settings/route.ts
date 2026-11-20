@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead, adminWrite } from '@/lib/adminRoute'
 import { revalidatePath } from 'next/cache'
 import { routes } from '@/lib/routes'
@@ -40,7 +41,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     const settings = await getSiteSettingsUncached(community.slug)
     return Response.json({ ok: true, settings })
   } catch (err) {
-    console.error('[admin/site-settings] GET failed:', err)
+    reportServerError('[admin/site-settings] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load site settings.'] }, { status: 502 })
   }
 })
@@ -172,7 +173,7 @@ export const PATCH = adminWrite(async (request: Request, { community }) => {
     if (err instanceof MissingTodayColumnsError || err instanceof MissingMapPhotoColumnError || err instanceof MissingRightNowColumnError) {
       return Response.json({ ok: false, errors: [err.message] }, { status: 409 })
     }
-    console.error('[admin/site-settings] PATCH failed:', err)
+    reportServerError('[admin/site-settings] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not save site settings.'] }, { status: 502 })
   }
 })

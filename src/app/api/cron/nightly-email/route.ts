@@ -8,6 +8,7 @@
 // Each run is recorded for the Watches tab (jobRunStore.ts).
 //
 // Auth: as sync-hours (cronAuth.ts).
+import { reportServerError } from '@/lib/serverError'
 import { NextRequest, NextResponse } from 'next/server'
 import { cronAuthorized } from '@/lib/cronAuth'
 import { sendNightlyEmails } from '@/lib/nightlyEmailRun'
@@ -21,7 +22,7 @@ async function run(): Promise<NextResponse> {
     const body = await recordJobRun('nightly-email', async () => await sendNightlyEmails(), nightlyEmailOutcome)
     return NextResponse.json({ ok: true, ...body })
   } catch (err) {
-    console.error('[cron/nightly-email] failed:', err)
+    reportServerError('[cron/nightly-email] failed:', err)
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 })
   }
 }

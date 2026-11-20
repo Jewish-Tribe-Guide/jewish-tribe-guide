@@ -1,5 +1,6 @@
 'use client'
 
+import { groupBy } from '@/lib/groupBy'
 import { useContext, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { formatDays, isMinyanim, signUpAction, TEFILLAH_LABELS, TEFILLAH_ORDER, type Minyan } from '@/lib/davening'
@@ -393,7 +394,7 @@ export default function DaveningCard({
         <WeekGridTable grid={grid} todayDate={todayDate} marks={!weekdayRows.every((m) => m.signUp)} />
         {/* A link under the grid, naming the minyanim it's for, as under
             the usual table: "Join Thu Shacharis on Zoom". */}
-        {[...Map.groupBy(weekdayRows.filter((m) => m.joinLink?.trim()), (m) => m.joinLink!.trim())].map(([link, ms]) => (
+        {[...groupBy(weekdayRows.filter((m) => m.joinLink?.trim()), (m) => m.joinLink!.trim())].map(([link, ms]) => (
           <JoinLink
             key={link}
             link={link}

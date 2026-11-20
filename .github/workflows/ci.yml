@@ -290,7 +290,7 @@ jobs:
           retention-days: 1
 
   e2e:
-    name: End-to-end tests (test project, ${{ matrix.shard }}/6)
+    name: End-to-end tests (test project, ${{ matrix.shard }}/7)
     # See "One copy of each test-project suite at a time" above.
     if: github.event_name != 'push'
     concurrency:
@@ -312,7 +312,8 @@ jobs:
     # Nor form-roundtrip: it only creates/deletes form and submission rows
     # (a seeded test form, its response), which nothing in e2e/ reads.
     #
-    # Split six ways (four until Nov 20), each shard on its own runner
+    # Split seven ways (four until Nov 20, then six; the seventh took the
+    # slowest shard's 168s of tests down), each shard on its own runner
     # (Oct 19). Playwright splits by test count, not time, and a skipped
     # test counts, so four shards ran 150–208s of tests each; six, with the
     # build cached (see .github/actions/setup), cost one more cold start
@@ -330,7 +331,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        shard: [1, 2, 3, 4, 5, 6, 7]
     # The same settings the build had (the anchor on e2e-build): the
     # tests read the test project with them, and the server reads its
     # runtime ones.
@@ -346,7 +347,7 @@ jobs:
       # device emulation are both Chromium) — no `playwright install` step
       # needed, see container image above. It ships every engine, but we
       # only invoke Chromium via test:e2e.
-      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/6
+      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/7
         env:
           E2E_PREBUILT: '1'
       - uses: actions/upload-artifact@v7
@@ -356,31 +357,70 @@ jobs:
           path: playwright-report/
           retention-days: 14
 
-  e2e-prod-smoke:
-    name: End-to-end tests (production, non-blocking)
+  e2e-prod-build:
+    name: Build for the production smoke tests
+    # The same suite against real production, after a merge, never gating
+    # one (see the header). It ran on one runner, one test at a time, and
+    # by Nov 16 needed 13-15 minutes for its 582 tests: the 15-minute
+    # timeout cancelled it on most pushes to main, so it reported nothing.
+    # Built once and split like e2e's (Nov 20).
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.63.0-noble
     needs: unit
     timeout-minutes: 15
+    env: &prod-env
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPERADMIN_EMAILS: ${{ secrets.SUPERADMIN_EMAILS }}
+      INBOX_EMAILS: ${{ secrets.INBOX_EMAILS }}
+      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
+      NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID }}
     steps:
       - uses: actions/checkout@v7
       # No build cache: this build has production's values baked in, and
       # its cache would be main's, which every PR's e2e build restores from.
       - uses: ./.github/actions/setup
-      - run: npm run test:e2e
+      - run: npm run build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: e2e-prod-build
+          path: |
+            .next/
+            !.next/cache/
+          include-hidden-files: true
+          retention-days: 1
+
+  e2e-prod-smoke:
+    name: End-to-end tests (production, non-blocking, ${{ matrix.shard }}/6)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
+    needs: [e2e-prod-build]
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    env: *prod-env
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - uses: actions/download-artifact@v8
+        with:
+          name: e2e-prod-build
+          path: .next
+      - id: tests
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/6
         continue-on-error: true
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPERADMIN_EMAILS: ${{ secrets.SUPERADMIN_EMAILS }}
-          INBOX_EMAILS: ${{ secrets.INBOX_EMAILS }}
-          NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
-          NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID }}
+          E2E_PREBUILT: '1'
+      # continue-on-error leaves failure() false, so the report is kept
+      # by the step's own outcome.
       - uses: actions/upload-artifact@v7
-        if: failure()
+        if: steps.tests.outcome == 'failure'
         with:
-          name: playwright-report-prod-smoke
+          name: playwright-report-prod-smoke-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 14

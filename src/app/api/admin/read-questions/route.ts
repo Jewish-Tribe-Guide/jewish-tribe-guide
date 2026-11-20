@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead, adminWrite, unchanged } from '@/lib/adminRoute'
 import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
@@ -61,7 +62,7 @@ export const GET = adminRead(async (_request: Request, { community }) => {
       })),
     })
   } catch (err) {
-    console.error('[admin/read-questions] GET failed:', err)
+    reportServerError('[admin/read-questions] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load read questions.'] }, { status: 502 })
   }
 })
@@ -108,7 +109,7 @@ export const POST = adminWrite(async (request: Request, { community, admin }) =>
       }
       return Response.json({ ok: true })
     } catch (err) {
-      console.error('[admin/read-questions] teach failed:', err)
+      reportServerError('[admin/read-questions] teach failed:', err)
       return Response.json({ ok: false, errors: ['Could not save.'] }, { status: 502 })
     }
   }
@@ -119,7 +120,7 @@ export const POST = adminWrite(async (request: Request, { community, admin }) =>
     await forgetReading(community.slug, key)
     return unchanged(Response.json({ ok: true }))
   } catch (err) {
-    console.error('[admin/read-questions] POST failed:', err)
+    reportServerError('[admin/read-questions] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save.'] }, { status: 502 })
   }
 })

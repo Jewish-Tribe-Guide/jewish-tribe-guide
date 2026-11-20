@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { attachSubmitterEmail } from '@/lib/submissionStore'
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
   try {
     return Response.json({ ok: true, updated: await attachSubmitterEmail(community.slug, ids, email) })
   } catch (err) {
-    console.error('[message/email] failed:', err instanceof Error ? err.message : err)
+    reportServerError('[message/email] failed:', err instanceof Error ? err.message : err)
     return Response.json({ ok: false, error: 'That didn’t save. Please try again.' }, { status: 502 })
   }
 }

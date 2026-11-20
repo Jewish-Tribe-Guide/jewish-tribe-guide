@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminWrite } from '@/lib/adminRoute'
 import type { NextRequest } from 'next/server'
 import { setFormActive } from '@/lib/formStore'
@@ -25,7 +26,7 @@ export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx:
     // The public site caches this content; drop it so the change shows up.
     return Response.json({ ok: true, form })
   } catch (err) {
-    console.error('[admin/forms/:id/active] PATCH failed:', err)
+    reportServerError('[admin/forms/:id/active] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not update form.'] }, { status: 502 })
   }
 })

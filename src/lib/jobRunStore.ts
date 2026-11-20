@@ -1,3 +1,5 @@
+import { reportServerError } from './serverError'
+import { cronHeartbeat } from './cronHeartbeat'
 import { getAdminClient } from './supabase/admin'
 import { NIGHTLY_JOBS, type JobId, type JobOutcome, type JobRun, type RunKinds } from './jobRuns'
 
@@ -112,17 +114,29 @@ async function finish(job: JobId, id: string, outcome: JobOutcome, now: Date): P
 /** Runs a job and saves how it went. `outcome` reads its result; a job
  *  that throws is saved as failed and the error passed on. A run the
  *  platform stops is left unfinished, which the tab shows as cut off. */
-export async function recordJobRun<T>(job: JobId, run: () => Promise<T>, outcome: (result: T) => JobOutcome, now: () => Date = () => new Date(), community?: string): Promise<T> {
+export function recordJobRun<T>(job: JobId, run: () => Promise<T>, outcome: (result: T) => JobOutcome, now: () => Date = () => new Date(), community?: string): Promise<T> {
+  // A community's own watches run is one of several the cron's one call
+  // starts: that call is the job's heartbeat (cron/watches).
+  const go = () => recordRun(job, run, outcome, now, community)
+  return community ? go() : cronHeartbeat(job, go)
+}
+
+async function recordRun<T>(job: JobId, run: () => Promise<T>, outcome: (result: T) => JobOutcome, now: () => Date, community?: string): Promise<T> {
   const id = await startRun(job, now(), community).catch((err) => (quietly(`couldn’t save ${job}’s start`)(err), null))
   let result: T
   try {
     result = await run()
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
+    reportServerError(`[job ${job}] stopped with an error${community ? ` (${community})` : ''}:`, err)
     if (id) await finish(job, id, { ok: false, summary: 'Stopped with an error', error }, now())
     throw err
   }
-  if (id) await finish(job, id, outcome(result), now())
+  const told = outcome(result)
+  // Told of beyond the Watches tab and the nightly email, which is itself a
+  // job and can be the one that broke (Nov 20, the health sweep).
+  if (!told.ok) reportServerError(`[job ${job}] failed${community ? ` (${community})` : ''}:`, told.error || told.summary)
+  if (id) await finish(job, id, told, now())
   return result
 }
 

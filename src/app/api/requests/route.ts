@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import {
   type RequestType,
   type SubmissionPayload,
@@ -94,7 +95,7 @@ export async function POST(request: Request) {
       data: payload.formData,
     })
   } catch (err) {
-    console.error('[requests] DB save failed:', err)
+    reportServerError('[requests] DB save failed:', err)
     return Response.json(
       { ok: false, errors: ['Could not save your request. Please try again.'] },
       { status: 502 },
@@ -105,12 +106,12 @@ export async function POST(request: Request) {
   try {
     await sendNotification(payload, requestId, timestamp, community.slug)
   } catch (err) {
-    console.error('[requests] Admin notification failed:', err)
+    reportServerError('[requests] Admin notification failed:', err)
   }
   try {
     await sendRequestConfirmation(payload, requestId, community.slug)
   } catch (err) {
-    console.error('[requests] Confirmation email failed:', err)
+    reportServerError('[requests] Confirmation email failed:', err)
   }
 
   // 4. Success

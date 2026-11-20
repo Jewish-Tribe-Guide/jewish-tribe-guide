@@ -8,6 +8,7 @@
 // aborts unless you pass FORCE=1, which first deletes ALL rows and reseeds.
 //   FORCE=1 node --env-file=.env.local scripts/seed.mjs
 
+import { SEED_COMMUNITY } from './seedCommunity.mjs'
 import { createClient } from '@supabase/supabase-js'
 import { groceries, restaurants, hotels, mikvahs, whatsappGroups } from '../src/data/resources.js'
 import { categoryIds } from '../src/data/categories.js'
@@ -72,24 +73,26 @@ async function main() {
   const { count, error: countErr } = await supabase
     .from('resource')
     .select('*', { count: 'exact', head: true })
+    .eq('community_id', SEED_COMMUNITY)
   if (countErr) throw new Error(`Count failed: ${countErr.message}`)
 
   if (count && count > 0) {
     if (process.env.FORCE !== '1') {
-      console.error(`Aborting: \`resource\` already has ${count} row(s).`)
-      console.error('Re-run with FORCE=1 to delete all rows and reseed.')
+      console.error(`Aborting: \`resource\` already has ${count} row(s) in ${SEED_COMMUNITY}.`)
+      console.error('Re-run with FORCE=1 to delete that community’s rows and reseed.')
       process.exit(1)
     }
     console.log(`FORCE=1 — deleting ${count} existing row(s)…`)
     const { error: delErr } = await supabase
       .from('resource')
       .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000')
+      // That community's only: it once took every community's listings.
+      .eq('community_id', SEED_COMMUNITY)
     if (delErr) throw new Error(`Delete failed: ${delErr.message}`)
   }
 
   console.log(`Inserting ${rows.length} resources…`)
-  const { data, error } = await supabase.from('resource').insert(rows).select('id')
+  const { data, error } = await supabase.from('resource').insert(rows.map((r) => ({ ...r, community_id: SEED_COMMUNITY }))).select('id')
   if (error) throw new Error(`Insert failed: ${error.message}`)
 
   console.log(`✅ Seeded ${data.length} resources (all approved).`)

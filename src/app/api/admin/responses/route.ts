@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { listFormResponses, listNewAdminResponses } from '@/lib/formResponseStore'
 import { listFormsForAdmin } from '@/lib/formStore'
@@ -22,7 +23,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
       const titles = new Map(forms.map((f) => [f.id, f.title]))
       return Response.json({ ok: true, responses: responses.map((r) => responseSummary(r, titles)) })
     } catch (err) {
-      console.error('[admin/responses] GET new failed:', err)
+      reportServerError('[admin/responses] GET new failed:', err)
       return Response.json({ ok: false, errors: ['Could not load responses.'] }, { status: 502 })
     }
   }
@@ -38,7 +39,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     )
     return Response.json({ ok: true, responses })
   } catch (err) {
-    console.error('[admin/responses] GET failed:', err)
+    reportServerError('[admin/responses] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load responses.'] }, { status: 502 })
   }
 })

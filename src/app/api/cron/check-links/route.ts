@@ -12,6 +12,7 @@
 // Each run is recorded for the Watches tab (jobRunStore.ts).
 //
 // Auth: as sync-hours (cronAuth.ts).
+import { reportServerError } from '@/lib/serverError'
 import { NextRequest, NextResponse } from 'next/server'
 import { cronAuthorized } from '@/lib/cronAuth'
 import { checkAllLinks } from '@/lib/linkCheckRun'
@@ -31,7 +32,7 @@ async function run(): Promise<NextResponse> {
     )
     return NextResponse.json({ ok: true, links, files })
   } catch (err) {
-    console.error('[cron/check-links] failed:', err)
+    reportServerError('[cron/check-links] failed:', err)
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 })
   }
 }

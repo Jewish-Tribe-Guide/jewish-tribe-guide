@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { jobFindings } from '@/lib/watchFindingStore'
 import { listWatches } from '@/lib/watchStore'
@@ -29,7 +30,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     }))
     return Response.json({ ok: true, places: rows })
   } catch (err) {
-    console.error('[admin/watches/sites] GET failed:', err)
+    reportServerError('[admin/watches/sites] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the places.'] }, { status: 502 })
   }
 })

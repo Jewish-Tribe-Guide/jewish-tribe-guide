@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { validateSubmission, getResourceRowById, normalizeRow, listResourcesForAdmin, toAdminPlace } from '@/lib/resourceStore'
 import { getCategoryById, listCategoriesUncached } from '@/lib/categoryStore'
 import { submitListingCreate, approveSubmission } from '@/lib/submissionStore'
@@ -65,7 +66,7 @@ export const POST = adminWrite(async (request: Request, { community, admin }) =>
     after(() => runWalkRoutesAfterChange(community.slug))
     return Response.json({ ok: true, listing: normalizeRow(resourceRow) })
   } catch (err) {
-    console.error('[admin/listings] POST failed:', err)
+    reportServerError('[admin/listings] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not add listing.'] }, { status: 502 })
   }
 })
@@ -80,7 +81,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     const takesAddress = new Map(categories.map((c) => [c.id, c.hasAddress !== false]))
     return Response.json({ ok: true, places: rows.map((r) => toAdminPlace(r, takesAddress.get(r.category) ?? true)), categories })
   } catch (err) {
-    console.error('[admin/listings] GET failed:', err)
+    reportServerError('[admin/listings] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the places.'] }, { status: 502 })
   }
 })

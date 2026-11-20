@@ -1,8 +1,10 @@
+import { reportServerError } from '@/lib/serverError'
 import { revalidateTag } from 'next/cache'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { TAGS } from '@/lib/cacheTags'
 import { recordActivity, removeVisitorConfirmation } from '@/lib/activityStore'
+import { readUndo, signUndo } from '@/lib/confirmUndo'
 
 // POST /api/resource/:id/confirm   body: { section? }
 // Records that a visitor verified the community-curated info is still accurate.
@@ -41,8 +43,16 @@ async function sectionOf(request: Request): Promise<string | null | undefined> {
   return typeof body.section === 'string' && /^[A-Za-z0-9_]{1,64}$/.test(body.section) ? body.section : null
 }
 
-function isIso(v: unknown): v is string {
-  return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) && !Number.isNaN(Date.parse(v))
+/** The listing's (or box's) date as it stands, read just before a Yes, so
+ *  the undo can put it back (src/lib/confirmUndo.ts). Read outside the
+ *  RPC's lock, and that's safe: anything that moves the date in between
+ *  moves it to about now, so the RPC then sees it inside the cooldown and
+ *  changes nothing, and no undo is offered for a Yes that didn't land. */
+async function dateBefore(id: string, section: string | undefined): Promise<string | null> {
+  const { data } = await getAdminClient().from('resource').select('details').eq('id', id).maybeSingle()
+  const details = (data as { details?: Record<string, unknown> | null } | null)?.details ?? {}
+  const v = section ? (details.sectionConfirmed as Record<string, unknown> | undefined)?.[section] : details.confirmedAt
+  return typeof v === 'string' ? v : null
 }
 
 export async function POST(request: Request, ctx: RouteContext<'/api/resource/[id]/confirm'>) {
@@ -55,11 +65,12 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
   if (section === null) return Response.json({ ok: false, error: 'Invalid section.' }, { status: 400 })
 
   const now = new Date().toISOString()
+  const prev = await dateBefore(id, section)
   const { data, error } = section
     ? await getAdminClient().rpc('confirm_section', { p_id: id, p_section: section, p_now: now, p_cooldown_seconds: COOLDOWN_SECONDS })
     : await getAdminClient().rpc('confirm_resource', { p_id: id, p_now: now, p_cooldown_seconds: COOLDOWN_SECONDS })
   if (error) {
-    console.error('[confirm] rpc failed:', error)
+    reportServerError('[confirm] rpc failed:', error)
     return Response.json({ ok: false, error: 'Could not save confirmation.' }, { status: 502 })
   }
   const row = ((data ?? []) as RpcRow[])[0]
@@ -75,17 +86,18 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
     // the next visitor until the cache's own lifetime elapsed.
     revalidateTag(TAGS.resources(row.out_community), 'max')
   }
-  return Response.json({ ok: true, confirmedAt: row.out_confirmed_at, changed: row.out_changed, activityId })
+  const undo = row.out_changed && row.out_confirmed_at ? signUndo({ id, section: section ?? null, at: row.out_confirmed_at, prev }) : null
+  return Response.json({ ok: true, confirmedAt: row.out_confirmed_at, changed: row.out_changed, activityId, undo })
 }
 
-// DELETE /api/resource/:id/confirm
-// Undoes a confirmation made by mistake, restoring whatever confirmedAt (or
-// none) was in place before it — body: { previousConfirmedAt?, confirmedAt,
-// activityId? }. `confirmedAt` is the stamp this browser was given, and is
-// required: the undo only happens if the listing still carries it, so
-// undoing can't erase someone else's confirmation made in between, and no
-// one can write a date onto a listing they never confirmed. The date put
-// back is never later than the one undone.
+// DELETE /api/resource/:id/confirm   body: { undo, activityId?, section? }
+// Undoes a Yes made by mistake, putting back the date the listing had before
+// it (or none). `undo` is the signed note the POST handed this browser
+// (src/lib/confirmUndo.ts): the date to restore comes from the note, which
+// the server wrote, never from the browser. Until Nov 20 the browser sent
+// that date itself, so anyone could backdate or wipe any listing's check.
+// The undo also happens only if the listing still carries the date this Yes
+// set, so it can't erase someone else's confirmation made in between.
 export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/[id]/confirm'>) {
   const limited = await enforceRateLimit(request, 'confirm', { limit: 20, windowSec: 60 })
   if (limited) return limited
@@ -94,33 +106,18 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
   if (!UUID.test(id)) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
   const section = await sectionOf(request)
   if (section === null) return Response.json({ ok: false, error: 'Invalid section.' }, { status: 400 })
-  const body = (await request.json().catch(() => ({}))) as {
-    previousConfirmedAt?: unknown
-    confirmedAt?: unknown
-    activityId?: unknown
-  }
+  const body = (await request.json().catch(() => ({}))) as { undo?: unknown; activityId?: unknown }
 
-  // Public and unauthenticated, so these values are untrusted: they are
-  // written straight into the listing's details and shown to every visitor.
-  // The client only ever sends back timestamps this route issued, so anything
-  // that isn't a real ISO date is refused rather than stored.
-  const previous = body.previousConfirmedAt
-  if (previous !== undefined && previous !== null && !isIso(previous)) {
-    return Response.json({ ok: false, error: 'Invalid previous confirmation.' }, { status: 400 })
-  }
-  const expected = body.confirmedAt
-  if (!isIso(expected)) {
-    return Response.json({ ok: false, error: 'Invalid confirmation.' }, { status: 400 })
-  }
-  if (typeof previous === 'string' && Date.parse(previous) > Date.parse(expected)) {
-    return Response.json({ ok: false, error: 'Invalid previous confirmation.' }, { status: 400 })
-  }
+  const note = readUndo(body.undo, id, section ?? null)
+  if (!note) return Response.json({ ok: false, error: 'This can no longer be undone.' }, { status: 400 })
+  const expected = note.at
+  const previous = note.prev
 
   const { data, error } = section
-    ? await getAdminClient().rpc('unconfirm_section', { p_id: id, p_section: section, p_expected: expected, p_previous: previous ?? null })
-    : await getAdminClient().rpc('unconfirm_resource', { p_id: id, p_expected: expected, p_previous: previous ?? null })
+    ? await getAdminClient().rpc('unconfirm_section', { p_id: id, p_section: section, p_expected: expected, p_previous: previous })
+    : await getAdminClient().rpc('unconfirm_resource', { p_id: id, p_expected: expected, p_previous: previous })
   if (error) {
-    console.error('[confirm] undo rpc failed:', error)
+    reportServerError('[confirm] undo rpc failed:', error)
     return Response.json({ ok: false, error: 'Could not undo confirmation.' }, { status: 502 })
   }
   const row = ((data ?? []) as RpcRow[])[0]

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead, adminWrite, unchanged } from '@/lib/adminRoute'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { listJobRuns } from '@/lib/jobRunStore'
@@ -35,7 +36,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     const [loaded, { runs }] = await Promise.all([loadLookAgain(community.slug), listJobRuns(community.slug)])
     return Response.json({ ok: true, ...loaded, runs: runs['look-again'] ?? [] })
   } catch (err) {
-    console.error('[admin/watches/look-again] GET failed:', err)
+    reportServerError('[admin/watches/look-again] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load Look again.'] }, { status: 502 })
   }
 })
@@ -83,7 +84,7 @@ export const POST = adminWrite(async (request: Request, { community }) => {
     return Response.json({ ok: true })
   } catch (err) {
     if (err instanceof GoogleJobError) return bad(err.message, err.status)
-    console.error('[admin/watches/look-again] POST failed:', err)
+    reportServerError('[admin/watches/look-again] POST failed:', err)
     return bad('Could not do that.', 502)
   }
 })

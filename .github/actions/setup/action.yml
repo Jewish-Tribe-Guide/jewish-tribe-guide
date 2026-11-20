@@ -20,6 +20,12 @@ description: >
 # fetch-cache, which a build could serve as data instead of reading the test
 # project. The suites using it don't run on main, so a PR's first run builds
 # cold and saves; its later pushes start warm. A new lock file starts cold.
+#
+# Saved once per PR, not every run (Nov 20). Keyed on the commit, every run
+# missed and saved anew, 18-23s at the end of each build job, and e2e's
+# shards wait for that job to finish. A warm build compiles in ~6s, a cold
+# one in ~19s. A later push restores the PR's first cache, a few files
+# behind its own tree; Turbopack recompiles only what changed.
 
 inputs:
   next-dist-dir:
@@ -48,6 +54,4 @@ runs:
       uses: actions/cache@v6
       with:
         path: ${{ inputs.next-dist-dir }}/cache/turbopack
-        key: turbopack-${{ inputs.next-dist-dir }}-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
-        restore-keys: |
-          turbopack-${{ inputs.next-dist-dir }}-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+        key: turbopack-${{ inputs.next-dist-dir }}-${{ runner.os }}-${{ hashFiles('package-lock.json') }}

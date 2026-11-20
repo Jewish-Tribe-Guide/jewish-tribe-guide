@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { after } from 'next/server'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
@@ -50,10 +51,10 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
       ...(itemEntry(name) ? [] : ['A name not on the item list yet.']),
     ].join(' ')
     const submission = await submitListingUpdate(community.slug, id, additionSubmission(category, listing, field.key, name, sometimes), note, null)
-    after(() => sendSubmissionNotification(submission).catch((err) => console.error('[item/add] Admin notification failed:', err)))
+    after(() => sendSubmissionNotification(submission).catch((err) => reportServerError('[item/add] Admin notification failed:', err)))
     return Response.json({ ok: true, item: named, sometimes })
   } catch (err) {
-    console.error('[item/add] could not file the addition:', err)
+    reportServerError('[item/add] could not file the addition:', err)
     return Response.json(FAILED, { status: 502 })
   }
 }

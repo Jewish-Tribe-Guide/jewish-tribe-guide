@@ -7,6 +7,7 @@
 //
 //   node --env-file=.env.local scripts/seed-hospitals.mjs
 
+import { SEED_COMMUNITY } from './seedCommunity.mjs'
 import { createClient } from '@supabase/supabase-js'
 import { hospitals } from '../src/data/hospitals.js'
 
@@ -24,6 +25,7 @@ if (!hospitals.length) {
 }
 
 const rows = hospitals.map((h, i) => ({
+  community_id: SEED_COMMUNITY,
   id: h.id,
   name: h.name,
   latitude: h.latitude,

@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { getAllowedAdminEmails } from '@/lib/adminAuth'
 import { getCommunityAdminEmails } from '@/lib/communityStore'
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
 
     return Response.json({ ok: true, accessToken, refreshToken })
   } catch (err) {
-    console.error('[admin/dev-login] failed:', err)
+    reportServerError('[admin/dev-login] failed:', err)
     const message = err instanceof Error ? err.message : 'Could not create a dev session.'
     return Response.json({ ok: false, error: message }, { status: 502 })
   }

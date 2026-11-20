@@ -17,6 +17,7 @@
 // and any of the category's field keys/labels. Booleans accept yes/true/x/1;
 // tag/list fields split on ; or |. Unknown columns are ignored (and listed).
 
+import { SEED_COMMUNITY } from './seedCommunity.mjs'
 import { readFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
 import { categories } from '../src/data/categories.js'
@@ -165,7 +166,7 @@ if (!url || !key) {
 const supabase = createClient(url, key, { auth: { persistSession: false } })
 
 // Skip names already present in this category (idempotent re-runs).
-const { data: existing } = await supabase.from('resource').select('name').eq('category', categoryId)
+const { data: existing } = await supabase.from('resource').select('name').eq('community_id', SEED_COMMUNITY).eq('category', categoryId)
 const seen = new Set((existing ?? []).map((r) => norm(r.name)))
 
 let inserted = 0
@@ -178,6 +179,7 @@ for (const r of records) {
     await sleep(1100)
   }
   const { error } = await supabase.from('resource').insert({
+    community_id: SEED_COMMUNITY,
     category: categoryId,
     name: r.name,
     anchor_id: 'community',

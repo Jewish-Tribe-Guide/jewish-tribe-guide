@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { adminRead } from '@/lib/adminRoute'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { jobFindings } from '@/lib/watchFindingStore'
@@ -164,7 +165,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
         .sort((a, b) => a.name.localeCompare(b.name)),
     })
   } catch (err) {
-    console.error('[admin/watches/hospitals] GET failed:', err)
+    reportServerError('[admin/watches/hospitals] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load the hospitals.'] }, { status: 502 })
   }
 })
@@ -246,7 +247,7 @@ export const POST = adminRead(async (request: Request, { community, admin }) => 
     const { watch: read } = await runAndRecord(on, undefined, undefined, { full: true })
     return Response.json({ ok: true, watch: read, notOnRefuah: false })
   } catch (err) {
-    console.error('[admin/watches/hospitals] POST failed:', err)
+    reportServerError('[admin/watches/hospitals] POST failed:', err)
     return Response.json({ ok: false, errors: ['Could not save that.'] }, { status: 502 })
   }
 })

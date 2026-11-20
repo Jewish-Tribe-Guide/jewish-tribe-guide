@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { timingSafeEqual } from 'node:crypto'
 import { listCommunities } from '@/lib/communityStore'
 import { newsletterSenders, receiveNewsletter, type NewsletterEmail } from '@/lib/newsletterRun'
@@ -79,7 +80,7 @@ export async function GET(request: Request) {
   try {
     return Response.json({ ok: true, senders: await newsletterSenders(community.slug) }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
-    console.error('[inbound/newsletter] senders failed:', err)
+    reportServerError('[inbound/newsletter] senders failed:', err)
     return Response.json({ ok: false, error: 'Couldn’t list the senders.' }, { status: 502 })
   }
 }
@@ -117,7 +118,7 @@ export async function POST(request: Request) {
     const eruv = await receiveEruvEmail(community.slug, email, { timezone: community.timezone })
     if (eruv) return Response.json({ ok: true, ...eruv })
   } catch (err) {
-    console.error('[inbound/newsletter] eruv email failed:', err)
+    reportServerError('[inbound/newsletter] eruv email failed:', err)
     return Response.json({ ok: false, error: err instanceof Error ? err.message : 'Couldn’t read it.' }, { status: 502 })
   }
 
@@ -131,7 +132,7 @@ export async function POST(request: Request) {
     })
     return Response.json({ ok: true, ...result })
   } catch (err) {
-    console.error('[inbound/newsletter] failed:', err)
+    reportServerError('[inbound/newsletter] failed:', err)
     return Response.json(
       {
         ok: false,

@@ -6,6 +6,7 @@
 //
 //   node --env-file=.env.local scripts/seed-home-sections.mjs
 
+import { SEED_COMMUNITY } from './seedCommunity.mjs'
 import { createClient } from '@supabase/supabase-js'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -28,6 +29,7 @@ const sections = [
 const { count, error: countErr } = await supabase
   .from('home_section')
   .select('id', { count: 'exact', head: true })
+  .eq('community_id', SEED_COMMUNITY)
 if (countErr) {
   console.error('❌ Seed failed:', countErr.message)
   process.exit(1)
@@ -37,7 +39,7 @@ if (count && count > 0) {
   process.exit(0)
 }
 
-const { error } = await supabase.from('home_section').upsert(sections, { onConflict: 'id' })
+const { error } = await supabase.from('home_section').upsert(sections.map((s) => ({ ...s, community_id: SEED_COMMUNITY })), { onConflict: 'community_id,id' })
 if (error) {
   console.error('❌ Seed failed:', error.message)
   process.exit(1)

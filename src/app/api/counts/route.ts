@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { listCommunities } from '@/lib/communityStore'
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
     p_day: dayInTimezone(community.timezone, new Date()),
   })
   if (error) {
-    console.error('[counts] bump failed:', error)
+    reportServerError('[counts] bump failed:', error)
     return Response.json({ ok: false }, { status: 502 })
   }
   return new Response(null, { status: 204 })

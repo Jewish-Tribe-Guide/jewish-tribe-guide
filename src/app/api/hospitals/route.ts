@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { listHospitals } from '@/lib/hospitalStore'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
     const hospitals = await listHospitals(community.slug)
     return Response.json({ ok: true, hospitals })
   } catch (err) {
-    console.error('[hospitals] GET failed:', err)
+    reportServerError('[hospitals] GET failed:', err)
     return Response.json({ ok: false, hospitals: [] }, { status: 502 })
   }
 }

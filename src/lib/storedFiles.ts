@@ -1,3 +1,4 @@
+import { reportServerError } from './serverError'
 import { after } from 'next/server'
 import { getAdminClient } from './supabase/admin'
 import type { FilesSwept } from './jobRuns'
@@ -134,7 +135,7 @@ export async function filesInRow(table: string, match: Record<string, string>): 
 export function removeLaterIfUnused(paths: string[], where: string): void {
   if (!paths.length) return
   after(() =>
-    removeIfUnused(paths).catch((err) => console.error(`[storedFiles] ${where}: couldn’t clear old files:`, err)),
+    removeIfUnused(paths).catch((err) => reportServerError(`[storedFiles] ${where}: couldn’t clear old files:`, err)),
   )
 }
 

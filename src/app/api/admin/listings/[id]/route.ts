@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { validateSubmission, getResourceRowById, normalizeRow } from '@/lib/resourceStore'
 import { getCategoryById } from '@/lib/categoryStore'
 import { submitListingUpdate, submitListingDelete, approveSubmission } from '@/lib/submissionStore'
@@ -42,7 +43,7 @@ export const PATCH = adminWrite(async (request: NextRequest, { community, admin 
     after(() => runWalkRoutesAfterChange(community.slug))
     return Response.json({ ok: true, listing: row ? normalizeRow(row) : null })
   } catch (err) {
-    console.error('[admin/listings/:id] PATCH failed:', err)
+    reportServerError('[admin/listings/:id] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not update the listing.'] }, { status: 502 })
   }
 })
@@ -60,7 +61,7 @@ export const DELETE = adminWrite(async (_request: NextRequest, { community, admi
     after(() => runWalkRoutesAfterChange(community.slug))
     return Response.json({ ok: true })
   } catch (err) {
-    console.error('[admin/listings/:id] DELETE failed:', err)
+    reportServerError('[admin/listings/:id] DELETE failed:', err)
     return Response.json({ ok: false, errors: ['Could not archive the listing.'] }, { status: 502 })
   }
 })

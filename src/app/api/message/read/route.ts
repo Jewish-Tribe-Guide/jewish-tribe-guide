@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { isHoneypotTripped } from '@/lib/honeypot'
@@ -96,7 +97,7 @@ export async function POST(request: Request) {
         const storage = getAdminClient().storage.from(BUCKET)
         const { error } = await storage.upload(path, b.data, { contentType: b.mime, upsert: false })
         if (!error) photoUrls.push(storage.getPublicUrl(path).data.publicUrl)
-        else console.error('[message/read] could not keep the photo:', error.message)
+        else reportServerError('[message/read] could not keep the photo:', error.message)
       }
       return photoUrls
     }
@@ -170,7 +171,7 @@ export async function POST(request: Request) {
           ...linesFor(l.id, items),
         }
       } catch (err) {
-        console.error('[message/read] menu not read:', err instanceof Error ? err.message : err)
+        reportServerError('[message/read] menu not read:', err instanceof Error ? err.message : err)
         return failedMenu(l.id, asWritten, 'down')
       }
     }
@@ -234,7 +235,7 @@ export async function POST(request: Request) {
             const { update } = await readShulWeek(l, key, source, apiKey, { where: community })
             return { ...p, listing: brief(p.listingId), item: l, minyanimKey: key, update }
           } catch (err) {
-            console.error('[message/read] times not read:', err instanceof Error ? err.message : err)
+            reportServerError('[message/read] times not read:', err instanceof Error ? err.message : err)
             return { ...p, listing: brief(p.listingId), item: l, minyanimKey: key, update: null }
           }
         }
@@ -244,7 +245,7 @@ export async function POST(request: Request) {
 
     return Response.json({ ok: true, proposals, photoUrls: await keepPhotos(), model: reading.model })
   } catch (err) {
-    console.error('[message/read] failed:', err instanceof Error ? err.message : err)
+    reportServerError('[message/read] failed:', err instanceof Error ? err.message : err)
     return Response.json({ ok: false, code: 'down', error: 'Couldn’t read it right now. Please try again in a minute.' }, { status: 502 })
   }
 }
