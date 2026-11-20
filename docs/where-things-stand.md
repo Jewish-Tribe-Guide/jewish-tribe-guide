@@ -949,8 +949,8 @@ Done (batch 4, housekeeping, each red against the old code first):
   refused as too long. Live, with more, likely the same (not checked:
   needs the live admin).
 - **Migration 102, composite indexes** (listings by community, status
-  and category; To do; History; a browser's votes). **Not run on dev or
-  live**; nothing depends on it.
+  and category; To do; History; a browser's votes). Run on dev and live
+  by the user Nov 20.
 - **Option renames and field clears** write a category's listings ten
   at a time (`atMostAtOnce`), each scoped to its community.
 
