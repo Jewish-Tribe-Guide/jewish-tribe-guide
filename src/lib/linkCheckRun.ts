@@ -11,6 +11,7 @@ import { routes } from '@/lib/routes'
 import { answerOf, checkedRecord, isLinkCheck, LINK_CHECK_CREATOR, linkCheckUrl, linksToCheck, standingOf, type LinkAnswer, type LinkStanding, type ListingLink } from '@/lib/linkCheck'
 import type { Watch } from '@/lib/watches'
 import type { ResourceRow } from '@/types'
+import { readAll } from '@/lib/readAll'
 
 // The weekly link check (linkCheck.ts): opens each link a listing shows
 // and keeps how it answered. Run by /api/cron/check-links, and for one
@@ -92,7 +93,7 @@ async function communityLinks(community: string): Promise<{ links: PlacedLink[];
   const categories = (await listCategoriesUncached(community)).filter((c) => c.kind === 'listing')
   const { watches, available } = await listWatches(community)
   if (!categories.length || !available) return { links: [], records: [], available }
-  const { data, error } = await getAdminClient()
+  const { data, error } = await readAll((from, to) => getAdminClient()
     .from('resource')
     .select('*')
     .eq('community_id', community)
@@ -100,7 +101,7 @@ async function communityLinks(community: string): Promise<{ links: PlacedLink[];
     .in(
       'category',
       categories.map((c) => c.id),
-    )
+    ).order('id').range(from, to))
   if (error) throw new Error(`Couldn’t list the places: ${error.message}`)
   const links = ((data ?? []) as ResourceRow[]).flatMap((row) => {
     const category = categories.find((c) => c.id === row.category)

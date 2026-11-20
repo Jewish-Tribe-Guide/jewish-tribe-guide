@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // for the person to check. Nothing reaches the listing from here.
 const m = vi.hoisted(() => ({
   enforceRateLimit: vi.fn(),
+  photoReaderSpend: vi.fn(),
   verifyTurnstile: vi.fn(),
   row: vi.fn(),
   getResourceById: vi.fn(),
@@ -17,7 +18,7 @@ const m = vi.hoisted(() => ({
   communityUi: {} as Record<string, unknown>,
   timezone: 'America/New_York',
 }))
-vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
+vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, photoReaderSpend: m.photoReaderSpend, clientIp: () => '1.2.3.4' }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     from: () => {
@@ -59,6 +60,7 @@ beforeEach(() => {
   m.communityUi = {}
   m.timezone = 'America/New_York'
   m.enforceRateLimit.mockResolvedValue(null)
+  m.photoReaderSpend.mockResolvedValue(null)
   m.verifyTurnstile.mockResolvedValue(true)
   m.row.mockResolvedValue({ data: { community_id: 'philly' } })
   m.getResourceById.mockResolvedValue({ id: ID, name: 'Kesher Israel' })
@@ -102,6 +104,16 @@ describe('POST /api/schedule/read', () => {
     m.readSchedule.mockClear()
     m.communityUi = { contributions: { edit: false } }
     expect((await POST(req({ text: 'Shacharis 9:00, Mincha 6:35' }))).status).toBe(403)
+    expect(m.readSchedule).not.toHaveBeenCalled()
+  })
+
+  // All the photo readers together have a day (Nov 20): past it, the
+  // answer is reading off, and the model is never asked.
+  it('stops at the readers’ day, before the model', async () => {
+    m.photoReaderSpend.mockResolvedValue(Response.json({ ok: false, code: 'off' }, { status: 503 }))
+    const res = await POST(req({ text: 'Shacharis 9:00, Mincha 6:35' }))
+    expect(res.status).toBe(503)
+    expect(await res.json()).toMatchObject({ code: 'off' })
     expect(m.readSchedule).not.toHaveBeenCalled()
   })
 

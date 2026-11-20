@@ -16,6 +16,7 @@ import { KOSHER_SECTION } from '@/lib/boxDates'
 import { CATEGORIES } from '@/lib/mekorRun'
 import { listDifference, type ListRead } from '@/lib/watches'
 import { KCL_NAME, KCL_WATCH_NAME, kclListLink, kclMatches, kclMissing, kclMissingKey, kclMissingNote, kclSubmissionKey, parseKclList, type KclEntry } from '@/lib/kclWatch'
+import { readAll } from '@/lib/readAll'
 
 /** Fewer names than this means the PDF changed shape, not that KCL dropped
  *  most of its places. The December 2025 list had 205. */
@@ -74,12 +75,12 @@ export async function runKclWatch(community: string, homeUrl: string): Promise<K
   if ('error' in list) return { ok: false, error: list.error }
 
   const supabase = getAdminClient()
-  const { data: rows, error } = await supabase
+  const { data: rows, error } = await readAll((from, to) => supabase
     .from('resource')
     .select('id,category,name,address,phone,anchor_id,distance,status,details')
     .eq('community_id', community)
     .eq('status', 'approved')
-    .in('category', CATEGORIES)
+    .in('category', CATEGORIES).order('id').range(from, to))
   if (error) return { ok: false, error: `Couldn’t read the guide's listings: ${error.message}` }
 
   const listings = (rows ?? []) as Row[]
@@ -88,11 +89,11 @@ export async function runKclWatch(community: string, homeUrl: string): Promise<K
 
   // Every card this watch has filed, whatever became of it: one an admin
   // rejected isn't filed again until the listing's hechshers change.
-  const { data: earlier, error: earlierError } = await supabase
+  const { data: earlier, error: earlierError } = await readAll((from, to) => supabase
     .from('submission')
     .select('operation,target_id,payload')
     .eq('community_id', community)
-    .eq('submitted_by->>name', KCL_WATCH_NAME)
+    .eq('submitted_by->>name', KCL_WATCH_NAME).order('id').range(from, to))
   if (earlierError) return { ok: false, error: `Couldn’t read earlier suggestions: ${earlierError.message}` }
   const before = new Set((earlier ?? []).map(kclSubmissionKey).filter(Boolean))
 

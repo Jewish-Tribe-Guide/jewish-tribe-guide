@@ -13,6 +13,7 @@ import { recentJobRuns } from './jobRunStore'
 import { adminAppUrl, sendNightlyEmail } from './email'
 import { buildNightlyEmail, dayIn, waitingRow, type Night, type StoppedRow, type WaitingRow } from './nightlyEmail'
 import type { Watch } from './watches'
+import { readAll } from '@/lib/readAll'
 
 // The nightly email's run (/api/cron/nightly-email, after the last job):
 // for each community, the night gathered from where it already is, then
@@ -78,7 +79,7 @@ const runDayOf = (iso: string) => new Date(iso).toLocaleDateString('en-US', { mo
 /** What waits on To do from tonight, a row a place, and how many more. */
 async function queue(slug: string, since: string, today: string): Promise<{ waiting: WaitingRow[]; earlier: number; people: number }> {
   const db = getAdminClient()
-  const { data, error } = await db.from('submission').select('*').eq('community_id', slug).eq('status', 'pending').order('created_at', { ascending: true })
+  const { data, error } = await readAll((from, to) => db.from('submission').select('*').eq('community_id', slug).eq('status', 'pending').order('created_at', { ascending: true }).order('id').range(from, to))
   if (error) throw new Error(`Couldn’t read the queue: ${error.message}`)
   const pending = (data ?? []) as SubmissionRow[]
   const automated = pending.filter(isAutomated)

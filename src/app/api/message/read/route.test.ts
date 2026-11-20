@@ -7,6 +7,7 @@ import type { MessageReading } from '@/lib/messageReader'
 // proposals for them to see. Nothing but the photos is saved here.
 const m = vi.hoisted(() => ({
   enforceRateLimit: vi.fn(),
+  photoReaderSpend: vi.fn(),
   verifyTurnstile: vi.fn(),
   listApprovedResources: vi.fn(),
   listCategories: vi.fn(),
@@ -18,7 +19,7 @@ const m = vi.hoisted(() => ({
   ui: { contributions: { add: true, edit: true, report: true } },
   communityUi: {} as Record<string, unknown>,
 }))
-vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
+vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, photoReaderSpend: m.photoReaderSpend, clientIp: () => '1.2.3.4' }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     storage: { from: () => ({ upload: m.upload, getPublicUrl: (p: string) => ({ data: { publicUrl: `https://x.supabase.co/storage/v1/object/public/site-assets/${p}` } }) }) },
@@ -91,6 +92,7 @@ beforeEach(() => {
   m.ui.contributions.add = m.ui.contributions.edit = true
   m.communityUi = {}
   m.enforceRateLimit.mockResolvedValue(null)
+  m.photoReaderSpend.mockResolvedValue(null)
   m.verifyTurnstile.mockResolvedValue(true)
   m.listApprovedResources.mockResolvedValue(listings)
   m.listCategories.mockResolvedValue([grocery, shuls, hidden, food])
@@ -123,6 +125,16 @@ describe('POST /api/message/read — refusals before any reading', () => {
   it('refuses where this community takes neither additions nor edits', async () => {
     m.communityUi = { contributions: { add: false, edit: false } }
     expect((await POST(req({ text: 'Acme has challah' }))).status).toBe(403)
+    expect(m.readMessage).not.toHaveBeenCalled()
+  })
+
+  // All the photo readers together have a day (Nov 20): past it, the
+  // answer is reading off, and the model is never asked.
+  it('stops at the readers’ day, before the model', async () => {
+    m.photoReaderSpend.mockResolvedValue(Response.json({ ok: false, code: 'off' }, { status: 503 }))
+    const res = await POST(req({ text: 'Mincha moved to 6:40' }))
+    expect(res.status).toBe(503)
+    expect(await res.json()).toMatchObject({ code: 'off' })
     expect(m.readMessage).not.toHaveBeenCalled()
   })
 

@@ -16,7 +16,7 @@ vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submit }))
 vi.mock('@/lib/supabase/admin', () => {
   const table = (rows: () => unknown[]) => {
     const b: Record<string, unknown> = {}
-    Object.assign(b, { select: () => b, eq: () => b, in: () => b, then: (r: (v: unknown) => void) => r({ data: rows(), error: null }) })
+    Object.assign(b, { select: () => b, eq: () => b, in: () => b, range: () => b, order: () => b, then: (r: (v: unknown) => void) => r({ data: rows(), error: null }) })
     return b
   }
   return { getAdminClient: () => ({ from: (t: string) => table(() => (t === 'submission' ? m.earlier : m.rows)) }) }

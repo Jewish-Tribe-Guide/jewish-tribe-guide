@@ -32,7 +32,8 @@ describe('GET /api/admin/whoami', () => {
     expect(res.status).toBe(200)
     const cookie = res.headers.get('set-cookie') ?? ''
     expect(cookie).toContain('jpc_preview_riverton=tok-r')
-    expect(cookie).toContain('Path=/riverton')
+    // The whole site: the public API routes are gated on it too (proxy.ts).
+    expect(cookie).toMatch(/Path=\/(;|$)/)
     expect(cookie).toContain('HttpOnly')
   })
 

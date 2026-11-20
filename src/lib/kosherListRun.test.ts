@@ -15,7 +15,7 @@ const { earlier, mockGoogle, mockCanAsk, mockConfirm } = vi.hoisted(() => ({
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     from: () => {
-      const q = { select: () => q, eq: () => q, then: (ok: (v: unknown) => unknown) => ok({ data: earlier.rows, error: null }) }
+      const q = { select: () => q, eq: () => q, range: () => q, order: () => q, then: (ok: (v: unknown) => unknown) => ok({ data: earlier.rows, error: null }) }
       return q
     },
   }),

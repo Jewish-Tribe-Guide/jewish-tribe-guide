@@ -26,6 +26,7 @@ import {
   type MekorEntry,
   type MekorFinding,
 } from '@/lib/mekorWatch'
+import { readAll } from '@/lib/readAll'
 
 /** Fewer places than this means the page changed shape, not that Mekor
  *  dropped half its list: file nothing rather than a card for every IKC
@@ -78,12 +79,12 @@ function mekorList(community: string, url: string): KosherList<MekorEntry, Mekor
     async compare(supabase, entries, pending) {
       // Archived listings too: a place Mekor still lists that the guide took
       // down is said as such, not suggested as if the guide never had it.
-      const { data: rows, error } = await supabase
+      const { data: rows, error } = await readAll((from, to) => supabase
         .from('resource')
         .select('id,category,name,address,phone,anchor_id,distance,details,status')
         .eq('community_id', community)
         .in('status', ['approved', 'archived'])
-        .in('category', CATEGORIES)
+        .in('category', CATEGORIES).order('id').range(from, to))
       if (error) return { error: `Couldn’t read the guide's listings: ${error.message}` }
 
       const findings = compareMekor(entries, (rows ?? []) as GuideListing[], pending)

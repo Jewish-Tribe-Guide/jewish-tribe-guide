@@ -1,5 +1,6 @@
 import { getAdminClient } from './supabase/admin'
 import { listCategories } from './categoryStore'
+import { readAll } from '@/lib/readAll'
 
 /** Whether a listing takes votes: it is on the site (approved) and its
  *  category has upvotes switched on. Anything else a vote would only count
@@ -26,10 +27,10 @@ export async function canVote(resourceId: string): Promise<boolean> {
 // the counts. The join keeps the URL a constant size however many listings
 // there are. Rows are one per vote, tallied here; the table is tiny.
 export async function getVoteCounts(community: string): Promise<Map<string, number>> {
-  const { data, error } = await getAdminClient()
+  const { data, error } = await readAll((from, to) => getAdminClient()
     .from('vote')
     .select('resource_id, resource!inner(community_id)')
-    .eq('resource.community_id', community)
+    .eq('resource.community_id', community).order('resource_id').order('voter_token').range(from, to))
 
   if (error) throw new Error(`Failed to load votes: ${error.message}`)
   const counts = new Map<string, number>()

@@ -1,7 +1,14 @@
+import { reportServerError } from '@/lib/serverError'
+
 // Cloudflare Turnstile server-side verification. Gated on TURNSTILE_SECRET_KEY:
-// if the secret isn't configured, verification is skipped (returns true) so the
-// app keeps working before the keys are added. Enforcement turns on
-// automatically the moment the secret is present in the environment.
+// if the secret isn't configured, verification is skipped (returns true) so
+// local dev, previews and the test suites work without it. Enforcement turns
+// on the moment the secret is present.
+//
+// Except on the live site (Nov 20, the health sweep): there a missing secret
+// was the bot check quietly switched off, with every form and paid photo
+// reader open to scripts and nothing saying so. Live refuses instead, and
+// says why in Sentry.
 
 const VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 
@@ -20,7 +27,11 @@ export async function verifyTurnstile(
   ip?: string,
 ): Promise<boolean> {
   const secret = process.env.TURNSTILE_SECRET_KEY
-  if (!secret) return true // inert until configured
+  if (!secret) {
+    if (process.env.VERCEL_ENV !== 'production') return true // inert until configured
+    reportServerError('[turnstile] TURNSTILE_SECRET_KEY is not set on the live site, so every check is refused')
+    return false
+  }
   if (!token) return false
 
   try {

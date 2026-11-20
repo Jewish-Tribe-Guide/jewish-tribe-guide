@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   // while they're building it.
   if (community) {
     const entry = (await listCommunityVisibility())[community]
-    if (entry && !entry.visible) response.cookies.set(previewCookieName(community), entry.previewToken, previewCookieOptions(community))
+    if (entry && !entry.visible) response.cookies.set(previewCookieName(community), entry.previewToken, previewCookieOptions())
   }
   return response
 }

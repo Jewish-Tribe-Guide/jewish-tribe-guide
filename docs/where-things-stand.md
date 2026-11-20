@@ -955,17 +955,38 @@ Fix first:
 Soon:
 
 - Reads cut off at 1,000 rows with no error: vote counts first (checked).
+  **Built Nov 20**: every list read of a table that grows pages through
+  `readAll` (`src/lib/readAll.ts`), ordered to the key so pages don't
+  overlap; `readsArePaged.test.ts` scans the source and fails on a new
+  unpaged one (41 against the old code); a read that still comes back
+  at exactly 1,000 rows is reported to Sentry by table
+  (`src/lib/supabase/rowCap.ts`).
 - Migrations: nothing records which ran where; `contribution_note`
   drift; 16 "table missing" fallbacks hide a missed one; a fresh project
   can't be rebuilt from the folder (no grants since 056 was removed).
-- Hidden communities' data through the public API routes.
+- Hidden communities' data through the public API routes. **Built Nov
+  20**: the proxy now sees the public API routes too, and answers 404 to
+  `?community=<hidden>` without that community's preview cookie; the
+  cookie is set for the whole site (path `/`) so it reaches `/api`. Admin,
+  cron, inbound and inbox routes stay outside the proxy. Red 4/4 against
+  the old proxy. A preview cookie set before this only covers the pages:
+  reopen the preview link (an admin's console sets it again on load).
 - Focus in dialogs and sheets, drag handles keyboard can't use, search
   results silent to screen readers, swipe-only actions.
 - Eruv status set from an unauthenticated email (inferred), admin sign-in
   not checking the email is confirmed (depends on Supabase settings),
   a cross-community Google sync route, eruv fetchers with no SSRF guard.
 - Spend: no site-wide cap on the AI photo readers; Turnstile and rate
-  limits fail open when their keys are missing.
+  limits fail open when their keys are missing. **Built Nov 20**: the
+  two photo readers share a day of 300 reads (`PHOTO_READS_A_DAY` in
+  `rateLimit.ts`), and past it answer as reading off, so the box offers
+  typing. On the live site only (`VERCEL_ENV=production`), a missing
+  `TURNSTILE_SECRET_KEY` refuses every check, and missing Upstash keys
+  make the shared ceilings (this one and the question reader's) refuse;
+  per-visitor limits keep counting in memory. Each is reported to Sentry.
+  Local, previews and tests are unchanged. Red 6/6 against the old code.
+  **Needs the user**: confirm both keys are set on Vercel's Production
+  before this merges, or contributions and the readers stop on live.
 - Dependabot's one group can't pass CI (container tag) and has blocked
   updates since September; Playwright held at 1.63 for production's
   Chromium (PR 402); `npm audit fix` is free; Node declared four ways.

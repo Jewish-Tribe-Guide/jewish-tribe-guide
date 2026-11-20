@@ -26,6 +26,7 @@ import { eruvPageOwnFields } from './eruvFields'
 import { keepOnly } from './watchFindings'
 import { editedFields, onListingNow } from './editedFields'
 import { approvingPart, leavingPart, reviewParts } from './reviewParts'
+import { readAll } from './readAll'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -100,7 +101,9 @@ export async function listSubmissionsByStatus(
     }
     query = query.limit(page.limit)
   }
-  const { data, error } = await query
+  // Unpaged (To do, and a status read whole): every row, not the first
+  // 1,000 (readAll.ts). Ties broken by id so no row moves between pages.
+  const { data, error } = page && decided ? await query : await readAll((from, to) => query.order('id', { ascending: false }).range(from, to))
 
   if (error) throw new Error(`Failed to load submissions: ${error.message}`)
   const all = data as SubmissionRow[]

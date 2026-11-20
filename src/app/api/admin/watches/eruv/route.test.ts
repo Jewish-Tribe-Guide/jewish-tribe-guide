@@ -24,6 +24,8 @@ vi.mock('@/lib/supabase/admin', () => ({
           m.filters.push([col, v])
           return q
         },
+        order: () => q,
+        range: () => q,
         then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: m.pending, error: null }).then(ok),
       }
       return q

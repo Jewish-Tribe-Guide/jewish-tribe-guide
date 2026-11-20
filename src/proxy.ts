@@ -143,10 +143,35 @@ async function gateCommunityPath(request: NextRequest) {
 
   if (fromQuery === entry.previewToken && fromCookie !== entry.previewToken) {
     const response = NextResponse.next()
-    response.cookies.set(previewCookieName(segment), entry.previewToken, previewCookieOptions(segment))
+    response.cookies.set(previewCookieName(segment), entry.previewToken, previewCookieOptions())
     return response
   }
   return null
+}
+
+// ── The public API routes, for a hidden community (Nov 20) ──
+// The pages were gated and the data behind them wasn't: every public API
+// route takes its community as ?community=, so /api/resources?community=
+// <hidden> handed over a hidden guide's listings to anyone who guessed its
+// slug. Same rule as the pages: the community's preview cookie (set by its
+// preview link, or by its own admin console through /api/admin/whoami) or
+// nothing. The cookie is path "/" for this (previewCookie.ts).
+//
+// Not gated: /api/admin (real sign-in), /api/cron (its secret),
+// /api/inbound (a signed webhook), /api/inbox (a signed link); the matcher
+// below keeps them out of the proxy altogether. A route reached by a
+// listing's id (/api/resource/<id>/…) needs that id, which the gate keeps.
+const UNGATED_API = /^\/api\/(admin|cron|inbound|inbox)(\/|$)/
+
+async function gateCommunityApi(request: NextRequest) {
+  const { pathname, searchParams } = request.nextUrl
+  if (UNGATED_API.test(pathname)) return null
+  const slug = searchParams.get('community')
+  if (!slug || !looksLikeCommunitySlug(slug)) return null
+  const entry = await getVisibility(slug)
+  if (!entry || entry.visible) return null
+  if (request.cookies.get(previewCookieName(slug))?.value === entry.previewToken) return null
+  return NextResponse.json({ error: 'Not found.' }, { status: 404 })
 }
 
 // A listing's bare-id link goes to its friendly one (see bareListingLink.ts
@@ -164,15 +189,19 @@ async function redirectBareListingLink(request: NextRequest) {
 
 export async function proxy(request: NextRequest) {
   if (request.nextUrl.pathname === '/') return redirectRoot(request)
+  if (request.nextUrl.pathname.startsWith('/api/')) return (await gateCommunityApi(request)) ?? NextResponse.next()
   return (await gateCommunityPath(request)) ?? (await redirectBareListingLink(request)) ?? NextResponse.next()
 }
 
 export const config = {
   // One pattern covers both jobs: bare "/" (for the redirect above) plus
-  // every community path (for the visibility gate) — everything EXCEPT the
-  // standalone superadmin console (/admin, no community segment), /inbox,
-  // API routes, and static/metadata assets, none of which are ever
+  // every community path (for the visibility gate) and the public API
+  // routes (gateCommunityApi) — everything EXCEPT the standalone superadmin
+  // console (/admin, no community segment), /inbox, the API routes that
+  // aren't public, and static/metadata assets, none of which are ever
   // community paths. A slug can never collide with any excluded word —
   // assertUsableSlug's reserved-word list blocks that at creation.
-  matcher: '/((?!api|admin|inbox|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|manifest.webmanifest|icons).*)',
+  // The admin API stays out on purpose too: a proxy buffers every request
+  // body it sees, and the admin's uploads have no need to be.
+  matcher: '/((?!api/admin|api/cron|api/inbound|api/inbox|admin|inbox|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|manifest.webmanifest|icons).*)',
 }

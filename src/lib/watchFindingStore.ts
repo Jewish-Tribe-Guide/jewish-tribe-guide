@@ -2,6 +2,7 @@ import type { ResourceRow, SubmissionRow } from '@/types'
 import type { CategoryConfig } from './categories'
 import { getAdminClient } from './supabase/admin'
 import { FINDING_SOURCES, findingFrom, type Finding, type FindingJob } from './watchFindings'
+import { readAll } from '@/lib/readAll'
 
 // What the job pages read of the suggestions their watches filed
 // (watchFindings.ts): the ones waiting, as Findings, and when each place's
@@ -20,13 +21,15 @@ export async function jobFindings(
   // Each watch's, waiting (whole) and decided (only when, and how: a
   // decided one carries the page it was read from, which isn't needed).
   const read = async <T,>(name: string, waiting: boolean): Promise<T[]> => {
-    const q = supabase
-      .from('submission')
-      .select(waiting ? '*' : 'target_id,status,reviewed_at')
-      .eq('community_id', community)
-      .eq('target_type', 'listing')
-      .eq('submitted_by->>name', name)
-    const { data, error } = await (waiting ? q.eq('status', 'pending').order('created_at', { ascending: true }) : q.neq('status', 'pending'))
+    const { data, error } = await readAll((from, to) => {
+      const q = supabase
+        .from('submission')
+        .select(waiting ? '*' : 'target_id,status,reviewed_at')
+        .eq('community_id', community)
+        .eq('target_type', 'listing')
+        .eq('submitted_by->>name', name)
+      return (waiting ? q.eq('status', 'pending').order('created_at', { ascending: true }) : q.neq('status', 'pending')).order('id').range(from, to)
+    })
     if (error) throw new Error(`Couldn’t read the findings: ${error.message}`)
     return (data ?? []) as T[]
   }

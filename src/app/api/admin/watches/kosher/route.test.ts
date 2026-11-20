@@ -54,6 +54,8 @@ vi.mock('@/lib/supabase/admin', () => ({
           return q
         },
         maybeSingle: async () => ({ data: m.single[table] ?? null, error: null }),
+        order: () => q,
+        range: () => q,
         then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: m.rows[table === 'submission' ? name : table] ?? [], error: null }).then(ok),
       }
       return q

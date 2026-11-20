@@ -1,6 +1,6 @@
 import { reportServerError } from '@/lib/serverError'
 import { getAdminClient } from '@/lib/supabase/admin'
-import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
+import { enforceRateLimit, clientIp, photoReaderSpend } from '@/lib/rateLimit'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
 import { getResourceById } from '@/lib/resourceStore'
@@ -48,6 +48,10 @@ export async function POST(request: Request) {
   if (!(await verifyTurnstile(field('turnstileToken') || undefined, clientIp(request)))) {
     return Response.json({ ok: false, code: 'turnstile', error: 'Verification failed. Please try again.' }, { status: 403 })
   }
+  // All the photo readers together, a day (rateLimit.ts): after the bot
+  // check, so a refused script doesn't use up the day.
+  const spend = await photoReaderSpend()
+  if (spend) return spend
 
   // The listing's own community, from the row: a live one only, taking
   // edits. Its clock and its place read the times (Nov 18, item 33).

@@ -27,6 +27,7 @@ import {
   type WatchFinding,
   type WatchedListing,
 } from '@/lib/keystoneWatch'
+import { readAll } from '@/lib/readAll'
 
 /** Fewer entries than this means the page changed shape, not that Keystone-K
  *  stopped certifying half of Philadelphia: file nothing rather than a card
@@ -75,12 +76,12 @@ function keystoneList(community: string, url: string): KosherList<KeystoneEntry,
       return 'error' in list ? list : { updated: null, entries: list.entries }
     },
     async compare(supabase, entries) {
-      const { data: rows, error } = await supabase
+      const { data: rows, error } = await readAll((from, to) => supabase
         .from('resource')
         .select('id,category,name,address,phone,anchor_id,distance,details')
         .eq('community_id', community)
         .eq('status', 'approved')
-        .in('category', ['restaurant', 'grocery'])
+        .in('category', ['restaurant', 'grocery']).order('id').range(from, to))
       if (error) return { error: `Couldn\u2019t read the guide's listings: ${error.message}` }
       const findings = compareKeystone(entries, (rows ?? []) as WatchedListing[])
       return { findings, agree: keystoneAgrees(entries, (rows ?? []) as WatchedListing[], findings) }

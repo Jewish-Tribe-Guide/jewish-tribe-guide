@@ -25,6 +25,7 @@ import {
   type GooglePlace,
 } from './googleJob'
 import type { ResourceSubmission } from '@/types'
+import { readAll } from '@/lib/readAll'
 
 // ── The Watches tab's Google page, on the server (googleJob.ts) ─────────────
 // Who checks each field is worked out here from each job's own rule:
@@ -236,7 +237,7 @@ const COLUMNS = 'id,name,category,phone,address,anchor_id,distance,details,creat
 export async function loadGoogleJob(community: string, now = Date.now()): Promise<GooglePlace[]> {
   const [categories, { data, error }, { watches }] = await Promise.all([
     listCategoriesUncached(community),
-    getAdminClient().from('resource').select(COLUMNS).eq('community_id', community).eq('status', 'approved'),
+    readAll((from, to) => getAdminClient().from('resource').select(COLUMNS).eq('community_id', community).eq('status', 'approved').order('id').range(from, to)),
     listWatches(community),
   ])
   if (error) throw new Error(`Failed to load listings: ${error.message}`)

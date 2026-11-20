@@ -7,6 +7,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { ERUV_WEBSITE_CREATOR, ERUV_WEBSITE_WATCH_NAME, eruvWebsiteUrl, eruvWebsiteWatchChanges, isEruvWebsiteWatch } from '@/lib/eruvWebsite'
 import type { EruvFinding, EruvJobLoaded } from '@/lib/eruvJob'
 import type { EruvSuggestion } from '@/lib/eruvSuggestion'
+import { readAll } from '@/lib/readAll'
 
 // GET /api/admin/watches/eruv — the Watches tab's Eruv status page (Oct 22,
 //     eruvJob.ts): every eruv, what its website says waiting for Use this
@@ -25,13 +26,13 @@ export const GET = adminRead(async (request: Request, { community }) => {
     const [{ eruvim, available }, { watches }, pending] = await Promise.all([
       listEruvimForAdmin(community.slug),
       listWatches(community.slug),
-      getAdminClient()
+      readAll((from, to) => getAdminClient()
         .from('submission')
         .select('id, created_at, payload')
         .eq('community_id', community.slug)
         .eq('status', 'pending')
         .eq('target_type', 'eruv')
-        .eq('submitted_by->>name', ERUV_WEBSITE_WATCH_NAME),
+        .eq('submitted_by->>name', ERUV_WEBSITE_WATCH_NAME).order('id').range(from, to)),
     ])
     if (pending.error) throw new Error(pending.error.message)
     const findings: EruvFinding[] = ((pending.data ?? []) as { id: string; created_at: string; payload: Partial<EruvSuggestion> }[]).map((s) => ({

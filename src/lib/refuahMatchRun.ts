@@ -5,6 +5,7 @@ import { addWatch, listWatches, removeWatch } from '@/lib/watchStore'
 import { readRefuahNear } from '@/lib/refuahRun'
 import { HOSPITAL_CATEGORY, REFUAH_MATCH_CREATOR, matchRefuah, refuahWatchChanges, wantedRefuahWatches } from '@/lib/refuahMatch'
 import type { ResourceRow } from '@/types'
+import { readAll } from '@/lib/readAll'
 
 // The Refuah matches' database and network half (refuahMatch.ts has the
 // rules). Server-only.
@@ -16,7 +17,7 @@ import type { ResourceRow } from '@/types'
  *  run's log. `only`: that community's hospitals alone. */
 export async function syncRefuahWatches(fetcher: typeof fetch = fetch, only?: string): Promise<{ community: string; added: number; removed: number }[]> {
   const supabase = getAdminClient()
-  const { data: rows, error } = await supabase.from('resource').select('*').eq('status', 'approved').eq('category', HOSPITAL_CATEGORY)
+  const { data: rows, error } = await readAll((from, to) => supabase.from('resource').select('*').eq('status', 'approved').eq('category', HOSPITAL_CATEGORY).order('community_id').order('id').range(from, to))
   if (error) throw new Error(`Couldn’t list the hospitals: ${error.message}`)
   const byCommunity = new Map<string, ResourceRow[]>()
   for (const r of (rows ?? []) as ResourceRow[]) byCommunity.set(r.community_id, [...(byCommunity.get(r.community_id) ?? []), r])

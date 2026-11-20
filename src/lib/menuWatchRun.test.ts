@@ -32,7 +32,7 @@ vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     from: (table: string) => {
       const result = { data: table === 'community' ? m.communities : m.resources, error: null }
-      const q = { select: () => q, eq: () => q, in: () => q, then: (ok: (v: unknown) => unknown) => Promise.resolve(result).then(ok) }
+      const q = { select: () => q, eq: () => q, in: () => q, range: () => q, order: () => q, then: (ok: (v: unknown) => unknown) => Promise.resolve(result).then(ok) }
       return q
     },
   }),

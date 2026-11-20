@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
+import { createRequire } from 'node:module'
 import type { proxy as ProxyFn } from './proxy'
 
 // listCommunityVisibility is the one piece of proxy.ts that reaches the
@@ -158,6 +159,57 @@ describe('proxy — hidden-community gating', () => {
     const inbox = await proxy(req('/inbox'))
     expect(admin.status).toBe(200)
     expect(inbox.status).toBe(200)
+  })
+})
+
+// The pages were gated and the data wasn't: /api/resources?community=<hidden>
+// answered anyone (Nov 20, the health sweep).
+describe('proxy — a hidden community through the public API', () => {
+  const hidden = { blatimore: { visible: false, previewToken: 'secret-token' }, philly: { visible: true, previewToken: 't' } }
+
+  it('404s a public read of a hidden community without its preview cookie', async () => {
+    mockListCommunityVisibility.mockResolvedValue(hidden)
+    for (const path of ['/api/resources', '/api/categories', '/api/site-settings', '/api/submissions']) {
+      const res = await proxy(req(`${path}?community=blatimore`))
+      expect(res.status, path).toBe(404)
+    }
+    // ?access= opens the pages, not the data: the page sets the cookie.
+    expect((await proxy(req('/api/resources?community=blatimore&access=secret-token'))).status).toBe(404)
+    expect((await proxy(req('/api/resources?community=blatimore', 'jpc_preview_blatimore=wrong'))).status).toBe(404)
+  })
+
+  it('answers with the preview cookie, and for visible, unknown or no community', async () => {
+    mockListCommunityVisibility.mockResolvedValue(hidden)
+    expect((await proxy(req('/api/resources?community=blatimore', 'jpc_preview_blatimore=secret-token'))).status).toBe(200)
+    expect((await proxy(req('/api/resources?community=philly'))).status).toBe(200)
+    expect((await proxy(req('/api/resources?community=nowhere'))).status).toBe(200)
+    expect((await proxy(req('/api/resources'))).status).toBe(200)
+  })
+
+  it('leaves the admin, cron, inbound and inbox routes alone', async () => {
+    mockListCommunityVisibility.mockResolvedValue(hidden)
+    for (const path of ['/api/admin/listings', '/api/cron/watches', '/api/inbound/email', '/api/inbox']) {
+      expect((await proxy(req(`${path}?community=blatimore`))).status, path).toBe(200)
+    }
+    expect(mockListCommunityVisibility).not.toHaveBeenCalled()
+  })
+
+  it('the cookie reaches the API: it is set for the whole site', async () => {
+    mockListCommunityVisibility.mockResolvedValue(hidden)
+    const res = await proxy(req('/blatimore?access=secret-token'))
+    expect(res.headers.get('set-cookie')).toMatch(/jpc_preview_blatimore=secret-token;.*Path=\/(;|$)/i)
+  })
+
+  it('the matcher sends the public API through the proxy, and keeps the rest out', async () => {
+    const { pathToRegexp } = createRequire(import.meta.url)('next/dist/compiled/path-to-regexp') as {
+      pathToRegexp: (path: string, keys: unknown[], options: { strict: boolean; sensitive: boolean; delimiter: string }) => RegExp
+    }
+    const { config } = await import('./proxy')
+    const re = pathToRegexp(config.matcher, [], { strict: true, sensitive: false, delimiter: '/' })
+    for (const path of ['/api/resources', '/api/zmanim/batch', '/philly', '/blatimore/food']) expect(re.test(path), path).toBe(true)
+    for (const path of ['/api/admin/listings', '/api/cron/watches', '/api/inbound/email', '/api/inbox', '/admin', '/inbox', '/_next/static/x.js']) {
+      expect(re.test(path), path).toBe(false)
+    }
   })
 })
 

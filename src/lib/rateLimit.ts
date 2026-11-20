@@ -1,5 +1,6 @@
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
+import { reportServerError } from '@/lib/serverError'
 
 // Abuse protection for public endpoints. Two-tier by design:
 //
@@ -22,6 +23,19 @@ const hasUpstash = Boolean(
 )
 
 const redis = hasUpstash ? Redis.fromEnv() : null
+
+// On the live site, no Upstash is a setup mistake, not a mode (Nov 20, the
+// health sweep): each instance counts on its own, so a per-visitor limit
+// is loose and a ceiling for everyone together (sharedLimit) is no ceiling
+// at all. The per-visitor limits keep counting in memory; the shared
+// ceilings refuse. Either way it is reported, once per instance.
+const live = () => process.env.VERCEL_ENV === 'production'
+let reportedMissing = false
+function reportMissingUpstash() {
+  if (reportedMissing) return
+  reportedMissing = true
+  reportServerError('[rateLimit] UPSTASH_REDIS_REST_URL/TOKEN are not set on the live site: limits count per instance, shared ceilings refuse')
+}
 
 // Cache one Ratelimit instance per (limit, windowSec) so we don't rebuild them.
 const upstashLimiters = new Map<string, Ratelimit>()
@@ -95,7 +109,7 @@ export async function rateLimit(
       // Never let a limiter outage take down the endpoint — degrade to memory.
       console.error('[rateLimit] Upstash error, falling back to memory:', err)
     }
-  }
+  } else if (live()) reportMissingUpstash()
   return memoryDecision(key, limit, windowSec)
 }
 
@@ -125,6 +139,28 @@ export async function sharedLimit(name: string, opts: { limit: number; windowSec
     } catch (err) {
       console.error('[rateLimit] Upstash error, falling back to memory:', err)
     }
+  } else if (live()) {
+    reportMissingUpstash()
+    return { ok: false, retryAfter: opts.windowSec }
   }
   return memoryDecision(key, opts.limit, opts.windowSec)
+}
+
+// ── What the paid readers may spend, all of them together (Nov 20) ──
+// The two photo readers (a schedule, a message or menu: /api/schedule/read,
+// /api/message/read) each send photos or a PDF to the model. They were
+// limited per visitor only, so many visitors, or one with many addresses,
+// had no ceiling. This is that ceiling: reads a day, both readers in one
+// count. Past it they answer as they do when reading is off, and the box
+// offers typing instead. The question reader has its own (ask/read).
+export const PHOTO_READS_A_DAY = 300
+
+/** Null when a photo read may go ahead today; otherwise the answer to send. */
+export async function photoReaderSpend(): Promise<Response | null> {
+  const today = await sharedLimit('photo-readers-day', { limit: PHOTO_READS_A_DAY, windowSec: 86_400 })
+  if (today.ok) return null
+  return Response.json(
+    { ok: false, code: 'off', error: 'Reading photos is paused for today. Type it in instead.' },
+    { status: 503, headers: { 'Retry-After': String(today.retryAfter) } },
+  )
 }

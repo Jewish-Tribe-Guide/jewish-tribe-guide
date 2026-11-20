@@ -28,7 +28,7 @@ vi.mock('./supabase/admin', () => ({
         update: (p: Record<string, unknown>) => ((patch = p), q),
         eq: () => q,
         order: () => q,
-        then: (ok: (v: unknown) => unknown) => Promise.resolve(result()).then(ok),
+        range: () => q, then: (ok: (v: unknown) => unknown) => Promise.resolve(result()).then(ok),
       }
       return q
     },

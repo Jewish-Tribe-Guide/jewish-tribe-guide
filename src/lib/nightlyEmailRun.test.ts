@@ -26,7 +26,7 @@ vi.mock('./supabase/admin', () => ({
         eq: () => c,
         in: () => c,
         order: () => c,
-        then: (ok: (r: unknown) => unknown) => Promise.resolve({ data: rows(), error: null }).then(ok),
+        range: () => c, then: (ok: (r: unknown) => unknown) => Promise.resolve({ data: rows(), error: null }).then(ok),
       }
       return c
     },

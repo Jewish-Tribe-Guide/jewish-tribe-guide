@@ -27,6 +27,7 @@ import {
   readEruvDetails,
   type EruvReading,
 } from '@/lib/eruvWebsite'
+import { readAll } from '@/lib/readAll'
 
 /** Gives each eruv's website its watch, and takes away the ones no eruv
  *  has any more, in every community (`only`: in that one). */
@@ -83,12 +84,12 @@ export async function runEruvWebsiteWatch(community: string, url: string, fetche
   // Everything this watch has filed for these eruvim, whatever became of it.
   let filedEarlier: (Filed & { eruvId: string })[] = []
   if (differing.length) {
-    const { data, error } = await getAdminClient()
+    const { data, error } = await readAll((from, to) => getAdminClient()
       .from('submission')
       .select('id, status, payload')
       .eq('community_id', community)
       .eq('target_type', 'eruv')
-      .eq('submitted_by->>name', ERUV_WEBSITE_WATCH_NAME)
+      .eq('submitted_by->>name', ERUV_WEBSITE_WATCH_NAME).order('id').range(from, to))
     if (error) return { ok: false, error: `Couldn’t read earlier suggestions: ${error.message}` }
     filedEarlier = ((data ?? []) as Filed[]).map((s) => ({ ...s, eruvId: s.payload?.eruvId ?? '' }))
   }
