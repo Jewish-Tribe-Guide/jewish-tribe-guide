@@ -17,11 +17,11 @@ not highlights" and "Shul watches, in short").
    gives has no minyan; a part it doesn't give, it says nothing about. We
    copy what it says.
 4. **Less than a whole part** (a highlighted time, an events box, one
-   time on a homepage, Monday and Wednesday only) is set against the
-   usual times for that part. Every usual minyan there at its usual time:
-   taken as that part's week. Some there and agreeing: ignored, it says
-   nothing new. Anything extra, different or missing: sent to the admin
-   (see "Short sources", below).
+   time on a homepage, Monday and Wednesday only) is looked at only when
+   nothing whole covers that part that week. Then it is set against the
+   usual times for that part: every usual minyan there at its usual time
+   is taken as that part's week; anything else (extra, different or
+   missing) goes to the admin. See "Short sources", below.
 5. **On the site**, usual times and this week's are separate boxes and
    never mix. The this-week box shows the parts we have; with neither,
    there's no this-week box.
@@ -45,15 +45,24 @@ not highlights" and "Shul watches, in short").
   the listing's "Confirmed by" date.
 - A newsletter that skips a week: the usual times show, and Watches says
   "no email this week"; no To do item. Sons of Israel stays watched.
-- **Short sources** (the user, Nov 19). When a source gives less than a
-  whole part and differs from the usual times, nothing in it says whether
-  a missing minyan is cancelled or just not mentioned, and the usual
-  times may be the stale side (a shul's winter change is how Lower
-  Merion's calendar got filled from old times). So the watch doesn't
-  guess: the To do item says what is extra, different or missing, and
-  the admin decides. The usual times are compared here only to sort the
-  three cases, never to fill a week. Real newsletters never land here
-  (each gives whole parts); homepages and the odd short email do.
+- **Short sources** (the user, Nov 19). A source that gives less than a
+  whole part can't say whether a minyan it leaves out is cancelled or
+  just not mentioned, and the usual times may be the stale side (a
+  shul's winter change is how Lower Merion's calendar got filled from
+  old times). So:
+  1. **A whole source wins.** If a calendar or newsletter gave that
+     part whole for that week, a short source for it is not looked at.
+     Mekor's homepage "Fri 4:25" box never reaches the admin: its
+     newsletter gives the whole Shabbos every week.
+  2. **Otherwise, set against the usual times for that part.** Every
+     usual minyan there at its usual time: taken as that part's week.
+     Anything else, a minyan missing included: the To do item says what
+     is extra, different or missing ("Shabbos morning not mentioned"),
+     and the admin decides. Nothing is ignored on a guess that what's
+     missing is still on.
+  The usual times are compared only to sort these, never to fill a
+  week. This comes up for a shul with no calendar and no newsletter for
+  that part, or a week the newsletter skips.
 - **The goal is for the watch to find the answer, the admin to check
   it** (the user, Nov 19: "Admins are really just there to validate,
   not to answer"). So each admin answer on a short source is kept with
@@ -197,8 +206,10 @@ Each is tested, committed and pushed before the next.
    week dated by the email, not its stale heading; the Shtiebel's Shabbos email taken with its weekday usual times
    untouched; dated weekday times missing a day as no minyan that day;
    the Little Shul's empty calendar week as no minyan; a newsletter and a calendar disagreeing about the week;
-   a short source matching every usual minyan taken, one agreeing in part
-   ignored, and one with something extra or missing sent to the admin.
+   a short source not looked at when a whole source covers that part
+   that week (Mekor's homepage box beside its newsletter); with none, one
+   matching every usual minyan taken, and one with anything extra,
+   different or missing sent to the admin.
 4. **The page search prefers a calendar**, and the confirm rows are built.
 5. **A read-only dry run on the 14 live shuls**: what the new code would
    file, beside what the old code filed this week. Shown to the user

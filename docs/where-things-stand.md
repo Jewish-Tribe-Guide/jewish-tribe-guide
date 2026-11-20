@@ -991,9 +991,10 @@ Still open:
   Shabbos times, each part shown once, the other folded; Shabbos first
   after the last weekday minyan. The watch rebuild goes first (the user,
   Nov 19: "watch first"), then the listing. Spec in the plan's "The
-  listing". Short sources decided Nov 19: less than a whole part that
-  matches every usual minyan is taken, one that agrees in part is
-  ignored, anything extra or missing goes to the admin. Each admin
+  listing". Short sources decided Nov 19: less than a whole part is
+  looked at only when nothing whole covers that part that week; then
+  one matching every usual minyan is taken, and anything extra,
+  different or missing goes to the admin. Each admin
   answer is kept so the watch can learn to propose it ("Admins are
   really just there to validate, not to answer").
 - A listing list's scroll-to-a-row wait gives up after about 3 seconds
