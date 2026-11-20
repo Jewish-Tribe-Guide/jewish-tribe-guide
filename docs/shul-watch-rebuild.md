@@ -82,6 +82,34 @@ a calendar page is; not guessed each email.
 The Shtiebel's gives all of Shabbos and no weekdays: its Shabbos is
 taken, and its website's weekday times stand (decided Nov 19).
 
+## The listing (approved Nov 19)
+
+Boards 5e–7e on the "Shul schedules" canvas (KYnj9bnY5aY5qg7bp6ty5M).
+Built before the watch, which comes straight after it.
+
+- **Four boxes, one per part:** This week (weekdays), This Shabbos, Usual
+  weekday times, Usual Shabbos times.
+- **Each part shown once.** This week's version when we have it, else the
+  usual one; the other folds to one line ("Usual weekday times ›").
+  At most one weekday and one Shabbos box are open.
+- **Order follows the clock:** Shabbos first after the last weekday
+  minyan on Friday (Oct 26 rule), weekdays first otherwise. Open boxes
+  first, folds under them.
+- **Weekdays are a grid**, columns from that shul's own minyanim (Mekor:
+  Shacharis · Mincha · Mincha & Maariv). This week's grid keeps past days,
+  greyed; today tinted. A row-specific place or note gets a mark (†) and
+  one line under the grid.
+- **Shabbos is names with times lined up on the right**, under two small
+  grey labels, Friday night and Shabbos. Candle lighting and Havdalah in
+  grey in the same column. A time set by sunset or candle lighting shows
+  this week's clock time, the rule in grey under the name.
+- **Each box ends "Confirmed by [shul], [date]"**, the date the admin
+  approved it. Which page or email it came from is for the admin, not
+  the visitor.
+- No "Weekdays"/"Shabbos" part headings, no dates in the group labels.
+- Not drawn yet: the desktop listing; "+ Add this week's schedule" needs
+  a new home.
+
 ## What stays as it is
 
 These work, and have nothing to do with the old approach.
@@ -129,6 +157,10 @@ Each is tested, committed and pushed before the next.
 1. **Newsletters:** a month of each shul's, marked by which parts it gives, for the user. Done Nov 19 (above).
 2. **Draw the "Their calendar / Their usual times / Their newsletter
    gives Shabbos / weekdays" rows** on a shul's Places page, for the user's OK.
+   Drawn Nov 19 (board 4 on the canvas); not yet OK'd.
+2a. **Build the listing** (above), on today's stored data: a stored week
+   is split into its weekday and Shabbos parts for display. Comes first;
+   step 3 follows it.
 3. **`shulTimes.ts` and its tests**, written from the rule. Each real case
    is a test: Lower Merion's late Maariv on its homepage ignored and its
    calendar's week taken whole; Mekor's homepage Friday ignored; Society
