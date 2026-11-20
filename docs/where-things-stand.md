@@ -971,7 +971,10 @@ Still open:
   `docs/shul-watch-rebuild.md`. Nov 19: the nightly run is switched to
   the new rule on `claude/next-round` (unmerged); still to do there: the
   dry run re-run, the live data cleanup (needs the user's yes), then the
-  listing's four boxes. What follows is the history. A dated week is still compared
+  listing's four boxes. Decided Nov 20: once a newsletter gives a week,
+  it wins that part; a website change later that week files nothing ("No,
+  newsletter wins"). Kol Tzedek's and the Shtiebel's newsletters stay
+  watched as a backup. What follows is the history. A dated week is still compared
   with and filled from the usual times (`keepUncovered`, `dropListed`,
   `compareTimes` on weeks), because a week replaces its day and the
   reader takes one highlighted time as a week. Decided Nov 19: we post

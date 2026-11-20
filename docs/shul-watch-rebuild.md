@@ -354,8 +354,10 @@ Built on `claude/next-round`. A shul's page is now read through the rule:
 Changes to earlier decisions, made under "take it from here":
 
 - **The website no longer corrects an older newsletter week** (Nov 11's
-  `correctOlderWeeks`). A newsletter's week wins its part; a page that
-  disagrees is asked about only once that week's newsletter is past due.
+  `correctOlderWeeks`). A newsletter's week wins its part, and a page
+  that disagrees with it later in the week files nothing, not even a To
+  do item. Asked Nov 20 whether such a late change should go to To do;
+  the user: "No, newsletter wins".
 - **A time the reader can't name ("other") is left out.** Rodeph
   Shalom's potluck-adjacent 6pm, Mikveh Israel's pictured 6pm.
 - **The Little Shul's list of dates isn't read as its calendar** (open
