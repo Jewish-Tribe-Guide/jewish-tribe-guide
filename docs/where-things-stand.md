@@ -34,8 +34,8 @@ Small open items from Nov 9:
   screen. Fixed: `MapBoundary` keeps a broken map in its own box on the Map
   page too, as on the category page. A real visitor whose map Google
   refuses now keeps the search, chips and list.
-- Dev's pretend Riverton community has no pages left and can be deleted
-  (dev only; no yes needed).
+- ~~Dev's pretend Riverton community~~ Deleted Nov 20 (the user's yes),
+  with philly's old `Cache Round-trip Seed` category and section.
 - "How it looks" isn't built for the phone (nothing sits beside a field
   there).
 - The Denomination/Nusach script is still a dry run (see "Waiting for a yes
@@ -998,10 +998,9 @@ reasons CI is ~9 min, fixed in that order:
    admin-write 4.4 and unit 4.0 beside them. The slowest path is now the
    build plus the slowest shard (5.6), with admin-write and unit a minute
    under it.
-   Left in the test project (it's also dev): philly still has the old
-   `Cache Round-trip Seed` category and its `E2E Fixtures` section. Old
-   code on other branches recreates them, so they go once those branches
-   have merged main.
+   philly's old `Cache Round-trip Seed` category and `E2E Fixtures`
+   section were deleted Nov 20. A branch still on the old code (the
+   Dependabot PRs) puts them back when its CI runs.
 
 Flakes seen this batch, to watch: `category-open.spec.ts` (a click asked
 the server once, the re-run passed), the mobile prefetch budget (once).
