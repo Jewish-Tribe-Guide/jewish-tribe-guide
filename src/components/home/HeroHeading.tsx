@@ -5,7 +5,7 @@ import { preload } from 'react-dom'
 import { useRef, useState, type ReactNode } from 'react'
 import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
-import { isOptimizableImage } from '@/lib/imageHosts'
+import { photoProps } from '@/lib/imageHosts'
 import SearchBox from './SearchBox'
 import SearchPrompts from './SearchPrompts'
 import { useCloseOnTapAway } from '@/lib/useCloseOnTapAway'
@@ -118,7 +118,7 @@ export default function HeroHeading({
       alt: '',
       fill: true,
       sizes: '100vw',
-      unoptimized: !isOptimizableImage(heroImage.url),
+      ...photoProps(heroImage.url),
     })
     preload(props.src, {
       as: 'image',
@@ -245,7 +245,7 @@ export default function HeroHeading({
               // is `hidden` on a phone (the <head> preload above carries
               // one). Lazy by default, so a phone never fetches it.
               fetchPriority="high"
-              unoptimized={!isOptimizableImage(heroImage.url)}
+              {...photoProps(heroImage.url)}
             />
           ) : (
             // No photo set yet: a plain gradient, so a new community never

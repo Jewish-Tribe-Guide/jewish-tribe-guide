@@ -1,8 +1,9 @@
 'use client'
 
 import { FitTitle } from './FitTitle'
-import { type MouseEvent } from 'react'
+import { type MouseEvent, useState } from 'react'
 import Image from 'next/image'
+import { storageThumbnailUrl } from '@/lib/imageHosts'
 import Link from 'next/link'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import CommunitySwitcher from '@/components/CommunitySwitcher'
@@ -191,32 +192,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
               className="block relative h-9 w-9 shrink-0 overflow-hidden rounded-xl desktop:h-11 desktop:w-11"
               aria-hidden="true"
             >
-              <Image
-                src={settings.logoUrl}
-                alt=""
-                fill
-                sizes="(min-width: 640px) 44px, 36px"
-                className="object-cover"
-                // Always unoptimized, unlike the card photos.
-                //
-                // Two reasons, one of which has already bitten. It renders at
-                // 36px from a file measured in kilobytes, so the optimizer
-                // saves close to nothing on it — and routing it through a
-                // metered service means the site's own logo is the thing that
-                // breaks when the month's Image Optimization quota runs out.
-                // That is exactly what happened: uploading a new logo put a
-                // fresh URL in front of an exhausted optimizer, /_next/image
-                // returned 402, and the header rendered a broken-image icon
-                // while every already-cached listing photo carried on fine.
-                //
-                // A broken logo is a worse failure than an unresized one, and
-                // this is a single small asset on every page rather than a
-                // grid of photos, so it opts out permanently. The card photos
-                // still go through the optimizer (see imageHosts.ts, and the
-                // NEXT_PUBLIC_IMAGES_UNOPTIMIZED switch for when quota is the
-                // problem across the board).
-                unoptimized
-              />
+              <LogoImage src={settings.logoUrl} />
             </span>
           ) : (
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white desktop:h-11 desktop:w-11">
@@ -335,5 +311,29 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
         />
       )}
     </header>
+  )
+}
+
+/** The community's logo, drawn at 36-44px. Never through Vercel's metered
+ *  optimizer: uploading a new logo once put a fresh URL in front of an
+ *  exhausted quota, /_next/image answered 402, and the header showed a broken
+ *  image while every cached photo carried on. An upload is fetched as
+ *  Storage's own small copy instead (88px, sharp at 2x), falling back to the
+ *  original if that fails, as CategoryIcon does; it was the whole 1024px
+ *  file on every page until Nov 20. A logo hosted elsewhere is drawn as it is. */
+function LogoImage({ src }: { src: string }) {
+  const thumb = storageThumbnailUrl(src, 44)
+  const [failedThumb, setFailedThumb] = useState<string | null>(null)
+  const useThumb = thumb !== null && failedThumb !== thumb
+  return (
+    <Image
+      src={useThumb ? thumb : src}
+      alt=""
+      fill
+      sizes="(min-width: 640px) 44px, 36px"
+      className="object-cover"
+      unoptimized
+      onError={useThumb ? () => setFailedThumb(thumb) : undefined}
+    />
   )
 }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { isOptimizableImage, optimizedImagePatterns, storageThumbnailUrl } from './imageHosts'
+import { isOptimizableImage, optimizedImagePatterns, photoProps, storageThumbnailUrl } from './imageHosts'
 
 const SUPABASE = 'https://abcdefg.supabase.co'
 
@@ -172,5 +172,54 @@ describe('storageThumbnailUrl', () => {
 
     vi.stubEnv('NEXT_PUBLIC_STORAGE_THUMBNAILS_DISABLED', '0')
     expect(storageThumbnailUrl(PHOTO, 40)).not.toBeNull()
+  })
+})
+
+describe('photoProps', () => {
+  const loaded = (src: string, width: number) => photoProps(src).loader!({ src, width })
+
+  it('asks Unsplash for the width drawn, not the 2070px the link was pasted with', () => {
+    const src = 'https://plus.unsplash.com/premium_photo-1683121938935?q=80&w=2070&h=1380&auto=format&fit=crop'
+    const url = new URL(loaded(src, 384))
+    expect(url.searchParams.get('w')).toBe('384')
+    expect(url.searchParams.get('h')).toBeNull()
+    expect(url.searchParams.get('auto')).toBe('format')
+    expect(url.searchParams.get('fit')).toBe('crop')
+    expect(url.hostname).toBe('plus.unsplash.com')
+  })
+
+  it('never asks for more than the largest screen width', () => {
+    expect(new URL(loaded('https://images.unsplash.com/photo-1?w=900', 3840)).searchParams.get('w')).toBe('1920')
+  })
+
+  it('resizes even with the Vercel optimizer switched off', () => {
+    vi.stubEnv('NEXT_PUBLIC_IMAGES_UNOPTIMIZED', '1')
+    expect(photoProps('https://images.unsplash.com/photo-1?w=2070').loader).toBeDefined()
+  })
+
+  it('leaves Storage photos to the optimizer while it’s on', () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', SUPABASE)
+    expect(photoProps(`${SUPABASE}/storage/v1/object/public/x.png`)).toEqual({ unoptimized: false })
+  })
+
+  it('with the optimizer off, asks Storage for a copy by width, keeping the photo’s shape', () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', SUPABASE)
+    vi.stubEnv('NEXT_PUBLIC_IMAGES_UNOPTIMIZED', '1')
+    const url = new URL(loaded(`${SUPABASE}/storage/v1/object/public/site-assets/logo/a.webp`, 96))
+    expect(url.pathname).toBe('/storage/v1/render/image/public/site-assets/logo/a.webp')
+    expect(url.searchParams.get('width')).toBe('96')
+    expect(url.searchParams.get('height')).toBeNull()
+  })
+
+  it('leaves Storage photos whole when its thumbnails are switched off', () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', SUPABASE)
+    vi.stubEnv('NEXT_PUBLIC_IMAGES_UNOPTIMIZED', '1')
+    vi.stubEnv('NEXT_PUBLIC_STORAGE_THUMBNAILS_DISABLED', '1')
+    expect(photoProps(`${SUPABASE}/storage/v1/object/public/x.png`)).toEqual({ unoptimized: true })
+  })
+
+  it('serves any other host as it is', () => {
+    expect(photoProps('https://media.istockphoto.com/id/1/photo.jpg')).toEqual({ unoptimized: true })
+    expect(photoProps('not a url')).toEqual({ unoptimized: true })
   })
 })

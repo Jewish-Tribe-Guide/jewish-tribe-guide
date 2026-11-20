@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { isOptimizableImage, storageThumbnailUrl } from '@/lib/imageHosts'
+import { isOptimizableImage, photoProps, storageThumbnailUrl } from '@/lib/imageHosts'
 import { CategoryGlyph, hasCategoryIcon, useGlyphKey } from '@/lib/categoryIcons'
 import type { CategoryConfig } from '@/lib/categories'
 import type { HomeSection } from '@/lib/homeSections'
@@ -243,7 +243,7 @@ export function TilePhoto({ src, px = 210, sizes = '(min-width: 1200px) 210px, 1
       fill
       sizes={sizes}
       className="object-cover"
-      unoptimized={useThumb || !isOptimizableImage(src)}
+      {...(useThumb ? { unoptimized: true } : thumb ? { unoptimized: !isOptimizableImage(src) } : photoProps(src))}
       onError={useThumb ? () => setFailedThumb(thumb) : undefined}
     />
   )

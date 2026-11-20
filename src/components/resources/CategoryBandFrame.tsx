@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import type { ReactNode } from 'react'
-import { isOptimizableImage } from '@/lib/imageHosts'
+import { photoProps } from '@/lib/imageHosts'
 import { categoryTint, categoryRing } from '@/lib/categoryColor'
 import { useIsMobile } from '@/lib/useIsMobile'
 
@@ -107,7 +107,7 @@ export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, 
         <div className="relative hidden desktop:block" style={{ height: heroOverlap ? HERO_PHOTO_PX : HERO_TITLE_PHOTO_PX, marginBottom: heroOverlap ? -HERO_OVERLAP_PX : undefined }}>
           <div className="absolute inset-0 overflow-hidden" style={{ backgroundColor: color }}>
             {bandImage && (
-              <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover object-[center_55%]" unoptimized={!isOptimizableImage(bandImage)} />
+              <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover object-[center_55%]" {...photoProps(bandImage)} />
             )}
           </div>
           <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.78)_0%,rgba(15,23,42,0.55)_45%,rgba(15,23,42,0.15)_80%)]" />
@@ -147,7 +147,7 @@ export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, 
         style={!bandImage ? { backgroundColor: categoryTint(color) } : undefined}
       >
         {bandImage && (
-          <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover" unoptimized={!isOptimizableImage(bandImage)} />
+          <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover" {...photoProps(bandImage)} />
         )}
       </div>
       <div className="border-x border-slate-200">
