@@ -38,7 +38,7 @@ const weekdayTimes = (except: string[] = []) => WEEKDAYS.filter((d) => !except.i
 
 describe('a whole source', () => {
   it('Lower Merion: its calendar is the week, its homepage’s late Maariv is not looked at', () => {
-    const calendar = read(src('calendar', 'calendar'), 'schedule', WEEK, [...weekdayTimes(), t(FRI, 'kabbalas_shabbos', '4:30 PM'), t(SAT, 'shacharis', '8:45 AM')])
+    const calendar = read(src('calendar', 'calendar'), 'schedule', WEEK, [...weekdayTimes([THU]), t(THU, 'shacharis', '7:00 AM'), t(FRI, 'kabbalas_shabbos', '4:30 PM'), t(SAT, 'shacharis', '8:45 AM')])
     const homepage = read(src('homepage', 'page'), 'highlight', { from: WED, to: WED }, [t(WED, 'maariv', '9:30 PM')], { heading: 'This week at LMS' })
     const fs = weekFrom([homepage, calendar], ctx({ usual: USUAL }))
     expect(part(fs, 'weekdays')).toMatchObject({ do: 'take', from: { source: { id: 'calendar' } } })
@@ -83,6 +83,15 @@ describe('a whole source', () => {
     expect(strip(weekFrom([email], ctx({ usual: USUAL })))).toBe(strip(weekFrom([email], ctx({ usual: [] }))))
   })
 
+  // The Shtiebel's calendar, Nov 19 dry run: next week's weekdays exactly
+  // their usual times, and nothing on the listing for that week yet.
+  it('the Shtiebel: a whole week that is only the usual times files nothing, unless a note says more', () => {
+    const fs = weekFrom([read(src('calendar', 'calendar'), 'schedule', WEEK, weekdayTimes())], ctx({ usual: USUAL }))
+    expect(part(fs, 'weekdays')).toEqual({ do: 'nothing', part: 'weekdays', reason: 'agrees' })
+    const online = weekdayTimes().map((x) => (x.date === MON ? { ...x, notes: 'Online only' } : x))
+    expect(part(weekFrom([read(src('calendar', 'calendar'), 'schedule', WEEK, online)], ctx({ usual: USUAL })), 'weekdays')).toMatchObject({ do: 'take' })
+  })
+
   it('files nothing when it is the week we already have', () => {
     const times = weekdayTimes()
     const email = read(src('email', 'newsletter'), 'schedule', { from: SUN, to: FRI }, times)
@@ -113,6 +122,20 @@ describe('one pick per part', () => {
     expect(part(weekFrom([home, email], ctx()), 'shabbos')).toMatchObject({ from: { source: { id: 'email' } } })
   })
 
+  // Kol Tzedek, Nov 19 dry run: its homepage carries the same calendar feed
+  // as its calendar page, and the reader gave Shabbos morning's end two ways
+  // ("until 10:45 AM", "until 12:30 PM"). Whichever page ran last filed it.
+  it('Kol Tzedek: two sources of one rank, one giving the week we hold, file nothing', () => {
+    const held = [t(FRI, 'kabbalas_shabbos', '6:30pm', { notes: 'until 8:00 PM' }), t(SAT, 'shacharis', '10:00am', { notes: 'until 12:30 PM' })]
+    const calendar = read(src('calendar', 'calendar', '2026-11-19T11:00:00Z'), 'schedule', { from: THU, to: SAT }, [t(FRI, 'kabbalas_shabbos', '6:30 PM', { notes: 'until 8:00 PM' }), t(SAT, 'shacharis', '10:00 AM', { notes: 'until 12:30 PM' })])
+    const homepage = read(src('homepage', 'calendar', '2026-11-19T11:05:00Z'), 'schedule', { from: THU, to: SAT }, [t(FRI, 'kabbalas_shabbos', '6:30 PM', { notes: 'until 8:00 PM' }), t(SAT, 'shacharis', '10:00 AM', { notes: 'until 10:45 AM' })])
+    const fs = weekFrom([homepage, calendar], ctx({ held: [{ part: 'shabbos', times: held }] }))
+    expect(part(fs, 'shabbos')).toEqual({ do: 'nothing', part: 'shabbos', reason: 'same' })
+    // A newer source of a lower rank still doesn't get a say.
+    const page = read(src('page', 'page', '2026-11-19T11:10:00Z'), 'schedule', { from: THU, to: SAT }, [t(FRI, 'kabbalas_shabbos', '6:00 PM'), t(SAT, 'shacharis', '10:00 AM')])
+    expect(part(weekFrom([page, calendar], ctx({ held: [{ part: 'shabbos', times: held }] })), 'shabbos')).toMatchObject({ do: 'nothing', reason: 'same' })
+  })
+
   it('Sons of Israel’s usual times: the regular-schedule page over the homepage', () => {
     expect(pick([src('home', 'page'), src('tefillot', 'schedule')])?.id).toBe('tefillot')
     expect(pick([src('home', 'page'), src('cal', 'calendar'), src('email', 'newsletter')])?.id).toBe('email')
@@ -124,7 +147,7 @@ describe('one pick per part', () => {
 describe('a calendar’s weeks', () => {
   it('the Little Shul: an empty week is no minyan when something is posted after it', () => {
     const calendar = read(src('calendar', 'calendar'), 'schedule', WEEK, [], { lastPosted: '2026-12-05' })
-    expect(part(weekFrom([calendar], ctx()), 'shabbos')).toMatchObject({ do: 'take', times: [] })
+    expect(part(weekFrom([calendar], ctx({ usual: USUAL })), 'shabbos')).toMatchObject({ do: 'take', times: [] })
   })
 
   it('an empty week with nothing posted after it isn’t posted yet (Leyv Ha-Ir, Nov 22–28)', () => {

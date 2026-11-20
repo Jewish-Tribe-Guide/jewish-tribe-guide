@@ -364,7 +364,24 @@ Changes to earlier decisions, made under "take it from here":
   week speaks for a part it gives times in, or whose every day it spans
   (the Shtiebel's Friday-to-Saturday week is Shabbos only).
 
-Not yet: the dry run re-run on this code, step 7's live data, step 8.
+Found by the dry run on this code (Nov 19), and fixed:
+
+- **Two sources of one rank take turns.** Kol Tzedek's homepage carries
+  the same calendar feed as its calendar page, and the reader gave
+  Shabbos morning's end two ways ("until 10:45 AM", "until 12:30 PM").
+  The newest read won, so whichever page ran last filed. Now, if any
+  source of the top rank gives the week we hold, nothing is filed.
+- **A whole week that is only the usual times files nothing** when no
+  week is held for it, notes included (an "Online only" week still
+  files). The Shtiebel's calendar filed next week's weekdays exactly as
+  usual. The same reasoning as Kesher Israel's short source.
+- **On live, only BZBI, Mekor and Society Hill have newsletter weeks.**
+  Kol Tzedek's newsletter has sent nothing to the watch since Oct 8, and
+  the Shtiebel's one email was rejected, so their calendars speak for
+  their weeks. That is right for what the site has; if their newsletters
+  are meant to be linked, that's a setup job, not code.
+
+Not yet: step 7's live data, step 8.
 
 ## Not in this rebuild
 

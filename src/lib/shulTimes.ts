@@ -206,21 +206,35 @@ function againstUsual(p: InPart, part: Part, ctx: WeekContext) {
 function forPart(part: Part, reads: readonly SourceRead[], ctx: WeekContext): Finding {
   const parts = reads.map((r) => inPart(r, part, ctx.week))
   const held = ctx.held.find((h) => h.part === part)
-  const take = (p: InPart): Finding => {
-    const times = p.times.filter((t) => !p.cancelled.some((c) => cancels(c, t))).sort(byDate)
-    if (held && sameWeek(held.times, times, ctx.zmanim)) return { do: 'nothing', part, reason: 'same' }
-    return { do: 'take', part, times, from: p.read, quotes: p.cancelled.map((c) => c.quote) }
-  }
+  const timesOf = (p: InPart) => p.times.filter((t) => !p.cancelled.some((c) => cancels(c, t))).sort(byDate)
   const pickOf = (ps: InPart[]) => ps.find((p) => p.read.source === pick(ps.map((x) => x.read.source)))!
+  const onlyUsual = (p: InPart) => {
+    const { extra, different, missing } = againstUsual(p, part, ctx)
+    if (extra.length || different.length || missing.length) return false
+    return p.times.every((t) => ctx.usual.some((m) => m.days.includes(weekdayOf(t.date)) && sameName(m.tefillah, t.tefillah) && sameTime(m, t, ctx.zmanim[t.date]) && sameNote(m.notes, t.notes)))
+  }
+  // Of the whole sources, the pick; but if another of its rank gives the
+  // week we hold, nothing. Kol Tzedek's homepage and calendar page carry
+  // one feed, which the reader gave two ways (Nov 19): the newest read
+  // would have filed whichever ran last, night after night.
+  const take = (ps: InPart[]): Finding => {
+    const p = pickOf(ps)
+    const rank = RANK.indexOf(p.read.source.kind)
+    if (held && ps.some((x) => RANK.indexOf(x.read.source.kind) === rank && sameWeek(held.times, timesOf(x), ctx.zmanim))) return { do: 'nothing', part, reason: 'same' }
+    // With nothing held, a week that is only the usual times, notes and
+    // all, changes nothing a visitor sees (the Shtiebel's calendar, Nov 19).
+    if (!held && !p.cancelled.length && onlyUsual(p)) return { do: 'nothing', part, reason: 'agrees' }
+    return { do: 'take', part, times: timesOf(p), from: p.read, quotes: p.cancelled.map((c) => c.quote) }
+  }
 
   // While the shul's newsletter is due to give this part, nothing else is
   // filed for it: the newsletter wins, so one item a part, not two.
   const due = !!ctx.newsletterGives?.includes(part) && ctx.today <= partDates(part, ctx.week)[0]
   const whole = parts.filter(isWhole)
   const wholeLetter = whole.filter((p) => p.read.source.kind === 'newsletter')
-  if (wholeLetter.length) return take(pickOf(wholeLetter))
+  if (wholeLetter.length) return take(wholeLetter)
   if (whole.length && due) return { do: 'nothing', part, reason: 'waiting' }
-  if (whole.length) return take(pickOf(whole))
+  if (whole.length) return take(whole)
 
   const short = parts.filter((p) => p.times.length || p.cancelled.length)
   if (!short.length) return { do: 'nothing', part, reason: 'not read' }

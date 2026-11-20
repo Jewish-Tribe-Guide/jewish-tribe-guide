@@ -4,7 +4,7 @@
 // the old watch filed this week. Files nothing, dates nothing.
 // docs/shul-watch-rebuild.md, steps 5 and 6.
 //
-//   npx tsx scripts/shul-times-dry-run.mts [today] [> out.json]
+//   npx tsx scripts/shul-times-dry-run.mts [today] [shul name] [> out.json]
 //
 // Each page is read twice: once on its own, then with the shul's other
 // pages' reads beside it, as the run has them from the night before
@@ -64,6 +64,7 @@ const shuls = (rows as ResourceRow[])
     return c && reads?.kind === 'times' ? [{ listing: l, category: c, key: reads.key }] : []
   })
   .filter(({ listing }) => (watches ?? []).some((w) => w.resource_id === listing.id))
+  .filter(({ listing }) => !process.argv[3] || listing.name === process.argv[3])
 
 const sunday = (() => {
   const d = new Date(`${TODAY}T12:00:00Z`)
@@ -115,6 +116,7 @@ for (const { listing, category, key } of shuls) {
     pages.push({
       page,
       read: got.read,
+      reads: got.shulReads.map((r) => ({ shape: r.shape, shows: r.shows, times: r.times.map((t) => `${t.date} ${t.tefillah} ${t.time}${t.notes ? ` (${t.notes})` : ''}`) })),
       note: got.note ?? null,
       parts: got.parts,
       files: got.proposal ? Object.values(got.proposal.weekLines).length ? got.proposal.weekLines : got.proposal.lines : null,
