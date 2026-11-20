@@ -140,8 +140,8 @@ shul can have several sources for the same thing (Kol Tzedek: four pages
 and a newsletter; Sons of Israel: two pages both giving usual times), and
 "newer wins" between them means they overwrite each other nightly. So
 the watch picks one source for each of usual weekdays, usual Shabbos,
-this week's weekdays and this week's Shabbos, ranked: a calendar, then a
-newsletter, then a regular-schedule page, then anything else. Its pick
+this week's weekdays and this week's Shabbos, ranked: a newsletter, then
+a calendar (swapped Nov 19, "Dry run"), then a regular-schedule page, then anything else. Its pick
 shows on the shul's Places page and in each To do item; the admin can
 change it. The watch answers; the admin checks.
 
@@ -301,18 +301,20 @@ Found, and fixed in the code:
 - **"No week held" isn't "a week with no minyan".** The run must pass a
   held part only when a listing week covers it.
 
-Open, for the user:
+Decided (the user handed both to Claude, Nov 19: "take it from here"):
 
-- **Newsletter or calendar first.** BZBI's calendar for Nov 22–28 lists
-  Sunday and "Tuesday & Wednesday Morning Minyan" once; its newsletter,
-  the same evening, lists every weekday, Thanksgiving at 9:00. With the
-  calendar first, the week would have had no minyan four days it has
-  one. BZBI's calendar is a highlight under `calendarListsUsual` (its
-  Wednesday Maariv isn't on it), so the dry run waited for the newsletter,
-  but a shul whose calendar lists its usual times and lags would not.
-- **A short source matching the usual times exactly** (Kesher Israel's
-  homepage, one run) is taken as the week, a To do item that changes
-  nothing a visitor sees.
+- **A newsletter first, then a calendar.** BZBI's calendar for Nov 22–28
+  lists Sunday and "Tuesday & Wednesday Morning Minyan" once; its
+  newsletter, the same evening, lists every weekday, Thanksgiving at
+  9:00. With the calendar first the week would have had no minyan four
+  days it has one. While the newsletter is due for a part, nothing else
+  is filed for it, whole or not, so a part is filed once.
+- **A short source giving only the usual times files nothing.** Kesher
+  Israel's homepage did, once: a To do item that changed nothing a
+  visitor sees.
+
+Still open:
+
 - **The Little Shul's homepage lists its next service** (Dec 5); the old
   run filed "no minyan" for Nov 22–28 from it. The new rules don't read a
   list of dates as a whole calendar.

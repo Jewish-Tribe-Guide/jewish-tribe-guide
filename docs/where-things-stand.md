@@ -1001,9 +1001,10 @@ Still open:
   part (calendar, newsletter, schedule page, then anything else) and the
   admin checks it; and seven cases from live To do items go in as
   tests (plan, "Cases from live"). Dry run done Nov 19 (plan, "Dry
-  run"): four wiring faults found and fixed; waiting on the user for
-  newsletter-or-calendar first, and whether a short source that only
-  matches the usual times files anything. Not switched.
+  run"): four wiring faults found and fixed. The user handed the rest to
+  Claude (Nov 19, "take it from here"): newsletter before calendar, and a
+  short source matching the usual times files nothing. Switch being built;
+  live data cleanup still needs the user's yes.
 - A listing list's scroll-to-a-row wait gives up after about 3 seconds
   and stops when the list goes away (`whenSettled`, Nov 19). It used to
   poll every 32ms forever for a row that never appeared, and one timer

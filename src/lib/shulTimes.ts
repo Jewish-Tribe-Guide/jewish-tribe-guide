@@ -9,7 +9,7 @@ import { datesBetween, sameTime, weekdayOf, type DayZmanim, type RegularReading 
 //
 //   1. A whole source for a part (it shows every day of the part and is
 //      the shul's schedule) is that part's week. A day it leaves out has
-//      no minyan. Where several are whole, one is picked: a calendar, then
+//      no minyan. Where several are whole, one is picked: a newsletter, then
 //      a newsletter, then a regular-schedule page, then any other page.
 //      Its week is never set against the usual times.
 //   2. Only with no whole source is a short one looked at (a homepage box,
@@ -27,7 +27,10 @@ export const PARTS: readonly Part[] = ['weekdays', 'shabbos']
 
 /** Where a reading came from, ranked in this order for the pick (pick). */
 export type SourceKind = 'calendar' | 'newsletter' | 'schedule' | 'page'
-const RANK: readonly SourceKind[] = ['calendar', 'newsletter', 'schedule', 'page']
+// A newsletter first (decided Nov 19): a person writes it for that week.
+// BZBI's calendar for Nov 22–28 listed Sunday and Tuesday; its newsletter
+// that evening listed every weekday, Thanksgiving at 9:00.
+const RANK: readonly SourceKind[] = ['newsletter', 'calendar', 'schedule', 'page']
 
 /** What the reader says the source is: the shul's schedule (a calendar, a
  *  "Weekday Services" table, "Regular Minyan Times"), one thing picked out
@@ -75,7 +78,7 @@ export type WeekContext = {
 
 export type Finding =
   | { do: 'nothing'; part: Part; reason: 'same' | 'not read' | 'waiting' | 'agrees' }
-  | { do: 'take'; part: Part; whole: boolean; times: DatedTime[]; from: SourceRead; quotes: string[] }
+  | { do: 'take'; part: Part; times: DatedTime[]; from: SourceRead; quotes: string[] }
   | {
       do: 'ask'
       part: Part
@@ -203,29 +206,34 @@ function againstUsual(p: InPart, part: Part, ctx: WeekContext) {
 function forPart(part: Part, reads: readonly SourceRead[], ctx: WeekContext): Finding {
   const parts = reads.map((r) => inPart(r, part, ctx.week))
   const held = ctx.held.find((h) => h.part === part)
-  const take = (p: InPart, whole: boolean): Finding => {
+  const take = (p: InPart): Finding => {
     const times = p.times.filter((t) => !p.cancelled.some((c) => cancels(c, t))).sort(byDate)
     if (held && sameWeek(held.times, times, ctx.zmanim)) return { do: 'nothing', part, reason: 'same' }
-    return { do: 'take', part, whole, times, from: p.read, quotes: p.cancelled.map((c) => c.quote) }
+    return { do: 'take', part, times, from: p.read, quotes: p.cancelled.map((c) => c.quote) }
   }
   const pickOf = (ps: InPart[]) => ps.find((p) => p.read.source === pick(ps.map((x) => x.read.source)))!
 
+  // While the shul's newsletter is due to give this part, nothing else is
+  // filed for it: the newsletter wins, so one item a part, not two.
+  const due = !!ctx.newsletterGives?.includes(part) && ctx.today <= partDates(part, ctx.week)[0]
   const whole = parts.filter(isWhole)
-  if (whole.length) return take(pickOf(whole), true)
+  const wholeLetter = whole.filter((p) => p.read.source.kind === 'newsletter')
+  if (wholeLetter.length) return take(pickOf(wholeLetter))
+  if (whole.length && due) return { do: 'nothing', part, reason: 'waiting' }
+  if (whole.length) return take(pickOf(whole))
 
   const short = parts.filter((p) => p.times.length || p.cancelled.length)
   if (!short.length) return { do: 'nothing', part, reason: 'not read' }
-  if (ctx.newsletterGives?.includes(part) && ctx.today <= partDates(part, ctx.week)[0]) return { do: 'nothing', part, reason: 'waiting' }
+  if (due) return { do: 'nothing', part, reason: 'waiting' }
 
   const p = pickOf(short)
   const { extra, different, missing } = againstUsual(p, part, ctx)
   const quotes = p.cancelled.map((c) => c.quote)
   // A highlight never removes a minyan: what it leaves out is still on.
   const counted = p.read.shape === 'highlight' ? [] : missing
-  if (!extra.length && !different.length && !quotes.length) {
-    if (!missing.length && p.shown.length === p.dates.length) return take(p, false)
-    if (!counted.length) return { do: 'nothing', part, reason: 'agrees' }
-  }
+  // Only the usual times again files nothing: the listing shows them
+  // already (decided Nov 19, Kesher Israel's homepage).
+  if (!extra.length && !different.length && !quotes.length && !counted.length) return { do: 'nothing', part, reason: 'agrees' }
   const readAs = `Read as a ${p.read.shape}${p.read.heading ? `, under “${p.read.heading}”` : ''}`
   return { do: 'ask', part, from: p.read, readAs, extra, different, missing: counted, quotes }
 }

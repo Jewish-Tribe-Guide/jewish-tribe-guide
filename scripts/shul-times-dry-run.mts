@@ -192,7 +192,7 @@ const describe = (f: Finding) =>
   f.do === 'nothing'
     ? `nothing (${f.reason})`
     : f.do === 'take'
-      ? `take ${f.whole ? 'whole' : 'matches usual'} from ${f.from.source.kind}: ${f.times.length} times${f.quotes.length ? `; quotes ${f.quotes.join(' / ')}` : ''}`
+      ? `take from ${f.from.source.kind}: ${f.times.length} times${f.quotes.length ? `; quotes ${f.quotes.join(' / ')}` : ''}`
       : `ask (${f.readAs}, ${f.from.source.kind}): ${f.extra.length} extra, ${f.different.length} different, ${f.missing.length} missing${f.quotes.length ? `; quotes ${f.quotes.join(' / ')}` : ''}`
 const file = process.env.DRY_RUN_OUT ?? `shul-times-dry-run-${TODAY}.json`
 writeFileSync(file, JSON.stringify(out, null, 2))
