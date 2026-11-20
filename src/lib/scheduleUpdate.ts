@@ -83,6 +83,12 @@ export type RegularReading = {
   times: ReadRegularTime[]
   /** It writes calendar dates for its times, rather than only weekdays. */
   namesDates?: true
+  /** Asked only by the shul watch (scheduleReader's DESCRIBE): what the
+   *  message is as a whole, the heading its times sit under, and what it
+   *  says outright isn't held. */
+  shape?: 'schedule' | 'highlight' | 'event'
+  heading?: string | null
+  cancelled?: { date: string; tefillah?: Tefillah; quote: string }[]
 }
 
 export type RowStatus = 'same' | 'changed' | 'new' | 'gone' | 'kept'
