@@ -491,17 +491,18 @@ describe('this week’s schedule (Oct 6)', () => {
       expect(dated()).toEqual(['davening-this-shabbos', 'davening-this-week'])
     })
 
-    // Nov 19 (board 5e): candle lighting closes Friday night and havdalah
-    // Shabbos, in grey, as this week's times. A change: Oct 27 had taken
-    // candle lighting out ("the city's time, not the shul's"). Kol Tzedek
-    // got a Friday with nothing else on it; it still doesn't.
-    it('This Shabbos: candle lighting and havdalah in grey, but no Friday of its own when the week gives Friday nothing', () => {
+    // The user, Oct 27, and again Nov 20 though board 5e drew it: no candle
+    // lighting, the city's time, not the shul's, and on the home page.
+    // Havdalah closes Shabbos in grey. Kol Tzedek got a Friday with nothing
+    // else on it; it still doesn't.
+    it('This Shabbos: no candle lighting, havdalah in grey, and no Friday of its own when the week gives Friday nothing', () => {
       zmanAnchors.value = { timezone: 'America/New_York', candleLightingIso: '2026-10-09T18:05:00-04:00', havdalahIso: '2026-10-10T19:05:00-04:00' }
       showAt('2026-10-08T16:00:00-04:00', [fullWeek])
       expect(within(screen.getByTestId('davening-this-shabbos')).getByTestId('davening-shabbos-lines')).toHaveTextContent(
-        /^Friday nightKabbalas Shabbos6:20 PMCandle lighting6:05 PMShabbosShacharis9 AMHavdalah7:05 PM$/,
+        /^Friday nightKabbalas Shabbos6:20 PMShabbosShacharis9 AMHavdalah7:05 PM$/,
       )
-      expect(within(screen.getByTestId('davening-this-shabbos')).getAllByTestId('davening-zman')).toHaveLength(2)
+      expect(within(screen.getByTestId('davening-this-shabbos')).getAllByTestId('davening-zman')).toHaveLength(1)
+      expect(screen.queryByText('Candle lighting')).not.toBeInTheDocument()
       cleanup()
       showAt('2026-10-08T16:00:00-04:00', [{ ...fullWeek, minyanim: fullWeek.minyanim.filter((m) => m.id !== 'f3') }])
       const shabbos = screen.getByTestId('davening-this-shabbos')

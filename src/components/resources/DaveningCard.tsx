@@ -619,7 +619,7 @@ function WeekTable({ table, today, marks = true }: { table: NonNullable<ReturnTy
 
 /** One line of a Shabbos box (board 5e, Nov 19): a name, a time lined up
  *  on the right, and under the name in grey the rule a zman sets it by or
- *  its note. `ref`: candle lighting and havdalah, in grey. */
+ *  its note. `ref`: havdalah, in grey. */
 type ShabbosItem = { key: string; group: 'friday' | 'shabbos'; name: string; time: string; sub?: string | null; row?: Minyan }
 
 const capital = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
@@ -659,14 +659,14 @@ function weekShabbosItems(days: readonly { date: string; rows: Minyan[] }[], tod
 }
 
 /** A Shabbos box's lines under two small labels, Friday night and Shabbos,
- *  with candle lighting closing the first and havdalah the second, in grey
- *  in the same column (board 5e). */
+ *  havdalah closing the second in grey in the same column (board 5e). No
+ *  candle lighting, though the board drew it: the city's time, not the
+ *  shul's, and on the home page (the user, Oct 27, and again Nov 20). */
 function ShabbosRows({ items, anchors, marks = true }: { items: readonly ShabbosItem[]; anchors: AnchorTimes | undefined; marks?: boolean }) {
-  const candles = resolveAnchorTime({ anchor: 'candle_lighting' }, anchors)
   const havdalah = resolveAnchorTime({ anchor: 'havdalah' }, anchors)
   const groups = (
     [
-      ['friday', 'Friday night', candles ? { key: 'candles', group: 'friday', name: 'Candle lighting', time: candles } : null],
+      ['friday', 'Friday night', null],
       ['shabbos', 'Shabbos', havdalah ? { key: 'havdalah', group: 'shabbos', name: 'Havdalah', time: havdalah } : null],
     ] as const
   ).flatMap(([group, label, ref]) => {

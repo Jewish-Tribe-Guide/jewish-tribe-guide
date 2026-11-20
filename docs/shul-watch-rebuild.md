@@ -213,9 +213,8 @@ Decided while building, each a change to name:
   comes, and adding it is each box's own "Update their times" (the
   board's open question, "a new home"). Oct 26 had drawn a "Not on the
   guide yet" box with "Add this week's schedule".
-- **Candle lighting is back in This Shabbos**, as the board draws it, in
-  grey with havdalah. Oct 27 had taken it out ("the city's time, not the
-  shul's").
+- **No candle lighting**, though the board draws it: the user, Nov 20,
+  "don't want candle lighting", as on Oct 27. Havdalah stays, in grey.
 - **The usual weekday table has a row a day**, Sunday to Friday, as the
   board does; it used to merge days with the same times ("Mon, Thu").
 - **This Shabbos is dated, not named** ("Nov 21–22", not "Shabbos
