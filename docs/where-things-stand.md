@@ -932,11 +932,9 @@ Done (batch 3, nightly jobs, each red against the old code first):
   community (`?community=slug`), each answered at once and run in
   `after()` with its own 300s; the run lives in `src/lib/watchesRun.ts`.
   Each run is saved under its community (`job_run.community_id`,
-  **migration 101: not run on dev or live**; the dev SQL editor wanted a
-  sign-in). The Watches tab, look-again, main dishes, the nightly email
-  and Activity read their community's runs and the whole site's. Until
-  101 runs, every community's runs save and read as one list (the tab
-  shows Philly's and UES's watches runs side by side as "watches").
+  migration 101, run on dev and live by the user Nov 20). The Watches
+  tab, look-again, main dishes, the nightly email and Activity read
+  their community's runs and the whole site's.
   To check on the first live morning after deploy: each community's run
   shows in its own tab, and Vercel's log has no "run didn't start" (the
   call reaches the site through its own address; a 401 or a Vercel
