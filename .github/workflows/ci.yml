@@ -89,11 +89,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:coverage
@@ -115,11 +111,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
       - run: npm run test:integration
         env:
           TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
@@ -137,11 +129,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+          next-dist-dir: .next-e2e-3211
       # This job ran on a bare runner while every test here took only the
       # `request` fixture. That stopped being true when "an already-open tab
       # picks up an admin edit when it regains focus" was added — it takes
@@ -177,11 +167,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+          next-dist-dir: .next-e2e-3212
       # Unlike cache-roundtrip, this suite drives a real browser (filling in
       # and submitting the wizard). Browsers + OS deps are already in the
       # container image, so no `playwright install` step is needed here.
@@ -224,11 +212,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+          next-dist-dir: .next-e2e-3213
       # Drives a real browser (clicking Approve/Reject in ModerationQueue),
       # same as form-roundtrip — no `playwright install` step needed, see
       # container image above.
@@ -245,7 +231,7 @@ jobs:
           retention-days: 14
 
   e2e:
-    name: End-to-end tests (test project, ${{ matrix.shard }}/4)
+    name: End-to-end tests (test project, ${{ matrix.shard }}/6)
     # See "One copy of each test-project suite at a time" above.
     if: github.event_name != 'push'
     concurrency:
@@ -279,7 +265,11 @@ jobs:
     # cache-roundtrip/admin-write finish rather than also waiting on however
     # long form-roundtrip's own run takes.
     #
-    # Split four ways, each shard on its own runner (Oct 19). The suite runs
+    # Split six ways (four until Nov 20), each shard on its own runner
+    # (Oct 19). Playwright splits by test count, not time, and a skipped
+    # test counts, so four shards ran 150–208s of tests each; six, with the
+    # build cached (see .github/actions/setup), cost one more cold start
+    # each and take ~70s off the slowest. The suite runs
     # one test at a time per runner (playwright.config.ts's `workers` — a
     # 4-vCPU runner shared with the server and Chromium flaked with more),
     # so on one runner it took ~10 minutes, half of every PR's wait. Four
@@ -292,19 +282,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+          next-dist-dir: .next
       # Only the two engines the config actually uses (Desktop Chrome + Pixel 7
       # device emulation are both Chromium) — no `playwright install` step
       # needed, see container image above. It ships every engine, but we
       # only invoke Chromium via test:e2e.
-      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
+      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/6
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
@@ -339,11 +327,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
+      # No build cache: this build has production's values baked in, and
+      # its cache would be main's, which every PR's e2e build restores from.
+      - uses: ./.github/actions/setup
       - run: npm run test:e2e
         continue-on-error: true
         env:

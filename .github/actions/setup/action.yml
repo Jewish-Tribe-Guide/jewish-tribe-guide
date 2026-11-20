@@ -1,0 +1,53 @@
+name: Set up Node and packages
+description: >
+  Node 24, node_modules restored from the cache (npm ci only when the lock
+  file has changed), and, given a dist dir, Turbopack's build cache for it.
+
+# Why (Nov 20): every job spent 35–53s in `npm ci` and every build-and-start
+# suite ~60–75s in `next build`, on every run, with the same lock file. CI
+# took ~11 minutes, and the path a PR waits on (admin-write, then an e2e
+# shard) paid both twice.
+#
+# node_modules, not ~/.npm: restoring npm's download cache still leaves
+# `npm ci` to unpack and link ~840 MB. The key is the lock file, the OS and
+# Node's major version, so a dependency change misses and runs `npm ci`.
+# Bare runners and the Playwright image (both Ubuntu 24.04, x64, glibc)
+# share it: the native packages (swc, lightningcss, sharp, esbuild) pick the
+# same prebuilt binaries in both. `unit` runs on push to main too, so main
+# saves it and every PR's first run can restore it.
+#
+# Only `<dist>/cache/turbopack`, never all of `<dist>/cache`: the rest holds
+# fetch-cache, which a build could serve as data instead of reading the test
+# project. The suites using it don't run on main, so a PR's first run builds
+# cold and saves; its later pushes start warm. A new lock file starts cold.
+
+inputs:
+  next-dist-dir:
+    description: The build's dist dir (`.next`, or `.next-e2e-<port>` for the test-project suites). Empty for none.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 24
+
+    - id: modules
+      uses: actions/cache@v6
+      with:
+        path: node_modules
+        key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+
+    - if: steps.modules.outputs.cache-hit != 'true'
+      shell: sh
+      run: npm ci
+
+    - if: inputs.next-dist-dir != ''
+      uses: actions/cache@v6
+      with:
+        path: ${{ inputs.next-dist-dir }}/cache/turbopack
+        key: turbopack-${{ inputs.next-dist-dir }}-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+        restore-keys: |
+          turbopack-${{ inputs.next-dist-dir }}-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-

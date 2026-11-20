@@ -175,3 +175,53 @@ describe('test-project suites never run two copies at once', () => {
     expect(new Set(groups).size).toBe(groups.length)
   })
 })
+
+// Each build-and-start suite restores Turbopack's build cache for its own
+// dist dir (.github/actions/setup, Nov 20). A dist dir named wrong caches a
+// folder no build writes, and nothing fails: the job just builds cold again,
+// a minute a run, which is how a cache quietly stops paying. Derived from
+// each suite's Playwright config, so a moved port moves the expectation too.
+describe('each build restores its own build cache', () => {
+  const body = WORKFLOW.slice(WORKFLOW.indexOf('\njobs:'))
+  const jobs = Object.fromEntries(
+    body
+      .split(/\n {2}(?=[a-z][\w-]*:\n)/)
+      .slice(1)
+      .map((b) => [b.match(/^([\w-]+):/)![1], b] as const),
+  )
+  const ACTION = readFileSync('.github/actions/setup/action.yml', 'utf-8')
+
+  /** The dist dir a suite's build writes: run-test-project-server.mjs builds
+   *  into `.next-e2e-<port>`; the plain `npm run build` into `.next`. */
+  function distDirFor(script: string): string {
+    const config = SCRIPTS[script].match(/--config\s+(\S+)/)?.[1] ?? 'playwright.config.ts'
+    const src = readFileSync(config, 'utf-8')
+    if (!src.includes('run-test-project-server.mjs')) return '.next'
+    const port = src.match(/const PORT = process\.env\.CACHE_E2E_PORT \|\| '(\d+)'/)?.[1]
+    expect(port, `${config}: no default port found`).toBeDefined()
+    return `.next-e2e-${port}`
+  }
+
+  const building = Object.entries(jobs).flatMap(([name, block]) => {
+    const script = block.match(/npm run (test:[\w-]+)/)?.[1]
+    return script && testDirFor(script) ? [{ name, block, script }] : []
+  })
+
+  it('finds the build jobs at all', () => {
+    expect(building.length).toBeGreaterThanOrEqual(5)
+  })
+
+  for (const { name, block, script } of building) {
+    // Production's smoke build has production's values baked in, and its
+    // cache would be main's, which every PR's e2e build restores from.
+    const want = name === 'e2e-prod-smoke' ? '' : distDirFor(script)
+    it(`${name} caches ${want || 'no build'}`, () => {
+      expect(block).toContain('uses: ./.github/actions/setup')
+      expect(block.match(/next-dist-dir:\s*(\S+)/)?.[1] ?? '').toBe(want)
+    })
+  }
+
+  it('caches only Turbopack’s part, never the fetch cache beside it', () => {
+    expect(ACTION).toMatch(/path:\s*\$\{\{ inputs\.next-dist-dir \}\}\/cache\/turbopack\s*\n/)
+  })
+})
