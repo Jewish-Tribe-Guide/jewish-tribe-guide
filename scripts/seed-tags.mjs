@@ -4,6 +4,7 @@
 //
 //   node --env-file=.env.local scripts/seed-tags.mjs
 
+import { SEED_COMMUNITY } from './seedCommunity.mjs'
 import { createClient } from '@supabase/supabase-js'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -30,8 +31,8 @@ const ITEMS = [
   'Pareve Products',
 ]
 
-const tagRows = ITEMS.map((label) => ({ slug: slugify(label), label, group: GROUP }))
-const { error: tagErr } = await supabase.from('tag').upsert(tagRows, { onConflict: 'slug' })
+const tagRows = ITEMS.map((label) => ({ community_id: SEED_COMMUNITY, slug: slugify(label), label, group: GROUP }))
+const { error: tagErr } = await supabase.from('tag').upsert(tagRows, { onConflict: 'community_id,slug' })
 if (tagErr) {
   console.error('❌ tag upsert failed:', tagErr.message)
   process.exit(1)
@@ -44,6 +45,7 @@ console.log(`✅ Seeded ${tagRows.length} kosher-item tags.`)
 const { data: grocery, error: gErr } = await supabase
   .from('category')
   .select('fields')
+  .eq('community_id', SEED_COMMUNITY)
   .eq('id', 'grocery')
   .maybeSingle()
 if (gErr) {
@@ -64,7 +66,7 @@ if (!grocery) {
       renderAs: 'badge',
       help: 'Which kosher products can people find here?',
     })
-    const { error: upErr } = await supabase.from('category').update({ fields }).eq('id', 'grocery')
+    const { error: upErr } = await supabase.from('category').update({ fields }).eq('community_id', SEED_COMMUNITY).eq('id', 'grocery')
     if (upErr) {
       console.error('❌ could not update grocery fields:', upErr.message)
       process.exit(1)

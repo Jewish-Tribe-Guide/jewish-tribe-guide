@@ -22,6 +22,7 @@
 //
 //   node --env-file=.env.local scripts/seed-home-blocks.mjs
 
+import { SEED_COMMUNITY } from './seedCommunity.mjs'
 import { createClient } from '@supabase/supabase-js'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -54,6 +55,7 @@ const BUILT_INS = [
 const { data: existing, error: readErr } = await supabase
   .from('home_section')
   .select('id, community_id')
+  .eq('community_id', SEED_COMMUNITY)
   .in('id', BUILT_INS.map((b) => b.id))
 if (readErr) {
   console.error('❌ Seed failed:', readErr.message)
@@ -67,7 +69,7 @@ if (toInsert.length === 0) {
   process.exit(0)
 }
 
-const { error } = await supabase.from('home_section').upsert(toInsert, { onConflict: 'community_id,id' })
+const { error } = await supabase.from('home_section').upsert(toInsert.map((b) => ({ ...b, community_id: SEED_COMMUNITY })), { onConflict: 'community_id,id' })
 if (error) {
   console.error('❌ Seed failed:', error.message)
   process.exit(1)

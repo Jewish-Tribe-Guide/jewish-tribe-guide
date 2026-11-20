@@ -7,6 +7,7 @@
 //
 //   node --env-file=.env.local scripts/seed-forms.mjs
 
+import { SEED_COMMUNITY } from './seedCommunity.mjs'
 import { createClient } from '@supabase/supabase-js'
 import { forms } from '../src/data/forms.js'
 
@@ -25,6 +26,7 @@ if (forms.length === 0) {
 }
 
 const rows = forms.map((f) => ({
+  community_id: SEED_COMMUNITY,
   id: f.id,
   title: f.title,
   submit_label: f.submit_label,
@@ -33,7 +35,7 @@ const rows = forms.map((f) => ({
   steps: f.steps,
 }))
 
-const { error } = await supabase.from('form').upsert(rows, { onConflict: 'id' })
+const { error } = await supabase.from('form').upsert(rows, { onConflict: 'community_id,id' })
 if (error) {
   console.error('❌ Seed failed:', error.message)
   process.exit(1)

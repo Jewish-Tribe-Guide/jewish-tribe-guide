@@ -6,6 +6,7 @@
 //   #3 "Kosher Challah" added to the kosher-item vocabulary
 //   #4 restaurants get a "Kosher certification" field shown only when isKosher
 
+import { SEED_COMMUNITY } from './seedCommunity.mjs'
 import { createClient } from '@supabase/supabase-js'
 import { whatsappGroups } from '../src/data/resources.js'
 
@@ -21,19 +22,19 @@ const s = createClient(url, key, { auth: { persistSession: false } })
 {
   const { error } = await s
     .from('tag')
-    .upsert({ slug: 'kosher-challah', label: 'Kosher Challah', group: 'kosher_product' }, { onConflict: 'slug' })
+    .upsert({ community_id: SEED_COMMUNITY, slug: 'kosher-challah', label: 'Kosher Challah', group: 'kosher_product' }, { onConflict: 'community_id,slug' })
   if (error) throw new Error(`#3 tag: ${error.message}`)
   console.log('✅ #3 added "Kosher Challah" tag')
 }
 
 // ── #2 grocery kosherItems only when isKosher ─────────────────────────────────
 {
-  const { data } = await s.from('category').select('fields').eq('id', 'grocery').single()
+  const { data } = await s.from('category').select('fields').eq('community_id', SEED_COMMUNITY).eq('id', 'grocery').single()
   const fields = data.fields ?? []
   const f = fields.find((x) => x.key === 'kosherItems')
   if (f && !f.showIf) {
     f.showIf = { field: 'isKosher', equals: true }
-    const { error } = await s.from('category').update({ fields }).eq('id', 'grocery')
+    const { error } = await s.from('category').update({ fields }).eq('community_id', SEED_COMMUNITY).eq('id', 'grocery')
     if (error) throw new Error(`#2: ${error.message}`)
     console.log('✅ #2 grocery kosherItems now shows only when Kosher is checked')
   } else {
@@ -43,7 +44,7 @@ const s = createClient(url, key, { auth: { persistSession: false } })
 
 // ── #4 restaurant certification when isKosher ─────────────────────────────────
 {
-  const { data } = await s.from('category').select('fields').eq('id', 'restaurant').single()
+  const { data } = await s.from('category').select('fields').eq('community_id', SEED_COMMUNITY).eq('id', 'restaurant').single()
   const fields = data.fields ?? []
   if (!fields.some((x) => x.key === 'certification')) {
     fields.push({
@@ -54,7 +55,7 @@ const s = createClient(url, key, { auth: { persistSession: false } })
       placeholder: 'e.g. OU, Star-K, local Vaad',
       showIf: { field: 'isKosher', equals: true },
     })
-    const { error } = await s.from('category').update({ fields }).eq('id', 'restaurant')
+    const { error } = await s.from('category').update({ fields }).eq('community_id', SEED_COMMUNITY).eq('id', 'restaurant')
     if (error) throw new Error(`#4: ${error.message}`)
     console.log('✅ #4 restaurants now have a Kosher certification field (when Kosher)')
   } else {
@@ -66,6 +67,7 @@ const s = createClient(url, key, { auth: { persistSession: false } })
 {
   const { error: catErr } = await s.from('category').upsert(
     {
+      community_id: SEED_COMMUNITY,
       id: 'whatsapp',
       label: 'Community WhatsApp Group',
       plural_label: 'Community WhatsApp Groups',
@@ -77,14 +79,15 @@ const s = createClient(url, key, { auth: { persistSession: false } })
         { key: 'link', label: 'WhatsApp invite link', type: 'url', linkLabel: 'Join group', placeholder: 'https://chat.whatsapp.com/…' },
       ],
     },
-    { onConflict: 'id' },
+    { onConflict: 'community_id,id' },
   )
   if (catErr) throw new Error(`#1 category: ${catErr.message}`)
 
   // Migrate the previously-hardcoded groups, only if none exist yet.
-  const { count } = await s.from('resource').select('*', { count: 'exact', head: true }).eq('category', 'whatsapp')
+  const { count } = await s.from('resource').select('*', { count: 'exact', head: true }).eq('community_id', SEED_COMMUNITY).eq('category', 'whatsapp')
   if (!count) {
     const rows = whatsappGroups.map((g) => ({
+      community_id: SEED_COMMUNITY,
       category: 'whatsapp',
       name: g.name,
       anchor_id: 'community',

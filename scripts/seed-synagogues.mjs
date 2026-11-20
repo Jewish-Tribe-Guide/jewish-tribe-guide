@@ -9,6 +9,7 @@
 // Safe to re-run: upserts the category and skips existing synagogue rows
 // (matches by legacyId inside details). Does NOT touch other categories or rows.
 
+import { SEED_COMMUNITY } from './seedCommunity.mjs'
 import { createClient } from '@supabase/supabase-js'
 import { synagogues } from '../src/data/synagogues.js'
 import { categories } from '../src/data/categories.js'
@@ -53,7 +54,7 @@ async function geocode(address) {
 console.log('Upserting synagogue category…')
 const { error: catErr } = await supabase
   .from('category')
-  .upsert(SYNAGOGUE_CATEGORY, { onConflict: 'id' })
+  .upsert({ ...SYNAGOGUE_CATEGORY, community_id: SEED_COMMUNITY }, { onConflict: 'community_id,id' })
 if (catErr) {
   console.error('❌ Category upsert failed:', catErr.message)
   process.exit(1)
@@ -65,6 +66,7 @@ console.log('✅ Synagogue category upserted.')
 const { data: existing } = await supabase
   .from('resource')
   .select('id,details')
+  .eq('community_id', SEED_COMMUNITY)
   .eq('category', 'synagogue')
 
 const existingLegacyIds = new Set(
@@ -107,6 +109,7 @@ for (const s of synagogues) {
   }
 
   const row = {
+    community_id: SEED_COMMUNITY,
     category: 'synagogue',
     name: s.name,
     anchor_id: s.hospitalId ?? 'community',

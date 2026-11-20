@@ -923,7 +923,16 @@ Fix first:
    request asks again; the config's community only for a missing or empty
    table. Red 2/2 against the old code.
 6. **`community_id` still defaults to 'philly'** on 9 tables; 027 says
-   to drop it once a second community exists (checked).
+   to drop it once a second community exists (checked). **Built Nov 20**:
+   migration 104 drops it. Every insert in the site already named its
+   community; the setup, seed and import scripts didn't, and now all go
+   through `scripts/seedCommunity.mjs` (`COMMUNITY=<slug>`, default the
+   config's). Also fixed on the way: their upserts keyed on `id` alone
+   (already failing against the composite keys), and `FORCE=1 npm run
+   seed` deleted every community's listings, now only its own. The form
+   round-trip's test form names Philly. `noDefaultCommunity.test.ts`, red
+   3/3 against the old code. **To run: dev, then live (the user), after
+   this deploys.**
 7. **`Map.groupBy` takes down a shul listing on iOS before 17.4**
    (checked, `DaveningCard.tsx:396`), and the only error boundary is the
    root one, so the header goes too.

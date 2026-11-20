@@ -4,6 +4,7 @@
 //
 //   node --env-file=.env.local scripts/seed-upvotes.mjs
 
+import { SEED_COMMUNITY } from './seedCommunity.mjs'
 import { createClient } from '@supabase/supabase-js'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -19,6 +20,7 @@ const s = createClient(url, key, { auth: { persistSession: false } })
 const { data, error } = await s
   .from('category')
   .update({ upvotes_enabled: true })
+  .eq('community_id', SEED_COMMUNITY)
   .in('id', ['grocery', 'restaurant', 'hotel'])
   .select('id')
 if (error) {
