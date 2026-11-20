@@ -416,7 +416,9 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   computer home's hero and map, the map page's band) were `100vw` wide,
   so they ran under the scrollbar, lost half its width off the left, and
   made the page 8px wider than the window. They take the scrollbar off
-  now (`bleed-x` / `w-page`, measured by `src/lib/scrollbarWidth.ts`).
+  now (`bleed-x` / `w-page`, sized in `cqw` with <html> as the page's
+  container; first by a script measuring the scrollbar, which on CI read
+  0px on a category page and left it 8px too wide again).
   New `e2e/full-bleed.spec.ts`: red 6 of 6 on the old bands, 20 of 20 on
   the new.
 - Found Nov 17, not fixed: `FindResourcesConnected`'s `replace` sync (the
@@ -954,12 +956,46 @@ Done (batch 4, housekeeping, each red against the old code first):
 - **Option renames and field clears** write a category's listings ten
   at a time (`atMostAtOnce`), each scoped to its community.
 
+Done (batch 5, CI, Nov 20): a PR's run is 8–9 min, from 11.4.
+`.github/actions/setup` restores `node_modules` (keyed on the lock file;
+`npm ci` only on a miss) and each build's `<dist>/cache/turbopack` (not
+the fetch cache beside it; production's smoke build caches none), and
+e2e runs in six shards, not four. `ciWorkflow.test.ts` checks each build
+job caches its own dist dir. A PR's first run builds cold (the suites
+don't run on main, so there's no main cache to start from); its later
+pushes start warm. Two failures it turned up along the way:
+
+- `todo-scroll.spec.ts` failed 4 runs in 5 on CI, never locally. The
+  open area's link now leaves the scroll alone (`scroll={false}`), and
+  the test prints the window's scrolls if it fails again; not proven to
+  be the cause.
+- `full-bleed.spec.ts`: the bands' scrollbar script measured 0px on CI's
+  category page. The bands are sized in `cqw` now, no script; green on CI.
+
+Then, the user's steer (Nov 20): "a healthy system that is built right
+and is fast and can scale", no patches to hit a number. Two structural
+reasons CI is ~9 min, fixed in that order:
+
+1. **Built once** (done, Nov 20). The six e2e shards each built the app;
+   now `e2e-build` builds once in the shards' container, hands `.next`
+   over as an artifact, and the shards start it (`E2E_PREBUILT=1`), with
+   the build's settings by YAML anchor. Measured: build job 1.8 min (38s
+   building, warm), shards 2.5–3 min each (1.8–2.7 min of tests). No
+   wall-time gain yet: the build still waits for the write suites.
+2. **The write suites on rows of their own** (next). e2e (now e2e-build)
+   waits for cache-roundtrip and admin-write only because they change
+   rows e2e and the build read. With those suites on a community of
+   their own in the test project, the build starts at once and nothing
+   depends on job order; expected ~4.5 min (the slowest of: write suites
+   ~4 min, build + a shard ~4.3, unit ~4.2).
+
+Flakes seen this batch, to watch: `category-open.spec.ts` (a click asked
+the server once, the re-run passed), the mobile prefetch budget (once).
+`todo-scroll.spec.ts` has passed every run since its fix.
+
 Still to do:
 
-1. **CI** (11.4 min average): cache `node_modules` and `.next/cache`,
-   balance the e2e shards (skipped tests count toward a shard), about
-   8 min. About 5.5 needs the write suites on a community of their own,
-   so e2e stops waiting on them.
+1. **CI step 2**, above.
 
 For the user: two home tiles link straight to a Google image thumbnail
 and an iStock photo (Mikvah's is the iStock one, on live). Either can vanish,
