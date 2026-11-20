@@ -71,6 +71,12 @@ describe('adminRead / adminWrite', () => {
     expect(m.revalidatePublicContent).not.toHaveBeenCalled()
   })
 
+  // Nov 20: a save made every community's pages stale; it names its own now.
+  it('invalidates only the community the write was for', async () => {
+    await adminWrite(async () => json(200))(req())
+    expect(m.revalidatePublicContent).toHaveBeenCalledExactlyOnceWith({ communities: ['ues'] })
+  })
+
   it('invalidates before answering, so the next load is the new copy', async () => {
     const order: string[] = []
     m.revalidatePublicContent.mockImplementation(async () => void order.push('invalidated'))
@@ -87,6 +93,7 @@ describe('siteAdminWrite', () => {
     expect(m.resolveCommunity).not.toHaveBeenCalled()
     expect(handler).toHaveBeenCalledWith(expect.any(Request), { admin: { email: 'owner@x.co' } }, undefined)
     expect(m.revalidatePublicContent).toHaveBeenCalledTimes(1)
+    expect(m.revalidatePublicContent.mock.calls[0][0]?.communities, 'every community').toBeUndefined()
   })
 
   it('refuses a community admin who isn’t a site owner', async () => {

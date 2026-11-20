@@ -47,3 +47,12 @@ export function allCommunityTags(community: string): string[] {
     TAGS.changes(community),
   ]
 }
+
+/** On every public page of one community, and on nothing else's: getSiteSettings
+ *  carries it, and the community layout reads that for every screen under it.
+ *  Only the second pass of an admin save uses it (revalidateContent.ts): a
+ *  tag the first pass doesn't, as Next drops a repeat within one request, and
+ *  one that reaches only the saving community's pages, where the pattern
+ *  `_N_T_/[community]/layout` it replaces reached every community's.
+ *  Not in TAGS, so not in allCommunityTags: the first pass must not use it. */
+export const communityPagesTag = (community: string) => `community-pages:${community}`

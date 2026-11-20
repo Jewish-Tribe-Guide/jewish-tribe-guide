@@ -22,7 +22,7 @@ export async function contentVersion(community: string): Promise<string> {
   cacheLife('days')
   // The stored stamp when there is one (contentStamp.ts): what the page was
   // built with, compared below with what's current.
-  const stamp = await readContentStamp()
+  const stamp = await readContentStamp(community)
   if (stamp) return stamp
   return fingerprint(community)
 }
@@ -31,7 +31,7 @@ export async function contentVersion(community: string): Promise<string> {
  *  every server gives the same answer and it moves the moment a save does.
  *  Without migration 100, the cached fingerprint, as before. */
 export async function currentContentVersion(community: string): Promise<string> {
-  return (await readContentStamp()) ?? contentVersion(community)
+  return (await readContentStamp(community)) ?? contentVersion(community)
 }
 
 async function fingerprint(community: string): Promise<string> {

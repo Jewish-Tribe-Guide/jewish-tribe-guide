@@ -307,7 +307,7 @@ export const POST = adminWrite(async (request: Request, { community, admin }) =>
       // listing it changes drops the cache itself: the wrapper's pass is over.
       const started = await startMenuReading(community.slug, resourceId, url)
       after(() =>
-        readIt().then(async ({ wrote }) => { if (wrote) await revalidatePublicContent() }).catch(async (err) => {
+        readIt().then(async ({ wrote }) => { if (wrote) await revalidatePublicContent({ communities: [community.slug] }) }).catch(async (err) => {
           console.error('[admin/main-dishes] reading a menu link failed:', err)
           await saveMenuReading(community.slug, resourceId, { status: 'failed', sourceUrl: url, dishes: [], note: 'Saved as its menu link, but it couldn’t be read. Read it again.', model: null }).catch(() => {})
         }),

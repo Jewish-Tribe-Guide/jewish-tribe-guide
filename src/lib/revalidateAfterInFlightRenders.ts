@@ -1,4 +1,4 @@
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { after } from 'next/server'
 import { IN_FLIGHT_RENDER_GRACE_MS } from './inFlightRenderGrace'
 
@@ -64,5 +64,18 @@ export function revalidateRouteAfterInFlightRenders(routePattern: string, type: 
   after(async () => {
     await new Promise((resolve) => setTimeout(resolve, IN_FLIGHT_RENDER_GRACE_MS))
     revalidatePath(routePattern, type)
+  })
+}
+
+/** The same second pass by data tags rather than a route pattern: tags a
+ *  page entry carries and the caller's first pass didn't use (the dedupe
+ *  note above), expired outright as revalidatePath would. For one
+ *  community's pages, communityPagesTag (cacheTags.ts): the pattern
+ *  `/[community]` reaches every community's. */
+export function revalidateTagsAfterInFlightRenders(tags: string[]): void {
+  if (!tags.length) return
+  after(async () => {
+    await new Promise((resolve) => setTimeout(resolve, IN_FLIGHT_RENDER_GRACE_MS))
+    for (const tag of tags) revalidateTag(tag, { expire: 0 })
   })
 }
