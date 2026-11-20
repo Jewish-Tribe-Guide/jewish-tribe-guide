@@ -42,7 +42,6 @@ export function ErrorScreen({
             reliable escape hatch, which is the whole job of this button —
             `reset()` above is the soft option, and this is the one that works
             when the soft option doesn't. */}
-        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a
           href={home}
           className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"

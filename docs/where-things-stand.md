@@ -943,7 +943,13 @@ Fix first:
    made to throw: header kept and Go home `/philly`; without it, no header
    and Go home `/`. Not automated (it needs a page that always throws).
 8. **If Turnstile can't load, a contributor's Send never enables** and
-   nothing says why (hospital wifi, blockers).
+   nothing says why (hospital wifi, blockers). **Built Nov 20**: the
+   widget says "The spam check didn't load. Try again" after a failed
+   load, a script not there after 10s, or a challenge Cloudflare says
+   failed; a failed load is no longer kept, so Try again fetches it
+   again. Red 3/3 against the old widget. Seen in a real browser on
+   localhost, where Cloudflare refuses the check (600010), so local dev
+   shows the line on every form now.
 
 Soon:
 
