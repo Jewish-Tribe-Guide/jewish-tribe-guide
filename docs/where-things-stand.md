@@ -941,15 +941,22 @@ Done (batch 3, nightly jobs, each red against the old code first):
   protection page there would show as that). Two communities' runs can
   each read a site they share at the same moment; within one run, never.
 
-Still to do, in the user's order:
+Done (batch 4, housekeeping, each red against the old code first):
 
-1. **Housekeeping for growth**: the moderation History reads every
-   approved and rejected change ever (no limit); composite indexes on
-   `resource (community_id, status, category)`, `submission
-   (community_id, status, created_at)` and `vote (voter_token)` (a
-   migration: live needs a yes); per-category option renames write one
-   row at a time.
-2. **CI** (11.4 min average): cache `node_modules` and `.next/cache`,
+- **History fifty at a time** (`/api/admin/submissions`, Show older). It
+  read every decided change (live Philly: 1,253 approved), and on dev it
+  had stopped loading at all: every listing id went into one request,
+  refused as too long. Live, with more, likely the same (not checked:
+  needs the live admin).
+- **Migration 102, composite indexes** (listings by community, status
+  and category; To do; History; a browser's votes). **Not run on dev or
+  live**; nothing depends on it.
+- **Option renames and field clears** write a category's listings ten
+  at a time (`atMostAtOnce`), each scoped to its community.
+
+Still to do:
+
+1. **CI** (11.4 min average): cache `node_modules` and `.next/cache`,
    balance the e2e shards (skipped tests count toward a shard), about
    8 min. About 5.5 needs the write suites on a community of their own,
    so e2e stops waiting on them.
