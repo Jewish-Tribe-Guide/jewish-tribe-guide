@@ -51,7 +51,8 @@ export async function generateStaticParams() {
 export async function generateMetadata(props: LayoutProps<'/admin/[community]'>): Promise<Metadata> {
   const { community: slug } = await props.params
   const { community } = await resolveFromPath(slug)
-  return community ? { title: `Admin · ${community.name}` } : {}
+  // Never in a search result, whatever robots.txt says.
+  return community ? { title: `Admin · ${community.name}`, robots: { index: false, follow: false } } : {}
 }
 
 export default async function AdminLayout(props: LayoutProps<'/admin/[community]'>) {

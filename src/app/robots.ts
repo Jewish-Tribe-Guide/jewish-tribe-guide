@@ -11,9 +11,11 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      // The bare paths still redirect (see next.config.ts), so both the old
-      // and new (canonical, /philly-prefixed) URLs are blocked.
-      disallow: ['/admin', '/inbox', '/philly/admin', '/philly/inbox', '/api/'],
+      // Every community's, by wildcard (Google, Bing and the rest read `*`):
+      // until Nov 20 only Philly's were listed, so a second community's
+      // console was fair game. The bare paths are the superadmin console and
+      // the inbox.
+      disallow: ['/admin', '/inbox', '/*/admin', '/*/inbox', '/api/'],
     },
     sitemap: `${base}/sitemap.xml`,
   }
