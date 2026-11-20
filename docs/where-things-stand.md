@@ -935,7 +935,13 @@ Fix first:
    this deploys.**
 7. **`Map.groupBy` takes down a shul listing on iOS before 17.4**
    (checked, `DaveningCard.tsx:396`), and the only error boundary is the
-   root one, so the header goes too.
+   root one, so the header goes too. **Built Nov 20**: a plain `groupBy`
+   (`src/lib/groupBy.ts`); `browserSupport.test.ts` fails on any built-in
+   past Safari 16.4 (Next's build target), red 1/1 against the old card.
+   `[community]/error.tsx` shares the root's screen and keeps the header,
+   Go home going to the community. Checked in a real browser with a page
+   made to throw: header kept and Go home `/philly`; without it, no header
+   and Go home `/`. Not automated (it needs a page that always throws).
 8. **If Turnstile can't load, a contributor's Send never enables** and
    nothing says why (hospital wifi, blockers).
 
