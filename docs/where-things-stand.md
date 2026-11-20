@@ -898,23 +898,37 @@ with each page. The home is 90 KB compressed, and the admin-only keys are
 about 5% of it; the bulk is schedules and hours. A slim index for the
 home's search would be the real saving, later.
 
+Done (batch 2, saves, each red against the old code first):
+
+- A community admin's save makes only its own community stale: its
+  content tags, its own `content_stamp` row (`c:<slug>`, no migration;
+  a tab reads the later of it and `all`), and a second pass on
+  `community-pages:<slug>`, which the site settings read carries onto
+  every page of that community. Before, one save sent every community's
+  pages back to the database and told every open tab to re-render. The
+  site owner's routes, the nightly jobs and the manual revalidate still
+  reach every community. Default location invalidates the community list
+  itself (11 of 11 red).
+- An approval reads its category once (it read it 4 to 6 times), and its
+  independent last steps run side by side. Measured on the test project
+  from here: a new listing 1.0s → 0.6s (9 → 6 requests), an edit
+  1.35s → 0.8s (12 → 8). A category with tag fields saves more.
+- Approving a new listing answers before Google: the sync runs after the
+  response and refreshes the listings itself (2 of 2 red). Not timed:
+  the test project has no Google key.
+
 Still to do, in the user's order:
 
-1. **Saves.** An approval is 15–20 database trips one after another (the
-   category read up to 6 times; a new place waits on Google before the
-   screen answers). And every save expires every community's whole site
-   (`revalidatePublicContent` loops all communities; one `content_stamp`
-   row for all). Per community, and load once.
-2. **The nightly jobs per community**: the morning watches' AI caps and
+1. **The nightly jobs per community**: the morning watches' AI caps and
    220s are shared by all communities; the Google hours sync is one at a
    time.
-3. **Housekeeping for growth**: the moderation History reads every
+2. **Housekeeping for growth**: the moderation History reads every
    approved and rejected change ever (no limit); composite indexes on
    `resource (community_id, status, category)`, `submission
    (community_id, status, created_at)` and `vote (voter_token)` (a
    migration: live needs a yes); per-category option renames write one
    row at a time.
-4. **CI** (11.4 min average): cache `node_modules` and `.next/cache`,
+3. **CI** (11.4 min average): cache `node_modules` and `.next/cache`,
    balance the e2e shards (skipped tests count toward a shard), about
    8 min. About 5.5 needs the write suites on a community of their own,
    so e2e stops waiting on them.
@@ -1836,7 +1850,9 @@ The user's answers on Nov 10, evening, and what was done with them:
   way a changed time shows what it was. Two admin-write flakes seen while
   running it, each green alone: todo-scroll's resize line and
   category-open's no-request check. todo-scroll's "keeps the row you
-  clicked" failed once more on Nov 19 (562px off), green 3 of 3 alone.
+  clicked" failed once more on Nov 19 (562px off), green 3 of 3 alone,
+  and again Nov 20 under the full run ("the list came back somewhere
+  else"), green 4 of 4 alone. Third time: worth a look of its own.
 - **A shul's week read again with its notes only reworded files nothing**
   (fixed Nov 11, South Philadelphia Shtiebel). Its calendar is read twice
   a week, and the AI wrote "until 8:00 AM" one time and "until 8:00 AM;

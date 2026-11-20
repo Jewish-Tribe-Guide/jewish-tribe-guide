@@ -249,7 +249,14 @@ layout, any of them can show what its tags hold, and `_N_T_/[community]/layout`
 is a tag no first pass uses (it is on every page entry's `x-next-cache-tags`;
 checked in the build's `.meta` files). `revalidateRouteAfterInFlightRenders`
 takes the type now — `'page'` for the pages route's one route, `'layout'` for
-this. Why that target and not the alternatives:
+this. **Since Nov 20 that is only the all-communities path** (the site
+owner's routes, cron jobs, the manual revalidate). A community admin's save
+names its community, and its second pass expires `community-pages:<slug>`
+instead (`communityPagesTag`, set by `getSiteSettings`, so every page of that
+community carries it and no other's does), through
+`revalidateTagsAfterInFlightRenders`. A concrete `_N_T_/philly/layout` tag
+doesn't exist to target: page entries carry the pattern tags and their own
+exact path only. Why the pattern and not the alternatives:
 
 - `revalidatePath('/', 'layout')` would also reach `/`, `/offline`, `/inbox`
   and the `/icons` route's cached renders, none of which show admin content
