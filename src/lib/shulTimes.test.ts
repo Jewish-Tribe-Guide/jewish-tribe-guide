@@ -84,12 +84,16 @@ describe('a whole source', () => {
   })
 
   // The Shtiebel's calendar, Nov 19 dry run: next week's weekdays exactly
-  // their usual times, and nothing on the listing for that week yet.
-  it('the Shtiebel: a whole week that is only the usual times files nothing, unless a note says more', () => {
+  // their usual times, and nothing on the listing for that week yet. It is
+  // still put to the admin, said to be as usual; if that proves accurate,
+  // it may later go up on its own (the user, Nov 20).
+  it('the Shtiebel: a whole week that is only the usual times goes to the admin, marked as usual', () => {
     const fs = weekFrom([read(src('calendar', 'calendar'), 'schedule', WEEK, weekdayTimes())], ctx({ usual: USUAL }))
-    expect(part(fs, 'weekdays')).toEqual({ do: 'nothing', part: 'weekdays', reason: 'agrees' })
+    expect(part(fs, 'weekdays')).toMatchObject({ do: 'take', asUsual: true })
     const online = weekdayTimes().map((x) => (x.date === MON ? { ...x, notes: 'Online only' } : x))
-    expect(part(weekFrom([read(src('calendar', 'calendar'), 'schedule', WEEK, online)], ctx({ usual: USUAL })), 'weekdays')).toMatchObject({ do: 'take' })
+    const changed = part(weekFrom([read(src('calendar', 'calendar'), 'schedule', WEEK, online)], ctx({ usual: USUAL })), 'weekdays')
+    expect(changed).toMatchObject({ do: 'take' })
+    expect(changed).not.toHaveProperty('asUsual')
   })
 
   it('files nothing when it is the week we already have', () => {

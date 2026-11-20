@@ -40,6 +40,13 @@ describe('a finding as the week put on the listing', () => {
     expect(lines[schedules[0].id][0]).toBe('Their whole schedule for Shabbos')
   })
 
+  it('a whole week that is only the usual times tells the admin so', () => {
+    const calendar = page('schedule', WEEK, [t(FRI, 'kabbalas_shabbos', '4:30 PM'), t(SAT, 'shacharis', '9:00 AM'), t(SAT, 'mincha', '4:15 PM')])
+    const [, shabbos] = weekFrom([calendar], ctx())
+    const { lines } = withFindings([], [shabbos], ctx(), { now: NOW, newId })
+    expect(Object.values(lines)).toEqual([['Their whole schedule for Shabbos', 'The same as their usual times']])
+  })
+
   it('a highlight’s ask keeps the usual minyanim it doesn’t mention, on the days it shows', () => {
     const box = page('highlight', { from: FRI, to: SAT }, [t(FRI, 'kabbalas_shabbos', '5:00 PM')], { heading: 'This Shabbat' })
     const [, shabbos] = weekFrom([box], ctx())

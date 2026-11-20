@@ -78,7 +78,17 @@ export type WeekContext = {
 
 export type Finding =
   | { do: 'nothing'; part: Part; reason: 'same' | 'not read' | 'waiting' | 'agrees' }
-  | { do: 'take'; part: Part; times: DatedTime[]; from: SourceRead; quotes: string[] }
+  | {
+      do: 'take'
+      part: Part
+      times: DatedTime[]
+      from: SourceRead
+      quotes: string[]
+      /** Only the usual times, notes and all, with no week held: still put
+       *  to the admin, said to be as usual (the user, Nov 20: if it proves
+       *  accurate, it may go up on its own later). */
+      asUsual?: true
+    }
   | {
       do: 'ask'
       part: Part
@@ -226,10 +236,10 @@ function forPart(part: Part, reads: readonly SourceRead[], ctx: WeekContext): Fi
     const p = pickOf(ps)
     const rank = RANK.indexOf(p.read.source.kind)
     if (held && ps.some((x) => RANK.indexOf(x.read.source.kind) === rank && sameWeek(held.times, timesOf(x), ctx.zmanim))) return { do: 'nothing', part, reason: 'same' }
-    // With nothing held, a week that is only the usual times, notes and
-    // all, changes nothing a visitor sees (the Shtiebel's calendar, Nov 19).
-    if (!held && !p.cancelled.length && onlyUsual(p)) return { do: 'nothing', part, reason: 'agrees' }
-    return { do: 'take', part, times: timesOf(p), from: p.read, quotes: p.cancelled.map((c) => c.quote) }
+    // A week that is only the usual times still goes to the admin, marked
+    // so (the Shtiebel's calendar, Nov 19; the user, Nov 20).
+    const asUsual = !held && !p.cancelled.length && onlyUsual(p)
+    return { do: 'take', part, times: timesOf(p), from: p.read, quotes: p.cancelled.map((c) => c.quote), ...(asUsual ? { asUsual: true as const } : {}) }
   }
 
   // While the shul's newsletter is due to give this part, nothing else is

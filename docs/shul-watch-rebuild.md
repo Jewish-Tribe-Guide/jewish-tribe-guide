@@ -373,10 +373,12 @@ Found by the dry run on this code (Nov 19), and fixed:
   Shabbos morning's end two ways ("until 10:45 AM", "until 12:30 PM").
   The newest read won, so whichever page ran last filed. Now, if any
   source of the top rank gives the week we hold, nothing is filed.
-- **A whole week that is only the usual times files nothing** when no
-  week is held for it, notes included (an "Online only" week still
-  files). The Shtiebel's calendar filed next week's weekdays exactly as
-  usual. The same reasoning as Kesher Israel's short source.
+- **A whole week that is only the usual times still goes to the admin**,
+  with the line "The same as their usual times". Nov 19 it filed nothing;
+  the user, Nov 20: "let's actually have admin approval for it even if it
+  matches. If we see that it's accurate then that could be the first
+  exception down the road." A short source (a homepage listing the usual
+  times) still files nothing: it doesn't say anything about this week.
 - **Notes are compared by their words.** The reader gave Kol Tzedek's
   Shabbos morning note three ways from one feed ("In-Person" / "in
   person", "Torah Study" with and without "with Rabbi Mó", "Shacharit &"
@@ -388,11 +390,12 @@ Found by the dry run on this code (Nov 19), and fixed:
   their weeks. That is right for what the site has; if their newsletters
   are meant to be linked, that's a setup job, not code.
 
-With all three, the dry run on Nov 19 files four items for the week of
+With these, the dry run on Nov 19 filed four items for the week of
 Nov 22 across 13 shuls, each a real change: the Shtiebel's Shabbos (5:00
 PM Kabbalat Shabbat where the listing has candle lighting, a 4:00 Mincha),
 and Mikveh Israel's Thanksgiving Shacharis at 8:15 and its Friday
-Kabbalat Shabbat. The old watch filed 17 items since Nov 15.
+Kabbalat Shabbat. Since Nov 20, a week matching the usual times goes to
+To do too (the Shtiebel's weekdays), marked as usual. The old watch filed 17 items since Nov 15.
 
 Not yet: step 7's live data, step 8.
 

@@ -973,7 +973,10 @@ Still open:
   dry run re-run, the live data cleanup (needs the user's yes), then the
   listing's four boxes. Decided Nov 20: once a newsletter gives a week,
   it wins that part; a website change later that week files nothing ("No,
-  newsletter wins"). Kol Tzedek's and the Shtiebel's newsletters stay
+  newsletter wins"). Decided Nov 20 too: a calendar or newsletter week
+  that matches the usual times still goes to To do, marked "The same as
+  their usual times"; if those prove accurate, it may become the first
+  thing the watch posts on its own. Kol Tzedek's and the Shtiebel's newsletters stay
   watched as a backup. What follows is the history. A dated week is still compared
   with and filled from the usual times (`keepUncovered`, `dropListed`,
   `compareTimes` on weeks), because a week replaces its day and the

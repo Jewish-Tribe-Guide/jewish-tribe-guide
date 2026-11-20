@@ -139,7 +139,7 @@ const timeLine = (t: DatedTime) => `${TEFILLAH_LABELS[t.tefillah]} ${dateText(t.
 export function findingLines(f: Extract<Finding, { do: 'take' | 'ask' }>): string[] {
   const part = f.part === 'shabbos' ? 'Shabbos' : 'the weekdays'
   const heading = f.from.heading ? `, under “${f.from.heading}”` : ''
-  if (f.do === 'take') return [`Their whole schedule for ${part}${heading}`, ...f.quotes.map((q) => `They say: “${q}”`)]
+  if (f.do === 'take') return [`Their whole schedule for ${part}${heading}`, ...(f.asUsual ? ['The same as their usual times'] : []), ...f.quotes.map((q) => `They say: “${q}”`)]
   return [
     `${f.readAs}, for ${part}`,
     ...f.extra.map((t) => `Not usual: ${timeLine(t)}`),
