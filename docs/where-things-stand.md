@@ -999,6 +999,10 @@ Soon:
   candidates left were dead (nothing used them anywhere) and are gone,
   259 lines. `npm run knip` runs in CI's lint job and fails on a new
   unused file, export or dependency (checked with a planted export).
+  knip's Playwright plugin is off: it ran the write suites' configs,
+  which refuse to load without the test project's keys (CI's lint job
+  has none), so it listed every spec as unused. The specs and configs
+  are listed as entry points instead.
   Still open: stale comments (11 names that no longer exist).
 - Preview emails go out without [DEV] (checked); `.env.example` has
   never been committed, `.gitignore` drops it (checked).

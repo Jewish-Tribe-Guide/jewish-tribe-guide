@@ -6,6 +6,15 @@ import { installMockGeolocation } from './src/test/geolocationMock'
 import { installMockIntersectionObserver } from './src/test/intersectionObserverMock'
 import { afterEach, beforeAll, vi } from 'vitest'
 import { forgetConfirmed } from './src/lib/confirmedHere'
+import { configure } from '@testing-library/dom'
+
+// findBy*/waitFor wait 1s by default. CI runs the suite under coverage, where
+// a heavy component can take longer than that to open, and main's run failed
+// on exactly that (Nov 20: ModerationQueue's "1 of 2", 43 tests, 8.4s for
+// the file, green 5/5 locally). A wait shorter than the machine needs is a
+// budget, not a bug in the code under test (AGENTS.md). 5s, as Playwright's
+// expect: a real regression still fails, a few seconds later.
+configure({ asyncUtilTimeout: 5_000 })
 
 // next/dynamic loads a piece's code on first render, so a test would find it
 // missing for a moment. Here it loads with the file instead; see eagerDynamic.
