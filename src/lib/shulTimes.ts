@@ -1,5 +1,5 @@
 import type { Minyan, Tefillah, ZmanAnchor } from './davening'
-import { datesBetween, sameTime, weekdayOf, type DayZmanim } from './scheduleUpdate'
+import { datesBetween, sameTime, weekdayOf, type DayZmanim, type RegularReading } from './scheduleUpdate'
 
 // ── A shul's week: what its sources say, by the rule ──────────────────────────
 // docs/shul-watch-rebuild.md is the rule; this is it as code, pure, with no
@@ -237,4 +237,57 @@ export function weekFrom(reads: readonly SourceRead[], ctx: WeekContext): Findin
     .filter((r) => r.shape !== 'event')
     .map((r) => ({ ...r, times: r.times.filter((t) => t.tefillah !== 'other' && t.date >= ctx.week.from && t.date <= ctx.week.to) }))
   return PARTS.map((part) => forPart(part, counted, ctx))
+}
+
+/** A window no date falls in: a page with no dated times shows no day. */
+const SHOWS_NOTHING = { from: '9999-12-31', to: '0000-01-01' }
+
+/** A reader's reply as the rules take it, for one week.
+ *  - A newsletter is about its week, so a time it gives by weekday
+ *    ("Shacharis Mon–Fri 7:00") is that week's, on each of those days.
+ *    A page's undated times are its usual times, not a week: only its
+ *    dated ones count.
+ *  - It shows: an email, its week; a calendar or page, the window passed
+ *    in, else the dates the reading says it covers, else its dated times'.
+ *  - Its shape is what the reader said, else a calendar is a schedule, and
+ *    a page is one only when it lists every minyan for its days. */
+export function fromReading(
+  reading: RegularReading,
+  source: Source,
+  { week, shows, lastPosted }: { week: WeekContext['week']; shows?: SourceRead['shows']; lastPosted?: string },
+): SourceRead {
+  const dated = reading.times.filter((t) => t.date).map((t) => t.date!)
+  const window =
+    shows ??
+    (source.kind === 'newsletter'
+      ? week
+      : reading.from && reading.to
+        ? { from: reading.from, to: reading.to }
+        : dated.length
+          ? { from: dated.reduce((a, b) => (a < b ? a : b)), to: dated.reduce((a, b) => (a > b ? a : b)) }
+          : SHOWS_NOTHING)
+  const onDays = source.kind === 'newsletter' ? datesBetween(week.from, week.to).filter((d) => d >= window.from && d <= window.to) : []
+  const times: DatedTime[] = reading.times.flatMap((t) => {
+    const dates = t.date ? [t.date] : onDays.filter((d) => t.days.includes(weekdayOf(d)))
+    return dates.map((date) => ({
+      date,
+      tefillah: t.tefillah,
+      time: t.time,
+      ...(t.anchor ? { anchor: t.anchor } : {}),
+      ...(t.offsetMinutes != null ? { offsetMinutes: t.offsetMinutes } : {}),
+      ...(t.notes ? { notes: t.notes } : {}),
+      quote: t.quote,
+    }))
+  })
+  const shape: Shape = reading.shape ?? (source.kind === 'calendar' || reading.complete ? 'schedule' : 'highlight')
+  const heading = reading.heading ?? reading.title ?? undefined
+  return {
+    source,
+    shape,
+    ...(heading ? { heading } : {}),
+    shows: window,
+    ...(lastPosted ? { lastPosted } : {}),
+    times,
+    ...(reading.cancelled?.length ? { cancelled: reading.cancelled } : {}),
+  }
 }

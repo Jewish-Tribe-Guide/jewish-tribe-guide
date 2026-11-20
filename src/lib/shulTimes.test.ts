@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan, Tefillah } from './davening'
-import { pick, sameNote, weekFrom, type DatedTime, type Finding, type Part, type SourceKind, type SourceRead, type WeekContext } from './shulTimes'
+import type { ReadRegularTime, RegularReading } from './scheduleUpdate'
+import { fromReading, pick, sameNote, weekFrom, type DatedTime, type Finding, type Part, type SourceKind, type SourceRead, type WeekContext } from './shulTimes'
 
 // Each case here is a real one (docs/shul-watch-rebuild.md, "Steps" 3 and
 // "Cases from live"), from the Nov 5–19 To do items and the newsletters
@@ -210,5 +211,40 @@ describe('notes compared by what they say', () => {
       const calendar = read(src('calendar', 'calendar'), 'schedule', { from: SUN, to: FRI }, [t(THU, 'shacharis', '8:10 AM', { notes })])
       expect(part(weekFrom([calendar], ctx({ held: [{ part: 'weekdays', times: held }] })), 'weekdays')).toMatchObject({ do: 'nothing', reason: 'same' })
     }
+  })
+})
+
+describe('fromReading: a reader’s reply as the rules take it', () => {
+  const rt = (tefillah: Tefillah, days: ReadRegularTime['days'], time: string, extra: Partial<ReadRegularTime> = {}): ReadRegularTime => ({ id: `${tefillah}${time}`, tefillah, days, time, quote: `${tefillah} ${time}`, checked: true, ...extra })
+  const reading = (times: ReadRegularTime[], extra: Partial<RegularReading> = {}): RegularReading => ({ kind: 'week', complete: false, season: null, title: null, startsOn: null, from: null, to: null, times, ...extra })
+
+  it('BZBI: an email’s weekday times are that week’s, on each of those days', () => {
+    const r = fromReading(reading([rt('shacharis', ['mon', 'tue', 'thu'], '7:00 AM'), rt('maariv', ['sat'], '5:30 PM', { date: SAT })], { shape: 'schedule' }), src('email', 'newsletter'), { week: WEEK })
+    expect(r.shows).toEqual(WEEK)
+    expect(r.times.map((x) => `${x.date} ${x.tefillah}`)).toEqual([`${MON} shacharis`, `${TUE} shacharis`, `${THU} shacharis`, `${SAT} maariv`])
+  })
+
+  it('a page’s weekday times are its usual times, not this week: only dated ones count, and it shows their days', () => {
+    const r = fromReading(reading([rt('shacharis', ['mon'], '7:00 AM'), rt('kabbalas_shabbos', ['fri'], '4:30 PM', { date: FRI }), rt('shacharis', ['sat'], '9:00 AM', { date: SAT })]), src('home', 'page'), { week: WEEK })
+    expect(r.times.map((x) => x.date)).toEqual([FRI, SAT])
+    expect(r.shows).toEqual({ from: FRI, to: SAT })
+    expect(r.shape).toBe('highlight')
+  })
+
+  it('a page with nothing dated shows no day, so it says nothing', () => {
+    const r = fromReading(reading([rt('shacharis', ['mon'], '7:00 AM')], { complete: true }), src('home', 'page'), { week: WEEK })
+    expect(r.times).toEqual([])
+    expect(part(weekFrom([r], ctx({ usual: USUAL })), 'weekdays')).toMatchObject({ do: 'nothing', reason: 'not read' })
+  })
+
+  it('the shows window and last date passed in win; a calendar is a schedule; the reader’s shape, heading and cancellations carry over', () => {
+    const cal = fromReading(reading([]), src('cal', 'calendar'), { week: WEEK, shows: WEEK, lastPosted: '2026-12-01' })
+    expect(cal).toMatchObject({ shape: 'schedule', shows: WEEK, lastPosted: '2026-12-01', times: [] })
+    const page = fromReading(
+      reading([rt('shacharis', ['sat'], '9:00 AM', { date: SAT })], { from: THU, to: SAT, title: 'Shabbat Vayetze', shape: 'highlight', heading: 'This Shabbat', cancelled: [{ date: FRI, quote: 'No Kabbalat Shabbat' }] }),
+      src('home', 'page'),
+      { week: WEEK },
+    )
+    expect(page).toMatchObject({ shape: 'highlight', heading: 'This Shabbat', shows: { from: THU, to: SAT }, cancelled: [{ date: FRI }] })
   })
 })
