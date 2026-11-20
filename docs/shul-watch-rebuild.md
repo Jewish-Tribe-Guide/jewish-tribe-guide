@@ -16,8 +16,12 @@ not highlights" and "Shul watches, in short").
 3. **A source changes only what it covers.** A day missing from a part it
    gives has no minyan; a part it doesn't give, it says nothing about. We
    copy what it says.
-4. **Anything else is ignored**: a highlighted time, an events box, one
-   time on a homepage, a newsletter that features one service.
+4. **Less than a whole part** (a highlighted time, an events box, one
+   time on a homepage, Monday and Wednesday only) is set against the
+   usual times for that part. Every usual minyan there at its usual time:
+   taken as that part's week. Some there and agreeing: ignored, it says
+   nothing new. Anything extra, different or missing: sent to the admin
+   (see "Short sources", below).
 5. **On the site**, usual times and this week's are separate boxes and
    never mix. The this-week box shows the parts we have; with neither,
    there's no this-week box.
@@ -41,6 +45,23 @@ not highlights" and "Shul watches, in short").
   the listing's "Confirmed by" date.
 - A newsletter that skips a week: the usual times show, and Watches says
   "no email this week"; no To do item. Sons of Israel stays watched.
+- **Short sources** (the user, Nov 19). When a source gives less than a
+  whole part and differs from the usual times, nothing in it says whether
+  a missing minyan is cancelled or just not mentioned, and the usual
+  times may be the stale side (a shul's winter change is how Lower
+  Merion's calendar got filled from old times). So the watch doesn't
+  guess: the To do item says what is extra, different or missing, and
+  the admin decides. The usual times are compared here only to sort the
+  three cases, never to fill a week. Real newsletters never land here
+  (each gives whole parts); homepages and the odd short email do.
+- **The goal is for the watch to find the answer, the admin to check
+  it** (the user, Nov 19: "Admins are really just there to validate,
+  not to answer"). So each admin answer on a short source is kept with
+  the shul, the source and what was extra or missing, and once a
+  source's answers are consistent the watch proposes that answer itself
+  and the admin only approves it. Later, a source with "extreme
+  consistency" may skip approval. Not built in this rebuild beyond
+  keeping the answers.
 - **Holiday timetables** (Mekor's Tisha B'Av) are their own thing, maybe
   their own box. Not in this rebuild.
 - **Shabbos and the weekdays are the parts**, not the whole week, because
@@ -175,7 +196,9 @@ Each is tested, committed and pushed before the next.
    Hill's week read from the whole email, Monday Maariv included; Mekor's
    week dated by the email, not its stale heading; the Shtiebel's Shabbos email taken with its weekday usual times
    untouched; dated weekday times missing a day as no minyan that day;
-   the Little Shul's empty calendar week as no minyan; a newsletter and a calendar disagreeing about the week.
+   the Little Shul's empty calendar week as no minyan; a newsletter and a calendar disagreeing about the week;
+   a short source matching every usual minyan taken, one agreeing in part
+   ignored, and one with something extra or missing sent to the admin.
 4. **The page search prefers a calendar**, and the confirm rows are built.
 5. **A read-only dry run on the 14 live shuls**: what the new code would
    file, beside what the old code filed this week. Shown to the user
