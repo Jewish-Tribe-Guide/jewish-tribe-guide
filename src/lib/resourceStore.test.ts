@@ -389,6 +389,24 @@ describe('countCategoryFieldUsage', () => {
 })
 
 describe('clearCategoryFieldData', () => {
+  it('clears the listings ten at a time (Nov 20)', async () => {
+    const rows = Array.from({ length: 25 }, (_, i) => ({ id: `r${i}`, address: null, phone: '215-555-0100', details: {} }))
+    let going = 0
+    let most = 0
+    mockFrom.mockImplementation(() => {
+      if (mockFrom.mock.calls.length === 1) return chainable({ data: rows, error: null })
+      const b = chainable({ error: null })
+      b.then = (resolve: (v: unknown) => void) => {
+        going++
+        most = Math.max(most, going)
+        setTimeout(() => (going--, resolve({ error: null })), 1)
+      }
+      return b
+    })
+    expect(await clearCategoryFieldData('philly', 'synagogue', { phone: true })).toEqual({ updated: 25 })
+    expect(most).toBe(10)
+  })
+
   it('clears address plus its derived geo/placeId details together, leaving unrelated details alone', async () => {
     const rows = [
       {
@@ -548,6 +566,32 @@ describe('applyFieldOptionRenames', () => {
 
     expect(result).toEqual({ updated: 0 })
     expect(updateBuilder.update).not.toHaveBeenCalled()
+  })
+
+  // Nov 20: one write after another, a few hundred listings (Food) took
+  // long enough to risk the save timing out. Ten at a time now.
+  it('writes the listings ten at a time, each scoped to its community', async () => {
+    const rows = Array.from({ length: 25 }, (_, i) => ({ id: `r${i}`, details: { kosher: 'OU' } }))
+    let going = 0
+    let most = 0
+    const updates: Record<string, unknown>[] = []
+    mockFrom.mockImplementation(() => {
+      if (mockFrom.mock.calls.length === 1) return chainable({ data: rows, error: null })
+      const b = chainable({ error: null })
+      updates.push(b)
+      b.then = (resolve: (v: unknown) => void) => {
+        going++
+        most = Math.max(most, going)
+        setTimeout(() => (going--, resolve({ error: null })), 1)
+      }
+      return b
+    })
+
+    const result = await applyFieldOptionRenames('philly', 'synagogue', [{ fieldKey: 'kosher', oldValue: 'OU', newValue: 'Orthodox Union' }])
+
+    expect(result).toEqual({ updated: 25 })
+    expect(most).toBe(10)
+    expect(updates.every((b) => (b.eq as ReturnType<typeof vi.fn>).mock.calls.some(([col, v]) => col === 'community_id' && v === 'philly'))).toBe(true)
   })
 
   it('throws with the Supabase error message when a write fails', async () => {

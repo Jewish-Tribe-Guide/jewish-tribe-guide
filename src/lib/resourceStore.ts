@@ -1,4 +1,5 @@
 import { cacheLife, cacheTag } from 'next/cache'
+import { atMostAtOnce } from './atMostAtOnce'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import type { CategoryConfig } from './categories'
@@ -296,6 +297,11 @@ export async function countCategoryFieldUsage(
   return { address, phone, fields }
 }
 
+/** A category's listings are written this many at a time when a field is
+ *  cleared or an option renamed (Nov 20): one at a time, a few hundred
+ *  listings (Food) took long enough to risk the admin's save timing out. */
+const LISTING_WRITES_AT_ONCE = 10
+
 /** Actually clears the given field(s) from every listing in a category —
  *  irreversible. Called only after the admin has confirmed against the
  *  counts from `countCategoryFieldUsage`. Scoped to `community` for the same
@@ -314,7 +320,7 @@ export async function clearCategoryFieldData(
   if (error) throw new Error(`Failed to load existing listings: ${error.message}`)
 
   const rows = (data ?? []) as { id: string; address: string | null; phone: string | null; details: Record<string, unknown> }[]
-  let updated = 0
+  const writes: { id: string; update: Record<string, unknown> }[] = []
 
   for (const row of rows) {
     const update: { address?: null; phone?: null; details?: Record<string, unknown> } = {}
@@ -335,12 +341,14 @@ export async function clearCategoryFieldData(
     if (details) update.details = details
 
     if (Object.keys(update).length === 0) continue
-    const { error: updErr } = await supabase.from('resource').update(update).eq('id', row.id)
-    if (updErr) throw new Error(`Failed to clear data for a listing: ${updErr.message}`)
-    updated++
+    writes.push({ id: row.id, update })
   }
 
-  return { updated }
+  await atMostAtOnce(LISTING_WRITES_AT_ONCE, writes, async ({ id, update }) => {
+    const { error: updErr } = await supabase.from('resource').update(update).eq('community_id', community).eq('id', id)
+    if (updErr) throw new Error(`Failed to clear data for a listing: ${updErr.message}`)
+  })
+  return { updated: writes.length }
 }
 
 /** How many of a category's listings currently store the OLD value of a
@@ -393,7 +401,7 @@ export async function applyFieldOptionRenames(
   if (error) throw new Error(`Failed to load existing listings: ${error.message}`)
 
   const rows = (data ?? []) as { id: string; details: Record<string, unknown> }[]
-  let updated = 0
+  const writes: { id: string; details: Record<string, unknown> }[] = []
 
   for (const row of rows) {
     let details: Record<string, unknown> | null = null
@@ -410,11 +418,12 @@ export async function applyFieldOptionRenames(
         details[r.fieldKey] = r.newValue
       }
     }
-    if (!details) continue
-    const { error: updErr } = await supabase.from('resource').update({ details }).eq('id', row.id)
-    if (updErr) throw new Error(`Failed to migrate a listing's data: ${updErr.message}`)
-    updated++
+    if (details) writes.push({ id: row.id, details })
   }
 
-  return { updated }
+  await atMostAtOnce(LISTING_WRITES_AT_ONCE, writes, async ({ id, details }) => {
+    const { error: updErr } = await supabase.from('resource').update({ details }).eq('community_id', community).eq('id', id)
+    if (updErr) throw new Error(`Failed to migrate a listing's data: ${updErr.message}`)
+  })
+  return { updated: writes.length }
 }
