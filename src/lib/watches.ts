@@ -13,6 +13,7 @@
 
 import { KEYSTONE_LIST_URL } from './keystoneWatch'
 import type { PartGiven } from './timesParts'
+import type { SourceRead } from './shulTimes'
 
 export type WatchKind = 'keystone_list' | 'website'
 
@@ -103,6 +104,9 @@ export type WatchCheck = {
    *  changed (weeklyReadDue in listingPageRun.ts, Oct 26). Older checks
    *  hold the Sunday of the week read, which compares the same way. */
   readWeek?: string
+  /** A shul's page: what it read, as sources (shulTimes.ts), for the
+   *  shul's other pages to weigh beside theirs (shulPageRead.ts). */
+  shulReads?: SourceRead[]
 }
 
 export type ListRead = { updated: string | null; entries: unknown[] }

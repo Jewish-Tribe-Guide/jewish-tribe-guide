@@ -529,6 +529,9 @@ const SCHEDULE_FIELD_VISIBILITY: Record<keyof SpecialSchedule | keyof ScheduleMi
   // for has no minyan, or none at all that week (Oct 23). It takes the
   // usual times off, so the moderator sees it ("no minyan").
   whole: 'shown',
+  // A week that speaks for Shabbos or the weekdays only leaves the other
+  // half of Friday as it was (Nov 19), so the moderator sees which.
+  parts: 'shown',
   // Bookkeeping, not content.
   id: 'deliberately-hidden',
   // Set by the app when a week's times are applied, never typed by anyone:
@@ -569,6 +572,7 @@ const SCHEDULE_CHANGES: Record<string, [SpecialSchedule, SpecialSchedule]> = {
   season: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, season: 'winter' }] }],
   signUp: [baseSchedule, { ...baseSchedule, minyanim: [{ ...row, signUp: { link: 'https://chat.whatsapp.com/Mekor' } }] }],
   whole: [{ ...baseSchedule, kind: 'week' }, { ...baseSchedule, kind: 'week', whole: true }],
+  parts: [{ ...baseSchedule, kind: 'week' }, { ...baseSchedule, kind: 'week', parts: ['shabbos'] }],
 }
 
 function renderScheduleDiff(before: SpecialSchedule[] | undefined, after: SpecialSchedule[]) {

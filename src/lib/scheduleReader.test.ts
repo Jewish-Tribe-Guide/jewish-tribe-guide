@@ -562,3 +562,35 @@ describe('clipNote', () => {
     expect(clipNote('  following Kiddush ', 120)).toBe('following Kiddush')
   })
 })
+
+describe('what the shul watch asks besides the times (DESCRIBE)', () => {
+  const email = 'This Week at Kol Tzedek\nFriday: No Shabbat Services!\nShabbat morning 10:00 AM, hybrid'
+  const raw = {
+    kind: 'week',
+    complete: true,
+    from: '2026-10-09',
+    to: '2026-10-10',
+    shape: 'schedule',
+    heading: 'This Week at Kol Tzedek',
+    cancelled: [
+      { date: '2026-10-09', tefillah: null, quote: 'No Shabbat Services!' },
+      { date: '2026-10-10', tefillah: 'mincha', quote: 'Mincha is cancelled' },
+    ],
+    times: [{ tefillah: 'shacharis', date: '2026-10-10', time: '10:00 AM', quote: 'Shabbat morning 10:00 AM' }],
+  }
+
+  it('keeps the shape, the heading, and only cancellations in the message’s own words', () => {
+    const r = tidyRegularReading(raw, { text: email }, DAYS, id)
+    expect(r).toMatchObject({ shape: 'schedule', heading: 'This Week at Kol Tzedek', cancelled: [{ date: '2026-10-09', quote: 'No Shabbat Services!' }] })
+    expect(r.cancelled).toHaveLength(1)
+  })
+
+  it('says nothing of them when it wasn’t asked, and isn’t asked unless the watch asks', () => {
+    const plainRaw: Record<string, unknown> = { ...raw }
+    for (const k of ['shape', 'heading', 'cancelled']) delete plainRaw[k]
+    expect(tidyRegularReading(plainRaw, { text: email }, DAYS, id)).not.toHaveProperty('shape')
+    const system = (describe: boolean) => (regularMessages({ text: email }, DAYS, 'Kol Tzedek', { describe }) as { content: string }[])[0].content
+    expect(system(false)).not.toContain('"shape"')
+    expect(system(true)).toContain('"shape"')
+  })
+})

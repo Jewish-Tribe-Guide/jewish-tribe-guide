@@ -281,7 +281,17 @@ export function asRegularTime(tefillah: Tefillah, time: string): { time: string;
  *  start there, and a time on a day already past is left out. */
 export type ReadingDays = { today: string; sentOn?: string; days: { date: string; names: string[] }[] }
 
-export function regularMessages(source: ScheduleSource, { today, sentOn, days }: ReadingDays, shulName: string): unknown[] {
+/** What the shul watch asks besides the times (shulTimes.ts): what the
+ *  message is as a whole, the heading its times sit under, and what it
+ *  says outright isn't held. Asked only by the watch, so the paste box
+ *  and the old watch read as they did. */
+const DESCRIBE = `
+Also say what the message is, as a whole:
+- "shape": "schedule" when it sets out the shul's services: a calendar, a table or list of services by day, "Weekday Services", "Regular Minyan Times", "Shabbat schedule", this week's services. "highlight" when it picks out one or a few services among other news (a homepage box, "This Shabbat", "Join us Friday night"). "event" when it is about something other than the shul's own davening (a talk, a commemoration, a celebration, a class), even if it gives a time.
+- "heading": the heading its times sit under, copied exactly, else null.
+- "cancelled": each service it says outright is not held, in its own words: [{"date": "YYYY-MM-DD", "tefillah": "..." or null, "quote": "No Shabbat Services!"}], the date from the days above. A service it doesn't mention is not cancelled: leave it out. Else [].`
+
+export function regularMessages(source: ScheduleSource, { today, sentOn, days }: ReadingDays, shulName: string, { describe = false }: { describe?: boolean } = {}): unknown[] {
   const list = days.map((d) => `${d.date} (${dateText(d.date, { weekday: true })})${d.names.length ? `: ${d.names.join(', ')}` : ''}`).join('\n')
   const sent =
     sentOn && sentOn < today
@@ -318,8 +328,8 @@ Then "times", one entry per prayer time:
 - "quote": a few words copied exactly from the message where you read this time.
 - "unsure": when you can't tell what a time is for or which day it's on, say why in a few words. Otherwise leave it out.
 - Only times the message gives. Never add one it doesn't.
-
-Answer in JSON only: {"kind": "...", "complete": true, "season": null, "title": "...", "startsOn": null, "from": null, "to": null, "namesDates": false, "times": [{"tefillah": "...", "days": ["..."], "date": "...", "occasion": "...", "time": "...", "notes": "...", "season": "...", "signUp": true, "signUpLink": "...", "joinLink": "...", "where": "...", "quote": "...", "unsure": "..."}]}`
+${describe ? DESCRIBE : ''}
+Answer in JSON only: {"kind": "...", "complete": true, "season": null, "title": "...", "startsOn": null, "from": null, "to": null, "namesDates": false, ${describe ? '"shape": "...", "heading": "...", "cancelled": [], ' : ''}"times": [{"tefillah": "...", "days": ["..."], "date": "...", "occasion": "...", "time": "...", "notes": "...", "season": "...", "signUp": true, "signUpLink": "...", "joinLink": "...", "where": "...", "quote": "...", "unsure": "..."}]}`
   const intro = `The shul: ${shulName}. Its message:`
   const content = messageContent(intro, source)
   return [
@@ -487,7 +497,18 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
   // A week is its dated times: none, or more than 8 days, and it isn't one.
   if (kind === 'week' && (!from || !to || datesBetween(from, to).at(-1) !== to)) kind = 'schedule'
   const weekTimes = kind === 'week' ? times.filter((t) => t.date && t.date >= from! && t.date <= to!) : times
+  // What the shul watch asked besides (DESCRIBE): only when answered.
+  const shape = body.shape === 'schedule' || body.shape === 'highlight' || body.shape === 'event' ? body.shape : null
+  const cancelled = (Array.isArray(body.cancelled) ? body.cancelled : []).flatMap((c): NonNullable<RegularReading['cancelled']> => {
+    if (!c || typeof c !== 'object') return []
+    const x = c as Record<string, unknown>
+    const quote = typeof x.quote === 'string' ? x.quote.replace(/\s+/g, ' ').trim().slice(0, 160) : ''
+    const tefillah = TEFILLAH_ORDER.find((o) => o === x.tefillah)
+    if (typeof x.date !== 'string' || !ahead.has(x.date) || !quote || (text !== null && !text.includes(` ${plain(quote)} `))) return []
+    return [{ date: x.date, ...(tefillah ? { tefillah } : {}), quote }]
+  })
   return {
+    ...(shape ? { shape, heading: str(body.heading, 120), cancelled } : {}),
     kind,
     complete: body.complete === true,
     season: body.season === 'winter' || body.season === 'summer' ? body.season : null,
@@ -547,8 +568,14 @@ export async function readRegular(
   source: ScheduleSource,
   days: ReadingDays,
   shulName: string,
-  { apiKey, model = DEFAULT_READER_MODEL, fetchImpl = fetch, newId = () => crypto.randomUUID() }: { apiKey: string; model?: string; fetchImpl?: typeof fetch; newId?: () => string },
+  {
+    apiKey,
+    model = DEFAULT_READER_MODEL,
+    fetchImpl = fetch,
+    newId = () => crypto.randomUUID(),
+    describe = false,
+  }: { apiKey: string; model?: string; fetchImpl?: typeof fetch; newId?: () => string; describe?: boolean },
 ): Promise<RegularReading & { model: string }> {
-  const raw = await callReader(regularMessages(source, days, shulName), { apiKey, model, fetchImpl })
+  const raw = await callReader(regularMessages(source, days, shulName, { describe }), { apiKey, model, fetchImpl })
   return { ...tidyRegularReading(raw, source, days, newId), model }
 }

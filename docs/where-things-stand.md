@@ -967,8 +967,17 @@ it says otherwise:
 Still open:
 
 - **Shul watches, to be rewritten rather than patched** (the user, Nov
-  19: "I don't want patches anymore"). The plan, waiting on the user:
-  `docs/shul-watch-rebuild.md`. A dated week is still compared
+  19: "I don't want patches anymore"). The plan:
+  `docs/shul-watch-rebuild.md`. Nov 19: the nightly run is switched to
+  the new rule on `claude/next-round` (unmerged); still to do there: the
+  dry run re-run, the live data cleanup (needs the user's yes), then the
+  listing's four boxes. Decided Nov 20: once a newsletter gives a week,
+  it wins that part; a website change later that week files nothing ("No,
+  newsletter wins"). Decided Nov 20 too: a calendar or newsletter week
+  that matches the usual times still goes to To do, marked "The same as
+  their usual times"; if those prove accurate, it may become the first
+  thing the watch posts on its own. Kol Tzedek's and the Shtiebel's newsletters stay
+  watched as a backup. What follows is the history. A dated week is still compared
   with and filled from the usual times (`keepUncovered`, `dropListed`,
   `compareTimes` on weeks), because a week replaces its day and the
   reader takes one highlighted time as a week. Decided Nov 19: we post
@@ -982,8 +991,29 @@ Still open:
   40 a week for 14 shuls) left alone for now, to see if this brings
   them down. Newsletters read Nov 19 (a month of each, in the guide's
   Gmail): Society Hill, BZBI, Mekor and Kol Tzedek give the week; the
-  Shtiebel's gives Shabbos only, waiting on the user; Sons of Israel
+  Shtiebel's gives Shabbos only, which is taken (decided: Shabbos and
+  weekdays are separate parts, and a source changes only what it covers); Sons of Israel
   has sent nothing. Details in the plan.
+  **The shul listing is approved** (Nov 19, boards 5e–7e on canvas
+  KYnj9bnY5aY5qg7bp6ty5M: "ok so this is what I want"): four boxes,
+  This week (weekday grid) / This Shabbos / Usual weekday times / Usual
+  Shabbos times, each part shown once, the other folded; Shabbos first
+  after the last weekday minyan. The watch rebuild goes first (the user,
+  Nov 19: "watch first"), then the listing. Spec in the plan's "The
+  listing". Short sources decided Nov 19: less than a whole part is
+  looked at only when nothing whole covers that part that week; then
+  one matching every usual minyan is taken, and anything extra,
+  different or missing goes to the admin. Each admin
+  answer is kept so the watch can learn to propose it ("Admins are
+  really just there to validate, not to answer"). Also agreed Nov 19:
+  board 4's one-time setup is dropped; the watch picks one source per
+  part (calendar, newsletter, schedule page, then anything else) and the
+  admin checks it; and seven cases from live To do items go in as
+  tests (plan, "Cases from live"). Dry run done Nov 19 (plan, "Dry
+  run"): four wiring faults found and fixed. The user handed the rest to
+  Claude (Nov 19, "take it from here"): newsletter before calendar, and a
+  short source matching the usual times files nothing. Switch being built;
+  live data cleanup still needs the user's yes.
 - A listing list's scroll-to-a-row wait gives up after about 3 seconds
   and stops when the list goes away (`whenSettled`, Nov 19). It used to
   poll every 32ms forever for a row that never appeared, and one timer
