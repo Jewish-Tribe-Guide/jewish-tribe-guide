@@ -221,7 +221,9 @@ Decided while building, each a change to name:
   Vayeitzei"), and This week's box is titled "This week".
 - **A sunset time shows the rule until the day itself.** The site knows
   only today's sunset, so on a Tuesday "30 min before sunset" stays the
-  rule; the board drew 4:35 PM.
+  rule; the board drew 4:35 PM. As the site has done since Oct 6, and
+  kept so (the user, Nov 20: "keep it as is"): no lookup of Shabbos's
+  own sunset.
 - **A week whose days have all gone by has no box** (on Shabbos before
   havdalah), as before.
 - Kept from the site, not the board: Edit under each box (Oct 15), the
