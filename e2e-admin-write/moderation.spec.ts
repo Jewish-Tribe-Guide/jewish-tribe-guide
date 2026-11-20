@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 import type { ResourceSubmission } from '../src/types'
+import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives the REAL admin UI (ModerationQueue) through the approve/reject
@@ -52,8 +53,8 @@ test.afterEach(async () => {
     await supabase.from('resource').delete().eq('id', id)
   }
   for (const id of pendingCategoryIds.splice(0)) {
-    await supabase.from('resource').delete().eq('category', id).eq('community_id', 'philly')
-    await supabase.from('category').delete().eq('id', id).eq('community_id', 'philly')
+    await supabase.from('resource').delete().eq('category', id).eq('community_id', WRITE_SUITE_COMMUNITY)
+    await supabase.from('category').delete().eq('id', id).eq('community_id', WRITE_SUITE_COMMUNITY)
   }
 })
 
@@ -62,9 +63,7 @@ test.describe('signing out', () => {
   // with Supabase's default GLOBAL scope — every session for that email,
   // not just this browser tab (see GoTrueClient.signOut's own doc). Every
   // other test in this suite reuses ONE shared session (from
-  // e2e-admin-write/.auth/admin.json, minted once in auth.setup.ts for
-  // whichever email resolveDefaultCommunityAdminEmail resolves — on a
-  // SHARED_DEV_TEST_PROJECT setup that can be a real admin's own address).
+  // e2e-admin-write/.auth/admin.json, minted once in auth.setup.ts).
   // Signing out as that same email, from anywhere, revokes the shared
   // session out from under whichever tests are running alongside it —
   // confirmed the hard way: running this test in the same invocation as the
@@ -72,14 +71,14 @@ test.describe('signing out', () => {
   // tests fail, even from an independently-minted session for that email.
   //
   // Mints its own disposable admin instead — a throwaway address temporarily
-  // added to philly's admin_emails for the duration of one test — so signing
+  // added to the community's admin_emails for the duration of one test — so signing
   // it out can never touch the shared session or a real admin's other
   // devices. Cleaned up in afterEach like every other suite here that
   // borrows a real row (see AGENTS.md's testing notes on that pattern).
   test.use({ storageState: { cookies: [], origins: [] } })
 
   const disposableEmail = `e2e-signout-${randomUUID()}@test.invalid`
-  // undefined until the test actually reads philly's real admin_emails —
+  // undefined until the test actually reads the community's real admin_emails —
   // afterEach only restores it once that read has genuinely happened, so a
   // failure before the read can't overwrite the real list with [].
   let originalAdminEmails: string[] | undefined
@@ -87,7 +86,7 @@ test.describe('signing out', () => {
   test.afterEach(async () => {
     const supabase = getAdminClient()
     if (originalAdminEmails !== undefined) {
-      await supabase.from('community').update({ admin_emails: originalAdminEmails }).eq('slug', 'philly')
+      await supabase.from('community').update({ admin_emails: originalAdminEmails }).eq('slug', WRITE_SUITE_COMMUNITY)
     }
     const { data } = await supabase.auth.admin.listUsers()
     const user = data?.users.find((u) => u.email === disposableEmail)
@@ -102,14 +101,14 @@ test.describe('signing out', () => {
     const { data: community, error: communityError } = await admin
       .from('community')
       .select('admin_emails')
-      .eq('slug', 'philly')
+      .eq('slug', WRITE_SUITE_COMMUNITY)
       .single()
-    if (communityError || !community) throw new Error(`Could not read philly's admin_emails: ${communityError?.message}`)
+    if (communityError || !community) throw new Error(`Could not read ${WRITE_SUITE_COMMUNITY}'s admin_emails: ${communityError?.message}`)
     originalAdminEmails = (community.admin_emails as string[] | null) ?? []
     const { error: updateError } = await admin
       .from('community')
       .update({ admin_emails: [...originalAdminEmails, disposableEmail] })
-      .eq('slug', 'philly')
+      .eq('slug', WRITE_SUITE_COMMUNITY)
     if (updateError) throw new Error(`Could not add the disposable admin: ${updateError.message}`)
 
     const { error: createError } = await admin.auth.admin.createUser({ email: disposableEmail, email_confirm: true })
@@ -140,11 +139,11 @@ test.describe('signing out', () => {
       token_type,
       type: 'magiclink',
     })
-    // The Categories tab specifically (not /philly/admin, the moderation
+    // The Categories tab specifically (not the console's front page, the moderation
     // queue, which had its own Sign out button before this control moved
     // into AdminAuthGate) — every other admin tab had no sign-out control at
     // all.
-    await page.goto(`${baseURL}/philly/admin/categories#${hash.toString()}`)
+    await page.goto(`${baseURL}/${WRITE_SUITE_COMMUNITY}/admin/categories#${hash.toString()}`)
     await expect(page.getByText(/^Signed in as /)).toBeVisible()
 
     await page.getByRole('button', { name: 'Sign out' }).click()
@@ -164,6 +163,7 @@ test('clicking Approve on a pending listing makes it live', async ({ page }) => 
   const { data: submission, error } = await supabase
     .from('submission')
     .insert({
+      community_id: WRITE_SUITE_COMMUNITY,
       operation: 'create',
       target_type: 'listing',
       target_id: null,
@@ -178,7 +178,7 @@ test('clicking Approve on a pending listing makes it live', async ({ page }) => 
   pendingSubmissionIds.push(submission.id)
 
   // To do lists it as a row; it's decided opened.
-  await page.goto('/philly/admin')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin`)
   await page.getByRole('button', { name: `Open ${name}` }).click()
   const review = page.getByTestId('submission-review')
   await review.getByRole('button', { name: 'Approve', exact: true }).click()
@@ -210,7 +210,7 @@ test('opening a card, fixing the name and approving puts the fix live', async ({
   const categoryId = `e2e-review-${randomUUID().slice(0, 8)}`
   const { error: categoryError } = await supabase.from('category').insert({
     id: categoryId,
-    community_id: 'philly',
+    community_id: WRITE_SUITE_COMMUNITY,
     label: categoryId,
     plural_label: categoryId,
     fields: [],
@@ -223,6 +223,7 @@ test('opening a card, fixing the name and approving puts the fix live', async ({
   const { data: submission, error } = await supabase
     .from('submission')
     .insert({
+      community_id: WRITE_SUITE_COMMUNITY,
       operation: 'create',
       target_type: 'listing',
       target_id: null,
@@ -236,7 +237,7 @@ test('opening a card, fixing the name and approving puts the fix live', async ({
   if (error || !submission) throw new Error(`Could not seed the pending submission: ${error?.message}`)
   pendingSubmissionIds.push(submission.id)
 
-  await page.goto('/philly/admin')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin`)
   await page.getByRole('button', { name: `Open ${sent}` }).click()
   const review = page.getByTestId('submission-review')
   await expect(review).toBeVisible()
@@ -263,6 +264,7 @@ test('clicking Reject with a reason marks the submission rejected and creates no
   const { data: submission, error } = await supabase
     .from('submission')
     .insert({
+      community_id: WRITE_SUITE_COMMUNITY,
       operation: 'create',
       target_type: 'listing',
       target_id: null,
@@ -276,7 +278,7 @@ test('clicking Reject with a reason marks the submission rejected and creates no
   if (error || !submission) throw new Error(`Could not seed the pending submission: ${error?.message}`)
   pendingSubmissionIds.push(submission.id)
 
-  await page.goto('/philly/admin')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin`)
   await page.getByRole('button', { name: `Open ${name}` }).click()
   const review = page.getByTestId('submission-review')
   await review.getByRole('button', { name: 'Reject' }).click()
@@ -300,6 +302,7 @@ test('a left-out submission shows up in History, with its reason', async ({ page
   const { data: submission, error } = await supabase
     .from('submission')
     .insert({
+      community_id: WRITE_SUITE_COMMUNITY,
       operation: 'create',
       target_type: 'listing',
       target_id: null,
@@ -313,7 +316,7 @@ test('a left-out submission shows up in History, with its reason', async ({ page
   if (error || !submission) throw new Error(`Could not seed the pending submission: ${error?.message}`)
   pendingSubmissionIds.push(submission.id)
 
-  await page.goto('/philly/admin')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin`)
   await page.getByRole('button', { name: `Open ${name}` }).click()
   const review = page.getByTestId('submission-review')
   await review.getByRole('button', { name: 'Reject' }).click()
@@ -325,7 +328,7 @@ test('a left-out submission shows up in History, with its reason', async ({ page
   // The click-through this test actually exists to prove: Reports' History
   // row, then Rejected, and the submission just rejected is on it — the
   // real-world case is "did I actually leave that out?".
-  await page.goto('/philly/admin/metrics')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/metrics`)
   await page.getByRole('link', { name: /History/ }).click()
   await page.getByRole('link', { name: 'Rejected', exact: true }).click()
   await expect(page).toHaveURL(/\/admin\/history\/rejected/)

@@ -237,14 +237,13 @@ jobs:
     # identical builds. The same container as the shards, so the build's
     # paths are the paths they run it at.
     #
-    # After cache-roundtrip and admin-write, for e2e's reason (its comment):
-    # the build prerenders pages from the test project, so it must not read
-    # rows those suites are mid-way through changing.
+    # Starts with everything else (Nov 20). It prerenders philly, and the
+    # write suites change a community of their own, never philly (see
+    # e2e's comment), so there is nothing of theirs for it to wait for.
     if: github.event_name != 'push'
     concurrency:
       group: test-db-e2e-build
       cancel-in-progress: false
-    needs: [cache-roundtrip, admin-write]
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.63.0-noble
     timeout-minutes: 15
@@ -294,31 +293,19 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.63.0-noble
-    # Waits, through e2e-build, for cache-roundtrip and admin-write: both share
-    # this same TEST_SUPABASE_* project now that e2e points at it and both
-    # create/rename/delete categories and home-section rows — content e2e's
-    # own helpers (defaultCommunity, categoryWithListings) read via "pick
-    # some real category with listings", which can land on a temporary row
-    # one of them is mid-edit on (e.g. cache-roundtrip's "Cache Round-trip
-    # Seed" fixture), failing when it changes or vanishes underneath the
-    # assertion. Same underlying class of bug as 03c2e99; running after both
-    # removes it the same way. (A separate, now-fixed race used to force
-    # cache-roundtrip and admin-write to run sequentially too — see
-    # admin-write's own comment above. They run in parallel now, so this
-    # job's actual wait is max(cache-roundtrip, admin-write), not their sum —
-    # unlike that one, this row-contention race isn't fixed at the source,
-    # since e2e's helpers genuinely need real, varied seeded content rather
-    # than an isolated fixture of their own; ordering remains the fix here.)
+    # Runs beside cache-roundtrip and admin-write, on the same test project.
+    # It reads philly, the project's default community, and they change
+    # `e2e-writes`, a hidden community of their own
+    # (scripts/writeSuiteCommunity.mjs). Until Nov 20 they changed philly
+    # too, so e2e (and its build, which prerenders philly) had to wait for
+    # both to finish, and a PR's run was those two suites end to end. The
+    # `page` rows (About, Privacy) belong to no community and are still
+    # shared; e2e checks those pages' structure, never their words.
+    # src/test/suiteRows.test.ts fails if a write suite claims a row in
+    # philly or adds one with no community.
     #
-    # NOT form-roundtrip: it only creates/deletes form and submission rows
-    # (a seeded test form, its response), which nothing in e2e/ reads —
-    # api.spec.ts's own /api/admin/forms calls are unauthenticated requests
-    # against an id that can't exist, asserting they're refused before
-    # reaching the database, and offline.spec.ts's /api/requests probe just
-    # checks a GET to a write endpoint isn't cached, independent of what (if
-    # anything) it returns. Excluding it lets e2e start as soon as
-    # cache-roundtrip/admin-write finish rather than also waiting on however
-    # long form-roundtrip's own run takes.
+    # Nor form-roundtrip: it only creates/deletes form and submission rows
+    # (a seeded test form, its response), which nothing in e2e/ reads.
     #
     # Split six ways (four until Nov 20), each shard on its own runner
     # (Oct 19). Playwright splits by test count, not time, and a skipped

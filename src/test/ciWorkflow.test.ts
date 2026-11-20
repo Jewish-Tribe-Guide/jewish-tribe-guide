@@ -119,6 +119,13 @@ describe('a PR’s checks start at once and e2e is split', () => {
     })
   }
 
+  // The write suites change a community of their own (scripts/
+  // writeSuiteCommunity.mjs), so e2e's build has nothing to wait for. A
+  // `needs` back on them is the ~4 minutes this took off every PR (Nov 20).
+  it('e2e’s build starts at once, beside the write suites', () => {
+    expect(needs('e2e-build')).toBe('')
+  })
+
   it('e2e runs as shards, each running its own share', () => {
     const e2e = job('e2e')
     const shards = e2e.match(/shard:\s*\[([^\]]+)\]/)?.[1].split(',').map((s) => s.trim()) ?? []

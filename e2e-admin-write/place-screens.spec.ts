@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
+import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The screens inside a place are entries in the browser's history, each with
@@ -39,7 +40,7 @@ test.beforeAll(async () => {
   const s = db()
   const category = await s.from('category').insert({
     id: categoryId,
-    community_id: 'philly',
+    community_id: WRITE_SUITE_COMMUNITY,
     label: categoryId,
     plural_label: categoryId,
     fields: [{ key: 'minyanim', type: 'minyanim', label: 'Minyanim', renderAs: 'row' }],
@@ -49,14 +50,14 @@ test.beforeAll(async () => {
   if (category.error) throw new Error(`Could not seed the category: ${category.error.message}`)
   const place = await s
     .from('resource')
-    .insert({ community_id: 'philly', category: categoryId, name, anchor_id: 'community', address: '1 Test St, Philadelphia, PA', details: { minyanim }, status: 'approved' })
+    .insert({ community_id: WRITE_SUITE_COMMUNITY, category: categoryId, name, anchor_id: 'community', address: '1 Test St, Philadelphia, PA', details: { minyanim }, status: 'approved' })
     .select('id')
     .single()
   if (place.error) throw new Error(`Could not seed the listing: ${place.error.message}`)
   placeId = place.data.id
-  const eruv = await s.from('eruv').insert({ community_id: 'philly', id: eruvId, name: eruvName, active: true })
+  const eruv = await s.from('eruv').insert({ community_id: WRITE_SUITE_COMMUNITY, id: eruvId, name: eruvName, active: true })
   if (eruv.error) throw new Error(`Could not seed the eruv: ${eruv.error.message}`)
-  const pending = { community_id: 'philly', target_type: 'listing', note: null, status: 'pending', submitted_by: { name: 'e2e-admin-write suite' } }
+  const pending = { community_id: WRITE_SUITE_COMMUNITY, target_type: 'listing', note: null, status: 'pending', submitted_by: { name: 'e2e-admin-write suite' } }
   const sent = await s
     .from('submission')
     .insert([
@@ -71,9 +72,9 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   const s = db()
   if (submissions.length) await s.from('submission').delete().in('id', submissions)
-  await s.from('resource').delete().eq('community_id', 'philly').eq('category', categoryId)
-  await s.from('category').delete().eq('community_id', 'philly').eq('id', categoryId)
-  await s.from('eruv').delete().eq('community_id', 'philly').eq('id', eruvId)
+  await s.from('resource').delete().eq('community_id', WRITE_SUITE_COMMUNITY).eq('category', categoryId)
+  await s.from('category').delete().eq('community_id', WRITE_SUITE_COMMUNITY).eq('id', categoryId)
+  await s.from('eruv').delete().eq('community_id', WRITE_SUITE_COMMUNITY).eq('id', eruvId)
 })
 
 type Screen = { shows: Locator; open?: () => Promise<void>; close?: () => Promise<void> }
@@ -140,7 +141,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('a listing in Places: a box, then a minyan in it', async ({ page }) => {
-  await page.goto('/philly/admin/places')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/places`)
   await page.getByLabel('Find a place by name').fill(name)
   await page.getByRole('button', { name: `Open ${name}`, exact: true }).click()
   const back = () => visible(page, page.getByRole('button', { name: '‹ Back' })).first().click()
@@ -150,11 +151,11 @@ test('a listing in Places: a box, then a minyan in it', async ({ page }) => {
     { shows: page.getByRole('button', { name: 'Remove this minyan' }), open: () => page.getByRole('button', { name: /^7 AM/ }).click(), close: back },
   ])
   // Still on the place: its own Back is what leaves it.
-  await expect(page).toHaveURL(/\/philly\/admin\/places\?place=[^&]+$/)
+  await expect(page).toHaveURL(new RegExp(`/${WRITE_SUITE_COMMUNITY}/admin/places\\?place=[^&]+$`))
 })
 
 test('an eruv in Places: a row', async ({ page }) => {
-  await page.goto('/philly/admin/places')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/places`)
   await page.getByLabel('Find a place by name').fill(eruvName)
   await page.getByRole('button', { name: `Open ${eruvName}`, exact: true }).click()
   await walk(page, [
@@ -165,7 +166,7 @@ test('an eruv in Places: a row', async ({ page }) => {
 })
 
 test('a new place in To do: a box, then a minyan in it', async ({ page }) => {
-  await page.goto('/philly/admin')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin`)
   await page.getByRole('button', { name: `Open ${newName}`, exact: true }).click()
   const done = () => page.getByRole('button', { name: 'Done', exact: true }).click()
   await walk(page, [
@@ -173,17 +174,17 @@ test('a new place in To do: a box, then a minyan in it', async ({ page }) => {
     { shows: page.getByRole('button', { name: 'Add a minyan' }), open: () => page.getByRole('button', { name: /^Usual weekday times.*7 AM/ }).click(), close: done },
     { shows: page.getByRole('button', { name: 'Remove this minyan' }), open: () => page.getByRole('button', { name: /^7 AM/ }).click(), close: done },
   ])
-  await expect(page).toHaveURL(/\/philly\/admin\?open=[^&]+$/)
+  await expect(page).toHaveURL(new RegExp(`/${WRITE_SUITE_COMMUNITY}/admin\\?open=[^&]+$`))
 })
 
 test('a change in To do: a minyan in the box it changes', async ({ page }) => {
-  await page.goto('/philly/admin')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin`)
   await page.getByRole('button', { name: `Open ${name}`, exact: true }).click()
   await walk(page, [
     { shows: page.getByRole('button', { name: 'Change to 7:15 AM' }) },
     { shows: page.getByRole('button', { name: 'Remove this minyan' }), open: () => page.getByRole('button', { name: /^7:15 AM/ }).click(), close: () => page.getByRole('button', { name: 'Done', exact: true }).click() },
   ])
-  await expect(page).toHaveURL(/\/philly\/admin\?open=[^&]+$/)
+  await expect(page).toHaveURL(new RegExp(`/${WRITE_SUITE_COMMUNITY}/admin\\?open=[^&]+$`))
 })
 
 // One change screen (the admin review, Nov 18): what Read now finds on a
@@ -192,7 +193,7 @@ test('a change in To do: a minyan in the box it changes', async ({ page }) => {
 // change another way. Opened here by its address, as a reload of it would:
 // a Read now needs a watched source the test project hasn't got.
 test('a change found on a place in Places: To do’s screen, a minyan in it', async ({ page }) => {
-  await page.goto(`/philly/admin/places?place=${placeId}&found=${submissions[1]}`)
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/places?place=${placeId}&found=${submissions[1]}`)
   const decide = page.getByRole('group', { name: 'Decide' })
   await expect(decide.getByRole('button', { name: 'Change to 7:15 AM' })).toBeVisible({ timeout: 20_000 })
   await expect(decide.getByRole('button')).toHaveCount(2)
@@ -216,7 +217,7 @@ test('a change found on a place in Places: To do’s screen, a minyan in it', as
 // reload on the form is Find again, since what was typed isn't kept, and
 // the address says so in place. Writes nothing: nothing is added.
 test('Add a place: Find, the form, a row, a source over it', async ({ page }) => {
-  await page.goto('/philly/admin/places?add=synagogue')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/places?add=synagogue`)
   const find = page.getByLabel('Find the place')
   const form = visible(page, page.getByRole('button', { name: /^Usual weekday times/ }))
   const row = visible(page, page.getByRole('button', { name: 'Add a minyan' }))

@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 
 // The lists on Site → Home page are put in order by dragging (notes
 // 25-28): by the handle with a mouse, or on a phone by holding the row.
@@ -14,7 +15,7 @@ async function middle(l: Locator) {
 
 test('a row dragged by its handle lands where it is dropped', async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 })
-  await page.goto('/philly/admin/home')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/home`)
   await page.getByRole('group', { name: 'Show the page on' }).getByRole('button', { name: 'Phone' }).click()
   const tabs = page.getByRole('region', { name: 'Tabs' })
   const handles = tabs.getByRole('button', { name: /^Move / })
@@ -39,7 +40,7 @@ test('a row dragged by its handle lands where it is dropped', async ({ page }) =
 // bottom of the window scrolls the page, and stays under the pointer.
 test('a row held at the bottom of the window scrolls the page and stays under the pointer', async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 420 })
-  await page.goto('/philly/admin/home')
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/home`)
   await page.getByRole('group', { name: 'Show the page on' }).getByRole('button', { name: 'Phone' }).click()
   const tabs = page.getByRole('region', { name: 'Tabs' })
   const handle = tabs.getByRole('button', { name: /^Move / }).first()
@@ -72,7 +73,7 @@ test.describe('on a phone', () => {
   }
 
   test('holding a row lifts it to drag; a tap still opens it', async ({ page }) => {
-    await page.goto('/philly/admin/home')
+    await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/home`)
     await page.getByRole('group', { name: 'Show the page on' }).getByRole('button', { name: 'Phone' }).tap()
     const tabs = page.getByRole('region', { name: 'Tabs' })
     const rows = tabs.locator('[data-drag-row]')
@@ -121,7 +122,7 @@ test.describe('the home page cards', () => {
     // Tall enough that every drop lands on the page: a mouse let go off it
     // never ends the drag.
     await page.setViewportSize({ width: 1400, height: 1400 })
-    await page.goto('/philly/admin/home')
+    await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/home`)
     const box = page.getByRole('region', { name: 'Cards under the search' })
     await expect(box.getByRole('button', { name: /^Move / }).nth(1)).toBeVisible({ timeout: 20_000 })
     await box.scrollIntoViewIfNeeded()

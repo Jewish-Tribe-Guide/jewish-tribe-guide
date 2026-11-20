@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { defineConfig } from '@playwright/test'
+import { writeSuitePreviewCookie } from './scripts/writeSuiteCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The cache-round-trip suite (e2e-cache/) — a separate Playwright config from
@@ -89,7 +90,9 @@ export default defineConfig({
     ? [['dot'], ['html', { open: 'never', outputFolder: 'playwright-report-cache' }]]
     : 'list',
 
-  use: { baseURL: BASE_URL },
+  // Its community is hidden (scripts/writeSuiteCommunity.mjs); this is the
+  // cookie that opens its public pages, for `page` and `request` alike.
+  use: { baseURL: BASE_URL, storageState: { cookies: [writeSuitePreviewCookie(BASE_URL)], origins: [] } },
 
   projects: [
     { name: 'setup', testMatch: /auth\.setup\.ts/ },

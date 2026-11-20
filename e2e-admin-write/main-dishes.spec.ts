@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 import { changedByTests } from '../e2e/suiteRows'
+import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives a food place's menu on its kind's page for real (the Main dishes
@@ -43,7 +44,7 @@ const earlier = '2026-09-01T12:00:00.000Z'
 
 test.afterEach(async () => {
   const supabase = getAdminClient()
-  await supabase.from('menu_reading').delete().eq('community_id', 'philly').eq('resource_id', id)
+  await supabase.from('menu_reading').delete().eq('community_id', WRITE_SUITE_COMMUNITY).eq('resource_id', id)
   await supabase.from('resource').delete().eq('id', id)
 })
 
@@ -51,7 +52,7 @@ async function dishField() {
   const supabase = getAdminClient()
   const { error: missing } = await supabase.from('menu_reading').select('resource_id').limit(1)
   expect(missing?.message ?? null, 'needs migration 065 (menu_reading) on the test project').toBeNull()
-  const { data: cats } = await supabase.from('category').select('id, fields').eq('community_id', 'philly')
+  const { data: cats } = await supabase.from('category').select('id, fields').eq('community_id', WRITE_SUITE_COMMUNITY)
   return (cats as { id: string; fields: Field[] }[])
     .filter((c) => !changedByTests(c))
     .flatMap((c) => (c.fields ?? []).filter((f) => f.type === 'tags' && f.showCountInHeader && /\bdish$/i.test(f.countLabel ?? '')).map((f) => ({ c, f })))
@@ -77,7 +78,7 @@ async function noAiReads(page: Page) {
  *  it shows. */
 async function openPlace(page: Page, shows: string) {
   await noAiReads(page)
-  await page.goto(`/philly/admin/watches/place/${id}`)
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/watches/place/${id}`)
   const revalidated = await page.evaluate(async () => {
     const key = Object.keys(localStorage).find((k) => /^sb-.+-auth-token$/.test(k))
     const token = key ? (JSON.parse(localStorage.getItem(key)!) as { access_token?: string }).access_token : undefined
@@ -109,11 +110,11 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
 
   // Shawarma and Tofu were found on its menu before; Laffa was added by hand.
   const details = { website: 'https://menu.example.invalid', [f.key]: ['Shawarma', 'Tofu', 'Laffa'], itemMenu: { [f.key]: { Shawarma: earlier, Tofu: earlier } } }
-  expect((await supabase.from('resource').insert({ id, community_id: 'philly', category: c.id, name, status: 'approved', details })).error).toBeNull()
+  expect((await supabase.from('resource').insert({ id, community_id: WRITE_SUITE_COMMUNITY, category: c.id, name, status: 'approved', details })).error).toBeNull()
   expect(
     (
       await supabase.from('menu_reading').insert({
-        community_id: 'philly',
+        community_id: WRITE_SUITE_COMMUNITY,
         resource_id: id,
         status: 'proposed',
         source_url: sourceUrl,
@@ -150,7 +151,7 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
   // Its Dishes, with what the menu read made of the one added by hand (the
   // user, Oct 26: "see or know if the AI reader is picking things up").
   await expect(async () => {
-    await page.goto(`/philly/admin/watches/place/${id}`)
+    await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/watches/place/${id}`)
     await open.getByRole('button', { name: /more checked$/ }).click({ timeout: 3_000 })
     await expect(open.getByTestId('checked-mark')).toHaveText(['Laffa · Not found on its menu'], { timeout: 3_000 })
   }).toPass({ timeout: 20_000 })
@@ -166,7 +167,7 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
   expect(reading?.decided_by).toBeTruthy()
 
   // And the listing says so.
-  await page.goto(`/philly/${c.id}/${id}`)
+  await page.goto(`/${WRITE_SUITE_COMMUNITY}/${c.id}/${id}`)
   const dishes = page.getByTestId('listing-items')
   await expect(dishes).toContainText('Main dishes · 3', { timeout: 20_000 })
   await expect(dishes.getByRole('link', { name: 'Full menu' })).toHaveAttribute('href', sourceUrl)
@@ -179,11 +180,11 @@ test('Edit: the listing’s own dishes editor, started from the menu’s list, s
   const { c, f } = found!
 
   const details = { website: 'https://menu.example.invalid', [f.key]: ['Shawarma'], itemMenu: { [f.key]: { Shawarma: earlier } } }
-  expect((await supabase.from('resource').insert({ id, community_id: 'philly', category: c.id, name, status: 'approved', details })).error).toBeNull()
+  expect((await supabase.from('resource').insert({ id, community_id: WRITE_SUITE_COMMUNITY, category: c.id, name, status: 'approved', details })).error).toBeNull()
   expect(
     (
       await supabase.from('menu_reading').insert({
-        community_id: 'philly',
+        community_id: WRITE_SUITE_COMMUNITY,
         resource_id: id,
         status: 'proposed',
         source_url: sourceUrl,
@@ -229,11 +230,11 @@ test('a menu that can’t be read: Stop reading it, read again, then its menu li
   test.skip(!found, 'no category with a list of dishes on the test project')
   const { c } = found!
 
-  expect((await supabase.from('resource').insert({ id, community_id: 'philly', category: c.id, name, status: 'approved', details: { website: 'https://menu.example.invalid' } })).error).toBeNull()
+  expect((await supabase.from('resource').insert({ id, community_id: WRITE_SUITE_COMMUNITY, category: c.id, name, status: 'approved', details: { website: 'https://menu.example.invalid' } })).error).toBeNull()
   expect(
     (
       await supabase.from('menu_reading').insert({
-        community_id: 'philly',
+        community_id: WRITE_SUITE_COMMUNITY,
         resource_id: id,
         status: 'failed',
         source_url: 'https://menu.example.invalid',
@@ -260,7 +261,7 @@ test('a menu that can’t be read: Stop reading it, read again, then its menu li
   await expect.poll(reading).toBeNull()
 
   // Fail it again for the link.
-  await supabase.from('menu_reading').insert({ community_id: 'philly', resource_id: id, status: 'failed', source_url: null, note: 'Couldn’t read a menu on its website.', dishes: [] })
+  await supabase.from('menu_reading').insert({ community_id: WRITE_SUITE_COMMUNITY, resource_id: id, status: 'failed', source_url: null, note: 'Couldn’t read a menu on its website.', dishes: [] })
   const again = await openPlace(page, 'can’t be read')
   await again.getByTestId('problem').getByRole('button', { name: 'Give its menu page' }).click()
   await again.getByLabel('Its menu page').fill('menu.example.invalid/our-menu')

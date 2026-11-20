@@ -14,7 +14,7 @@ const categoryUpsert = fixture.slice(fixture.indexOf(".from('category').upsert("
 describe('the cache-roundtrip fixture category', () => {
   it('only the cache suite’s own server puts its name back; any other only creates it', () => {
     expect(fixture).toMatch(/const ownsFixture = process\.env\.CACHE_ROUNDTRIP_OWNS_FIXTURE === '1'/)
-    expect(categoryUpsert).toMatch(/\{ ignoreDuplicates: !ownsFixture \}\)\s*$/)
+    expect(categoryUpsert).toMatch(/\{ onConflict: 'community_id,id', ignoreDuplicates: !ownsFixture \}\)\s*$/)
   })
 
   it('the cache suite says it owns it; the others don’t', () => {

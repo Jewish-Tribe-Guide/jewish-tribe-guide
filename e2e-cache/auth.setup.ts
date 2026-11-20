@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { test as setup } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { resolveDefaultCommunityAdminEmail, mintMagicLinkSession } from '../scripts/cacheE2eAdmin.mjs'
+import { CACHE_TEST_ADMIN_EMAIL, mintMagicLinkSession } from '../scripts/cacheE2eAdmin.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mints a real admin session against the disposable test Supabase project,
@@ -12,11 +12,11 @@ import { resolveDefaultCommunityAdminEmail, mintMagicLinkSession } from '../scri
 // rather than driving a browser, so it just saves the access token to a
 // file instead of a full browser storageState.
 //
-// The email itself isn't fixed — see resolveDefaultCommunityAdminEmail's own
-// comment on why it has to be read from the community actually being
-// tested rather than assumed. It doesn't need to exist as a Supabase Auth
-// user beforehand either way — this creates it (idempotently, pre-confirmed)
-// on first run. generateLink with type 'magiclink' alone was tried first and
+// Always this suite's own admin: the community it tests lists it by name
+// (scripts/writeSuiteCommunity.mjs), so it never signs in as a real
+// community's admin, and never as the same person as admin-write. It
+// doesn't need to exist as a Supabase Auth user beforehand — this creates
+// it (idempotently, pre-confirmed) on first run. generateLink with type 'magiclink' alone was tried first and
 // turned out unreliable for a genuinely brand-new email on some Supabase
 // project configs (the returned link failed to redeem with "invalid or has
 // expired" even though it was used within the same second) — explicitly
@@ -36,7 +36,7 @@ setup('mint a cache-test admin session', async () => {
     )
   }
 
-  const testAdminEmail = await resolveDefaultCommunityAdminEmail(supabaseUrl, serviceRoleKey)
+  const testAdminEmail = CACHE_TEST_ADMIN_EMAIL
   const admin = createClient(supabaseUrl, serviceRoleKey)
 
   const { error: createError } = await admin.auth.admin.createUser({
