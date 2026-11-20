@@ -982,8 +982,7 @@ reasons CI is ~9 min, fixed in that order:
    the build's settings by YAML anchor. Measured: build job 1.8 min (38s
    building, warm), shards 2.5–3 min each (1.8–2.7 min of tests). No
    wall-time gain yet: the build still waits for the write suites.
-2. **The write suites on a community of their own** (built Nov 20,
-   CI timing to measure). cache-roundtrip and admin-write change
+2. **The write suites on a community of their own** (done, Nov 20). cache-roundtrip and admin-write change
    `e2e-writes`, a hidden community in the test project
    (`scripts/writeSuiteCommunity.mjs`: made by the test server on
    start, its shape copied once from philly, both suites' admins on its
@@ -995,8 +994,11 @@ reasons CI is ~9 min, fixed in that order:
    e2e-build waits again. Still shared: the About and Privacy rows, which
    belong to no community; e2e checks only those pages' structure.
    Local: cache-roundtrip 6/6, admin-write 58 passed, form-roundtrip 1/1.
-   Expected ~4.5 min a run (the slowest of: write suites ~4 min, build +
-   a shard ~4.3, unit ~4.2).
+   First CI run (44797579727), all green: **5.6 min**, from 8–9. Everything
+   starts at once; the build takes 2.1 min, the shards 2.6–3.5 after it,
+   admin-write 4.4 and unit 4.0 beside them. The slowest path is now the
+   build plus the slowest shard (5.6), with admin-write and unit a minute
+   under it.
    Left in the test project (it's also dev): philly still has the old
    `Cache Round-trip Seed` category and its `E2E Fixtures` section. Old
    code on other branches recreates them, so they go once those branches
@@ -1008,7 +1010,8 @@ the server once, the re-run passed), the mobile prefetch budget (once).
 
 Still to do:
 
-1. **CI step 2**: measure a PR run after the push.
+1. Nothing left in batch 5. Leftovers in the test project are listed
+   under step 2.
 
 For the user: two home tiles link straight to a Google image thumbnail
 and an iStock photo (Mikvah's is the iStock one, on live). Either can vanish,
