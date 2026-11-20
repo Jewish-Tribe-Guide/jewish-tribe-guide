@@ -125,7 +125,7 @@ jobs:
       group: test-db-cache-roundtrip
       cancel-in-progress: false
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.65.1-noble
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -163,7 +163,7 @@ jobs:
       group: test-db-form-roundtrip
       cancel-in-progress: false
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.65.1-noble
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -193,7 +193,7 @@ jobs:
       group: test-db-admin-write
       cancel-in-progress: false
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.65.1-noble
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
     # Used to need cache-roundtrip too (not just unit): both suites'
     # auth.setup.ts minted a session by calling generateLink + verifyOtp
     # against the SAME resolved admin email, and a fresh magic-link token
@@ -245,7 +245,7 @@ jobs:
       group: test-db-e2e-build
       cancel-in-progress: false
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.65.1-noble
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
     timeout-minutes: 15
     # The shards reuse these (env: *e2e-env), so what they test is what
     # was built: NEXT_PUBLIC_ values are fixed into the build.
@@ -297,7 +297,7 @@ jobs:
       group: test-db-e2e-${{ matrix.shard }}
       cancel-in-progress: false
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.65.1-noble
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
     # Runs beside cache-roundtrip and admin-write, on the same test project.
     # It reads philly, the project's default community, and they change
     # `e2e-writes`, a hidden community of their own
@@ -360,7 +360,7 @@ jobs:
     name: End-to-end tests (production, non-blocking)
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.65.1-noble
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
     needs: unit
     timeout-minutes: 15
     steps:
