@@ -310,7 +310,7 @@ export default function DaveningCard({
         rows.some((m) => m.season && isShabbosRow(m)),
         <Card key="shabbos" title={shabbosFold ? undefined : 'Usual Shabbos times'} testId="davening-shabbos" footer={foot('shabbos-usual', 'shabbos')} muted={!!shabbosFold}>
           {shabbosFold}
-          <ShabbosRows items={usualShabbosItems(shab.lines, anchors, today)} anchors={anchors} marks={!shab.lines.every((l) => l.row.signUp)} />
+          <ShabbosRows items={usualShabbosItems(shab.lines, anchors, today)} marks={!shab.lines.every((l) => l.row.signUp)} />
           <Notes lines={[shab.otherSeason]} />
           {!allSignUp &&
             signUpBoxes([...new Set(shab.lines.filter((l) => l.row.signUp).map((l) => l.row))], {
@@ -426,7 +426,7 @@ export default function DaveningCard({
       testId="davening-this-shabbos"
       footer={postFootFor(shabbosPost, 'this-shabbos', shabbosDays)}
     >
-      <ShabbosRows items={weekShabbosItems(shabbosDays, todayDate, anchors)} anchors={anchors} marks={!shabbosRows.every((m) => m.signUp)} />
+      <ShabbosRows items={weekShabbosItems(shabbosDays, todayDate, anchors)} marks={!shabbosRows.every((m) => m.signUp)} />
       {!allSignUp &&
         signUpBoxes(
           shabbosRows.filter((m) => m.signUp),
@@ -619,7 +619,7 @@ function WeekTable({ table, today, marks = true }: { table: NonNullable<ReturnTy
 
 /** One line of a Shabbos box (board 5e, Nov 19): a name, a time lined up
  *  on the right, and under the name in grey the rule a zman sets it by or
- *  its note. `ref`: havdalah, in grey. */
+ *  its note. */
 type ShabbosItem = { key: string; group: 'friday' | 'shabbos'; name: string; time: string; sub?: string | null; row?: Minyan }
 
 const capital = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
@@ -658,20 +658,19 @@ function weekShabbosItems(days: readonly { date: string; rows: Minyan[] }[], tod
   })
 }
 
-/** A Shabbos box's lines under two small labels, Friday night and Shabbos,
- *  havdalah closing the second in grey in the same column (board 5e). No
- *  candle lighting, though the board drew it: the city's time, not the
- *  shul's, and on the home page (the user, Oct 27, and again Nov 20). */
-function ShabbosRows({ items, anchors, marks = true }: { items: readonly ShabbosItem[]; anchors: AnchorTimes | undefined; marks?: boolean }) {
-  const havdalah = resolveAnchorTime({ anchor: 'havdalah' }, anchors)
+/** A Shabbos box's lines under two small labels, Friday night and Shabbos
+ *  (board 5e). No candle lighting or havdalah, though the board drew them
+ *  in grey: the city's times, not the shul's, and on the home page (the
+ *  user, Oct 27, and again Nov 20). */
+function ShabbosRows({ items, marks = true }: { items: readonly ShabbosItem[]; marks?: boolean }) {
   const groups = (
     [
-      ['friday', 'Friday night', null],
-      ['shabbos', 'Shabbos', havdalah ? { key: 'havdalah', group: 'shabbos', name: 'Havdalah', time: havdalah } : null],
+      ['friday', 'Friday night'],
+      ['shabbos', 'Shabbos'],
     ] as const
-  ).flatMap(([group, label, ref]) => {
+  ).flatMap(([group, label]) => {
     const own = items.filter((i) => i.group === group)
-    return own.length ? [{ group, label, items: own, ref }] : []
+    return own.length ? [{ group, label, items: own }] : []
   })
   return (
     <div data-testid="davening-shabbos-lines">
@@ -689,12 +688,6 @@ function ShabbosRows({ items, anchors, marks = true }: { items: readonly Shabbos
               <span className="text-right font-bold whitespace-nowrap text-slate-900 tabular-nums">{i.time}</span>
             </div>
           ))}
-          {g.ref && (
-            <div className="flex items-baseline justify-between gap-3.5 border-t border-slate-100 px-2 py-2 text-[13.5px] text-slate-500" data-testid="davening-zman">
-              <span>{g.ref.name}</span>
-              <span className="text-right whitespace-nowrap tabular-nums">{g.ref.time}</span>
-            </div>
-          )}
         </div>
       ))}
     </div>
@@ -825,7 +818,7 @@ export function UsualTimes({ minyanim }: { minyanim: unknown }) {
       {shab && (
         <>
           <p className="mt-2 text-[12px] font-extrabold uppercase tracking-wide text-muted">Usual Shabbos times</p>
-          <ShabbosRows items={usualShabbosItems(shab.lines, undefined, null)} anchors={undefined} marks={false} />
+          <ShabbosRows items={usualShabbosItems(shab.lines, undefined, null)} marks={false} />
         </>
       )}
     </div>

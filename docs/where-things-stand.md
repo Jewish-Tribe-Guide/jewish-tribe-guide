@@ -974,7 +974,7 @@ Still open:
   the user's yes). The listing's four boxes are BUILT Nov 20 on
   `claude/shul-listing`, stacked on PR 399; the changes it makes to
   earlier decisions (no waiting box, a row a day; candle
-  lighting left out though the board drew it, Nov 20) are listed in the plan's "The listing". Decided Nov 20: once a newsletter gives a week,
+  lighting and havdalah left out though the board drew them, Nov 20) are listed in the plan's "The listing". Decided Nov 20: once a newsletter gives a week,
   it wins that part; a website change later that week files nothing ("No,
   newsletter wins"). Decided Nov 20 too: a calendar or newsletter week
   that matches the usual times still goes to To do, marked "The same as
