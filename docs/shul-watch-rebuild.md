@@ -30,6 +30,17 @@ not highlights" and "Shul watches, in short").
   day on the confirmed calendar with nothing has no minyan. The old guess
   (`calendarIsWhole`, which checked the calendar against the usual times)
   goes.
+- **A newsletter's regular times are that week's** (BZBI's "Regular
+  Minyan Times"): the shul said this week that those are the times, so
+  each week's email gives a dated weekday part, even when it matches the
+  last one. A week's changes written as sentences (Thanksgiving, Rosh
+  Chodesh) are applied to it, and the To do item quotes the sentence.
+- **Zoom and online-only minyanim are listed, marked Zoom** (BZBI's
+  Tue/Wed/Fri, Society Hill's Monday Maariv, Kol Tzedek's online weeks).
+- **One To do item per email**, both parts inside; its approval date is
+  the listing's "Confirmed by" date.
+- A newsletter that skips a week: the usual times show, and Watches says
+  "no email this week"; no To do item. Sons of Israel stays watched.
 - **Holiday timetables** (Mekor's Tisha B'Av) are their own thing, maybe
   their own box. Not in this rebuild.
 - **Shabbos and the weekdays are the parts**, not the whole week, because
