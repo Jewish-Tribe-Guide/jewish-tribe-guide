@@ -118,23 +118,28 @@ function sameName(a: Tefillah, b: Tefillah): boolean {
   return a === b || ((COMBINED.includes(a) || COMBINED.includes(b)) && EVENING.includes(a) && EVENING.includes(b))
 }
 
-/** A note's parts as it says them: lower case, "only" and AM/PM dropped,
- *  split where it lists. */
-function noteParts(note: string | undefined): string[] {
+/** Words that say nothing a note needs: joiners, "only", and the
+ *  tefillah's own name ("Shacharit & Torah Study"). */
+const NOTE_FILLER = new Set(['only', 'and', 'with', 'the', 'a', 'an', 'of', 'shacharit', 'shacharis'])
+
+/** A note's words as it says them: lower case, AM/PM dropped, hyphens as
+ *  spaces ("In-Person" is "in person"), the filler left out. */
+function noteWords(note: string | undefined): string[] {
   return (note ?? '')
     .toLowerCase()
     .replace(/\b(\d{1,2}:\d{2})\s*(am|pm)\b/g, '$1')
-    .split(/[;,.()\n]+/)
-    .map((f) => f.replace(/\bonly\b/g, '').replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
+    .split(/[^\p{L}\p{N}:]+/u)
+    .filter((w) => w && !NOTE_FILLER.has(w))
 }
 
-/** Whether `now` says nothing `was` doesn't: the same parts, reordered,
+/** Whether `now` says nothing `was` doesn't: only words it has, reordered,
  *  restated ("Online only"), or some dropped. Rodeph Shalom's Thursday
- *  note came four ways in one week (Nov 5–12) and was filed each time. */
+ *  note came four ways in one week (Nov 5–12) and was filed each time;
+ *  Kol Tzedek's Shabbos morning three ways from one feed (Nov 19). A new
+ *  word is a change: "Not in person", "until 1:30". */
 export function sameNote(was: string | undefined, now: string | undefined): boolean {
-  const had = new Set(noteParts(was))
-  return noteParts(now).every((f) => had.has(f))
+  const had = new Set(noteWords(was))
+  return noteWords(now).every((w) => had.has(w))
 }
 
 /** Whether a week read is the one we hold: each time once, the same

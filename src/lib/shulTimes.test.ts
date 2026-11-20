@@ -231,7 +231,16 @@ describe('notes compared by what they say', () => {
     expect(sameNote(undefined, '')).toBe(true)
   })
 
+  // Kol Tzedek's Shabbos morning, read three ways from one feed (Nov 19).
+  it('Kol Tzedek: the same words, hyphened, shortened or with the tefillah named, is one note', () => {
+    const held = 'Masked; In-Person; until 12:30 PM; Torah Study with Rabbi Mó'
+    expect(sameNote(held, 'Masked; in person; Torah Study; until 12:30 PM')).toBe(true)
+    expect(sameNote(held, 'Masked; in-person; until 12:30 PM; Shacharit & Torah Study with Rabbi Mó')).toBe(true)
+  })
+
   it('a note that says something new is a change', () => {
+    expect(sameNote('In person', 'Not in person')).toBe(false)
+    expect(sameNote('until 12:30 PM', 'until 1:30 PM')).toBe(false)
     expect(sameNote('Hybrid', 'Online only')).toBe(false)
     expect(sameNote('Online', 'Online; Celebrating the Bar Mitzvah of Sam')).toBe(false)
     expect(sameNote(undefined, 'Zoom')).toBe(false)

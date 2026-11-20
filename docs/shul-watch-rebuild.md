@@ -375,11 +375,22 @@ Found by the dry run on this code (Nov 19), and fixed:
   week is held for it, notes included (an "Online only" week still
   files). The Shtiebel's calendar filed next week's weekdays exactly as
   usual. The same reasoning as Kesher Israel's short source.
+- **Notes are compared by their words.** The reader gave Kol Tzedek's
+  Shabbos morning note three ways from one feed ("In-Person" / "in
+  person", "Torah Study" with and without "with Rabbi Mó", "Shacharit &"
+  in front). A note using only words the held one has says nothing new; a
+  new word ("Not", a new end time) is a change.
 - **On live, only BZBI, Mekor and Society Hill have newsletter weeks.**
   Kol Tzedek's newsletter has sent nothing to the watch since Oct 8, and
   the Shtiebel's one email was rejected, so their calendars speak for
   their weeks. That is right for what the site has; if their newsletters
   are meant to be linked, that's a setup job, not code.
+
+With all three, the dry run on Nov 19 files four items for the week of
+Nov 22 across 13 shuls, each a real change: the Shtiebel's Shabbos (5:00
+PM Kabbalat Shabbat where the listing has candle lighting, a 4:00 Mincha),
+and Mikveh Israel's Thanksgiving Shacharis at 8:15 and its Friday
+Kabbalat Shabbat. The old watch filed 17 items since Nov 15.
 
 Not yet: step 7's live data, step 8.
 
