@@ -2296,7 +2296,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   Maps. ────────────────────────────────────────────────────── */}
           <div
             ref={attachMapBox}
-            className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden desktop:left-0 desktop:min-h-0 desktop:w-auto desktop:translate-x-0"
+            className="relative left-1/2 flex min-h-[320px] w-page flex-1 -translate-x-1/2 flex-col overflow-hidden desktop:left-0 desktop:min-h-0 desktop:w-auto desktop:translate-x-0"
           >
               <MapWithHover
                 highlight={hover}

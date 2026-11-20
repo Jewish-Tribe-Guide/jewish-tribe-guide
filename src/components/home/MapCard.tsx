@@ -57,7 +57,7 @@ export default function MapCard({ href, photo, categoryNames, onOpen }: Props) {
       onClick={onOpen}
       data-testid="home-map-card"
       // Full width as the hero is (HeroHeading).
-      className="group relative left-1/2 block h-[420px] w-screen -translate-x-1/2 overflow-hidden border-y border-slate-200 bg-primary/[0.06]"
+      className="group relative left-1/2 block h-[420px] w-page -translate-x-1/2 overflow-hidden border-y border-slate-200 bg-primary/[0.06]"
     >
       <div data-testid="home-map-card-picture" aria-hidden={photo ? undefined : true} className="absolute inset-0">
         {photo ? (

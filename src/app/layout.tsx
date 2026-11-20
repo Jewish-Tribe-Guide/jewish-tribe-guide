@@ -9,6 +9,7 @@ import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { iconVersion, SITE_SETTINGS_DEFAULTS, shareDescription } from '@/lib/siteSettings'
 import './globals.css'
 import { getDefaultCommunity } from '@/lib/communityStore'
+import { SCROLLBAR_WIDTH_SCRIPT } from '@/lib/scrollbarWidth'
 
 // The one font, on phone and desktop. (Desktop headings had a serif of their
 // own until the redesign's one look, step 2.)
@@ -86,6 +87,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           the fold, needing a small scroll to reveal it. 100dvh tracks the
           real visible viewport as the browser chrome shows/hides. */}
       <body className="bg-surface text-slate-900 antialiased min-h-dvh flex flex-col">
+        {/* First, so the full-width bands are the page's width from their
+            first draw (src/lib/scrollbarWidth.ts). */}
+        <script dangerouslySetInnerHTML={{ __html: SCROLLBAR_WIDTH_SCRIPT }} />
         {children}
         <Analytics />
         <SpeedInsights />

@@ -623,7 +623,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                 // Board W7l (the user, Nov 15): a white band from edge to
                 // edge, one anchor like the hero and the map, its tiles in
                 // the page's column. Full width as the hero is (HeroHeading).
-                className="hidden desktop:block relative left-1/2 w-screen -translate-x-1/2 border-y border-slate-200 bg-white"
+                className="hidden desktop:block relative left-1/2 w-page -translate-x-1/2 border-y border-slate-200 bg-white"
               >
                 <div className="mx-auto max-w-7xl px-4 pt-10 pb-11 sm:px-6">
                   {/* Hardcoded — the user's own reference image titles this

@@ -1716,7 +1716,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           edge, in the gap under the header (32px on a phone: -mt-8). Its
           title is the header's. */}
       {tilePhoto && !phonePage && (
-        <div className="relative -mt-8 mb-3 mx-[calc(50%-50vw)] h-[120px] overflow-hidden desktop:hidden" data-testid="category-phone-picture">
+        <div className="relative -mt-8 mb-3 bleed-x h-[120px] overflow-hidden desktop:hidden" data-testid="category-phone-picture">
           <Image src={tilePhoto} alt="" fill sizes="100vw" className="object-cover object-[center_55%]" unoptimized={!isOptimizableImage(tilePhoto)} />
         </div>
       )}

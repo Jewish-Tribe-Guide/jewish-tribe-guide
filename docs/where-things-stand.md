@@ -406,6 +406,19 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   with no navigation. New test "keeps the category's address after Back,
   through a refresh": red 5 of 5 before, green 10 of 10 after; the old
   test 40 of 40 after.
+- Fixed Nov 20 (CI on PR 400, Nov 19-20): `listing-detail.spec.ts:196`
+  desktop, "the search stays put when a listing opens", read the search
+  up to 6px low. The test's fault: a category screen arrives rising 6px
+  (fadeIn, 180ms) and its "before" read landed mid-rise. It now waits for
+  the arrival (`settled` in e2e/helpers.ts). Red 7 of 20 before, 0 of 20
+  after. Found on the way, a real bug: on Windows and Linux, where the
+  scrollbar takes room, the full-width bands (a category's photo, the
+  computer home's hero and map, the map page's band) were `100vw` wide,
+  so they ran under the scrollbar, lost half its width off the left, and
+  made the page 8px wider than the window. They take the scrollbar off
+  now (`bleed-x` / `w-page`, measured by `src/lib/scrollbarWidth.ts`).
+  New `e2e/full-bleed.spec.ts`: red 6 of 6 on the old bands, 20 of 20 on
+  the new.
 - Found Nov 17, not fixed: `FindResourcesConnected`'s `replace` sync (the
   search box, Open now, filters, `?item=`) writes the address the same
   way, so Next never learns those either: by the same mechanism a refresh

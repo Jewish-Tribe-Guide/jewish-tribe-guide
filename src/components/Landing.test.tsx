@@ -327,7 +327,7 @@ describe('Landing', () => {
   it('desktop: Explore by Category is a white band from edge to edge, not a box', () => {
     renderLanding()
     const card = screen.getByTestId('browse-everything-card')
-    expect(card).toHaveClass('w-screen', 'bg-white', 'border-y')
+    expect(card).toHaveClass('w-page', 'bg-white', 'border-y')
     expect(card.className).not.toMatch(/\b(ring-1|rounded-2xl)\b/)
     expect(card.firstElementChild).toHaveClass('max-w-7xl', 'mx-auto')
     expect(within(card).getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()

@@ -357,6 +357,21 @@ export async function ready(page: Page): Promise<void> {
   })
 }
 
+/** Waits for every animation on the page that ends to have ended. A
+ *  screen arrives moving (fadeIn: rising 6px over 180ms), so a position
+ *  read straight after `ready` can be mid-rise (Nov 20, the search read up
+ *  to 6px low). Endless ones (a spinner) are left out: they never finish. */
+export async function settled(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
+        .map((a) => a.finished.catch(() => {})),
+    ),
+  )
+}
+
 /** The server's HTML with `<script>` contents removed — i.e. the markup a
  *  browser would actually lay out, minus the data React ships alongside it.
  *

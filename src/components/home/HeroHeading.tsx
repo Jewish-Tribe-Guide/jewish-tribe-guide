@@ -222,14 +222,14 @@ export default function HeroHeading({
           Browse Categories and View Map went with it: the header has
           Categories and Map, and the grid is just below.
 
-          A full-bleed band: `w-screen left-1/2 -translate-x-1/2` breaks out
+          A full-bleed band: `w-page left-1/2 -translate-x-1/2` breaks out
           of <main>'s column (the pattern ResourceMapView uses; globals.css
           backstops it). No overflow property: `overflow-x: hidden` alone
           turns `overflow-y` into `auto` and clips the search's results as
           they spill over the page (it has, once). The photo has its own
           clipping box. `z-30` puts the results over the page's next
           sections and keeps them under the sticky header's z-40. */}
-      <section data-spot="top" data-testid="desktop-hero" className="hidden desktop:block relative z-30 left-1/2 isolate w-screen -translate-x-1/2 bg-slate-800">
+      <section data-spot="top" data-testid="desktop-hero" className="hidden desktop:block relative z-30 left-1/2 isolate w-page -translate-x-1/2 bg-slate-800">
         <div className="absolute inset-0 -z-10 overflow-hidden">
           {heroImage ? (
             // Decoration: the big line over it says what the page is, so
