@@ -13,8 +13,8 @@ import type { ResourceRow } from '@/types'
  *  away the run's own watches it no longer wants. Never touches a watch an
  *  admin added. One request to Refuah per hospital on the map
  *  (readRefuahNear), none for a community with none. Returns what it did, for the
- *  run's log. */
-export async function syncRefuahWatches(fetcher: typeof fetch = fetch): Promise<{ community: string; added: number; removed: number }[]> {
+ *  run's log. `only`: that community's hospitals alone. */
+export async function syncRefuahWatches(fetcher: typeof fetch = fetch, only?: string): Promise<{ community: string; added: number; removed: number }[]> {
   const supabase = getAdminClient()
   const { data: rows, error } = await supabase.from('resource').select('*').eq('status', 'approved').eq('category', HOSPITAL_CATEGORY)
   if (error) throw new Error(`Couldn’t list the hospitals: ${error.message}`)
@@ -23,6 +23,7 @@ export async function syncRefuahWatches(fetcher: typeof fetch = fetch): Promise<
 
   const out = []
   for (const [community, communityRows] of byCommunity) {
+    if (only && community !== only) continue
     const { watches, available } = await listWatches(community)
     if (!available) continue
     // Hospitals turned off (jobOff.ts): Refuah isn't asked.

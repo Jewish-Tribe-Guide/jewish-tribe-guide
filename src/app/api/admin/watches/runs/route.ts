@@ -21,7 +21,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
   try {
     const now = Date.now()
     const [{ available, runs }, { watches }, google, unread, listings, links] = await Promise.all([
-      listJobRuns(),
+      listJobRuns(community.slug),
       listWatches(community.slug),
       loadGoogleJob(community.slug, now),
       listUnreadMenus(community.slug),

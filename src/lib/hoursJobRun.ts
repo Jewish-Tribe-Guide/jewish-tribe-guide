@@ -155,15 +155,15 @@ export async function recordSearch(
  *  place, every night, could take the watches' own time in the morning
  *  run). One not reached is left as it is, as one that took too long is,
  *  and the places are taken in turn (inTurn), so it isn't the same ones
- *  left out each night. */
-export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADLINE_MS, stopBy = Infinity): Promise<{ community: string; added: number; removed: number }[]> {
+ *  left out each night. `only`: that community's places alone. */
+export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADLINE_MS, stopBy = Infinity, only?: string): Promise<{ community: string; added: number; removed: number }[]> {
   const { data, error } = await getAdminClient().from('community').select('slug, timezone')
   if (error) throw new Error(`Couldn’t list the communities: ${error.message}`)
   const out = []
   // The communities in turn as well as their places: one minute covers them
   // all, and the first in a fixed order could spend it, leaving the next
   // community's places never searched (Nov 20).
-  const communities = [...((data ?? []) as { slug: string; timezone: string }[])].sort((a, b) => a.slug.localeCompare(b.slug))
+  const communities = [...((data ?? []) as { slug: string; timezone: string }[])].filter((c) => !only || c.slug === only).sort((a, b) => a.slug.localeCompare(b.slug))
   for (const { slug, timezone } of inTurn(communities, dayNumber())) {
     const { watches, available } = await listWatches(slug)
     if (!available) continue

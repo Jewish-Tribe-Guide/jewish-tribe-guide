@@ -18,6 +18,7 @@ function chain(call: Call) {
     single: () => Promise.resolve(result()),
     eq: (col: string, v: unknown) => (call.filters.push(['eq', col, v]), c),
     lt: (col: string, v: unknown) => (call.filters.push(['lt', col, v]), c),
+    or: (v: string) => (call.filters.push(['or', '', v]), c),
     order: () => c,
     limit: () => Promise.resolve(result()),
     then: (ok: (r: unknown) => unknown, bad: (e: unknown) => unknown) => Promise.resolve(result()).then(ok, bad),
@@ -183,5 +184,57 @@ describe('listJobRuns', () => {
     const { available, runs } = await listJobRuns()
     expect(available).toBe(true)
     expect(runs.watches[0]).toMatchObject({ id: 'r', kinds: null })
+  })
+})
+
+// Nov 20: the watches run once per community, each run saved under it; a
+// community reads its own runs and the whole site's, never another's.
+describe('a community’s runs (migration 101)', () => {
+  afterEach(() => {
+    db.calls.length = 0
+    db.error = null
+    db.errorFor = null
+    db.rows = []
+  })
+  const clock = () => () => START
+  const onlyOwnAndSite = ['or', '', 'community_id.is.null,community_id.eq."philly"']
+
+  it('saves which community the run was for', async () => {
+    await recordJobRun('watches', async () => null, () => ({ ok: true, summary: '' }), clock(), 'philly')
+    expect(db.calls.find((c) => c.op === 'insert')!.values).toMatchObject({ job: 'watches', community_id: 'philly' })
+  })
+
+  it('saves a whole-site job’s run without one', async () => {
+    await recordJobRun('sync-hours', async () => null, () => ({ ok: true, summary: '' }), clock())
+    expect(db.calls.find((c) => c.op === 'insert')!.values).not.toHaveProperty('community_id')
+  })
+
+  it('without migration 101, saves the run all the same', async () => {
+    db.errorFor = (c) => (c.op === 'insert' && c.values && 'community_id' in c.values ? { message: 'Could not find the \'community_id\' column of \'job_run\' in the schema cache' } : null)
+    await recordJobRun('watches', async () => null, () => ({ ok: true, summary: 'Checked 1' }), clock(), 'philly')
+    expect(db.calls.filter((c) => c.op === 'insert').map((c) => c.values)).toEqual([expect.objectContaining({ community_id: 'philly' }), { job: 'watches', started_at: START.toISOString() }])
+    expect(db.calls.find((c) => c.op === 'update')!.values).toMatchObject({ ok: true, summary: 'Checked 1' })
+  })
+
+  it('the tab reads its community’s runs and the whole site’s', async () => {
+    await listJobRuns('philly')
+    const reads = db.calls.filter((c) => c.op === 'select')
+    expect(reads.length).toBeGreaterThan(0)
+    expect(reads.every((c) => c.filters.some((f) => JSON.stringify(f) === JSON.stringify(onlyOwnAndSite)))).toBe(true)
+  })
+
+  it('the nightly email does too', async () => {
+    await recentJobRuns('philly')
+    const reads = db.calls.filter((c) => c.op === 'select')
+    expect(reads.every((c) => c.filters.some((f) => JSON.stringify(f) === JSON.stringify(onlyOwnAndSite)))).toBe(true)
+  })
+
+  it('without migration 101, reads every run', async () => {
+    db.errorFor = (c) => (c.op === 'select' && c.filters.some((f) => f[0] === 'or') ? { message: 'column job_run.community_id does not exist' } : null)
+    db.rows = [{ id: 'r', job: 'watches', started_at: START.toISOString(), finished_at: null, ok: null, summary: null, warning: null, error: null }]
+    const { available, runs } = await listJobRuns('philly')
+    expect(available).toBe(true)
+    expect(runs.watches[0]).toMatchObject({ id: 'r' })
+    expect((await recentJobRuns('philly')).get('watches')).toHaveLength(1)
   })
 })

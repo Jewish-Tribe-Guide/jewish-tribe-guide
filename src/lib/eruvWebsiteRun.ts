@@ -29,12 +29,13 @@ import {
 } from '@/lib/eruvWebsite'
 
 /** Gives each eruv's website its watch, and takes away the ones no eruv
- *  has any more, in every community. */
-export async function syncEruvWebsiteWatches(): Promise<{ community: string; added: number; removed: number }[]> {
+ *  has any more, in every community (`only`: in that one). */
+export async function syncEruvWebsiteWatches(only?: string): Promise<{ community: string; added: number; removed: number }[]> {
   const { data, error } = await getAdminClient().from('community').select('slug')
   if (error) throw new Error(`Couldn’t list the communities: ${error.message}`)
   const out = []
   for (const { slug } of (data ?? []) as { slug: string }[]) {
+    if (only && slug !== only) continue
     const [{ eruvim, available }, { watches, available: watching }] = await Promise.all([listEruvimForAdmin(slug), listWatches(slug)])
     if (!available || !watching) continue
     // Eruvs turned off (jobOff.ts): no eruv website watch is added or taken away.

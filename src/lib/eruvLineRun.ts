@@ -8,8 +8,9 @@ import { sendEruvLineAlert } from './email'
 
 export type LineRun = { id: string; result: 'read' | 'missing' | 'failed'; error?: string; missing?: string[] }
 
-export async function runEruvLines(now = new Date()): Promise<LineRun[]> {
-  const sources = await listEruvMapSources()
+/** `only`: that community's eruvim alone. */
+export async function runEruvLines(now = new Date(), only?: string): Promise<LineRun[]> {
+  const sources = (await listEruvMapSources()).filter((s) => !only || s.communityId === only)
   const runs: LineRun[] = []
   const tell = new Map<string, { name: string; missing: string[] }[]>()
   for (const source of sources) {

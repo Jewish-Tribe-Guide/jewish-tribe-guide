@@ -213,7 +213,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
       listApprovedResources(community.slug),
       listMenuReadings(community.slug),
       listWatches(community.slug),
-      listJobRuns()
+      listJobRuns(community.slug)
         .then(({ runs }) => lastNight(runs.watches))
         .catch(() => null),
     ])
