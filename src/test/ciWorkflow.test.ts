@@ -214,12 +214,43 @@ describe('each build restores its own build cache', () => {
   for (const { name, block, script } of building) {
     // Production's smoke build has production's values baked in, and its
     // cache would be main's, which every PR's e2e build restores from.
-    const want = name === 'e2e-prod-smoke' ? '' : distDirFor(script)
+    // The e2e shards build nothing: they start e2e-build's.
+    const prebuilt = block.includes('E2E_PREBUILT')
+    const want = name === 'e2e-prod-smoke' || prebuilt ? '' : distDirFor(script)
     it(`${name} caches ${want || 'no build'}`, () => {
       expect(block).toContain('uses: ./.github/actions/setup')
       expect(block.match(/next-dist-dir:\s*(\S+)/)?.[1] ?? '').toBe(want)
     })
   }
+
+  // e2e's shards start one build instead of each making their own (Nov 20),
+  // so the build must be what they'd have built: the same dist dir, the
+  // same settings (NEXT_PUBLIC_ values are fixed into a build), and
+  // handed over whole.
+  describe('the e2e shards start the one build', () => {
+    const build = jobs['e2e-build'] ?? ''
+    const shards = jobs['e2e'] ?? ''
+
+    it('e2e-build builds into the dist dir e2e starts, cached, and hands it over', () => {
+      expect(build).toMatch(/run: npm run build\n/)
+      expect(build.match(/next-dist-dir:\s*(\S+)/)?.[1]).toBe(distDirFor('test:e2e'))
+      expect(build).toMatch(/name: e2e-build\n\s+path: \|\n\s+\.next\/\n\s+!\.next\/cache\/\n\s+include-hidden-files: true/)
+    })
+
+    it('every shard waits for it, downloads it, and starts it unbuilt', () => {
+      expect(shards).toMatch(/\n {4}needs: \[e2e-build\]/)
+      expect(shards).toMatch(/download-artifact@v\d+\n\s+with:\n\s+name: e2e-build\n\s+path: \.next\n/)
+      expect(shards).toMatch(/npm run test:e2e[^\n]*\n\s+env:\n\s+E2E_PREBUILT: '1'/)
+      expect(readFileSync('playwright.config.ts', 'utf-8')).toMatch(/process\.env\.E2E_PREBUILT \? `npx next start/)
+    })
+
+    it('the shards run with exactly the build’s settings', () => {
+      expect(build).toMatch(/\n {4}env: &e2e-env\n/)
+      expect(shards).toMatch(/\n {4}env: \*e2e-env\n/)
+      // And nowhere else gives a shard a setting of its own beside them.
+      expect(shards.match(/\n {10}[A-Z0-9_]+:/g) ?? []).toEqual(['\n          E2E_PREBUILT:'])
+    })
+  })
 
   it('caches only Turbopack’s part, never the fetch cache beside it', () => {
     expect(ACTION).toMatch(/path:\s*\$\{\{ inputs\.next-dist-dir \}\}\/cache\/turbopack\s*\n/)
