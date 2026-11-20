@@ -10,7 +10,7 @@ describe('the write community\'s preview cookie', () => {
   it('is the one proxy.ts reads, on the path it sets it for', () => {
     const cookie = writeSuitePreviewCookie('http://localhost:3211')
     expect(cookie.name).toBe(previewCookieName(WRITE_SUITE_COMMUNITY))
-    expect(cookie.path).toBe(previewCookieOptions(WRITE_SUITE_COMMUNITY).path)
+    expect(cookie.path).toBe(previewCookieOptions().path)
     expect(cookie.domain).toBe('localhost')
   })
 })
