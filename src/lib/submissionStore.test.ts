@@ -980,6 +980,21 @@ describe('approveSubmission: Google-sync field ownership', () => {
     expect(mockFetchPlaceSync).not.toHaveBeenCalled()
   })
 
+  // Nov 20: the Google fields, the item dates, the tag vocabulary and what
+  // changed each read the category again, a round trip apiece.
+  it('reads the category once per approval, and again for the next one', async () => {
+    const sub = baseSubmission({ operation: 'create', payload: listingPayload({ details: { placeId: 'place-1', googleAutofill: { name: 'Test Shul' } } }) as unknown as Record<string, unknown> })
+    mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+
+    await approveSubmission('sub-1')
+    expect(mockGetCategoryById).toHaveBeenCalledTimes(1)
+
+    mockCreateFlow(sub)
+    await approveSubmission('sub-1')
+    expect(mockGetCategoryById, 'nothing outlives its approval').toHaveBeenCalledTimes(2)
+  })
+
   it('never resolves googleFields for a sync-ineligible category', async () => {
     const sub = baseSubmission({
       operation: 'create',

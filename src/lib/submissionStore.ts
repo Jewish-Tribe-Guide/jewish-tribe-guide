@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { SYNC_INTERNAL_FIELDS } from './syncFields'
 import { MENU_LINK_KEY, keepsMenuLink, readMenuLink } from './menuLink'
 import { getAdminClient } from './supabase/admin'
@@ -33,6 +34,28 @@ import type {
   EnrichedSubmission,
   CategorySubmissionPayload,
 } from '@/types'
+
+// ── One read of a category per approval (Nov 20) ────────────────────────────
+// An approval read the listing's category up to six times (its edit, the
+// Google fields, the item dates, the tag vocabulary, what changed), one
+// round trip each. Within one approval it doesn't change, so the first
+// read answers the rest. Scoped to the approval (approveSubmission runs in
+// its own), so nothing outlives it; outside one, a plain read.
+const categoryReads = new AsyncLocalStorage<Map<string, Promise<CategoryConfig | null>>>()
+
+function categoryOf(community: string, id: string): Promise<CategoryConfig | null> {
+  const memo = categoryReads.getStore()
+  if (!memo) return getCategoryById(community, id)
+  const key = `${community}\u0000${id}`
+  let read = memo.get(key)
+  if (!read) {
+    read = (async () => getCategoryById(community, id))()
+    memo.set(key, read)
+    // A failed read is asked again by the next caller, not handed on.
+    read.catch(() => memo.delete(key))
+  }
+  return read
+}
 
 // ── Reads (admin) ────────────────────────────────────────────────────────────
 
@@ -185,7 +208,7 @@ export async function submitListingUpdate(
   const sent: ResourceSubmission = { ...payload }
   delete sent.editedFields
   const { data: row } = await getAdminClient().from('resource').select('*').eq('community_id', community).eq('id', targetId).maybeSingle()
-  const category = row ? await getCategoryById(community, (row as ResourceRow).category) : null
+  const category = row ? await categoryOf(community, (row as ResourceRow).category) : null
   const filed: ResourceSubmission = row && category ? { ...sent, editedFields: editedFields(normalizeRow(row as ResourceRow), sent, category.detailFields) } : sent
   return insertSubmission({
     community_id: community,
@@ -393,7 +416,17 @@ export async function pendingForListing(community: string, listingId: string): P
   return (data ?? []) as { id: string; payload: unknown }[]
 }
 
-export async function approveSubmission(
+export function approveSubmission(
+  id: string,
+  community?: string,
+  reviewedBy?: string,
+  edited?: unknown,
+  only?: readonly string[],
+): Promise<SubmissionRow> {
+  return categoryReads.run(new Map(), () => approveNow(id, community, reviewedBy, edited, only))
+}
+
+async function approveNow(
   id: string,
   community?: string,
   reviewedBy?: string,
@@ -422,7 +455,7 @@ export async function approveSubmission(
   if (submission.target_type === 'listing' && submission.operation === 'update' && submission.target_id && Array.isArray((submission.payload as { editedFields?: unknown }).editedFields)) {
     const { data: row, error: rowErr } = await supabase.from('resource').select('*').eq('community_id', submission.community_id).eq('id', submission.target_id).single()
     if (rowErr || !row) throw new ReviewEditError('The listing this changes couldn’t be found.')
-    const category = await getCategoryById(submission.community_id, (row as ResourceRow).category)
+    const category = await categoryOf(submission.community_id, (row as ResourceRow).category)
     submission.payload = onListingNow(submission.payload as unknown as ResourceSubmission, row as ResourceRow, category?.detailFields ?? []) as unknown as Record<string, unknown>
   }
 
@@ -447,7 +480,7 @@ export async function approveSubmission(
     const { data: row, error: rowErr } = await supabase.from('resource').select('*').eq('community_id', submission.community_id).eq('id', submission.target_id).single()
     if (rowErr || !row) throw new ReviewEditError('The listing this changes couldn’t be found.')
     const sent = submission.payload as unknown as ResourceSubmission
-    const category = await getCategoryById(submission.community_id, sent.category)
+    const category = await categoryOf(submission.community_id, sent.category)
     edited = keepOnly(sent, row as ResourceRow, only, category?.detailFields ?? [])
   }
   if (edited !== undefined) {
@@ -455,7 +488,7 @@ export async function approveSubmission(
       throw new ReviewEditError('Only a new listing or an edit can be changed before approving.')
     }
     const sent = submission.payload as unknown as ResourceSubmission
-    const category = await getCategoryById(submission.community_id, sent.category)
+    const category = await categoryOf(submission.community_id, sent.category)
     const next = withReviewEdits(sent, edited, category?.detailFields ?? [], reviewedBy ?? 'an admin', new Date().toISOString())
     if (!next) throw new ReviewEditError('Those changes couldn’t be read. Please try again.')
     const errors = validateSubmission(next, category)
@@ -553,29 +586,30 @@ export async function approveSubmission(
     throw err
   }
 
-  const { data, error } = await supabase
-    .from('submission')
-    .update({
-      status: 'approved',
-      reviewed_at: new Date().toISOString(),
-      ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
-      ...(savedPayload ? { payload: savedPayload } : {}),
-      // A `create` arrives with no target_id — there was nothing to point at
-      // yet. Recording it now makes the submission point at the listing it
-      // produced, which is what lets the caller sync that listing against
-      // Google right away instead of leaving it for the nightly run. The
-      // moderation card branches on `operation`, so a create still renders as
-      // proposed details rather than turning into a diff.
-      ...(submission.target_id ? {} : affectedResourceId ? { target_id: affectedResourceId } : {}),
-    })
-    .eq('id', id)
-    .select('*')
-    .single()
+  // The activity log beside it: best-effort (recordActivity never throws),
+  // and the listing it describes is already on.
+  const [{ data, error }] = await Promise.all([
+    supabase
+      .from('submission')
+      .update({
+        status: 'approved',
+        reviewed_at: new Date().toISOString(),
+        ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
+        ...(savedPayload ? { payload: savedPayload } : {}),
+        // A `create` arrives with no target_id — there was nothing to point at
+        // yet. Recording it now makes the submission point at the listing it
+        // produced, which is what lets the caller sync that listing against
+        // Google right away instead of leaving it for the nightly run. The
+        // moderation card branches on `operation`, so a create still renders as
+        // proposed details rather than turning into a diff.
+        ...(submission.target_id ? {} : affectedResourceId ? { target_id: affectedResourceId } : {}),
+      })
+      .eq('id', id)
+      .select('*')
+      .single(),
+    submission.target_type === 'listing' ? recordActivity(activityForApproval(submission, affectedResourceId, newItems, changes)) : null,
+  ])
   if (error) throw new Error(`Failed to mark submission approved: ${error.message}`)
-
-  if (submission.target_type === 'listing') {
-    await recordActivity(activityForApproval(submission, affectedResourceId, newItems, changes))
-  }
   return data as SubmissionRow
 }
 
@@ -601,7 +635,7 @@ export async function decidePart(
   const { data: row } = await supabase.from('resource').select('*').eq('community_id', community).eq('id', submission.target_id).maybeSingle()
   if (!row) throw new ReviewEditError('The listing this changes couldn’t be found.')
   const listing = row as ResourceRow
-  const category = await getCategoryById(community, listing.category)
+  const category = await categoryOf(community, listing.category)
   const fields = category?.detailFields ?? []
   const payload = submission.payload as unknown as ResourceSubmission
   const sent = onListingNow(payload, listing, fields)
@@ -761,7 +795,7 @@ async function keepReportedItems(submission: SubmissionRow): Promise<void> {
       .maybeSingle<{ id: string; category: string; details: Record<string, unknown> | null }>()
     const before = row?.details ?? null
     if (!row || !before?.itemGone) return
-    const category = await getCategoryById(submission.community_id, row.category)
+    const category = await categoryOf(submission.community_id, row.category)
     const keys = itemFieldKeys(category?.detailFields ?? [])
     const proposed = (submission.payload as { details?: Record<string, unknown> } | null)?.details ?? null
     for (const { fieldKey, item } of goneItemsKept(before, proposed, keys)) {
@@ -861,7 +895,7 @@ async function computeGoogleFields(
   payload: ResourceSubmission,
   existing: ResourceRow | null,
 ): Promise<string[] | undefined> {
-  const category = await getCategoryById(community, payload.category)
+  const category = await categoryOf(community, payload.category)
   // Eligibility depends on hasAddress, which only the fetched category
   // knows — can't check this before the lookup above. A category that
   // fails to resolve at all is treated as ineligible too (nothing to
@@ -1108,7 +1142,7 @@ async function withItemDates(
   let fields: ReadonlyArray<{ key: string; type: string }> = []
   let menuLinks = false
   try {
-    const category = await getCategoryById(community, categoryId)
+    const category = await categoryOf(community, categoryId)
     fields = category?.detailFields ?? []
     menuLinks = keepsMenuLink(category)
   } catch (err) {
@@ -1192,11 +1226,14 @@ async function applyListing(submission: SubmissionRow): Promise<AppliedListing> 
       .select('id')
       .single()
     if (error) throw new Error(`Failed to create listing: ${error.message}`)
-    await growTagVocabulary(submission.community_id, payload)
     const id = (created as { id: string } | null)?.id ?? null
-    const changes = await saidForVisitors(submission.community_id, payload, (category) =>
-      newListingFacts({ id: id ?? '', category: payload.category, name: payload.name, anchorId: payload.anchorId, address: payload.address ?? '', distance: 0, phone: payload.phone ?? undefined, ...payload.details }, category),
-    )
+    // Side by side: both best-effort, neither reads what the other writes.
+    const [, changes] = await Promise.all([
+      growTagVocabulary(submission.community_id, payload),
+      saidForVisitors(submission.community_id, payload, (category) =>
+        newListingFacts({ id: id ?? '', category: payload.category, name: payload.name, anchorId: payload.anchorId, address: payload.address ?? '', distance: 0, phone: payload.phone ?? undefined, ...payload.details }, category),
+      ),
+    ])
     return { id, newItems: dated.newItems, changes }
   }
 
@@ -1238,9 +1275,11 @@ async function applyListing(submission: SubmissionRow): Promise<AppliedListing> 
       .eq('community_id', submission.community_id)
       .eq('id', submission.target_id)
     if (error) throw new Error(`Failed to update listing: ${error.message}`)
-    await growTagVocabulary(submission.community_id, payload)
     const existing = existingData ? normalizeRow(existingData as ResourceRow) : null
-    const changes = await saidForVisitors(submission.community_id, payload, (category) => visitorChanges(existing, payload, category.detailFields))
+    const [, changes] = await Promise.all([
+      growTagVocabulary(submission.community_id, payload),
+      saidForVisitors(submission.community_id, payload, (category) => visitorChanges(existing, payload, category.detailFields)),
+    ])
     return { id: submission.target_id, newItems: dated.newItems, changes }
   }
 
@@ -1264,7 +1303,7 @@ async function applyListing(submission: SubmissionRow): Promise<AppliedListing> 
  *  "updated", never fails the approval. */
 async function saidForVisitors(community: string, payload: ResourceSubmission, say: (category: CategoryConfig) => ChangePart[]): Promise<ChangePart[] | undefined> {
   try {
-    const category = await getCategoryById(community, payload.category)
+    const category = await categoryOf(community, payload.category)
     return category ? say(category) : undefined
   } catch (err) {
     console.error('[activity] could not work out what changed:', err)
@@ -1277,15 +1316,16 @@ async function saidForVisitors(community: string, payload: ResourceSubmission, s
 // shouldn't block approving the listing.
 async function growTagVocabulary(community: string, payload: ResourceSubmission): Promise<void> {
   try {
-    const category = await getCategoryById(community, payload.category)
+    const category = await categoryOf(community, payload.category)
     if (!category) return
-    for (const field of category.detailFields) {
-      if (field.type !== 'tags' || !field.tagGroup) continue
-      const labels = payload.details?.[field.key]
-      if (Array.isArray(labels) && labels.length > 0) {
-        await upsertTags(community, labels as string[], field.tagGroup)
-      }
-    }
+    // One upsert per tag field, side by side.
+    await Promise.all(
+      category.detailFields.flatMap((field) => {
+        if (field.type !== 'tags' || !field.tagGroup) return []
+        const labels = payload.details?.[field.key]
+        return Array.isArray(labels) && labels.length > 0 ? [upsertTags(community, labels as string[], field.tagGroup)] : []
+      }),
+    )
   } catch (err) {
     console.error('[submissions] growTagVocabulary failed:', err)
   }
