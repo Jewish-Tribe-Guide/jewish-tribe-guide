@@ -160,7 +160,11 @@ export async function syncHoursWatches(reach: HoursReach = {}, ms = SEARCH_DEADL
   const { data, error } = await getAdminClient().from('community').select('slug, timezone')
   if (error) throw new Error(`Couldn’t list the communities: ${error.message}`)
   const out = []
-  for (const { slug, timezone } of (data ?? []) as { slug: string; timezone: string }[]) {
+  // The communities in turn as well as their places: one minute covers them
+  // all, and the first in a fixed order could spend it, leaving the next
+  // community's places never searched (Nov 20).
+  const communities = [...((data ?? []) as { slug: string; timezone: string }[])].sort((a, b) => a.slug.localeCompare(b.slug))
+  for (const { slug, timezone } of inTurn(communities, dayNumber())) {
     const { watches, available } = await listWatches(slug)
     if (!available) continue
     // A job the community turned off isn't searched for (jobOff.ts): off

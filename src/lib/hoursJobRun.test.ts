@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const m = vi.hoisted(() => ({
   rows: [] as Record<string, unknown>[],
+  communities: [{ slug: 'philly' }] as { slug: string }[],
   listWatches: vi.fn(),
   addWatch: vi.fn(),
   removeWatch: vi.fn(),
@@ -19,7 +20,7 @@ vi.mock('@/lib/supabase/admin', () => ({
         eq: () => q,
         in: (_col: string, vals: string[]) => ((only = vals), q),
         then: (ok: (v: unknown) => unknown) =>
-          Promise.resolve({ data: table === 'community' ? [{ slug: 'philly' }] : m.rows.filter((r) => !only || only.includes(r.category as string)), error: null }).then(ok),
+          Promise.resolve({ data: table === 'community' ? m.communities : m.rows.filter((r) => !only || only.includes(r.category as string)), error: null }).then(ok),
       }
       return q
     },
@@ -73,6 +74,7 @@ const row = (id: string, name: string, website: string | null, category = 'mikva
 beforeEach(() => {
   vi.clearAllMocks()
   m.rows = [row('lmc', 'Lower Merion Community Mikvah', 'http://lmcmikvah.org/')]
+  m.communities = [{ slug: 'philly' }]
   m.listWatches.mockResolvedValue({ watches: [], available: true })
   m.addWatch.mockImplementation(async () => ({ id: 'new' }))
 })
@@ -149,6 +151,23 @@ describe('syncHoursWatches', () => {
     }
     expect(await firstOn('2026-11-17T08:00:00Z')).not.toBe(await firstOn('2026-11-18T08:00:00Z'))
     vi.useRealTimers()
+  })
+
+  // The search has one minute for every community (Nov 20, the scale
+  // sweep). Taken in the same order each night, the first could use all of
+  // it, and the second's places were never searched.
+  it('takes the communities in turn each night too', async () => {
+    m.communities = [{ slug: 'philly' }, { slug: 'ues' }]
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const firstOn = async (iso: string) => {
+      vi.setSystemTime(Date.parse(iso))
+      m.listWatches.mockClear()
+      await syncHoursWatches(reach)
+      return m.listWatches.mock.calls[0][0]
+    }
+    const first = [await firstOn('2026-11-17T08:00:00Z'), await firstOn('2026-11-18T08:00:00Z')]
+    vi.useRealTimers()
+    expect(new Set(first)).toEqual(new Set(['philly', 'ues']))
   })
 
   // And a website's candidate pages were read all in one moment.

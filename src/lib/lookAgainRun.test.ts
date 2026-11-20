@@ -12,8 +12,9 @@ vi.mock('./lookAgainStore', () => ({ listLookRows: vi.fn(), getNotThese: vi.fn(a
 
 import { listEruvimForAdmin } from './eruvStore'
 import { findEruvStatusPages } from './eruvFind'
-import { saveTry } from './lookAgainStore'
-import { tryLook } from './lookAgainRun'
+import { listLookRows, saveTry } from './lookAgainStore'
+import { getAdminClient } from './supabase/admin'
+import { lookAgainNight, tryLook } from './lookAgainRun'
 
 afterEach(() => vi.clearAllMocks())
 
@@ -49,5 +50,28 @@ describe('tryLook, after the night gave up on it', () => {
     const ready = () => new Promise<void>((ok) => setTimeout(() => (order.push('night saved'), ok()), 20))
     await tryLook('philly', ELKINS, undefined, Date.now(), { ready })
     expect(order).toEqual(['night saved', 'try saved'])
+  })
+})
+
+describe('lookAgainNight', () => {
+  // Its 200 seconds are for every community. Taken in the same order each
+  // night, the first could spend them, and the next never had a look
+  // (Nov 20, the scale sweep).
+  it('takes the communities in turn each night', async () => {
+    const select = async () => ({ data: [{ slug: 'ues' }, { slug: 'philly' }], error: null })
+    vi.mocked(getAdminClient).mockReturnValue({ from: () => ({ select }) } as never)
+    // The first community's load stops the night where it starts: which one
+    // it was is all this asks.
+    vi.mocked(listEruvimForAdmin).mockRejectedValue(new Error('stop'))
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const firstOn = async (iso: string) => {
+      vi.setSystemTime(Date.parse(iso))
+      vi.mocked(listLookRows).mockClear()
+      await lookAgainNight(undefined).catch(() => {})
+      return vi.mocked(listLookRows).mock.calls[0][0]
+    }
+    const first = [await firstOn('2026-11-17T09:00:00Z'), await firstOn('2026-11-18T09:00:00Z')]
+    vi.useRealTimers()
+    expect(new Set(first)).toEqual(new Set(['philly', 'ues']))
   })
 })
