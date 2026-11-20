@@ -927,12 +927,21 @@ Done (batch 3, nightly jobs, each red against the old code first):
   says its 300s outright. Not made parallel: live it asks about 132
   listings in 15s, so its 500 cap fits in a minute one at a time.
 
-Open, the user's call: the morning watches still share one run's 220s.
-Turns split it fairly, but a second community Philly's size (134–170s
-now) would leave both short each night. The fix is a run per community
-(the cron starting one per community, each its own 300s), which needs
-`job_run` to say which community a run was (a migration: live needs a
-yes) and the Watches tab to read its own community's runs.
+- **A morning watches run per community** (Nov 20, the user: "if that's
+  something we could do now"). `/api/cron/watches` starts a call per
+  community (`?community=slug`), each answered at once and run in
+  `after()` with its own 300s; the run lives in `src/lib/watchesRun.ts`.
+  Each run is saved under its community (`job_run.community_id`,
+  **migration 101: not run on dev or live**; the dev SQL editor wanted a
+  sign-in). The Watches tab, look-again, main dishes, the nightly email
+  and Activity read their community's runs and the whole site's. Until
+  101 runs, every community's runs save and read as one list (the tab
+  shows Philly's and UES's watches runs side by side as "watches").
+  To check on the first live morning after deploy: each community's run
+  shows in its own tab, and Vercel's log has no "run didn't start" (the
+  call reaches the site through its own address; a 401 or a Vercel
+  protection page there would show as that). Two communities' runs can
+  each read a site they share at the same moment; within one run, never.
 
 Still to do, in the user's order:
 
