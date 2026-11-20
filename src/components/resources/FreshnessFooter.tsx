@@ -190,10 +190,13 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
 
   if (!ask) {
     const what = subject ?? 'Listing'
+    // No subject, under a box's own times (a shul's week, board 5e): "Confirmed
+    // by Mekor Habracha, Nov 6", the box's name saying what.
+    const said = subject ? `${what} ${lower ? `${lower},` : 'last checked'}` : giver ? `${giver},` : 'Confirmed'
     return (
       <p className="text-[13.5px] leading-snug text-slate-600" data-testid="freshness">
         {leadText}
-        {confirmedAt ? `${what} ${lower ? `${lower},` : 'last checked'} ${shortDate(confirmedAt, timezone, now)}.` : `${what} not checked by anyone yet.`}
+        {confirmedAt ? `${said} ${shortDate(confirmedAt, timezone, now)}.` : subject ? `${what} not checked by anyone yet.` : 'Not confirmed by anyone yet.'}
       </p>
     )
   }

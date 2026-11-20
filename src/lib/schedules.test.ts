@@ -314,6 +314,30 @@ describe('a shul’s weekly schedule', () => {
     expect(thisWeeksDays([lekhLekha, next], '2026-10-24', { shabbosOver: true }).posts.map((p) => p.name)).toEqual(['Times for Oct 25 – Oct 31'])
   })
 
+  // Nov 20: the watch files a shul's weekdays and its Shabbos as two weeks
+  // (parts), both covering Friday. The listing's week took one post a day,
+  // so the weekdays week's Friday hid the Shabbos week's Friday night.
+  it('Friday in two halves: the weekdays week’s Shacharis, the Shabbos week’s night', () => {
+    const weekdays = {
+      ...post('Week of Nov 15', '2026-11-15', '2026-11-20'), postedBy: 'website', whole: true, parts: ['weekdays'],
+      minyanim: [{ id: 'w', tefillah: 'shacharis', on: ['2026-11-17', '2026-11-20'], time: '6:45 AM' }],
+    } satisfies SpecialSchedule
+    const shabbos = {
+      ...post('Shabbos Nov 20–21', '2026-11-20', '2026-11-21'), postedBy: 'website', whole: true, parts: ['shabbos'],
+      minyanim: [{ id: 'k', tefillah: 'kabbalas_shabbos', on: ['2026-11-20'], time: '4:30 PM' }, { id: 's', tefillah: 'shacharis', on: ['2026-11-21'], time: '9:15 AM' }],
+    } satisfies SpecialSchedule
+    const week = thisWeeksDays([weekdays, shabbos], '2026-11-17', { withPast: true })
+    expect(week.days.map((d) => [d.date, d.minyanim.map((m) => `${m.minyan.tefillah} ${m.from.name}`)])).toEqual([
+      ['2026-11-17', ['shacharis Week of Nov 15']],
+      ['2026-11-20', ['shacharis Week of Nov 15', 'kabbalas_shabbos Shabbos Nov 20–21']],
+      ['2026-11-21', ['shacharis Shabbos Nov 20–21']],
+    ])
+    expect(week.posts.map((p) => p.name).sort()).toEqual(['Shabbos Nov 20–21', 'Week of Nov 15'])
+    // A day gone by is kept, from the week's Sunday; the week still runs.
+    expect(thisWeeksDays([weekdays, shabbos], '2026-11-19', { withPast: true }).days[0].date).toBe('2026-11-17')
+    expect(thisWeeksDays([weekdays, shabbos], '2026-11-19').days[0].date).toBe('2026-11-20')
+  })
+
   it('Shabbos is over once its havdalah has passed, and only on Shabbos', () => {
     const havdalah = '2026-10-24T18:58:00-04:00'
     expect(shabbosIsOver('2026-10-24', Date.parse('2026-10-24T18:57:00-04:00'), havdalah)).toBe(false)

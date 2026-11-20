@@ -547,23 +547,38 @@ export function shabbosIsOver(today: string, nowMs: number, havdalahIso: string 
 export function thisWeeksDays(
   schedules: readonly SpecialSchedule[],
   date: string,
-  { shabbosOver = false, regular = [] }: { shabbosOver?: boolean; regular?: readonly Minyan[] } = {},
+  { shabbosOver = false, regular = [], withPast = false }: { shabbosOver?: boolean; regular?: readonly Minyan[]; withPast?: boolean } = {},
 ): { days: WeekDayTimes[]; posts: SpecialSchedule[]; none: SpecialSchedule | null; range: { from: string; to: string } } {
   // Friday, the week ends with Shabbos, its last; once Shabbos is over
   // (shabbosIsOver), it's the week ahead, Sunday to Shabbos (the user, Oct
   // 23: "right when shabbos is over we need to show the week's schedule").
   const today = shabbosOver ? new Date(Date.parse(`${date}T12:00:00Z`) + DAY_MS).toISOString().slice(0, 10) : date
   const saturday = saturdayOf(today)
-  const weeks = schedules.filter((s) => s.kind === 'week' && s.to >= today && s.from <= saturday)
+  // `withPast`: from the week's Sunday, the days gone by included, for a
+  // listing's grid that keeps them, greyed (board 5e, Nov 19). `none` and
+  // `range` still go by today on.
+  const start = withPast ? new Date(Date.parse(`${saturday}T12:00:00Z`) - 6 * DAY_MS).toISOString().slice(0, 10) : today
+  const weeks = schedules.filter((s) => s.kind === 'week' && s.to >= start && s.from <= saturday)
   const days: WeekDayTimes[] = []
   const used = new Set<SpecialSchedule>()
-  const whole: SpecialSchedule[] = []
-  for (const date of datesOf({ from: today, to: saturday })) {
+  const wholeOn = new Map<string, SpecialSchedule>()
+  for (const date of datesOf({ from: start, to: saturday })) {
     const weekday = weekdayOfDate(date)
-    const post = firstCovering(weeks.filter((s) => s.from <= date && date <= s.to))
-    if (post?.whole) whole.push(post)
-    const own = post ? post.minyanim.filter((m) => m.on.includes(date) || m.on.includes(weekday)).map((minyan) => ({ minyan, from: post })) : []
-    if (own.length) used.add(post!)
+    // Friday in two halves, each from a week speaking for that part
+    // (withSchedules' rule): a weekdays week's Friday Shacharis beside a
+    // Shabbos week's Friday night, as the watch files them (Nov 19).
+    const halves = weekday === 'fri' ? FRIDAY_HALVES : [null]
+    const own: WeekDayTimes['minyanim'] = []
+    let post: SpecialSchedule | undefined
+    for (const half of halves) {
+      const p = firstCovering(weeks.filter((s) => s.from <= date && date <= s.to && (!half || !s.parts || s.parts.includes(half.part))))
+      if (!p) continue
+      post ??= p
+      if (p.whole && date >= today && !wholeOn.has(date)) wholeOn.set(date, p)
+      const mine = p.minyanim.filter((m) => (m.on.includes(date) || m.on.includes(weekday)) && (!half || half.has(m.tefillah))).map((minyan) => ({ minyan, from: p }))
+      if (mine.length && date >= today) used.add(p)
+      own.push(...mine)
+    }
     const extras = schedules.filter((s) => isOneDayAddition(s) && s.from === date)
     // A time the day has already isn't added: the week's, or, where the
     // week gives none that day, the usual one (resolveDay's rule). BZBI's
@@ -586,7 +601,7 @@ export function thisWeeksDays(
   const posts = weeks.filter((s) => used.has(s)).sort((a, b) => Number(a.postedBy === 'website') - Number(b.postedBy === 'website') || a.from.localeCompare(b.from))
   // Nothing any day, and every day the shul's whole week's: no minyan this
   // week, which isn't the same as no week posted (SpecialSchedule.whole).
-  const none = !days.length && whole.length === datesOf({ from: today, to: saturday }).length ? whole[0] : null
+  const none = !days.some((d) => d.date >= today) && wholeOn.size === datesOf({ from: today, to: saturday }).length ? [...wholeOn.values()][0] : null
   return { days, posts, none, range: { from: today, to: saturday } }
 }
 
