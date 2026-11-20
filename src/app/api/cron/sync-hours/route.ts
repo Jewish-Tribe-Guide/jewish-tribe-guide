@@ -38,6 +38,11 @@ import { countGoogleKinds } from '@/lib/nightKinds'
 // Components rejects.
 
 
+// The 500-listing cap at about 0.1s a listing (132 in 15s, live, Nov 20)
+// is about a minute; said outright, so it never rests on the plan's
+// default.
+export const maxDuration = 300
+
 // Best-effort ping to a dead-man's-switch monitor (e.g. healthchecks.io) so a
 // silently broken sync — Google API key revoked, quota exhausted, an
 // unhandled exception — shows up as a missed check-in instead of just stale
@@ -118,7 +123,11 @@ async function runSync(): Promise<SyncHoursRun> {
   // every category page uses (cacheLife('hours')) — without this, a synced
   // hours/phone/closure change would sit invisible to visitors for up to an
   // hour after the very sync meant to keep it current.
-  if (synced > 0) await revalidatePublicContent()
+  //
+  // Only the communities it changed (Nov 20): each community's own pages,
+  // not every community's.
+  const changed = [...new Set(asked.filter((a) => a.ok).map((a) => a.community))].sort()
+  if (synced > 0) await revalidatePublicContent({ communities: changed })
 
   // Closures and reopenings alike, kept for the nightly email
   // (nightlyEmail.ts); without migration 096, one email now, as before.

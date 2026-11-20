@@ -43,7 +43,8 @@ vi.mock('@/lib/email', () => ({
 }))
 const mockKeep = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/nightNoteStore', () => ({ keepStatusChanges: mockKeep }))
-vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: vi.fn() }))
+const mockRevalidate = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: mockRevalidate }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: vi.fn().mockResolvedValue([]) }))
 // The run's own record is jobRunStore.test.ts's.
 vi.mock('@/lib/jobRunStore', () => ({ recordJobRun: (_job: string, run: () => Promise<unknown>) => run() }))
@@ -264,6 +265,16 @@ describe('GET /api/cron/sync-hours', () => {
     const update = writeBuilder.update as ReturnType<typeof vi.fn>
     const written = update.mock.calls.at(-1)?.[0] as { details: Record<string, unknown> }
     expect(written.details).not.toHaveProperty('businessStatusChangedAt')
+  })
+
+  // Nov 20: a night's sync made every community's pages stale, whichever
+  // it had changed.
+  it('refreshes only the communities whose listings it synced', async () => {
+    mockRevalidate.mockClear()
+    mockFetchPlaceSync.mockResolvedValueOnce(OPERATIONAL).mockResolvedValueOnce(null)
+    stubTable([row, { ...row, id: 'r2', community_id: 'ues' }])
+    await runGet()
+    expect(mockRevalidate).toHaveBeenCalledExactlyOnceWith({ communities: ['philly'] })
   })
 
   // A dead email provider must not turn a successful sync into a failed cron:
