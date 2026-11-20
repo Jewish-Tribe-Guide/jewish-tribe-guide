@@ -37,6 +37,17 @@ test.describe('full-width bands are the page’s width, scrollbar and all', () =
         window: innerWidth,
         page: root.clientWidth,
         content: root.scrollWidth,
+        // What sticks out past the page, deepest first, for the message:
+        // on CI the category page was 8px too wide (Nov 20), never locally.
+        over: [...document.querySelectorAll('body *')]
+          .filter((el) => el.getBoundingClientRect().right > root.clientWidth + 0.5 && !el.querySelector('*:not(svg *)'))
+          .slice(0, 4)
+          .map((el) => {
+            const r = el.getBoundingClientRect()
+            const cls = typeof el.className === 'string' ? el.className.slice(0, 80) : ''
+            return `<${el.tagName.toLowerCase()} class="${cls}"> ${Math.round(r.left)}–${Math.round(r.right)}`
+          }),
+        scrollbarVar: getComputedStyle(root).getPropertyValue('--scrollbar-width'),
         bands: selectors.map((sel) => {
           const r = document.querySelector(sel)?.getBoundingClientRect()
           return { sel, left: r?.left ?? null, right: r?.right ?? null }
@@ -45,7 +56,7 @@ test.describe('full-width bands are the page’s width, scrollbar and all', () =
     }, bands)
     // Otherwise the test checks nothing: the overhang is the scrollbar's.
     expect(m.window - m.page, 'no scrollbar taking room on this page').toBeGreaterThan(0)
-    expect(m.content, 'the page is wider than the window').toBe(m.page)
+    expect(m.content, `the page is wider than the window (--scrollbar-width ${m.scrollbarVar || 'unset'}; past its edge: ${m.over.join('; ') || 'nothing'})`).toBe(m.page)
     for (const b of m.bands) {
       expect(b.left, `${b.sel} isn't on the page`).not.toBeNull()
       expect(Math.abs(b.left!), `${b.sel} starts off the page's left edge`).toBeLessThanOrEqual(0.5)
