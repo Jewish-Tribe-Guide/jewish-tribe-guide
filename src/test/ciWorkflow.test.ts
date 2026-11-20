@@ -126,3 +126,52 @@ describe('a PR’s checks start at once and e2e is split', () => {
     expect(e2e).toMatch(new RegExp(`--shard=\\$\\{\\{ matrix\\.shard \\}\\}/${shards.length}\\b`))
   })
 })
+
+// Every job that uses the test project (any `secrets.TEST_SUPABASE_*`) shares
+// one database with every other run of the same job, on any branch. Two copies
+// of one suite at once rename the same fixture and mint the same admin's
+// magic link — PR 400's admin-write failed beside main's that way (Nov 19).
+// Row claims (e2e/suiteRows.ts) only separate different suites. So each such
+// job queues repo-wide, and none runs on push to main, whose tree its PR
+// already tested (main requires up-to-date branches). Derived from the
+// secrets, so a new suite against the test project is held to it too.
+describe('test-project suites never run two copies at once', () => {
+  // Top-level job blocks, as the suites above split them.
+  const body = WORKFLOW.slice(WORKFLOW.indexOf('\njobs:'))
+  const jobs = Object.fromEntries(
+    body
+      .split(/\n {2}(?=[a-z][\w-]*:\n)/)
+      .slice(1)
+      .map((b) => [b.match(/^([\w-]+):/)![1], b] as const),
+  )
+  const usesTestProject = Object.keys(jobs).filter((n) => /secrets\.TEST_SUPABASE_/.test(jobs[n]))
+  const field = (block: string, re: RegExp) => block.match(re)?.[1].trim() ?? ''
+
+  it('finds the test-project jobs at all', () => {
+    expect(usesTestProject.length).toBeGreaterThanOrEqual(5)
+  })
+
+  for (const name of usesTestProject) {
+    it(`${name} queues in its own repo-wide group and skips main's push`, () => {
+      const job = jobs[name]
+      const group = field(job, /\n {4}concurrency:\n {6}group:\s*(.+)/)
+      // Repo-wide: no ref, run or PR number in the group, or each branch
+      // gets its own queue and the copies overlap again.
+      expect(group, `${name} needs concurrency.group test-db-…`).toMatch(/^test-db-/)
+      expect(group).not.toMatch(/github\.(ref|run_id|head_ref|event\.number)/)
+      // A matrix job's group must name its cell, or its shards queue
+      // behind each other instead of behind the other run's same shard.
+      for (const [, key] of job.matchAll(/\n {6}matrix:\n {8}([\w-]+):/g)) {
+        expect(group).toContain(`matrix.${key}`)
+      }
+      // Wait, never kill: cancelling would fail the running PR's check.
+      expect(field(job, /\n {6}cancel-in-progress:\s*(.+)/)).toBe('false')
+      expect(field(job, /\n {4}if:\s*(.+)/)).toMatch(/github\.event_name\s*!=\s*'push'/)
+    })
+  }
+
+  it('each suite has a group of its own', () => {
+    const groups = usesTestProject.map((n) => field(jobs[n], /\n {4}concurrency:\n {6}group:\s*(.+)/))
+    expect(new Set(groups).size).toBe(groups.length)
+  })
+})
