@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan, Tefillah } from './davening'
 import type { ReadRegularTime, RegularReading } from './scheduleUpdate'
-import { fromReading, pick, sameNote, weekFrom, type DatedTime, type Finding, type Part, type SourceKind, type SourceRead, type WeekContext } from './shulTimes'
+import { calendarListsUsual, fromReading, pick, sameNote, weekFrom, type DatedTime, type Finding, type Part, type SourceKind, type SourceRead, type WeekContext } from './shulTimes'
 
 // Each case here is a real one (docs/shul-watch-rebuild.md, "Steps" 3 and
 // "Cases from live"), from the Nov 5–19 To do items and the newsletters
@@ -237,8 +237,13 @@ describe('fromReading: a reader’s reply as the rules take it', () => {
     expect(part(weekFrom([r], ctx({ usual: USUAL })), 'weekdays')).toMatchObject({ do: 'nothing', reason: 'not read' })
   })
 
-  it('the shows window and last date passed in win; a calendar is a schedule; the reader’s shape, heading and cancellations carry over', () => {
-    const cal = fromReading(reading([]), src('cal', 'calendar'), { week: WEEK, shows: WEEK, lastPosted: '2026-12-01' })
+  it('Rodeph Shalom: a calendar’s shape is the one passed in, whatever the reader called its week', () => {
+    const r = fromReading(reading([rt('shacharis', ['thu'], '8:10 AM', { date: '2026-11-26' })], { shape: 'event' }), src('cal', 'calendar'), { week: WEEK, shows: WEEK, shape: 'schedule' })
+    expect(r.shape).toBe('schedule')
+  })
+
+  it('the shows window and last date passed in win; the reader’s shape, heading and cancellations carry over', () => {
+    const cal = fromReading(reading([]), src('cal', 'calendar'), { week: WEEK, shows: WEEK, lastPosted: '2026-12-01', shape: 'schedule' })
     expect(cal).toMatchObject({ shape: 'schedule', shows: WEEK, lastPosted: '2026-12-01', times: [] })
     const page = fromReading(
       reading([rt('shacharis', ['sat'], '9:00 AM', { date: SAT })], { from: THU, to: SAT, title: 'Shabbat Vayetze', shape: 'highlight', heading: 'This Shabbat', cancelled: [{ date: FRI, quote: 'No Kabbalat Shabbat' }] }),
@@ -246,5 +251,21 @@ describe('fromReading: a reader’s reply as the rules take it', () => {
       { week: WEEK },
     )
     expect(page).toMatchObject({ shape: 'highlight', heading: 'This Shabbat', shows: { from: THU, to: SAT }, cancelled: [{ date: FRI }] })
+  })
+})
+
+describe('calendarListsUsual: a calendar that is the shul’s schedule', () => {
+  const e = (date: string, time: string) => ({ date, time })
+  it('the Shtiebel: its clock-time minyanim are there; Kabbalat Shabbat at candle lighting isn’t held against it', () => {
+    const usual = [m('shacharis', ['mon', 'thu'], '7:15am'), m('shacharis', ['sat'], '9:00am'), m('kabbalas_shabbos', ['fri'], 'At Candle Lighting', { anchor: 'candle_lighting' })]
+    expect(calendarListsUsual([e(MON, '7:15 AM'), e(SAT, '9:00 AM'), e(FRI, '5:00 PM')], usual)).toBe(true)
+  })
+  it('BZBI: a usual minyan it never lists (Wednesday Maariv) means it isn’t the schedule', () => {
+    const usual = [m('shacharis', ['mon', 'thu'], '7:45 AM'), m('maariv', ['wed'], '7:00 PM')]
+    expect(calendarListsUsual([e(MON, '7:45 AM'), e(THU, '7:45 AM')], usual)).toBe(false)
+  })
+  it('a calendar of classes, and a shul with only zman times, aren’t either', () => {
+    expect(calendarListsUsual([e(TUE, '7:00 PM')], [m('shacharis', ['mon'], '7:00 AM')])).toBe(false)
+    expect(calendarListsUsual([e(FRI, '4:30 PM')], [m('kabbalas_shabbos', ['fri'], 'At Candle Lighting', { anchor: 'candle_lighting' })])).toBe(false)
   })
 })

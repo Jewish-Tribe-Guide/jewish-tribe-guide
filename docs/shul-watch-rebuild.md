@@ -278,6 +278,53 @@ Each is tested, committed and pushed before the next.
    the user first.
 8. **Build the listing** ("The listing", above).
 
+## Dry run (Nov 19)
+
+`scripts/shul-times-dry-run.mts`, reading live only (any write is refused
+before it leaves). Thirteen shuls have a watched page; Sons of Israel's and
+Lower Merion's sites refuse a request from a laptop (406), though the live
+run reads them, so they aren't in it. Newsletters aren't stored: a week on
+the listing no website posted stands in for one.
+
+Found, and fixed in the code:
+
+- **A calendar read mid-week shows from today**, not from Sunday. Taken
+  as Sunday on, its Thursday–Friday times were a whole weekday week with
+  no minyan Sunday to Wednesday.
+- **The reader's shape isn't asked of a calendar.** It called Rodeph
+  Shalom's Nov 22 week (services beside Torah study) an event, so the
+  week was dropped. A calendar is the shul's schedule when it lists the
+  usual minyanim (`calendarListsUsual`), else a highlight.
+- **The old check failed any shul with a usual minyan set by a zman.**
+  The Shtiebel's Kabbalat Shabbat at candle lighting kept its whole
+  calendar from counting; such minyanim are left out of the check now.
+- **"No week held" isn't "a week with no minyan".** The run must pass a
+  held part only when a listing week covers it.
+
+Open, for the user:
+
+- **Newsletter or calendar first.** BZBI's calendar for Nov 22–28 lists
+  Sunday and "Tuesday & Wednesday Morning Minyan" once; its newsletter,
+  the same evening, lists every weekday, Thanksgiving at 9:00. With the
+  calendar first, the week would have had no minyan four days it has
+  one. BZBI's calendar is a highlight under `calendarListsUsual` (its
+  Wednesday Maariv isn't on it), so the dry run waited for the newsletter,
+  but a shul whose calendar lists its usual times and lags would not.
+- **A short source matching the usual times exactly** (Kesher Israel's
+  homepage, one run) is taken as the week, a To do item that changes
+  nothing a visitor sees.
+- **The Little Shul's homepage lists its next service** (Dec 5); the old
+  run filed "no minyan" for Nov 22–28 from it. The new rules don't read a
+  list of dates as a whole calendar.
+- **The reader isn't the same twice.** Kol Tzedek's and Kesher Israel's
+  weeks came out differently across four runs of the same pages. Pages
+  are read only when they change, which limits it.
+
+Lines: the old shul logic is about 720 (431 in `listingPageRun.ts`, 155
+`shulWeekReading.ts`, 130 `websiteNotes.ts`); the new is 316 in
+`shulTimes.ts`, a third of it comments, plus the run, not written yet
+(about 150). About a third fewer, not half.
+
 ## Not in this rebuild
 
 - **The paste box, "+ Add" and Add a minyan.** They share the old

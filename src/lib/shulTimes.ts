@@ -1,4 +1,4 @@
-import type { Minyan, Tefillah, ZmanAnchor } from './davening'
+import { parseTimeToMinutes, type Minyan, type Tefillah, type ZmanAnchor } from './davening'
 import { datesBetween, sameTime, weekdayOf, type DayZmanim, type RegularReading } from './scheduleUpdate'
 
 // ── A shul's week: what its sources say, by the rule ──────────────────────────
@@ -239,6 +239,26 @@ export function weekFrom(reads: readonly SourceRead[], ctx: WeekContext): Findin
   return PARTS.map((part) => forPart(part, counted, ctx))
 }
 
+/** Whether a calendar is the shul's schedule rather than its classes and
+ *  events: each usual minyan at a clock time is on it, that weekday,
+ *  within 15 minutes. One set by a zman can't be held against a date's
+ *  clock time, so it's left out of the check, not failed: the Shtiebel's
+ *  Kabbalat Shabbat at candle lighting kept its whole calendar from
+ *  counting (Nov 19). A calendar beside a daily minyan it never lists,
+ *  BZBI's missing its Wednesday Maariv, isn't one. */
+export function calendarListsUsual(services: readonly { date: string; time?: string | null }[], usual: readonly Minyan[]): boolean {
+  const clock = usual.filter((m) => !m.anchor && Number.isFinite(parseTimeToMinutes(m.time)))
+  return (
+    clock.length > 0 &&
+    clock.every((m) =>
+      services.some((e) => {
+        const at = e.time ? parseTimeToMinutes(e.time) : NaN
+        return m.days.includes(weekdayOf(e.date)) && Number.isFinite(at) && Math.abs(at - parseTimeToMinutes(m.time)) <= 15
+      }),
+    )
+  )
+}
+
 /** A window no date falls in: a page with no dated times shows no day. */
 const SHOWS_NOTHING = { from: '9999-12-31', to: '0000-01-01' }
 
@@ -249,12 +269,15 @@ const SHOWS_NOTHING = { from: '9999-12-31', to: '0000-01-01' }
  *    dated ones count.
  *  - It shows: an email, its week; a calendar or page, the window passed
  *    in, else the dates the reading says it covers, else its dated times'.
- *  - Its shape is what the reader said, else a calendar is a schedule, and
- *    a page is one only when it lists every minyan for its days. */
+ *  - Its shape is what the reader said, else a page is a schedule only
+ *    when it lists every minyan for its days. A calendar's is passed in:
+ *    it is the shul's schedule when it lists the usual minyanim
+ *    (calendarListsUsual), whatever else it has. The reader called Rodeph
+ *    Shalom's Nov 22 week, services beside Torah study, an event. */
 export function fromReading(
   reading: RegularReading,
   source: Source,
-  { week, shows, lastPosted }: { week: WeekContext['week']; shows?: SourceRead['shows']; lastPosted?: string },
+  { week, shows, lastPosted, shape: given }: { week: WeekContext['week']; shows?: SourceRead['shows']; lastPosted?: string; shape?: Shape },
 ): SourceRead {
   const dated = reading.times.filter((t) => t.date).map((t) => t.date!)
   const window =
@@ -279,7 +302,7 @@ export function fromReading(
       quote: t.quote,
     }))
   })
-  const shape: Shape = reading.shape ?? (source.kind === 'calendar' || reading.complete ? 'schedule' : 'highlight')
+  const shape: Shape = given ?? reading.shape ?? (reading.complete ? 'schedule' : 'highlight')
   const heading = reading.heading ?? reading.title ?? undefined
   return {
     source,
