@@ -3438,6 +3438,10 @@ after the deploy, dry run first, and needs its own go-ahead.
 7. The "+" button covers part of the third tile in a row on the phone home.
 8. ~~Counts on the admin's To do tabs~~ Done with the admin redesign
    (Oct 29): To do is one list, and the nav shows its count.
+9. To look at some time (flagged Nov 20): the drawing session "Draw:
+   asking for location when it helps" (branch `claude/eager-nash-317067`,
+   started from the public site review) is waiting on the user's look at
+   its boards. Nothing built until a board is approved.
 
 ## Planned: the admin redesign (started Oct 28, brief agreed Oct 28)
 
