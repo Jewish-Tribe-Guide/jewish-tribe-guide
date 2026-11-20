@@ -1,0 +1,214 @@
+import { describe, expect, it } from 'vitest'
+import type { Minyan, Tefillah } from './davening'
+import { pick, sameNote, weekFrom, type DatedTime, type Finding, type Part, type SourceKind, type SourceRead, type WeekContext } from './shulTimes'
+
+// Each case here is a real one (docs/shul-watch-rebuild.md, "Steps" 3 and
+// "Cases from live"), from the Nov 5–19 To do items and the newsletters
+// read Nov 19. The week is Sun Nov 15 – Sat Nov 21, 2026; today Thu Nov 19.
+
+const WEEK = { from: '2026-11-15', to: '2026-11-21' }
+const SUN = '2026-11-15', MON = '2026-11-16', TUE = '2026-11-17', WED = '2026-11-18', THU = '2026-11-19', FRI = '2026-11-20', SAT = '2026-11-21'
+const WEEKDAYS = [SUN, MON, TUE, WED, THU, FRI]
+
+const t = (date: string, tefillah: Tefillah, time: string, extra: Partial<DatedTime> = {}): DatedTime => ({ date, tefillah, time, ...extra })
+const src = (id: string, kind: SourceKind, at = '2026-11-19T12:00:00Z') => ({ id, kind, label: id, at })
+const read = (source: SourceRead['source'], shape: SourceRead['shape'], shows: { from: string; to: string }, times: DatedTime[], extra: Partial<SourceRead> = {}): SourceRead => ({ source, shape, shows, times, ...extra })
+const m = (tefillah: Tefillah, days: Minyan['days'], time: string, extra: Partial<Minyan> = {}): Minyan => ({ id: `${tefillah}-${days.join('')}-${time}`, tefillah, days, time, ...extra })
+const ctx = (over: Partial<WeekContext> = {}): WeekContext => ({
+  week: WEEK,
+  today: THU,
+  usual: [],
+  held: [],
+  // Philadelphia, Fri Nov 20: candle lighting 4:24 PM, sunset 4:42 PM.
+  zmanim: { [FRI]: { candleLighting: 16 * 60 + 24, sunset: 16 * 60 + 42 } },
+  ...over,
+})
+const part = (fs: Finding[], p: Part) => fs.find((f) => f.part === p)!
+
+// A shul with Shacharis every weekday and Mincha/Maariv Friday night and
+// Shabbos morning: Mekor's shape, simplified.
+const USUAL: Minyan[] = [
+  m('shacharis', ['sun'], '8:30 AM'),
+  m('shacharis', ['mon', 'tue', 'wed', 'thu', 'fri'], '6:45 AM'),
+  m('mincha_maariv', ['fri'], '', { anchor: 'candle_lighting', offsetMinutes: 0 }),
+  m('shacharis', ['sat'], '9:15 AM'),
+]
+const weekdayTimes = (except: string[] = []) => WEEKDAYS.filter((d) => !except.includes(d)).map((d) => t(d, 'shacharis', d === SUN ? '8:30 AM' : '6:45 AM'))
+
+describe('a whole source', () => {
+  it('Lower Merion: its calendar is the week, its homepage’s late Maariv is not looked at', () => {
+    const calendar = read(src('calendar', 'calendar'), 'schedule', WEEK, [...weekdayTimes(), t(FRI, 'kabbalas_shabbos', '4:30 PM'), t(SAT, 'shacharis', '8:45 AM')])
+    const homepage = read(src('homepage', 'page'), 'highlight', { from: WED, to: WED }, [t(WED, 'maariv', '9:30 PM')], { heading: 'This week at LMS' })
+    const fs = weekFrom([homepage, calendar], ctx({ usual: USUAL }))
+    expect(part(fs, 'weekdays')).toMatchObject({ do: 'take', whole: true, from: { source: { id: 'calendar' } } })
+    expect((part(fs, 'weekdays') as Extract<Finding, { do: 'take' }>).times.some((x) => x.time === '9:30 PM')).toBe(false)
+    expect(part(fs, 'shabbos')).toMatchObject({ do: 'take', whole: true, from: { source: { id: 'calendar' } } })
+  })
+
+  it('Society Hill: the whole email is both parts, the Monday Zoom Maariv included', () => {
+    const email = read(src('email', 'newsletter'), 'schedule', WEEK, [t(MON, 'maariv', '7:00 PM', { notes: 'Zoom' }), t(FRI, 'kabbalas_shabbos', '6:00 PM'), t(SAT, 'shacharis', '9:30 AM')], {
+      heading: 'This Week at Society Hill',
+    })
+    const fs = weekFrom([email], ctx())
+    expect(part(fs, 'weekdays')).toMatchObject({ do: 'take', whole: true, times: [{ date: MON, tefillah: 'maariv', notes: 'Zoom' }] })
+    expect(part(fs, 'shabbos')).toMatchObject({ do: 'take', whole: true })
+  })
+
+  it('the Shtiebel: a Shabbos-only email takes Shabbos and says nothing about weekdays', () => {
+    const email = read(src('email', 'newsletter'), 'schedule', { from: FRI, to: SAT }, [t(FRI, 'kabbalas_shabbos', '4:25 PM'), t(SAT, 'shacharis', '9:00 AM'), t(SAT, 'mincha', '4:15 PM')])
+    const fs = weekFrom([email], ctx({ usual: USUAL }))
+    expect(part(fs, 'shabbos')).toMatchObject({ do: 'take', whole: true })
+    expect(part(fs, 'weekdays')).toMatchObject({ do: 'nothing', reason: 'not read' })
+  })
+
+  it('a day the week leaves out has no minyan: BZBI’s regular times without Wednesday', () => {
+    const email = read(src('email', 'newsletter'), 'schedule', WEEK, weekdayTimes([WED]))
+    const take = part(weekFrom([email], ctx({ usual: USUAL })), 'weekdays') as Extract<Finding, { do: 'take' }>
+    expect(take.do).toBe('take')
+    expect(take.times.map((x) => x.date)).not.toContain(WED)
+  })
+
+  it('a week said in a sentence: the cancellation comes off and is quoted', () => {
+    const quote = 'No Shabbat Services!'
+    const email = read(src('email', 'newsletter'), 'schedule', WEEK, [t(SAT, 'shacharis', '10:00 AM')], { cancelled: [{ date: FRI, quote }] })
+    const take = part(weekFrom([email], ctx()), 'shabbos') as Extract<Finding, { do: 'take' }>
+    expect(take).toMatchObject({ do: 'take', quotes: [quote] })
+    expect(take.times.map((x) => x.date)).toEqual([SAT])
+  })
+
+  it('never reads the usual times: the same week whatever they are', () => {
+    const email = read(src('email', 'newsletter'), 'schedule', WEEK, [...weekdayTimes([TUE]), t(SAT, 'shacharis', '9:15 AM')])
+    const strip = (fs: Finding[]) => JSON.stringify(fs)
+    expect(strip(weekFrom([email], ctx({ usual: USUAL })))).toBe(strip(weekFrom([email], ctx({ usual: [] }))))
+  })
+
+  it('files nothing when it is the week we already have', () => {
+    const times = weekdayTimes()
+    const email = read(src('email', 'newsletter'), 'schedule', { from: SUN, to: FRI }, times)
+    const fs = weekFrom([email], ctx({ held: [{ part: 'weekdays', times }] }))
+    expect(part(fs, 'weekdays')).toMatchObject({ do: 'nothing', reason: 'same' })
+  })
+})
+
+describe('one pick per part', () => {
+  it('a calendar wins over a newsletter that disagrees with it', () => {
+    const calendar = read(src('calendar', 'calendar', '2026-11-17T00:00:00Z'), 'schedule', WEEK, [t(SAT, 'shacharis', '9:00 AM')])
+    const email = read(src('email', 'newsletter', '2026-11-19T00:00:00Z'), 'schedule', WEEK, [t(SAT, 'shacharis', '9:30 AM')])
+    expect(part(weekFrom([email, calendar], ctx()), 'shabbos')).toMatchObject({ do: 'take', from: { source: { id: 'calendar' } }, times: [{ time: '9:00 AM' }] })
+  })
+
+  it('Kol Tzedek: a newsletter wins over its homepage and Shabbat page, so they don’t take turns', () => {
+    const email = read(src('email', 'newsletter'), 'schedule', { from: FRI, to: SAT }, [t(FRI, 'kabbalas_shabbos', '6:30 PM', { notes: 'Online only' }), t(SAT, 'shacharis', '10:00 AM')])
+    const home = read(src('home', 'page', '2026-11-19T20:00:00Z'), 'schedule', { from: FRI, to: SAT }, [t(FRI, 'kabbalas_shabbos', '6:30 PM', { notes: 'Hybrid' }), t(SAT, 'shacharis', '10:00 AM')])
+    expect(part(weekFrom([home, email], ctx()), 'shabbos')).toMatchObject({ from: { source: { id: 'email' } } })
+  })
+
+  it('Sons of Israel’s usual times: the regular-schedule page over the homepage', () => {
+    expect(pick([src('home', 'page'), src('tefillot', 'schedule')])?.id).toBe('tefillot')
+    expect(pick([src('home', 'page'), src('cal', 'calendar'), src('email', 'newsletter')])?.id).toBe('cal')
+    expect(pick([src('a', 'page', '2026-11-01T00:00:00Z'), src('b', 'page', '2026-11-02T00:00:00Z')])?.id).toBe('b')
+    expect(pick([])).toBeNull()
+  })
+})
+
+describe('a calendar’s weeks', () => {
+  it('the Little Shul: an empty week is no minyan when something is posted after it', () => {
+    const calendar = read(src('calendar', 'calendar'), 'schedule', WEEK, [], { lastPosted: '2026-12-05' })
+    expect(part(weekFrom([calendar], ctx()), 'shabbos')).toMatchObject({ do: 'take', whole: true, times: [] })
+  })
+
+  it('an empty week with nothing posted after it isn’t posted yet (Leyv Ha-Ir, Nov 22–28)', () => {
+    const calendar = read(src('calendar', 'calendar'), 'schedule', WEEK, [], { lastPosted: '2026-11-07' })
+    expect(part(weekFrom([calendar], ctx()), 'shabbos')).toMatchObject({ do: 'nothing', reason: 'not read' })
+  })
+
+  it('Sons of Israel: a calendar showing Thu–Sat is whole for Shabbos only; the days before aren’t cancelled', () => {
+    const calendar = read(src('calendar', 'calendar'), 'schedule', { from: THU, to: SAT }, [t(THU, 'shacharis', '6:45 AM'), t(FRI, 'shacharis', '6:45 AM'), t(SAT, 'shacharis', '9:15 AM')])
+    const fs = weekFrom([calendar], ctx({ usual: USUAL }))
+    expect(part(fs, 'shabbos')).toMatchObject({ do: 'take', whole: true })
+    expect(part(fs, 'weekdays')).toMatchObject({ do: 'nothing', reason: 'agrees' })
+  })
+})
+
+describe('a short source', () => {
+  it('Mekor: its homepage’s Friday isn’t looked at beside the newsletter', () => {
+    const home = read(src('home', 'page'), 'highlight', { from: FRI, to: FRI }, [t(FRI, 'mincha_maariv', '4:25 PM')])
+    const email = read(src('email', 'newsletter'), 'schedule', WEEK, [t(FRI, 'mincha_maariv', '4:30 PM'), t(SAT, 'shacharis', '9:15 AM')])
+    expect(part(weekFrom([home, email], ctx({ usual: USUAL })), 'shabbos')).toMatchObject({ do: 'take', from: { source: { id: 'email' } } })
+  })
+
+  it('Mekor: its homepage waits while the newsletter is due', () => {
+    const home = read(src('home', 'page'), 'highlight', { from: FRI, to: FRI }, [t(FRI, 'mincha_maariv', '4:40 PM')])
+    expect(part(weekFrom([home], ctx({ usual: USUAL, newsletterGives: ['shabbos'] })), 'shabbos')).toMatchObject({ do: 'nothing', reason: 'waiting' })
+    // Saturday, and no newsletter came: now it is looked at.
+    expect(part(weekFrom([home], ctx({ usual: USUAL, today: SAT, newsletterGives: ['shabbos'] })), 'shabbos')).toMatchObject({ do: 'ask' })
+  })
+
+  it('a highlight that agrees is ignored: a highlight never removes a minyan', () => {
+    const home = read(src('home', 'page'), 'highlight', { from: FRI, to: FRI }, [t(FRI, 'kabbalas_shabbos', '4:25 PM')], { heading: 'This Shabbat' })
+    expect(part(weekFrom([home], ctx({ usual: USUAL })), 'shabbos')).toMatchObject({ do: 'nothing', reason: 'agrees' })
+  })
+
+  it('a highlight with a different time goes to the admin, saying how it was read', () => {
+    const home = read(src('home', 'page'), 'highlight', { from: SAT, to: SAT }, [t(SAT, 'shacharis', '10:00 AM')], { heading: 'This Shabbat' })
+    const ask = part(weekFrom([home], ctx({ usual: USUAL })), 'shabbos') as Extract<Finding, { do: 'ask' }>
+    expect(ask).toMatchObject({ do: 'ask', different: [{ read: { time: '10:00 AM' } }], missing: [] })
+    expect(ask.readAs).toBe('Read as a highlight, under “This Shabbat”')
+  })
+
+  it('a short schedule that leaves out a usual minyan on a day it shows goes to the admin', () => {
+    const page = read(src('page', 'page'), 'schedule', { from: MON, to: MON }, [], { cancelled: [] })
+    const withMaariv = read(src('page', 'page'), 'schedule', { from: MON, to: MON }, [t(MON, 'maariv', '7:00 PM')])
+    expect(part(weekFrom([page], ctx({ usual: USUAL })), 'weekdays')).toMatchObject({ do: 'nothing' })
+    expect(part(weekFrom([withMaariv], ctx({ usual: USUAL })), 'weekdays')).toMatchObject({ do: 'ask', extra: [{ tefillah: 'maariv' }], missing: [{ date: MON }] })
+  })
+
+  it('a short source with every usual minyan of the part at its usual time is that part’s week', () => {
+    const home = read(src('home', 'page'), 'highlight', { from: FRI, to: SAT }, [t(FRI, 'mincha_maariv', '4:24 PM'), t(SAT, 'shacharis', '9:15 AM')])
+    expect(part(weekFrom([home], ctx({ usual: USUAL })), 'shabbos')).toMatchObject({ do: 'take', whole: false })
+  })
+
+  it('a cancellation in a short source goes to the admin with its words', () => {
+    const home = read(src('home', 'page'), 'highlight', { from: FRI, to: FRI }, [], { cancelled: [{ date: FRI, quote: 'No services this Friday' }] })
+    expect(part(weekFrom([home], ctx({ usual: USUAL })), 'shabbos')).toMatchObject({ do: 'ask', quotes: ['No services this Friday'] })
+  })
+})
+
+describe('what isn’t counted', () => {
+  it('Society Hill’s Kristallnacht email and BZBI’s Hanukkah email: events are no part', () => {
+    const event = read(src('email', 'newsletter'), 'event', { from: MON, to: MON }, [t(MON, 'other', '5:00 PM')])
+    const fs = weekFrom([event], ctx({ usual: USUAL }))
+    expect(fs).toHaveLength(2)
+    expect(fs.every((f) => f.do === 'nothing')).toBe(true)
+  })
+
+  it('Mekor’s “other” at 9:15 PM on Shabbos isn’t a minyan', () => {
+    const home = read(src('home', 'page'), 'highlight', { from: SAT, to: SAT }, [t(SAT, 'other', '9:15 PM')])
+    expect(part(weekFrom([home], ctx({ usual: USUAL })), 'shabbos')).toMatchObject({ do: 'nothing' })
+  })
+})
+
+describe('notes compared by what they say', () => {
+  it('Rodeph Shalom’s Thursday note, four ways in one week, is one note', () => {
+    expect(sameNote('Online; until 8:40 AM', 'Online')).toBe(true)
+    expect(sameNote('Online; until 8:40 AM', 'until 8:40 AM; Online')).toBe(true)
+    expect(sameNote('Online; until 8:40 AM', 'Online only')).toBe(true)
+    expect(sameNote('Online', 'Online only')).toBe(true)
+    expect(sameNote('until 8:40 AM', 'until 8:40')).toBe(true)
+    expect(sameNote(undefined, '')).toBe(true)
+  })
+
+  it('a note that says something new is a change', () => {
+    expect(sameNote('Hybrid', 'Online only')).toBe(false)
+    expect(sameNote('Online', 'Online; Celebrating the Bar Mitzvah of Sam')).toBe(false)
+    expect(sameNote(undefined, 'Zoom')).toBe(false)
+  })
+
+  it('a week whose notes are only reworded files nothing', () => {
+    const held = [t(THU, 'shacharis', '8:10 AM', { notes: 'Online; until 8:40 AM' })]
+    for (const notes of ['Online', 'until 8:40 AM; Online', 'Online only']) {
+      const calendar = read(src('calendar', 'calendar'), 'schedule', { from: SUN, to: FRI }, [t(THU, 'shacharis', '8:10 AM', { notes })])
+      expect(part(weekFrom([calendar], ctx({ held: [{ part: 'weekdays', times: held }] })), 'weekdays')).toMatchObject({ do: 'nothing', reason: 'same' })
+    }
+  })
+})
