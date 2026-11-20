@@ -72,18 +72,35 @@ export async function listPendingSubmissions(community: string): Promise<Enriche
 // so it orders by created_at (oldest waiting first isn't the goal here,
 // newest submitted first is); approved/rejected order by reviewed_at, most
 // recently decided first — that's what "what just happened" means.
+//
+// `page` (History, Nov 20): `limit` of them, decided before `before` (the
+// last one shown). Live Philly had 1,253 approved changes, every one read
+// and matched to its listing each time History opened. Ties on
+// reviewed_at are broken by id, so a page never repeats or skips one.
+export type HistoryCursor = { at: string; id: string }
 export async function listSubmissionsByStatus(
   community: string,
   status: SubmissionStatus,
+  page?: { limit: number; before?: HistoryCursor },
 ): Promise<EnrichedSubmission[]> {
   const supabase = getAdminClient()
 
-  const { data, error } = await supabase
+  const decided = status !== 'pending'
+  let query = supabase
     .from('submission')
     .select('*')
     .eq('community_id', community)
     .eq('status', status)
-    .order(status === 'pending' ? 'created_at' : 'reviewed_at', { ascending: false })
+    .order(decided ? 'reviewed_at' : 'created_at', { ascending: false })
+  if (decided && page) {
+    query = query.order('id', { ascending: false })
+    if (page.before) {
+      const { at, id } = page.before
+      query = query.or(`reviewed_at.lt."${at}",and(reviewed_at.eq."${at}",id.lt."${id}")`)
+    }
+    query = query.limit(page.limit)
+  }
+  const { data, error } = await query
 
   if (error) throw new Error(`Failed to load submissions: ${error.message}`)
   const all = data as SubmissionRow[]
