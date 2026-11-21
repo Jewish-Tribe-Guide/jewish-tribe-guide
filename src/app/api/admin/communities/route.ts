@@ -8,6 +8,7 @@ import {
   listCommunityAdminEmails,
   listCommunityNotifyPreferenceLists,
   listCommunityPreviewTokens,
+  removeUnfinishedCommunity,
 } from '@/lib/communityStore'
 import { addMissingSiteScreens, cloneCommunityContent } from '@/lib/communityCloning'
 
@@ -114,12 +115,23 @@ export const POST = siteAdminRead(async (request: Request) => {
       adminEmails,
     })
 
-    if (body.cloneFrom) {
-      await cloneCommunityContent(community.slug, body.cloneFrom)
+    try {
+      if (body.cloneFrom) {
+        await cloneCommunityContent(community.slug, body.cloneFrom)
+      }
+      // On from the start, cloned or empty: without the Map's row a new
+      // community has no Map tab, which read as a bug (the user, Oct 31).
+      await addMissingSiteScreens(community.slug)
+    } catch (err) {
+      // Half made (Nov 21, the save survey): taken back out, so making it
+      // again starts clean rather than "already in use".
+      try {
+        await removeUnfinishedCommunity(community.slug)
+      } catch (backErr) {
+        reportServerError(`[admin/communities] ${community.slug} was made only in part, and couldn’t be taken back out: delete it before making it again`, backErr)
+      }
+      throw err
     }
-    // On from the start, cloned or empty: without the Map's row a new
-    // community has no Map tab, which read as a bug (the user, Oct 31).
-    await addMissingSiteScreens(community.slug)
 
     // The new community's directory (and, for everyone else, the updated
     // communities list) is public content — drop the cache so it shows up
