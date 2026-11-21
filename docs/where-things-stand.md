@@ -913,8 +913,15 @@ Found and not fixed:
   once (404 on a new community, `claude/shul-listing`). Still open:
   `category-open:41` ("opens without asking the server" saw an RSC
   request), twice (`claude/next-round`, and the Sentry 11.14 Dependabot
-  PR, where `category-editor:46` also found two Hours buttons). Not a
-  wait; not looked into.
+  PR, where `category-editor:46` also found two Hours buttons).
+  **Closed Nov 21 (a test bug):** both traces show the click while a
+  prefetch was still arriving. Next fetches each row's outline
+  (`/_tree`), but the page's content segment once, under whichever row
+  asks first, shared by all; the test waited only for the clicked row's
+  outline. It now waits until nothing under the list is arriving, for
+  half a second. Couldn't be shown red locally: the local build fetched
+  no shared segment at all (only outlines), so there was nothing to
+  hold back. Passed 4 of 4.
 - e2e `listing-detail.spec.ts:537` (above): once, not looked into.
 - 25 of 104 older migrations can't be told run or not from what they
   made (a policy, an index, a data fix).
