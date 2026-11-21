@@ -92,6 +92,13 @@ describe('ReportsPanel', () => {
     expect(screen.getByRole('link', { name: /History/ })).toHaveAttribute('href', '/philly/admin/history/approved')
   })
 
+  // The public page is on whenever a tab or header link leads to it, so its
+  // admin screen (hide an entry) is always reachable (Nov 21).
+  it('leads on to What changed', async () => {
+    await renderPanel()
+    expect(screen.getByRole('link', { name: /What changed/ })).toHaveAttribute('href', '/philly/admin/changes')
+  })
+
   it('a week asks for the week and says so', async () => {
     const user = userEvent.setup()
     await renderPanel()

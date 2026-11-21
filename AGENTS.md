@@ -12,7 +12,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 `docs/where-things-stand.md` is the running list of open work, decisions
 waiting on the user, and what's already decided. Read it before picking up
-redesign work, and update it in the same commit as anything that changes it.
+redesign work, and update it in the same commit as anything that changes it. Finished work is in `docs/history.md`
+(moved out Nov 21): look there for why something was built the way it was.
 
 # Local admin access
 

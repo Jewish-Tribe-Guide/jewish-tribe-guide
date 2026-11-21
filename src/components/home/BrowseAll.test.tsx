@@ -12,7 +12,7 @@ import { clearEruvStatuses } from '@/lib/useEruvStatuses'
 import BrowseAll from './BrowseAll'
 import { placeTime } from '@/test/placeTime'
 
-const features = vi.hoisted(() => ({ todayHome: false, whatChanged: true }))
+const features = vi.hoisted(() => ({ todayHome: false }))
 vi.mock('@/lib/features', () => ({ features }))
 
 vi.mock('next/navigation', () => ({
@@ -117,11 +117,12 @@ describe('the Browse tab', () => {
     expect(icon).not.toHaveTextContent('🧵')
   })
 
-  it('then What changed, Feedback, About and Privacy; Feedback only when it’s on', () => {
+  // No What changed link (Nov 21): where What changed shows is the admin's
+  // call, through a tab or a header link.
+  it('then Feedback, About and Privacy; Feedback only when it’s on', () => {
     show()
     const nav = screen.getByRole('navigation', { name: 'About the guide' })
     expect(within(nav).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-      ['What changed', '/philly/changes'],
       ['Feedback', '/philly/feedback'],
       ['About', '/philly/about'],
       ['Privacy', '/philly/privacy'],
@@ -129,17 +130,5 @@ describe('the Browse tab', () => {
     cleanup()
     show(false)
     expect(within(screen.getByRole('navigation', { name: 'About the guide' })).queryByRole('link', { name: 'Feedback' })).not.toBeInTheDocument()
-  })
-
-  // Held back from the site (features.ts): no link to a page that isn't there.
-  it('no What changed link while What changed is held back', () => {
-    features.whatChanged = false
-    try {
-      show()
-      const nav = screen.getByRole('navigation', { name: 'About the guide' })
-      expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(['Feedback', 'About', 'Privacy'])
-    } finally {
-      features.whatChanged = true
-    }
   })
 })

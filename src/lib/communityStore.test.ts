@@ -342,6 +342,14 @@ describe('deleteCommunity', () => {
     expect(calls.slice(1)).toEqual([...COMMUNITY_SCOPED_TABLES, 'community'])
   })
 
+  // Migration 113 (Nov 21): a category with listings in it can't be deleted
+  // (resource_category_fk), so where delete_community isn't there, one table
+  // at a time has to take the listings first. The rest cascade from the
+  // community, category, form or listing they point at.
+  it('deletes the listings before their categories', () => {
+    expect(COMMUNITY_SCOPED_TABLES.indexOf('resource')).toBeLessThan(COMMUNITY_SCOPED_TABLES.indexOf('category'))
+  })
+
   it('scopes every table delete to the given community, and the final delete by slug', async () => {
     const builders: ReturnType<typeof chainable>[] = []
     let call = 0

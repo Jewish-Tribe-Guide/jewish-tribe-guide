@@ -5,7 +5,6 @@ import { ChangesProvider } from '@/lib/changesContext'
 import { listChangeLog } from '@/lib/changesStore'
 import { listNights } from '@/lib/nightsStore'
 import { nightRow } from '@/lib/validatedNights'
-import { features } from '@/lib/features'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { changesLinked } from '@/lib/siteSettings'
 import { siteUrl } from '@/lib/siteUrl'
@@ -22,10 +21,10 @@ export async function generateMetadata(props: PageProps<'/[community]/changes'>)
 }
 
 export default async function ChangesPage(props: PageProps<'/[community]/changes'>) {
-  // Held back from the site for now (see features.ts), unless the admin has
-  // put it on a tab or a header link to see it (the user, Nov 15).
+  // Here while the admin has it on a tab or a header link (the user, Nov
+  // 15); that's the one switch for it (Nov 21).
   const { community } = await props.params
-  if (!features.whatChanged && !changesLinked(await getSiteSettings(community))) notFound()
+  if (!changesLinked(await getSiteSettings(community))) notFound()
   const [rows, nights] = await Promise.all([
     listChangeLog(community).catch((err) => {
       console.error('[changes] the log failed to load:', err)

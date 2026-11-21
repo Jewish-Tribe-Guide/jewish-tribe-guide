@@ -14,9 +14,6 @@ type Features = {
    *  (today_home), which its settings save needs. Run it on live first
    *  (decided Nov 21). */
   todayHome: boolean
-  /** What changed (step 7a): its page, its admin tab, the link at the foot
-   *  of the category list, and the home's read of the activity log. */
-  whatChanged: boolean
   /** Site's Forms tab (the user, Oct 31: hidden for now). Its page still
    *  answers at its address, and a form already published stays live. */
   formsTab: boolean
@@ -24,6 +21,5 @@ type Features = {
 
 export const features: Features = {
   todayHome: false,
-  whatChanged: false,
   formsTab: false,
 }

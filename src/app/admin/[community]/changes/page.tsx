@@ -2,13 +2,11 @@
 
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
 import WhatChangedAdmin from '@/components/admin/WhatChangedAdmin'
-import { notFound } from 'next/navigation'
-import { features } from '@/lib/features'
 
 export default function AdminWhatChangedPage() {
   const session = useAdminSession()
-  // Held back from the site for now (see features.ts).
-  if (!features.whatChanged) notFound()
+  // Always here (Nov 21): the public page is on whenever the admin links
+  // it, and hiding an entry from it is done here.
   return (
     <div>
       <WhatChangedAdmin token={session.access_token} />

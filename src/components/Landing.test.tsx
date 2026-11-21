@@ -45,7 +45,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 // Pinned, not read from features.ts, so these hold on a branch that has the
 // Today home switched back on too.
-const features = vi.hoisted(() => ({ todayHome: false, whatChanged: false }))
+const features = vi.hoisted(() => ({ todayHome: false }))
 vi.mock('@/lib/features', () => ({ features }))
 // Recorded, not run: the tests read what the search-miss log was told.
 vi.mock('@/lib/useLogSearchMiss', () => ({ useLogSearchMiss: vi.fn() }))

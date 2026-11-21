@@ -129,6 +129,12 @@ export default function ReportsPanel({ token }: { token: string }) {
               <div className="border-t border-slate-100">
                 <AdminRow href={`${base}/history/approved`} name="History" line="Who decided what, and when" />
               </div>
+              {/* Where an entry is hidden from the public What changed page,
+                  which is on whenever a tab or header link leads to it (Nov
+                  21: the page was live while this was switched off). */}
+              <div className="border-t border-slate-100">
+                <AdminRow href={`${base}/changes`} name="What changed" line="What visitors see on the What changed page" />
+              </div>
             </AdminBox>
           </div>
         </>
