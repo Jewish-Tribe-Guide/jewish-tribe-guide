@@ -52,6 +52,7 @@ import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useCommunityTimezone } from '@/lib/communityContext'
 import { dayLine } from '@/lib/todayHome'
 import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
+import SearchAnnouncer from '@/components/SearchAnnouncer'
 
 // Only after a search finds nothing; it carries the anti-spam check, which
 // the home shouldn't load for everyone (see GenericListingCard).
@@ -503,6 +504,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           today={today ? { dayLine: dayLine(schedule?.now ?? null, timezone, zmanim.data) } : undefined}
           trust={!today && trust ? <TrustBand facts={trust} region={activeCommunity.region} communitySlug={communitySlug} /> : null}
         />
+        {/* What the lines under the box found, for a screen reader. */}
+        <SearchAnnouncer query={q} count={searching && asked ? lines.length : null} />
 
         {/* ── How it stays right, on a computer (F1b, Nov 11): its own
                 band under the photo, before the cards. It took over from

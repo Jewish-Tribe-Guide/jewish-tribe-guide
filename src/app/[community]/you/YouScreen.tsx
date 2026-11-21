@@ -31,6 +31,7 @@ import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 import PhotoHeader from '@/components/PhotoHeader'
 import { useSetTabHeader } from '@/lib/headerVisibility'
 import { useTabLabel } from '@/lib/useTabLabel'
+import SearchAnnouncer from '@/components/SearchAnnouncer'
 
 // ── You (Oct 14, canvas page "you") ──────────────────────────────────────────
 // Saved places and saved searches, each with one live fact: a place's is its
@@ -155,6 +156,7 @@ export default function YouScreen() {
               Nothing in the guide for “{q}”
             </p>
           )}
+          <SearchAnnouncer query={q} count={showResults ? lines.length : null} />
         </div>
 
         {empty ? (

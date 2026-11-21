@@ -8,6 +8,7 @@ import BackIconButton from '@/components/BackIconButton'
 // The same order as the list's own groups, so a denomination sits in the
 // same place in both.
 import { orderForPicking } from '@/lib/listGroups'
+import { useDialogFocus } from '@/lib/useDialogFocus'
 
 // ── Every filter a category page has, in one place ───────────────────────────
 // Opened from Filters in the list heading (ListHeading), the same place on
@@ -319,6 +320,7 @@ export function FiltersDialog({
   onBack?: () => void
 }) {
   useBodyScrollLock(isOpen)
+  const dialogRef = useDialogFocus(isOpen)
   useEffect(() => {
     if (!isOpen) return
     const onKey = (e: KeyboardEvent) => {
@@ -335,7 +337,7 @@ export function FiltersDialog({
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div role="dialog" aria-modal="true" aria-label={title} className={`dialog-in flex max-h-[76vh] w-full flex-col rounded-2xl bg-white shadow-xl ${wide ? 'max-w-xl' : 'max-w-md'}`}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} className={`dialog-in flex max-h-[76vh] w-full flex-col rounded-2xl bg-white shadow-xl ${wide ? 'max-w-xl' : 'max-w-md'}`}>
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4">
           <div className="flex min-w-0 items-center gap-2">
             {onBack && <BackIconButton onClick={onBack} />}

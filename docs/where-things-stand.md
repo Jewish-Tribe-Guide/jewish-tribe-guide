@@ -1030,7 +1030,40 @@ Soon:
   the old proxy. A preview cookie set before this only covers the pages:
   reopen the preview link (an admin's console sets it again on load).
 - Focus in dialogs and sheets, drag handles keyboard can't use, search
-  results silent to screen readers, swipe-only actions.
+  results silent to screen readers, swipe-only actions. **Built Nov 20,
+  the first two of four** (`claude/health-a11y`):
+  - Dialogs: none moved the focus. Add's box opened and Tab walked the
+    page under the backdrop. Every modal one (9: the sheet every box uses,
+    Filters, the action dialog's two shapes, the form's two, the photo
+    crop, the add picker, a dropped pin) now takes it from
+    `useDialogFocus` (`src/lib/useDialogFocus.ts`): in on opening, round
+    inside on Tab, back to what opened it on closing, only the top one of
+    two. `dialogsTakeFocus.test.ts` fails on an `aria-modal` dialog
+    without it (9 against the old code). A dialog in an admin's preview
+    (drawn in its own frame, under `inert`) takes none: the form editor's
+    preview did, and pulled the focus out of the field being typed in
+    when it finished loading (caught by `FormsManager.test.tsx`, 2 runs
+    in 5).
+  - Search: the home's lines, You's, and a category page's list now tell a
+    screen reader what they found ("3 results", "2 listings", "Nothing
+    found for …") through `SearchAnnouncer`, a hidden status line.
+  - Proved in a real browser, phone and computer
+    (`e2e/focus-and-announcements.spec.ts`): red 8/8 against the old code.
+    The first try passed on a computer and failed on a phone: the sheet
+    has controls only a computer shows, and the trap counted one as its
+    first, so Shift+Tab walked out. It counts only what's shown now
+    (unit test red against that draft).
+  - Not done: the sheet's "Drag to resize" handle and the Nearby sheet's
+    handle are buttons a keyboard can't reach or work (no tabindex, no
+    keys), so the Nearby list can't be opened up without a drag. The
+    category split and the map sidebar's handles already take arrow keys.
+  - **For the user:** on a phone, You's saved places and searches are
+    removed only by a swipe (the bookmark is computer-only, on purpose by
+    its comment). Each can still be unsaved where it was saved (a place's
+    listing, the save beside a search's box on its page), but not from
+    You's list without the swipe. Whether a phone gets a visible remove
+    there is a design call. Every other swipe (category rows, the map
+    list) is a shortcut to actions the opened listing also has.
 - Eruv status set from an unauthenticated email (inferred), admin sign-in
   not checking the email is confirmed (depends on Supabase settings),
   a cross-community Google sync route, eruv fetchers with no SSRF guard.

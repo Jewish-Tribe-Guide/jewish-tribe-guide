@@ -7,6 +7,7 @@ import { stepIsVisible, type StepCondition } from '@/lib/forms'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import PrivacyNote from '@/components/PrivacyNote'
+import { useDialogFocus } from '@/lib/useDialogFocus'
 
 // ── Step config ───────────────────────────────────────────────────────────────
 // A wizard is a flat list of steps. Each step shows ONE question. `when` gates a
@@ -415,8 +416,9 @@ export default function Wizard({
 // is still loading (see useForms.ts) — same chrome as Shell, minus the
 // progress bar and Back button, since there's no step to show yet.
 export function WizardLoading({ onClose }: { onClose: () => void }) {
+  const dialogRef = useDialogFocus()
   return (
-    <div className="fixed inset-0 z-50 bg-white overflow-y-auto" role="dialog" aria-modal="true">
+    <div ref={dialogRef} className="fixed inset-0 z-50 bg-white overflow-y-auto" role="dialog" aria-modal="true">
       <div className="sticky top-0 bg-white/95 backdrop-blur pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex max-w-xl items-center justify-end px-4 sm:px-6 py-3">
           <button
@@ -494,8 +496,9 @@ function Shell({
   stepText: string
   children: React.ReactNode
 }) {
+  const dialogRef = useDialogFocus()
   return (
-    <div className="fixed inset-0 z-50 bg-white overflow-y-auto" role="dialog" aria-modal="true">
+    <div ref={dialogRef} className="fixed inset-0 z-50 bg-white overflow-y-auto" role="dialog" aria-modal="true">
       <div className="sticky top-0 bg-white/95 backdrop-blur pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex max-w-xl items-center gap-3 px-4 sm:px-6 py-3">
           <button
