@@ -123,7 +123,7 @@ type Props = {
    *  the top of the map just as surely as the sheet hides the bottom. 0 on
    *  desktop (no floating overlay). */
   obscuredTopPx?: number
-  /** Admin-configured cap (site_settings.map_zoom_radius_miles) on how far
+  /** Admin-configured cap (the Map category's map_zoom_radius_miles) on how far
    *  a point can be from the visitor (or the community center, if no
    *  location is set) and still count toward the automatic "fit everything"
    *  framing below. Without this, a single far-off listing — e.g. a

@@ -904,9 +904,17 @@ Built:
 Found and not fixed:
 
 - Admin-write waits shorter than a busy test database, the shape 406
-  fixed twice: `todo-scroll:75`, `main-dishes`, `category-editor`,
-  `community-editor:61`. Not looked into. `missed-searches:47` was one more (PR 417,
-  Nov 21): Dismiss's row waits on the save, now 20s.
+  fixed twice. `missed-searches:47` was one more (PR 417, Nov 21):
+  Dismiss's row waits on the save, now 20s. Read Nov 21, from every
+  admin-write failure in the last 60 CI runs: the rest were already
+  fixed. `todo-scroll:95` (4 runs, all `claude/bands-and-search` on
+  Nov 20) before 17d9b6a6 the same day; `main-dishes` and
+  `moderation:189` have 15s waits since PR 400; `community-editor:61`
+  once (404 on a new community, `claude/shul-listing`). Still open:
+  `category-open:41` ("opens without asking the server" saw an RSC
+  request), twice (`claude/next-round`, and the Sentry 11.14 Dependabot
+  PR, where `category-editor:46` also found two Hours buttons). Not a
+  wait; not looked into.
 - e2e `listing-detail.spec.ts:537` (above): once, not looked into.
 - 25 of 104 older migrations can't be told run or not from what they
   made (a policy, an index, a data fix).
@@ -919,8 +927,13 @@ Found and not fixed:
   the clock reader: they answer a different question.
 - Watches' days are on New York's clock in three files: right for Philly
   and UES only.
-- Rebuilding a fresh project from the migrations folder (grants, a
-  restore drill) is untouched.
+- Rebuilding a fresh project from the migrations folder, and a restore
+  drill: **done Nov 21** (`docs/backups.md`, "The drill"). All 104
+  migrations rebuilt it; `scripts/restore.mjs` put the first live copy
+  back, every count exact; the site ran on it. Files and sign-in weren't
+  tried (no Storage or Auth in the drill). **For the user:** run 107
+  (drops live's leftover `site_settings.map_zoom_radius_miles`), dev
+  then live.
 
 For the user:
 
