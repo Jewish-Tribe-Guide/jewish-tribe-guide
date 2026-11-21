@@ -700,7 +700,19 @@ export async function deleteCommunity(slug: string): Promise<void> {
   if (!target) throw new Error(`"${slug}" is not a real community.`)
   if (target.isDefault) throw new Error('The default community cannot be deleted.')
   if (all.length <= 1) throw new Error('Cannot delete the only remaining community.')
+  await deleteCommunityRows(slug)
+}
 
+/** A community just created whose setup failed partway (its content copied
+ *  in part, or its screens missing): taken back out, so making it again
+ *  starts clean (Nov 21, the save survey). No check against the community
+ *  list, which is cached and won't have it yet; never the default, which
+ *  `delete_community` refuses too. */
+export async function removeUnfinishedCommunity(slug: string): Promise<void> {
+  await deleteCommunityRows(slug)
+}
+
+async function deleteCommunityRows(slug: string): Promise<void> {
   if (await inOneStep('delete_community', { p_slug: slug, p_tables: [...COMMUNITY_SCOPED_TABLES] }, 'Failed to delete community')) return
 
   // Without migration 109: one table at a time.
@@ -710,6 +722,6 @@ export async function deleteCommunity(slug: string): Promise<void> {
     if (error && !tableMissing(table, error.message)) throw new Error(`Failed to delete ${table} rows: ${error.message}`)
   }
 
-  const { error } = await supabase.from('community').delete().eq('slug', slug)
+  const { error } = await supabase.from('community').delete().eq('slug', slug).eq('is_default', false)
   if (error) throw new Error(`Failed to delete community: ${error.message}`)
 }

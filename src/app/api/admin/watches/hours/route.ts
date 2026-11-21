@@ -221,6 +221,7 @@ export const POST = adminRead(async (request: Request, { community }) => {
     const reply = (ps: readonly Watch[], st: readonly Watch[], rest: Record<string, unknown> = {}) => Response.json({ ok: true, pages: shown(ps), stopped: shown(st), off: false, ...rest })
     const again = async (w: Watch) => {
       await updateWatch(slug, w.id, { createdBy: LISTING_PAGE_WATCH_CREATOR, active: true })
+      if (marker) await removeWatch(slug, marker.id)
       const [done] = await read([{ ...w, createdBy: LISTING_PAGE_WATCH_CREATOR, active: true }])
       return reply([...pages, done], stopped.filter((x) => x.id !== w.id))
     }
@@ -249,7 +250,6 @@ export const POST = adminRead(async (request: Request, { community }) => {
       const watched = watches.find((w) => samePage(w.url, url))
       // Given again after it was stopped: read again.
       if (watched && watched.resourceId === resourceId && isStoppedPage(watched)) {
-        if (marker) await removeWatch(slug, marker.id)
         return await again(watched)
       }
       if (watched) {
@@ -257,13 +257,16 @@ export const POST = adminRead(async (request: Request, { community }) => {
         return Response.json({ ok: false, errors: [other?.id === resourceId ? 'That page is read for it already.' : `That page is read for ${other?.name ?? 'another listing'} already.`] }, { status: 409 })
       }
       const reads = pageReadsFor(categories.find((c) => c.id === place.category)!)!
-      if (marker) await removeWatch(slug, marker.id)
+      // Saved, then the old page stopped and its "not read" taken off, then
+      // read (Nov 21, the save survey): the swap is done before the read,
+      // which can be slow or fail, and a failed save leaves both as they were.
       const added = await addWatch(slug, { kind: 'website', url, resourceId, label: listingPageLabel(place.name, reads), createdBy: LISTING_PAGE_WATCH_CREATOR })
       if (!added) return Response.json({ ok: false, errors: ['Could not save that page.'] }, { status: 409 })
-      const [given] = await read([added])
       // "Use a different page": the old one stopped, so the search never adds it again.
       const replaced = typeof body?.replaces === 'string' ? pages.find((w) => w.id === body.replaces) : undefined
       if (replaced) await updateWatch(slug, replaced.id, { createdBy: PAGE_STOPPED_CREATOR, active: false })
+      if (marker) await removeWatch(slug, marker.id)
+      const [given] = await read([added])
       return reply([...pages.filter((w) => w !== replaced), given], replaced ? [...stopped, { ...replaced, createdBy: PAGE_STOPPED_CREATOR, active: false }] : stopped)
     }
 
@@ -301,8 +304,8 @@ export const POST = adminRead(async (request: Request, { community }) => {
 
     // On again: its pages to read, or with none, its website searched now,
     // as the morning's run would.
-    if (marker) await removeWatch(slug, marker.id)
     for (const w of pages) if (!w.active) await updateWatch(slug, w.id, { active: true })
+    if (marker) await removeWatch(slug, marker.id)
     const on = pages.map((w) => ({ ...w, active: true }))
     if (!on.length) {
       const { added, reason } = await searchFor(slug, place, watches, job)

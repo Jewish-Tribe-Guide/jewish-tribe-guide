@@ -1405,7 +1405,7 @@ listing code; roughly a week of steps, each needing a migration run on
 dev then live at the right moment (step 1 before 3's deploy, 5 only
 after 4 is live).
 
-## The save survey (Nov 21; 1–5 fixed the same day, the rest open)
+## The save survey (Nov 21; all fixed the same day)
 
 Saves that make more than one write, through separate supabase-js calls
 with no transaction, and what a failure partway leaves. Only the
@@ -1433,8 +1433,23 @@ From 6, **deleting a category, a form or a community is one step** (Nov
 stores call them (`src/lib/supabase/inOneStep.ts`), keeping the old
 step-by-step delete where 109 hasn't run. Checked on a fresh Postgres 17:
 a failure at the last delete leaves every earlier one undone. Run on dev and
-live Nov 21 (recorded in `migration_ran`). The rest of 6 and 7 stay open;
-approvals as a whole stay outside a transaction (Google lookups and
+live Nov 21 (recorded in `migration_ran`).
+
+**The rest of 6 and 7 are fixed too** (Nov 21, `claude/save-survey-rest`,
+each with tests that failed against the old code): a new category whose
+first listing fails is taken back out (geocoded before the claim); a new
+eruv whose filling-in fails is too, and a failed removal is reported; a
+part approved at a time goes through `approveOwn`; kosher Bring it back
+and Archive answer ok once the change is on, and archiving again closes a
+finding left waiting; a community whose copying or screens fail is taken
+back out (`removeUnfinishedCommunity`); a Tell-us message checks every
+form before filing and emails the admins about whatever it filed; the
+hours and hospitals page swaps save the new state before taking off the
+old; activity and job-run write failures go to Sentry; the Google sync's
+update checks its error and counts a failed save as failed. Orphan
+uploads stay with the weekly sweep.
+
+Approvals as a whole stay outside a transaction (Google lookups and
 geocoding can't run inside one), with 1–3 covering what that left.
 
 The list as found:

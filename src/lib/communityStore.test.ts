@@ -44,6 +44,7 @@ const {
   communitySlugFromRequest,
   createCommunity,
   deleteCommunity,
+  removeUnfinishedCommunity,
   COMMUNITY_SCOPED_TABLES,
   getCommunityAdminEmails,
   getCommunityNotifyRecipients,
@@ -843,5 +844,25 @@ describe('deleteCommunity — in one step, once 109 has run (Nov 21)', () => {
     mockRpc.mockResolvedValue({ error: { message: 'boom' } })
     await expect(deleteCommunity('baltimore')).rejects.toThrow('Failed to delete community: boom')
     expect(mockFrom).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('removeUnfinishedCommunity (Nov 21, the save survey)', () => {
+  it('deletes one the cached list doesn’t have yet, without reading the list', async () => {
+    mockRpc.mockResolvedValue({ error: null })
+    await removeUnfinishedCommunity('ues')
+    expect(mockRpc).toHaveBeenCalledWith('delete_community', { p_slug: 'ues', p_tables: [...COMMUNITY_SCOPED_TABLES] })
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('without 109, never deletes the default community’s row', async () => {
+    const builders: ReturnType<typeof chainable>[] = []
+    mockFrom.mockImplementation(() => {
+      const b = chainable({ error: null })
+      builders.push(b)
+      return b
+    })
+    await removeUnfinishedCommunity('ues')
+    expect(builders.at(-1)!.eq).toHaveBeenCalledWith('is_default', false)
   })
 })

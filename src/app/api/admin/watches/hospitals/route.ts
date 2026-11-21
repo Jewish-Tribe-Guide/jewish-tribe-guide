@@ -200,9 +200,20 @@ export const POST = adminRead(async (request: Request, { community, admin }) => 
         const other = (await hospitalsIn(slug)).find((h) => h.id === elsewhere.resourceId)
         return Response.json({ ok: false, errors: [`That Refuah page is already read for ${other?.name ?? 'another hospital'}.`] }, { status: 409 })
       }
-      for (const w of [...pages, ...stopped, ...(marker ? [marker] : [])]) await removeWatch(slug, w.id)
-      const added = await addWatch(slug, { kind: 'website', url: page, resourceId, label: refuahWatchLabel(hospital.name), createdBy: admin.email })
+      // The new page saved first, the old ones taken off after (Nov 21, the
+      // save survey): a failure between leaves the old page read, never the
+      // hospital with none and its "Not on Refuah" gone. The same page given
+      // again is that one, given by hand.
+      const same = [...pages, ...stopped].find((w) => w.url === page)
+      let added: Watch | null
+      if (same) {
+        await updateWatch(slug, same.id, { createdBy: admin.email, active: true })
+        added = { ...same, createdBy: admin.email, active: true }
+      } else {
+        added = await addWatch(slug, { kind: 'website', url: page, resourceId, label: refuahWatchLabel(hospital.name), createdBy: admin.email })
+      }
       if (!added) return Response.json({ ok: false, errors: ['Could not save that page.'] }, { status: 409 })
+      for (const w of [...pages, ...stopped, ...(marker ? [marker] : [])]) if (w.id !== added.id) await removeWatch(slug, w.id)
       const { watch: read } = await runAndRecord(added, undefined, undefined, { full: true })
       return Response.json({ ok: true, watch: read, notOnRefuah: false })
     }
@@ -213,8 +224,10 @@ export const POST = adminRead(async (request: Request, { community, admin }) => 
     }
 
     if (action === 'none') {
-      for (const w of [...pages, ...stopped]) await removeWatch(slug, w.id)
+      // Said first, then its pages go: a failure between leaves a page
+      // over, not a hospital the morning's match fills in again.
       if (!marker) await addWatch(slug, { kind: 'website', url: notOnRefuahUrl(resourceId), resourceId, label: `${hospital.name}: not on Refuah`, createdBy: REFUAH_NOT_LISTED_CREATOR, active: false })
+      for (const w of [...pages, ...stopped]) await removeWatch(slug, w.id)
       return Response.json({ ok: true, watch: null, notOnRefuah: true })
     }
 
@@ -227,8 +240,8 @@ export const POST = adminRead(async (request: Request, { community, admin }) => 
       return Response.json({ ok: true, watch: null, notOnRefuah: true })
     }
 
-    // On again.
-    if (marker) await removeWatch(slug, marker.id)
+    // On again. Its "Not on Refuah" goes once there's a page to read, or
+    // none to be had (Nov 21, the save survey): Refuah down keeps it.
     let on: Watch | null = watch
     if (on) {
       await updateWatch(slug, on.id, { active: true })
@@ -243,6 +256,7 @@ export const POST = adminRead(async (request: Request, { community, admin }) => 
         on = await addWatch(slug, { kind: 'website', url: wanted.url, resourceId, label: wanted.label, createdBy: REFUAH_MATCH_CREATOR })
       }
     }
+    if (marker) await removeWatch(slug, marker.id)
     if (!on) return Response.json({ ok: true, watch: null, notOnRefuah: false })
     const { watch: read } = await runAndRecord(on, undefined, undefined, { full: true })
     return Response.json({ ok: true, watch: read, notOnRefuah: false })

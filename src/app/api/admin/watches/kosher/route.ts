@@ -19,7 +19,7 @@ import { UUID } from '@/lib/itemMarkRoutes'
 import { listApprovedResources, restoreResource } from '@/lib/resourceStore'
 import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { after } from 'next/server'
-import { approveSubmission, rejectSubmission, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
+import { approveOwn, approveSubmission, rejectSubmission, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
 import { kosherBoxKeys, renamedTo } from '@/lib/kosherBox'
 import type { ResourceSubmission } from '@/types'
 import { readAll } from '@/lib/readAll'
@@ -248,8 +248,17 @@ async function restore(slug: string, body: Record<string, unknown> | null, admin
       const category = (await listCategories(slug)).find((c) => c.id === row.category)
       const keys = category ? kosherBoxKeys(category) : []
       const listed = (found.payload.details ?? {}) as Record<string, unknown>
-      if (keys.length) await saveAsTheList(slug, row, found.by, { details: { ...row.details, ...pick(listed, keys) } }, 'Brought back from the archive, its hechsher as the list has it.', admin)
-      await rejectSubmission(found.id, slug, admin)
+      // It's back now, whatever follows (Nov 21, the save survey): a
+      // failure here is said, and the finding stays waiting to be decided,
+      // rather than "Could not bring it back" for a place that's back.
+      try {
+        if (keys.length) await saveAsTheList(slug, row, found.by, { details: { ...row.details, ...pick(listed, keys) } }, 'Brought back from the archive, its hechsher as the list has it.', admin)
+      } catch (err) {
+        reportServerError(`[admin/watches/kosher] ${row.id} is back, but the list’s hechsher couldn’t be put on it; its finding (${found.id}) stays waiting`, err)
+        after(() => runWalkRoutesAfterChange(slug))
+        return Response.json({ ok: true })
+      }
+      await closeFinding(found.id, slug, admin)
     }
     // Its walks along the streets now, not tonight (walkRouteJob.ts).
     after(() => runWalkRoutesAfterChange(slug))
@@ -257,6 +266,17 @@ async function restore(slug: string, body: Record<string, unknown> | null, admin
   } catch (err) {
     reportServerError('[admin/watches/kosher] restore failed:', err)
     return Response.json({ ok: false, errors: ['Could not bring it back.'] }, { status: 502 })
+  }
+}
+
+/** A finding decided by what was just done: closed. The change is on by
+ *  now, so a failure here is said rather than answered as one (Nov 21, the
+ *  save survey). Doing it again finishes it: see `archived` below. */
+async function closeFinding(id: string, slug: string, admin: string): Promise<void> {
+  try {
+    await rejectSubmission(id, slug, admin)
+  } catch (err) {
+    reportServerError(`[admin/watches/kosher] the change is on, but its finding (${id}) couldn’t be closed`, err)
   }
 }
 
@@ -275,7 +295,8 @@ async function saveAsTheList(slug: string, row: Row, by: string, change: { name?
     details: change.details,
   } as ResourceSubmission
   const filed = await submitListingUpdate(slug, row.id, payload, note, { name: by })
-  await approveSubmission(filed.id, slug, admin)
+  // Approved at once, or taken back out: never left in the queue (approveOwn).
+  await approveOwn(filed, slug, admin)
 }
 
 export const POST = adminWrite(async (request: Request, { community, admin }) => {
@@ -288,10 +309,14 @@ export const POST = adminWrite(async (request: Request, { community, admin }) =>
   try {
     const slug = community.slug
     const supabase = getAdminClient()
-    const listing = async (resourceId: string): Promise<Row | null> => {
-      const { data, error } = await supabase.from('resource').select('*').eq('community_id', slug).eq('id', resourceId).eq('status', 'approved').maybeSingle()
+    const anyListing = async (resourceId: string): Promise<Row | null> => {
+      const { data, error } = await supabase.from('resource').select('*').eq('community_id', slug).eq('id', resourceId).maybeSingle()
       if (error) throw new Error(error.message)
       return data && CATEGORIES.includes((data as Row).category) ? (data as Row) : null
+    }
+    const listing = async (resourceId: string): Promise<Row | null> => {
+      const row = await anyListing(resourceId)
+      return row?.status === 'approved' ? row : null
     }
 
     if (action === 'page') {
@@ -313,7 +338,15 @@ export const POST = adminWrite(async (request: Request, { community, admin }) =>
       return Response.json({ ok: false, errors: ['That suggestion isn’t waiting any more.'] }, { status: 409 })
     }
     const row = await listing(found.target_id)
-    if (!row) return Response.json({ ok: false, errors: ['That place isn’t in this guide.'] }, { status: 404 })
+    if (!row) {
+      // Archived already, its finding still waiting: an archive whose
+      // finding didn't close. Archiving again closes it.
+      if (action === 'archive' && (await anyListing(found.target_id))?.status === 'archived') {
+        await rejectSubmission(found.id, slug, admin.email)
+        return Response.json({ ok: true })
+      }
+      return Response.json({ ok: false, errors: ['That place isn’t in this guide.'] }, { status: 404 })
+    }
 
     if (action === 'edit') {
       const edited = body?.details && typeof body.details === 'object' && !Array.isArray(body.details) ? (body.details as Record<string, unknown>) : null
@@ -330,14 +363,14 @@ export const POST = adminWrite(async (request: Request, { community, admin }) =>
       // proposes it; an edit's is filed as one.
       if (found.operation === 'update') {
         const filed = await submitListingDelete(slug, row.id, found.note, { name: by })
-        await approveSubmission(filed.id, slug, admin.email)
+        await approveOwn(filed, slug, admin.email)
       } else if (found.operation === 'delete') {
         await approveSubmission(found.id, slug, admin.email)
       } else {
         return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
       }
     }
-    if (!(action === 'archive' && found.operation === 'delete')) await rejectSubmission(found.id, slug, admin.email)
+    if (!(action === 'archive' && found.operation === 'delete')) await closeFinding(found.id, slug, admin.email)
     return Response.json({ ok: true })
   } catch (err) {
     reportServerError('[admin/watches/kosher] POST failed:', err)

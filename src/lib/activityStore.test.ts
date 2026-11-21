@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const m = vi.hoisted(() => ({ from: vi.fn(), calls: [] as [string, unknown[]][], result: { data: null as unknown, error: null as unknown } }))
 vi.mock('./supabase/admin', () => ({ getAdminClient: () => ({ from: m.from }) }))
+const reported = vi.hoisted(() => vi.fn())
+vi.mock('./serverError', () => ({ reportServerError: reported }))
 
 // Records every chained call, then resolves to m.result.
 function builder() {
@@ -56,9 +58,9 @@ describe('recordActivity', () => {
 
   it('never throws: a failed write is reported and returns no ids', async () => {
     m.result = { data: null, error: { message: 'relation "activity" does not exist' } }
-    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
     await expect(recordActivity([{ community: 'philly', kind: 'listing_confirmed', source: 'visitor' }])).resolves.toEqual([])
-    expect(err).toHaveBeenCalled()
+    // To Sentry, not only the log (Nov 21, the save survey).
+    expect(reported).toHaveBeenCalledWith('[activity] could not record:', expect.any(Error))
   })
 
   it('does nothing for nothing', async () => {

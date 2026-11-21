@@ -228,9 +228,45 @@ describe('POST /api/admin/watches/hospitals', () => {
 
   it('choose: a page it stopped reading goes too', async () => {
     m.listWatches.mockResolvedValue({ watches: [w({ id: 'stopped', url: refuahPageUrl(PA._id), resourceId: PA_ID, createdBy: REFUAH_STOPPED_CREATOR, active: false })], available: true })
-    await POST(req('POST', { action: 'choose', resourceId: PA_ID, url: refuahPageUrl(PA._id) }))
+    await POST(req('POST', { action: 'choose', resourceId: PA_ID, url: refuahPageUrl(HUP._id) }))
     expect(m.removeWatch).toHaveBeenCalledWith('philly', 'stopped')
-    expect(m.addWatch).toHaveBeenCalledWith('philly', expect.objectContaining({ url: refuahPageUrl(PA._id), createdBy: 'me@x.co' }))
+    expect(m.addWatch).toHaveBeenCalledWith('philly', expect.objectContaining({ url: refuahPageUrl(HUP._id), createdBy: 'me@x.co' }))
+  })
+
+  it('choose: the page it stopped, chosen again, is that page read again, given by hand', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'stopped', url: refuahPageUrl(PA._id), resourceId: PA_ID, createdBy: REFUAH_STOPPED_CREATOR, active: false })], available: true })
+    expect((await POST(req('POST', { action: 'choose', resourceId: PA_ID, url: refuahPageUrl(PA._id) }))).status).toBe(200)
+    expect(m.updateWatch).toHaveBeenCalledWith('philly', 'stopped', { createdBy: 'me@x.co', active: true })
+    expect(m.removeWatch).not.toHaveBeenCalled()
+    expect(m.addWatch).not.toHaveBeenCalled()
+  })
+
+  // Nov 21, the save survey: each swap's new state is saved before the old
+  // one goes, so a failure between leaves the old, never nothing.
+  it('choose: a new page that won’t save leaves the old one and the "Not on Refuah"', async () => {
+    m.listWatches.mockResolvedValue({
+      watches: [w({ id: 'auto', url: refuahPageUrl(PA._id), resourceId: PA_ID }), w({ id: 'n', url: notOnRefuahUrl(PA_ID), resourceId: PA_ID, createdBy: REFUAH_NOT_LISTED_CREATOR })],
+      available: true,
+    })
+    m.addWatch.mockRejectedValueOnce(new Error('timeout'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect((await POST(req('POST', { action: 'choose', resourceId: PA_ID, url: refuahPageUrl(HUP._id) }))).status).toBe(502)
+    expect(m.removeWatch).not.toHaveBeenCalled()
+  })
+
+  it('none: a "Not on Refuah" that won’t save leaves its page', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'auto', url: refuahPageUrl(PA._id), resourceId: PA_ID })], available: true })
+    m.addWatch.mockRejectedValueOnce(new Error('timeout'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect((await POST(req('POST', { action: 'none', resourceId: PA_ID }))).status).toBe(502)
+    expect(m.removeWatch).not.toHaveBeenCalled()
+  })
+
+  it('on: Refuah down keeps its "Not on Refuah"', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'n', url: notOnRefuahUrl(PA_ID), resourceId: PA_ID, createdBy: REFUAH_NOT_LISTED_CREATOR, active: false })], available: true })
+    m.readRefuahNear.mockResolvedValue({ error: 'Refuah answered 502' })
+    expect((await POST(req('POST', { action: 'on', resourceId: PA_ID }))).status).toBe(502)
+    expect(m.removeWatch).not.toHaveBeenCalled()
   })
 
   it('refuses a listing that isn’t one of the guide’s hospitals', async () => {

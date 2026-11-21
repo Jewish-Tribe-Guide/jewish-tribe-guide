@@ -1,9 +1,11 @@
+import { reportServerError } from './serverError'
 import { getAdminClient } from './supabase/admin'
 import type { ActivityInput } from './activity'
 
 // Writes to the activity log. Best-effort by design: the log is a record of
 // what happened, never a gate on it, so a failed insert is reported and
-// swallowed. An approval or a "Mark as current" must never fail because the
+// swallowed. Reported to Sentry, not only the log (Nov 21, the save
+// survey): a log that quietly stops filling looks like a quiet week. An approval or a "Mark as current" must never fail because the
 // history of it couldn't be written.
 
 /** Inserts the rows and returns their ids, in order, or [] on failure. */
@@ -35,7 +37,7 @@ export async function recordActivity(rows: ActivityInput[]): Promise<number[]> {
     if (error) throw new Error(error.message)
     return ((data ?? []) as { id: number }[]).map((d) => d.id)
   } catch (err) {
-    console.error('[activity] could not record:', err)
+    reportServerError('[activity] could not record:', err)
     return []
   }
 }
@@ -61,7 +63,7 @@ export async function removeVisitorActivity(
       .gte('created_at', since)
     if (error) throw new Error(error.message)
   } catch (err) {
-    console.error('[activity] could not remove a visitor’s tap:', err)
+    reportServerError('[activity] could not remove a visitor’s tap:', err)
   }
 }
 

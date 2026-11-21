@@ -92,11 +92,33 @@ export async function POST(request: Request) {
 
   const community = await resolveCommunity(communitySlugFromRequest(request))
   const contributions = contributionsFor(community.ui)
+  const filed: SubmissionRow[] = []
   try {
     const [listings, categories] = await Promise.all([listApprovedResources(community.slug), listCategories(community.slug)])
     const byId = new Map(listings.map((l) => [l.id, l]))
     const catById = new Map(categories.filter((c) => c.active !== false).map((c) => [c.id, c]))
-    const filed: SubmissionRow[] = []
+
+    // Every form checked before anything is filed, so a refusal files
+    // nothing (Nov 21, the save survey).
+    const checkedForms: ResourceSubmission[] = []
+    for (const f of forms) {
+      const submission = (f.submission && typeof f.submission === 'object' ? f.submission : null) as ResourceSubmission | null
+      if (!submission) continue
+      const category = catById.get(submission.category)
+      if (!category || !contributions.add || !resolveCapabilities(category.capabilities).add) {
+        return Response.json({ ok: false, errors: ['This action is not available for this category.'] }, { status: 403 })
+      }
+      // The listing form's own preparation (/api/submissions).
+      const errors = prepareSubmission(submission, category, { operation: 'create' })
+      if (errors.length) return Response.json({ ok: false, errors }, { status: 400 })
+      checkedForms.push(submission)
+    }
+
+    // The admins hear of whatever was filed, even when a later one fails
+    // (Nov 21, the save survey): `filed` is read once the answer has gone.
+    after(async () => {
+      for (const s of filed) await sendSubmissionNotification(s).catch((err) => reportServerError('[message/send] Admin notification failed:', err))
+    })
 
     for (const s of stores) {
       const listing = typeof s.listingId === 'string' ? byId.get(s.listingId) : undefined
@@ -139,16 +161,7 @@ export async function POST(request: Request) {
       )
     }
 
-    for (const f of forms) {
-      const submission = (f.submission && typeof f.submission === 'object' ? f.submission : null) as ResourceSubmission | null
-      if (!submission) continue
-      const category = catById.get(submission.category)
-      if (!category || !contributions.add || !resolveCapabilities(category.capabilities).add) {
-        return Response.json({ ok: false, errors: ['This action is not available for this category.'] }, { status: 403 })
-      }
-      // The listing form's own preparation (/api/submissions).
-      const errors = prepareSubmission(submission, category, { operation: 'create' })
-      if (errors.length) return Response.json({ ok: false, errors }, { status: 400 })
+    for (const submission of checkedForms) {
       filed.push(
         await submitListingCreate(
           community.slug,
@@ -158,13 +171,10 @@ export async function POST(request: Request) {
       )
     }
 
-    after(async () => {
-      for (const s of filed) await sendSubmissionNotification(s).catch((err) => reportServerError('[message/send] Admin notification failed:', err))
-    })
     // The ids, for the email asked once at the end (/api/message/email).
     return Response.json({ ok: true, filed: filed.length, ids: filed.map((f) => f.id) })
   } catch (err) {
-    reportServerError('[message/send] could not file:', err)
+    reportServerError(`[message/send] could not file${filed.length ? `, after filing ${filed.length}` : ''}:`, err)
     return Response.json(FAILED, { status: 502 })
   }
 }
