@@ -84,6 +84,7 @@ vi.mock('./serverError', () => ({ reportServerError: mockReportServerError }))
 
 const {
   activityForApproval,
+  approveOwn,
   approveSubmission,
   listPendingSubmissions,
   listSubmissionsByStatus,
@@ -622,6 +623,44 @@ describe('approveSubmission', () => {
 
     await expect(approveSubmission('sub-1')).rejects.toThrow('Failed to archive listing: db down')
     expect(mockReportServerError).toHaveBeenCalledWith(expect.stringContaining('sub-1'), 'still down')
+  })
+
+  // Nov 21: once the listing is on, a failed last write only loses the
+  // record's who and what. Failing the approval told the admin their Add
+  // didn't happen, and adding again put the listing on twice.
+  it('a listing already on the site isn’t reported as failed when its record can’t be finished', async () => {
+    const sub = baseSubmission({ operation: 'create', payload: listingPayload() as unknown as Record<string, unknown> })
+    let submissionCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'resource') return chainable({ data: { id: 'res-new' }, error: null })
+      submissionCalls += 1
+      if (submissionCalls === 1) return chainable({ data: sub, error: null })
+      if (submissionCalls === 2) return chainable({ data: { id: 'sub-1' }, error: null })
+      return chainable({ data: null, error: { message: 'timeout' } })
+    })
+    mockGetCategoryById.mockResolvedValue(null)
+
+    const row = await approveSubmission('sub-1', undefined, 'admin@x.co')
+    expect(row).toMatchObject({ id: 'sub-1', status: 'approved', target_id: 'res-new', reviewed_by: 'admin@x.co' })
+    expect(mockReportServerError).toHaveBeenCalledWith(expect.stringContaining('sub-1'), 'timeout')
+  })
+
+  it('an admin’s own change that fails is taken back out of the queue, while it still waits', async () => {
+    const filed = baseSubmission({ id: 'own-1', operation: 'delete', target_id: 'res-1' })
+    const builders: ReturnType<typeof chainable>[] = []
+    let submissionCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'resource') return chainable({ error: { message: 'db down' } })
+      submissionCalls += 1
+      const b = chainable({ data: submissionCalls === 1 ? filed : { id: 'own-1' }, error: null })
+      builders.push(b)
+      return b
+    })
+
+    await expect(approveOwn(filed, 'philly', 'admin@x.co')).rejects.toThrow('db down')
+    const removal = builders.find((b) => (b.delete as ReturnType<typeof vi.fn>).mock.calls.length)
+    expect(removal?.eq).toHaveBeenCalledWith('id', 'own-1')
+    expect(removal?.eq).toHaveBeenCalledWith('status', 'pending')
   })
 
   // An edit keeps the listing's own keys from the listing as it is; a read

@@ -638,8 +638,36 @@ async function approveNow(
       .single(),
     submission.target_type === 'listing' ? recordActivity(activityForApproval(submission, affectedResourceId, newItems, changes)) : null,
   ])
-  if (error) throw new Error(`Failed to mark submission approved: ${error.message}`)
+  // The change is on the site by now: a failure here loses only the
+  // record's who and what (Nov 21, the save survey). Failing the approval
+  // would tell the admin it didn't happen, and their Add again would put
+  // the listing on twice.
+  if (error) {
+    reportServerError(`[submissions] ${id} is on the site, but its record couldn’t be finished`, error.message)
+    return {
+      ...submission,
+      status: 'approved',
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: reviewedBy ?? submission.reviewed_by,
+      ...(savedPayload ? { payload: savedPayload } : {}),
+      target_id: submission.target_id ?? affectedResourceId,
+    }
+  }
   return data as SubmissionRow
+}
+
+/** An admin's own change, filed and approved at once (Places' Add, Edit
+ *  and Archive). If approving fails, what was filed is taken back out
+ *  while it still waits, so a failed Add never sits in the queue as a
+ *  suggestion, one more for each try (Nov 21, the save survey). */
+export async function approveOwn(filed: SubmissionRow, community: string, reviewedBy: string): Promise<SubmissionRow> {
+  try {
+    return await approveSubmission(filed.id, community, reviewedBy)
+  } catch (err) {
+    const { error } = await getAdminClient().from('submission').delete().eq('id', filed.id).eq('community_id', community).eq('status', 'pending')
+    if (error) reportServerError(`[submissions] an admin’s own change (${filed.id}) failed and stays in the queue`, error.message)
+    throw err
+  }
 }
 
 /** One part of an edit decided on its own (reviewParts.ts). `whole`: it's

@@ -24,7 +24,7 @@ vi.mock('@/lib/categoryStore', () => ({
   getCategoryById: async () => ({ id: 'hotel', detailFields: [] }),
   listCategoriesUncached: async () => [{ id: 'hotel' }, { id: 'whatsapp', hasAddress: false }],
 }))
-vi.mock('@/lib/submissionStore', () => ({ submitListingCreate: m.submitListingCreate, approveSubmission: m.approveSubmission }))
+vi.mock('@/lib/submissionStore', () => ({ submitListingCreate: m.submitListingCreate, approveOwn: (filed: { id: string }, c: string, r: string) => m.approveSubmission(filed.id, c, r) }))
 vi.mock('@/lib/communityStore', () => ({ resolveCommunity: async () => ({ slug: 'philly' }), communitySlugFromRequest: () => 'philly' }))
 vi.mock('@/lib/walkRouteJob', () => ({ runWalkRoutesAfterChange: m.runWalkRoutesAfterChange }))
 
