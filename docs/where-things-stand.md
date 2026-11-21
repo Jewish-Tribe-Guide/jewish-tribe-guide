@@ -1083,6 +1083,25 @@ Soon:
 - Dependabot's one group can't pass CI (container tag) and has blocked
   updates since September; Playwright held at 1.63 for production's
   Chromium (PR 402); `npm audit fix` is free; Node declared four ways.
+  **Built Nov 20** (`claude/health-deps`):
+  - Dependabot leaves `@playwright/test`, `playwright-core` and
+    `@sparticuz/chromium` alone (moved by hand, together, checked on a
+    preview), and `@types/node`'s majors. Every group PR since September
+    carried the Playwright family, so CI's container-tag test failed it.
+    PR 402 already holds 1.63.
+  - `npm audit fix`, no `--force`, lock file only: Sentry 10.75 → 10.78
+    (the critical one, a tunnel-route bypass), undici, zod,
+    typescript-eslint, dompurify. 15 findings down to 5 moderate. All 5 are
+    `glob`/`minimatch` inside Sentry's build plugin, used at build time
+    only, and they wait on Sentry moving its pin.
+  - Node: `.nvmrc` (24) is the one place now. `engines` was `>=20.9.0`,
+    which lets Vercel take the newest major it has; it's `24.x`, so live
+    runs what CI tests. CI's two `setup-node`s read `.nvmrc`, and
+    `@types/node` went from 26 to 24. `versionsAgree.test.ts`, red 7/8
+    against the old files. **For the user:** the next production build's
+    log should say Node 24. Live's Node couldn't be read from here: the
+    Vercel token can't open the project, and Sentry had no recent server
+    events. This Mac runs Node 26; `nvm use` picks up `.nvmrc`.
 - Two time parsers disagree ("8am" is Infinity in `parseTimeToMinutes`,
   checked); date helpers copied 8–9 times; `partDates` twice.
 - knip: a 4-line config takes it from 42 files / 243 exports to 0 / 31
