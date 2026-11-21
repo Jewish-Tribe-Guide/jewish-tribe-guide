@@ -10,6 +10,7 @@ import type { ResourceRow, DirectoryResource, ResourceSubmission } from '@/types
 import { normalizeRow } from './resourceShape'
 import type { AdminPlace } from './adminPlaces'
 import { readAll } from '@/lib/readAll'
+import { patchListing } from './listingPatch'
 
 export { normalizeRow } from './resourceShape'
 
@@ -324,10 +325,10 @@ export async function clearCategoryFieldData(
   if (error) throw new Error(`Failed to load existing listings: ${error.message}`)
 
   const rows = (data ?? []) as { id: string; address: string | null; phone: string | null; details: Record<string, unknown> }[]
-  const writes: { id: string; update: Record<string, unknown> }[] = []
+  const writes: { id: string; before: Record<string, unknown>; details: Record<string, unknown>; columns: { address?: null; phone?: null } }[] = []
 
   for (const row of rows) {
-    const update: { address?: null; phone?: null; details?: Record<string, unknown> } = {}
+    const update: { address?: null; phone?: null } = {}
     if (opts.address && hasValue(row.address)) update.address = null
     if (opts.phone && hasValue(row.phone)) update.phone = null
 
@@ -342,15 +343,17 @@ export async function clearCategoryFieldData(
         delete details[key]
       }
     }
-    if (details) update.details = details
-
-    if (Object.keys(update).length === 0) continue
-    writes.push({ id: row.id, update })
+    if (!details && Object.keys(update).length === 0) continue
+    writes.push({ id: row.id, before: row.details, details: details ?? row.details, columns: update })
   }
 
-  await atMostAtOnce(LISTING_WRITES_AT_ONCE, writes, async ({ id, update }) => {
-    const { error: updErr } = await supabase.from('resource').update(update).eq('community_id', community).eq('id', id)
-    if (updErr) throw new Error(`Failed to clear data for a listing: ${updErr.message}`)
+  // Only the keys cleared, so a listing's other details saved meanwhile stay.
+  await atMostAtOnce(LISTING_WRITES_AT_ONCE, writes, async ({ id, before, details, columns }) => {
+    try {
+      await patchListing(community, id, before, details, { columns })
+    } catch (e) {
+      throw new Error(`Failed to clear data for a listing: ${(e as Error).message}`)
+    }
   })
   return { updated: writes.length }
 }
@@ -405,7 +408,7 @@ export async function applyFieldOptionRenames(
   if (error) throw new Error(`Failed to load existing listings: ${error.message}`)
 
   const rows = (data ?? []) as { id: string; details: Record<string, unknown> }[]
-  const writes: { id: string; details: Record<string, unknown> }[] = []
+  const writes: { id: string; before: Record<string, unknown>; details: Record<string, unknown> }[] = []
 
   for (const row of rows) {
     let details: Record<string, unknown> | null = null
@@ -422,12 +425,15 @@ export async function applyFieldOptionRenames(
         details[r.fieldKey] = r.newValue
       }
     }
-    if (details) writes.push({ id: row.id, details })
+    if (details) writes.push({ id: row.id, before: row.details ?? {}, details })
   }
 
-  await atMostAtOnce(LISTING_WRITES_AT_ONCE, writes, async ({ id, details }) => {
-    const { error: updErr } = await supabase.from('resource').update({ details }).eq('community_id', community).eq('id', id)
-    if (updErr) throw new Error(`Failed to migrate a listing's data: ${updErr.message}`)
+  await atMostAtOnce(LISTING_WRITES_AT_ONCE, writes, async ({ id, before, details }) => {
+    try {
+      await patchListing(community, id, before, details)
+    } catch (e) {
+      throw new Error(`Failed to migrate a listing's data: ${(e as Error).message}`)
+    }
   })
   return { updated: writes.length }
 }

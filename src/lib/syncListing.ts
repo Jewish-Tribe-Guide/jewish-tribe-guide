@@ -1,5 +1,6 @@
 import { reportServerError } from '@/lib/serverError'
 import { getAdminClient } from '@/lib/supabase/admin'
+import { patchListing } from '@/lib/listingPatch'
 import { fetchPlaceSync, nextGoogleFields, syncMayWrite, type OwnableSyncField } from '@/lib/googlePlaces'
 import { submitGoogleClosure } from '@/lib/submissionStore'
 import type { StatusChange } from '@/lib/email'
@@ -95,7 +96,6 @@ export function refreshNight(id: string): number {
  * run does it once for a whole batch rather than once per listing.
  */
 export async function syncOneListing(row: SyncedRow, { statusOnly = false }: { statusOnly?: boolean } = {}): Promise<SyncOneResult> {
-  const supabase = getAdminClient()
   const placeId = String(row.details.placeId)
   const sync = await fetchPlaceSync(placeId, { statusOnly })
 
@@ -104,17 +104,15 @@ export async function syncOneListing(row: SyncedRow, { statusOnly = false }: { s
     // listings are failing, not just how many — see the sync-coverage
     // report in the admin Metrics tab. Cleared on the next successful
     // sync below, so a stale failure never lingers once Google recovers.
-    const { error } = await supabase
-      .from('resource')
-      .update({
-        details: {
-          ...row.details,
-          lastSyncError: 'Google Places request failed (network error or bad place id).',
-          lastSyncFailedAt: new Date().toISOString(),
-        },
+    try {
+      await patchListing(row.community_id, row.id, row.details, {
+        ...row.details,
+        lastSyncError: 'Google Places request failed (network error or bad place id).',
+        lastSyncFailedAt: new Date().toISOString(),
       })
-      .eq('id', row.id)
-    if (error) reportServerError(`[sync] ${row.id}: Google didn’t answer, and saying so failed too`, error.message)
+    } catch (e) {
+      reportServerError(`[sync] ${row.id}: Google didn’t answer, and saying so failed too`, (e as Error).message)
+    }
     return { outcome: 'failed' }
   }
 
@@ -158,11 +156,10 @@ export async function syncOneListing(row: SyncedRow, { statusOnly = false }: { s
   // filled itself, or one still empty. See syncMayWrite in googlePlaces.ts.
   const wrote: OwnableSyncField[] = []
   const update: {
-    details: Record<string, unknown>
     name?: string
     phone?: string
     address?: string
-  } = { details }
+  } = {}
 
   if (sync.name && syncMayWrite(row.details, 'name', row.name)) {
     update.name = sync.name
@@ -199,9 +196,12 @@ export async function syncOneListing(row: SyncedRow, { statusOnly = false }: { s
   // Its error checked (Nov 21, the save survey): unsaved, Google's answer
   // was counted as synced, and its closure or status change told of again
   // the next night, as if new.
-  const { error } = await supabase.from('resource').update(update).eq('id', row.id)
-  if (error) {
-    reportServerError(`[sync] ${row.id}: Google’s answer couldn’t be saved`, error.message)
+  // Only what changed, so an edit saved while Google was asked stays
+  // (listingPatch.ts).
+  try {
+    await patchListing(row.community_id, row.id, row.details, details, { columns: update })
+  } catch (e) {
+    reportServerError(`[sync] ${row.id}: Google’s answer couldn’t be saved`, (e as Error).message)
     return { outcome: 'failed' }
   }
 

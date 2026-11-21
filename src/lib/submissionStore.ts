@@ -28,6 +28,7 @@ import { keepOnly } from './watchFindings'
 import { editedFields, onListingNow } from './editedFields'
 import { approvingPart, leavingPart, reviewParts } from './reviewParts'
 import { readAll } from './readAll'
+import { patchListing } from './listingPatch'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -1351,14 +1352,21 @@ async function prepareListing(submission: SubmissionRow): Promise<() => Promise<
     // source's.
     const fixed = !!(payload as { reviewEdit?: { fields?: string[] } }).reviewEdit?.fields?.length
     payload.details = fixed ? dated.details : withSourceBoxDated(dated.details, submissionSource(submission), now)
-    const columns = await listingColumnsWithGeo(payload)
+    const { details: nextDetails, ...columns } = await listingColumnsWithGeo(payload)
     return async () => {
-      const { error } = await supabase
-        .from('resource')
-        .update({ ...columns, reviewed_at: now })
-        .eq('community_id', submission.community_id)
-        .eq('id', target)
-      if (error) throw new Error(`Failed to update listing: ${error.message}`)
+      // Only the details that differ from the listing as read just now
+      // (listingPatch.ts): it's a writer of the listing's own keys too (its
+      // date, item dates, Google's fields), which migration 112 lets
+      // through no other way.
+      try {
+        const written = await patchListing(submission.community_id, target, ((existingData as ResourceRow).details as Record<string, unknown> | null) ?? {}, nextDetails, {
+          columns: { ...columns, reviewed_at: now },
+        })
+        if (!written) throw new ReviewEditError('The listing this changes couldn’t be found.')
+      } catch (e) {
+        if (e instanceof ReviewEditError) throw e
+        throw new Error(`Failed to update listing: ${(e as Error).message}`)
+      }
       const existing = existingData ? normalizeRow(existingData as ResourceRow) : null
       const [, changes] = await Promise.all([
         growTagVocabulary(submission.community_id, payload),

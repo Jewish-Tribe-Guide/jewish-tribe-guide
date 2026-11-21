@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const m = vi.hoisted(() => ({ client: {} as unknown }))
+vi.mock('@/lib/listingPatch', () => import('@/test/patchAsWholeWrite'))
 vi.mock('./supabase/admin', () => ({ getAdminClient: () => m.client }))
 const { dateMenuDishes, fromRow, isNoMenu, menuNamesListed, READING_GIVES_UP_MS, READING_NOTE, splitDishes, storedDishes, withMenuChecked, withMenuDishes } = await import('./menuReadingStore')
 const { validatedDuring } = await import('./validatedDuring')

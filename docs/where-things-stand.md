@@ -1367,29 +1367,47 @@ warning, not a failure.
 
 ## `details` holding the site's own state: started Nov 21 (the user's yes)
 
-**Order changed from the plan below, before building.** Merging reads
-first (old step 2) would bring a cleared key back: a writer that clears
-one (an item's "gone", a sync error, an undone confirmation) clears it in
-`details` only, and `state` still has it. So writers move before readers:
+**Changed again while building (Nov 21), to fewer steps and no change to
+any reader.** `details` keeps a copy of the site's keys for good, kept by
+the trigger, so nothing that reads a listing changes, and the copy can't
+go stale. What changes is who may write those keys:
 
-1. **Built (`claude/details-state`)**: migration 110 adds `state` and a
-   trigger that copies the site's keys (`SITE_STATE_KEYS`,
-   `syncFields.ts`; `site_state_keys()` in the migration, held together by
-   `resourceState.test.ts`) from every write of `details`, so every writer
-   (site, SQL function, script) keeps it exact with no code change; and
-   copies every row once. Checked on a fresh Postgres 17: inserts, confirm
-   and its undo, an unrelated update, a second run. **Needs running on dev
-   then live**; nothing reads it yet.
-2. Reads merge `{...details, ...state}`: no change while the trigger copies.
-3. Every writer of the site's keys writes `state` itself, key by key (the
-   SQL functions in a new migration, the site's writers through one),
-   still into `details` too.
-4. The trigger stops deriving `state` (a migration); submissions and
-   approvals stop carrying the site's keys.
-5. A migration removes the keys from `details`.
+1. **Built**: migration 110 adds `state` and a trigger that copies the
+   site's keys (`SITE_STATE_KEYS`, `syncFields.ts`; `site_state_keys()` in
+   the migration, held together by `resourceState.test.ts`) from every
+   write of `details`, and copies every row once.
+2. **Built**: migration 111 adds `patch_resource_details`, which changes
+   only the keys it's given (and an approved edit's columns) in one
+   statement, with an optional "only if still" guard. It and the SQL
+   functions that already write the site's keys (confirm, unconfirm, item
+   marks, approved dishes) are marked `jpc.writes_site_state`. Every site
+   writer of a listing's details goes through `patchListing`
+   (`listingPatch.ts`): Google's job, the nightly sync, menu links and
+   dishes, source dates, a category's field clean-ups, and approving an
+   edit. So a save landing between a job's read and its write is no
+   longer wiped. Where 111 hasn't run, `patchListing` writes the whole
+   `details` as before. `siteStateWriters.test.ts` fails on a new whole
+   write. **111 needs running on dev, live and the test project** (it
+   needs 110 first).
+3. **Written, held**: migration 112 turns the trigger round. A write not
+   marked as a site writer keeps the listing's `state`, and its `details`
+   gets the site's keys from it, so an approved week-old edit, an admin's
+   save or a script can no longer wipe or roll back a confirmation, an
+   item date or Google's record. A write that sets `state` itself keeps it.
+   **Run it only after 111 and this branch's deploy are live.** Before
+   running it: the old one-off scripts in `scripts/` that write site keys
+   whole (`backfill-place-ids`, `backfill-verified-directions`,
+   `migrate-mismatched-placeids`, `sync-google-hours`,
+   `reconcile-google-provenance`, `merge-food-categories`) would have
+   those writes ignored, and `run-test-project-server.mjs`'s fixture
+   upserts should send `state: {}` to keep resetting them. Checked on a
+   fresh Postgres 17: a stale whole write, the patch, `confirm_resource`,
+   an unrelated update, an explicit `state`.
 
-`googleDescription` and `menuUrl` stay in `details` (a person may write
-them); `googleFields` moves.
+The earlier order, kept for the record: reads merging `{...details,
+...state}`, every writer writing `state`, then removing the keys from
+`details`. Dropped because each reader would have changed for no gain
+once only the site's writers can touch the keys.
 
 The plan as first written:
 

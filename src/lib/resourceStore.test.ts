@@ -4,6 +4,7 @@ import type { ResourceSubmission } from '@/types'
 
 // next/cache mocked (cacheTag/cacheLife need a request context this plain
 // Vitest process doesn't have) — same pattern as categoryStore.test.ts.
+vi.mock('@/lib/listingPatch', () => import('@/test/patchAsWholeWrite'))
 vi.mock('next/cache', () => ({
   cacheTag: () => {},
   cacheLife: () => {},

@@ -2,6 +2,7 @@ import { revalidateTag } from 'next/cache'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { TAGS } from '@/lib/cacheTags'
 import { noteValidated } from '@/lib/validatedDuring'
+import { patchListing } from '@/lib/listingPatch'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // A watch that read its source today and found a place just as the guide
@@ -66,11 +67,12 @@ export async function confirmFromSource(
     const next = datedBySource(details, named, keys, now)
     if (!next) continue
     const was = (details.sectionConfirmed as Record<string, string> | undefined) ?? {}
-    let update = supabase.from('resource').update({ details: next }).eq('id', row.id)
-    for (const key of new Set(keys)) update = typeof was[key] === 'string' ? update.eq(`details->sectionConfirmed->>${key}`, was[key]) : update.is(`details->sectionConfirmed->>${key}`, null)
-    const { data: done, error: writeError } = await update.select('id')
-    if (writeError) console.error(`[source-confirm] couldn’t date ${row.id} by ${named}:`, writeError.message)
-    else dated += (done ?? []).length
+    const ifStill = Object.fromEntries([...new Set(keys)].map((key) => [`sectionConfirmed.${key}`, typeof was[key] === 'string' ? was[key] : null]))
+    try {
+      if (await patchListing(community, row.id, details, next, { ifStill })) dated++
+    } catch (e) {
+      console.error(`[source-confirm] couldn’t date ${row.id} by ${named}:`, (e as Error).message)
+    }
   }
   // The same cached listings every page reads (as a visitor's Yes does).
   // Outside Next (the daily test-project job, scripts/run-test-watches.mts)
