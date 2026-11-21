@@ -180,7 +180,8 @@ describe('submissionStore (integration)', () => {
     const { data: created } = await getAdminClient().from('resource').select('id').eq('name', name).single()
 
     const longAgo = '2020-01-01T00:00:00.000Z'
-    await getAdminClient().from('resource').update({ details: { confirmedAt: longAgo, kept: 'yes' } }).eq('id', created!.id)
+    // Since 112 a plain write can't change the site's keys: set `state` too.
+    await getAdminClient().from('resource').update({ details: { confirmedAt: longAgo, kept: 'yes' }, state: { confirmedAt: longAgo } }).eq('id', created!.id)
 
     const edit = { ...listingPayload(category.id, name), phone: '555-0100', details: { kept: 'yes' } }
     const updateSub = await submitListingUpdate('philly', created!.id, edit, null, null)
@@ -527,7 +528,8 @@ describe('submissionStore (integration)', () => {
     await approveSubmission(createSub.id)
     const { data: created } = await getAdminClient().from('resource').select('id').eq('name', name).single()
     const longAgo = '2020-01-01T00:00:00.000Z'
-    await getAdminClient().from('resource').update({ details: { confirmedAt: longAgo } }).eq('id', created!.id)
+    // Since 112 a plain write can't change the site's keys: set `state` too.
+    await getAdminClient().from('resource').update({ details: { confirmedAt: longAgo }, state: { confirmedAt: longAgo } }).eq('id', created!.id)
 
     const deleteSub = await submitListingDelete('philly', created!.id, 'closed', null)
     pendingSubmissionIds.push(deleteSub.id)
