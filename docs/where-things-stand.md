@@ -528,10 +528,48 @@ Soon:
 
 Later or bigger:
 ~~foreign keys~~ (written Nov 21, below); ~~`details`
-holding app state~~ (done Nov 21, below); an old-iOS floor
-decision; the parked Today
-features (keep or delete); `/inbox` per community; this file's size;
-Partial Prefetching before Next 17.
+holding app state~~ (done Nov 21, below); ~~an old-iOS floor
+decision~~ (below); ~~the parked Today
+features~~ (stay parked, the user Nov 21); ~~`/inbox` per community~~
+(left as it is, below); ~~this file's size~~ (finished work moved to
+`docs/history.md` Nov 21, 8,039 lines to about 2,200); Partial
+Prefetching before Next 17 (tried Nov 21, below; not on).
+
+The user's calls on this list, Nov 21: Today stays parked, not deleted.
+`/inbox` stays as it is: it's for forms, there are none yet, and forms
+will get something better than `/inbox` when they come. The user
+believes What changed is on the live site; in code it is off
+(`features.whatChanged` is false on main), so the page and its link
+aren't there. Worth a look together: the user may mean the trust line.
+
+Oldest iPhone (left to me, Nov 21): **iOS 16.4, so the iPhone 8 and X
+(2017) and every one since.** That's what Next 16 builds for (Safari
+16.4), and the site already holds to it: `browserSupport.test.ts` fails on
+a JavaScript built-in past 16.4, and the three newer browser APIs in use
+(`requestIdleCallback`, `checkVisibility`, `scrollbar-gutter`) each fall
+back where they're missing. Going lower (iOS 15, the iPhone 7 and older)
+would mean overriding Next's targets, more code rewritten for old phones
+on every visitor's download (the home's JS budget is 400 KB), and React
+and Next aren't tested there. Revisit only if analytics show real visits
+from iOS 15 or older.
+
+Partial Prefetching (tried Nov 21, not switched on): with
+`partialPrefetching: true`, e2e went 419 passed to 412 and **7 failed,
+all the same way: a made-up address answers 200, not 404** (an unknown
+category, community, listing, shared question, `/favicon.ico`, the old
+travel-time endpoint). The page still says "Page not found", but crawlers
+and link previews would take dead links as real pages. Cause, from Next's
+ISR docs: with the flag on, a path not prerendered is sent the route's
+App Shell at once, so the status is out before the page finds the
+address isn't real. `instant = false` doesn't help (it's validation
+only). What would work: `proxy.ts` answering 404 for an unknown community
+or category before rendering, against a cached list of slugs; a cost on
+every request, to measure. The gain is small today: measured with a
+production build, the home sends the same prefetches either way (3
+requests; most links already have `prefetch={false}`), and a category
+arrives on the click in about 0.4s. Next 17 turns it on for everyone, so
+it has to be done before that upgrade; the 7 e2e tests fail if it's
+flipped without the fix.
 
 Foreign keys (Nov 21, `claude/foreign-keys`): migration 113 written,
 **not run anywhere yet**. Every table's `community_id` points at
