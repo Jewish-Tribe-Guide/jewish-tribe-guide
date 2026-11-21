@@ -29,15 +29,17 @@ export function createVisibilityLoader<T>(opts: {
   retryMs: number
   now?: () => number
   onError?: (err: unknown) => void
-}): () => Promise<T> {
+}): (opts?: { maxAgeMs?: number }) => Promise<T> {
   const { load, empty, ttlMs, retryMs, onError } = opts
-  const now = opts.now ?? Date.now
+  const now = opts.now ?? (() => Date.now())
 
   let data: T | null = null
   let expiresAt = 0
   let inFlight: Promise<void> | null = null
+  let triedAt = -Infinity
 
   async function refresh(): Promise<void> {
+    triedAt = now()
     try {
       // `load` may throw synchronously (getAdminClient does on a missing env
       // var); the await inside try catches that too.
@@ -51,8 +53,13 @@ export function createVisibilityLoader<T>(opts: {
     }
   }
 
-  return async () => {
-    if (now() >= expiresAt) {
+  // `maxAgeMs` asks for a fresher copy than the TTL (the proxy's address
+  // check, on an address it doesn't know: a category made a moment ago). At
+  // most one load per maxAgeMs, however many ask, so a stream of made-up
+  // addresses can't turn into a stream of queries.
+  return async (opts) => {
+    const tooOld = opts?.maxAgeMs !== undefined && now() - triedAt >= opts.maxAgeMs
+    if (now() >= expiresAt || tooOld) {
       inFlight ??= refresh()
       await inFlight
     }
