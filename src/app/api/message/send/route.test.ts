@@ -190,6 +190,23 @@ describe('POST /api/message/send', () => {
     expect(m.sendSubmissionNotification).toHaveBeenCalledWith({ id: 's1' })
   })
 
+  // Nov 21, the save survey: a send that failed partway left what it had
+  // filed in the queue, and told no admin.
+  it('a send that fails partway still tells the admins of what it filed', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    m.submitListingCreate.mockRejectedValue(new Error('timeout'))
+    const place = { name: 'South Square Market', address: '2201 South St' }
+    expect((await post({ text: 'x', stores: [{ listingId: ARCH, items }], places: [{ category: 'grocery', place }] })).status).toBe(502)
+    for (const fn of m.after) await fn()
+    expect(m.sendSubmissionNotification).toHaveBeenCalledWith({ id: 's1' })
+  })
+
+  it('a form refused files nothing before it', async () => {
+    const form = { category: 'grocery', name: '', address: '2201 South St', phone: '', anchorId: 'all', distance: null, geo: null, details: {} }
+    expect((await post({ text: 'x', stores: [{ listingId: ARCH, items }], forms: [{ submission: form }] })).status).toBe(400)
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
   it('refuses a failed bot check and an empty send, filing nothing', async () => {
     m.verifyTurnstile.mockResolvedValue(false)
     expect((await post({ stores: [{ listingId: ARCH, items }] })).status).toBe(403)
