@@ -1,18 +1,13 @@
 import { TEFILLAH_LABELS, type Minyan, type Tefillah } from './davening'
-import { datesBetween, scheduleDayDates, weekdayOf } from './scheduleUpdate'
+import { scheduleDayDates, weekdayOf } from './scheduleUpdate'
 import { dateText, type ScheduleMinyan, type SpecialSchedule } from './schedules'
-import { partOf, PARTS, type DatedTime, type Finding, type HeldWeek, type Part, type SourceRead, type WeekContext } from './shulTimes'
+import { partDates, partOf, PARTS, type DatedTime, type Finding, type HeldWeek, type Part, type SourceRead, type WeekContext } from './shulTimes'
 
 // ── A shul's week, as the listing keeps it ───────────────────────────────────
 // shulTimes.ts decides, a part at a time, what a shul's sources say about a
 // week. This is the step between that and the listing, pure: the listing's
 // weeks as sources and as what's held, and a finding as the week schedule
 // filed for it. listingPageRun.ts does the reading and the filing.
-
-/** A part's dates in a week: Sunday to Friday, or Friday and Shabbos. */
-export function partDates(part: Part, week: { from: string; to: string }): string[] {
-  return datesBetween(week.from, week.to).filter((d) => (part === 'shabbos' ? weekdayOf(d) === 'fri' || weekdayOf(d) === 'sat' : weekdayOf(d) !== 'sat'))
-}
 
 /** A schedule's minyanim on their dates, each date once. */
 export function scheduleTimes(s: SpecialSchedule): DatedTime[] {

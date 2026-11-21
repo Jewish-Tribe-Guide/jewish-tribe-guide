@@ -70,7 +70,7 @@ describe('POST /api/inbound/newsletter', () => {
     expect(await res.json()).toEqual({ ok: true, status: 'read', filed: 1 })
     expect(m.receiveNewsletter).toHaveBeenCalledWith(
       'philly',
-      { messageId: 'g1', from: email.from, list: null, subject: 'Shabbos', date: '2026-10-16T14:00:00.000Z', text: 'Mincha 6pm', attachment: { mime: 'application/pdf', b64: 'JVBERg==' } },
+      { messageId: 'g1', from: email.from, list: null, subject: 'Shabbos', date: '2026-10-16T14:00:00.000Z', text: 'Mincha 6pm', attachment: { mime: 'application/pdf', b64: 'JVBERg==' }, auth: null },
       { apiKey: 'k', communityName: 'Philadelphia', where: expect.objectContaining({ slug: 'philly' }) },
     )
   })
@@ -91,6 +91,11 @@ describe('POST /api/inbound/newsletter', () => {
     expect(m.receiveEruvEmail.mock.calls[0][1]).toMatchObject({ list: 'jcor-ne-philadelphia@groups.io' })
     await POST(req({ ...email, list: 'not an address' }))
     expect(m.receiveEruvEmail.mock.calls[1][1]).toMatchObject({ list: null })
+  })
+
+  it('passes on Gmail’s check of who sent it', async () => {
+    await POST(req({ ...email, auth: 'mx.google.com; dkim=pass header.i=@groups.io' }))
+    expect(m.receiveEruvEmail.mock.calls[0][1]).toMatchObject({ auth: 'mx.google.com; dkim=pass header.i=@groups.io' })
   })
 
   it('a shul’s newsletter still needs the AI key', async () => {

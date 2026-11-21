@@ -1,4 +1,5 @@
 import type { DirectoryResource, ResourceRow } from '@/types'
+import { schemaMissing } from './supabase/schemaMissing'
 import { getAdminClient } from './supabase/admin'
 import { normalizeRow } from './resourceStore'
 import type { WalkRoute } from './walkRoutes'
@@ -22,7 +23,7 @@ type Row = {
 const COLUMNS = 'from_id,to_id,from_lat,from_lng,to_lat,to_lng,minutes,meters'
 
 export function walkRouteTableMissing(message: string | undefined): boolean {
-  return !!message && /\bwalk_route\b/.test(message) && /(does not exist|schema cache)/.test(message)
+  return schemaMissing('walk_route', message)
 }
 
 function fromRow(r: Row): WalkRoute {

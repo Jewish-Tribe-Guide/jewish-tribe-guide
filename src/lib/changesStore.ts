@@ -1,4 +1,5 @@
 import { cacheLife, cacheTag } from 'next/cache'
+import { saySchemaMissing } from './supabase/schemaMissing'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { CHANGE_KINDS, type ChangeLogRow } from './whatChanged'
@@ -30,7 +31,9 @@ type Row = {
 const LATER_COLUMNS = ['hidden_at', 'changes'] as const
 
 function missingLater(error: { message: string } | null, columns: readonly string[]): string | undefined {
-  return error ? LATER_COLUMNS.find((c) => columns.includes(c) && error.message.includes(c)) : undefined
+  const later = error ? LATER_COLUMNS.find((c) => columns.includes(c) && error.message.includes(c)) : undefined
+  if (later) saySchemaMissing(`activity.${later}`)
+  return later
 }
 
 /** Listing ids per log read: each is a query-string entry. */

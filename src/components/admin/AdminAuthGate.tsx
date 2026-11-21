@@ -148,7 +148,7 @@ export default function AdminAuthGate({
     // effect body is the call below — every setAuthorized happens inside
     // this function's own async continuation, not directly in the effect,
     // same shape as this codebase's useLoadOnMount(load) convention
-    // elsewhere (see e.g. ArchivedListings.tsx's own `load`).
+    // elsewhere (see e.g. TeamManager.tsx's own `load`).
     let cancelled = false
     async function checkAuthorized(currentSession: Session) {
       setAuthorized(null)

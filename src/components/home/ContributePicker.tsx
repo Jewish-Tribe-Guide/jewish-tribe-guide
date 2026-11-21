@@ -9,6 +9,7 @@ import { useCommunitySlug, useContributions } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { categoryTint, getCategoryColor, getCategoryTilePhoto } from '@/lib/categoryColor'
 import { TilePhoto } from './sections'
+import { useDialogFocus } from '@/lib/useDialogFocus'
 
 /** The Add flow's category picker — opened by SuggestListingCard's "Submit a
  *  Listing" button (UpdateListingsCard used to open this too, before the
@@ -32,6 +33,7 @@ export default function ContributePicker({ onClose }: { onClose: () => void }) {
   const community = useCommunitySlug()
   const contributions = useContributions()
   const [query, setQuery] = useState('')
+  const dialogRef = useDialogFocus()
 
   // Escape closes it, as it does every other dialog in the app.
   useEffect(() => {
@@ -54,7 +56,7 @@ export default function ContributePicker({ onClose }: { onClose: () => void }) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       role="presentation"
     >
-      <div className="dialog-in w-full max-w-md rounded-xl bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-label="Add a listing">
+      <div ref={dialogRef} className="dialog-in w-full max-w-md rounded-xl bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-label="Add a listing">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-slate-900">Add a listing</h3>

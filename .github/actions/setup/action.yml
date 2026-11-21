@@ -1,6 +1,6 @@
 name: Set up Node and packages
 description: >
-  Node 24, node_modules restored from the cache (npm ci only when the lock
+  Node (.nvmrc's), node_modules restored from the cache (npm ci only when the lock
   file has changed), and, given a dist dir, Turbopack's build cache for it.
 
 # Why (Nov 20): every job spent 35–53s in `npm ci` and every build-and-start
@@ -10,7 +10,7 @@ description: >
 #
 # node_modules, not ~/.npm: restoring npm's download cache still leaves
 # `npm ci` to unpack and link ~840 MB. The key is the lock file, the OS and
-# Node's major version, so a dependency change misses and runs `npm ci`.
+# Node's version (.nvmrc), so a dependency change misses and runs `npm ci`.
 # Bare runners and the Playwright image (both Ubuntu 24.04, x64, glibc)
 # share it: the native packages (swc, lightningcss, sharp, esbuild) pick the
 # same prebuilt binaries in both. `unit` runs on push to main too, so main
@@ -38,13 +38,13 @@ runs:
   steps:
     - uses: actions/setup-node@v7
       with:
-        node-version: 24
+        node-version-file: .nvmrc
 
     - id: modules
       uses: actions/cache@v6
       with:
         path: node_modules
-        key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+        key: node-modules-${{ runner.os }}-${{ hashFiles('.nvmrc', 'package-lock.json') }}
 
     - if: steps.modules.outputs.cache-hit != 'true'
       shell: sh

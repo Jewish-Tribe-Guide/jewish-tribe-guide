@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useDialogFocus } from '@/lib/useDialogFocus'
 
 type Props = {
   /** Set when editing a pin that already has a name — governs the title and
@@ -20,6 +21,7 @@ type Props = {
 export default function DroppedPinEditor({ initialLabel, onSave, onDelete, onCancel }: Props) {
   const [label, setLabel] = useState(initialLabel ?? '')
   const trimmed = label.trim()
+  const dialogRef = useDialogFocus()
 
   return (
     <div
@@ -28,6 +30,7 @@ export default function DroppedPinEditor({ initialLabel, onSave, onDelete, onCan
       onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
       <div
+        ref={dialogRef}
         className="w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-5 shadow-xl"
         role="dialog"
         aria-modal="true"

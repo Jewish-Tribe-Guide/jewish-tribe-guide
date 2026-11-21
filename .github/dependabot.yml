@@ -14,6 +14,18 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # Held at 1.63 (PR 402): playwright-core drives @sparticuz/chromium's
+      # serverless Chromium for the menu reader on Vercel, which no suite
+      # runs, and CI's Playwright container tag must match @playwright/test
+      # (ciWorkflow.test.ts). With these in it the group never passed CI.
+      # Moved by hand, together, and checked on a preview.
+      - dependency-name: "@playwright/test"
+      - dependency-name: "playwright-core"
+      - dependency-name: "@sparticuz/chromium"
+      # Node's types follow .nvmrc, not the newest Node (versionsAgree.test.ts).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: "/"

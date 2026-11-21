@@ -198,7 +198,5 @@ export function normalizeSearchMiss(raw: unknown): string | null {
 
 /** A date as YYYY-MM-DD where the community is, so a daily count means that
  *  community's day and not UTC's (in Philadelphia, UTC's day turns over at
- *  7 or 8 in the evening). */
-export function dayInTimezone(timezone: string, now: Date): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
-}
+ *  7 or 8 in the evening). In isoDay.ts, with the other date helpers. */
+export { dayInTimezone } from './isoDay'

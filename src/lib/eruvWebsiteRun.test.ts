@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ERUV_WEBSITE_CREATOR, ERUV_WEBSITE_WATCH_NAME } from './eruvWebsite'
+import { ERUV_WEBSITE_CREATOR, ERUV_WEBSITE_WATCH_NAME, eruvWebsiteUrl } from './eruvWebsite'
 
 const m = vi.hoisted(() => ({
   eruvim: [] as unknown[],
@@ -58,6 +58,21 @@ beforeEach(() => {
 })
 
 describe('reading an eruv’s website', () => {
+  // The website is an address an admin saved: only the public internet is
+  // read (the health sweep, Nov 20).
+  it('by default, an address that isn’t the public internet isn’t read', async () => {
+    const inside = 'http://169.254.169.254/latest/'
+    m.eruvim = [{ ...LOWER_MERION, website: inside }]
+    const sent = vi.fn(async () => new Response(`<p>${words}</p>`))
+    vi.stubGlobal('fetch', sent)
+    try {
+      expect(await runEruvWebsiteWatch('philly', eruvWebsiteUrl(inside)!)).toEqual({ ok: false, error: 'Couldn’t reach the page (Not a public web address)' })
+      expect(sent).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('files what differs as its suggestion, and its email opens the Eruvin page', async () => {
     const out = await runEruvWebsiteWatch('philly', URL_, NEW_NUMBER)
     expect(out).toMatchObject({ ok: true, filed: 1, check: { what: 'details', result: 'differs', queue: 'filed', differences: ['Lower Merion Eruv: Hotline (610) 664-5626, option 3 → (610) 555-0199'] } })

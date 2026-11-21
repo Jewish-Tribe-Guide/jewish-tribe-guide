@@ -1,4 +1,5 @@
 import { cacheLife, cacheTag } from 'next/cache'
+import { schemaMissing } from './supabase/schemaMissing'
 import { CONFIG_COMMUNITY_SLUG } from './configCommunity'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
@@ -677,7 +678,7 @@ export const COMMUNITY_SCOPED_TABLES = [
  *  of the community's to delete, so a delete there is skipped rather than
  *  stopping the whole delete half-way. */
 function tableMissing(table: string, message: string | undefined): boolean {
-  return !!message && new RegExp(`\\b${table}\\b`).test(message) && /(does not exist|schema cache)/.test(message)
+  return schemaMissing(table, message)
 }
 
 /** Permanently deletes a community and every row that belongs to it —

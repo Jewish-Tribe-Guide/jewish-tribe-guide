@@ -63,10 +63,17 @@ test('the computer preview shows the whole page, and opens full size on a click'
   expect(last).toBeLessThan(1000)
 
   const full = page.locator('iframe[title="Site preview"]')
+  const editor = new RegExp(`/${WRITE_SUITE_COMMUNITY}/admin/home$`)
   await shown.click()
   await expect(full).toBeVisible()
+  await expect(page).toHaveURL(/[?&]preview=open\b/)
   await page.getByRole('button', { name: '← Back to editor' }).click()
   await expect(shown).toBeVisible()
+  // The editor shows at once; its step back in history lands a moment
+  // later (useScreenHistory queues it). A Forward before then did nothing,
+  // and the step back then left the editor showing: CI on three PRs, Nov
+  // 20. Wait for the address, as a person's next click would.
+  await expect(page).toHaveURL(editor)
 
   // Browser Back and Forward close and open it, and Back goes no further
   // than the settings (the user, Nov 4).

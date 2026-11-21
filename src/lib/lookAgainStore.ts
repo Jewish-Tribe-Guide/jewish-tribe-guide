@@ -1,4 +1,5 @@
 import { getAdminClient } from './supabase/admin'
+import { schemaMissing } from './supabase/schemaMissing'
 import type { FoundPage, FoundPlace, LookKind, LookRow } from './lookAgain'
 
 // The look_again table (migration 092): Look again's tries, finds and stops
@@ -10,7 +11,7 @@ type Row = { kind: LookKind; target_id: string; tried_at: string | null; found: 
 const COLUMNS = 'kind, target_id, tried_at, found, not_these, stopped_at'
 
 export function lookTableMissing(message: string | undefined): boolean {
-  return !!message && /\blook_again\b/.test(message) && /(does not exist|schema cache)/.test(message)
+  return schemaMissing('look_again', message)
 }
 
 const fromRow = (r: Row): LookRow => ({

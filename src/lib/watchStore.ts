@@ -1,4 +1,5 @@
 import { getAdminClient } from './supabase/admin'
+import { saySchemaMissing, schemaMissing } from './supabase/schemaMissing'
 import type { SourceRead } from './shulTimes'
 import { withoutListRead, type ListRead, type Watch, type WatchCheck, type WatchKind } from './watches'
 import { readAll } from '@/lib/readAll'
@@ -16,7 +17,9 @@ const COLUMNS = `${BASE_COLUMNS}, last_check`
 
 /** Postgres naming migration 085's column, not there yet. */
 export function checkColumnMissing(message: string | undefined): boolean {
-  return !!message && /last_check/.test(message)
+  const missing = !!message && /last_check/.test(message)
+  if (missing) saySchemaMissing('watch.last_check')
+  return missing
 }
 
 type Res = { data: unknown; error: { message: string } | null }
@@ -92,7 +95,7 @@ function toColumns(patch: Partial<Watch>): Record<string, unknown> {
 }
 
 export function tableMissing(message: string | undefined): boolean {
-  return !!message && /\bwatch\b/.test(message) && /(does not exist|schema cache)/.test(message)
+  return schemaMissing('watch', message)
 }
 
 /** Every community's watches, for the daily run. `available` is false

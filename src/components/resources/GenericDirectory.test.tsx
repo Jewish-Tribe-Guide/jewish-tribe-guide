@@ -311,6 +311,10 @@ describe('GenericDirectory', () => {
       expect(screen.queryByRole('button', { name: 'challah' })).not.toBeInTheDocument()
     })
 
+    // A status line someone can see. SearchAnnouncer's is for a screen
+    // reader only (sr-only), and is there, empty, before any search.
+    const shownStatus = () => screen.queryAllByRole('status').filter((el) => !el.classList.contains('sr-only'))
+
     // Search takes you to the page (Oct 13): once there, the list is the
     // answer. No sentence over it, no "Share this answer" (the address
     // carries the search, for the browser's own share), no "Read as": what
@@ -319,7 +323,9 @@ describe('GenericDirectory', () => {
       const user = userEvent.setup()
       renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
       await user.type(screen.getByRole('searchbox'), 'wine')
-      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+      expect(shownStatus()).toEqual([])
+      // A screen reader hears the count instead (SearchAnnouncer, Nov 20).
+      expect(screen.getByTestId('search-announcer')).toHaveTextContent('2 listings')
       expect(screen.queryByRole('button', { name: 'Share this answer' })).not.toBeInTheDocument()
       expect(screen.queryByText('Acme')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: /^Filters/ })).toHaveTextContent('1')
@@ -341,7 +347,8 @@ describe('GenericDirectory', () => {
 
     it('shows an answer only after a search: nothing sits under the box unasked', () => {
       renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
-      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+      expect(shownStatus()).toEqual([])
+      expect(screen.getByTestId('search-announcer')).toHaveTextContent('')
     })
 
     it('no longer shows the old "you can just ask" tip', () => {

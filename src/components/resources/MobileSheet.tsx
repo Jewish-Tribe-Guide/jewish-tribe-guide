@@ -5,6 +5,7 @@ import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 import BodyPortal from '@/components/BodyPortal'
 import BackIconButton from '@/components/BackIconButton'
 import { useBackdropClose } from '@/lib/useBackdropClose'
+import { useDialogFocus } from '@/lib/useDialogFocus'
 
 type Props = {
   isOpen: boolean
@@ -279,6 +280,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
   // included. Measured before paint, so it opens at that height, and again
   // whenever the content's size changes.
   const panelRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(phase === 'open', panelRef)
   const fitRef = useRef<HTMLDivElement>(null)
   const [fitPx, setFitPx] = useState<number | null>(null)
   const fitOn = fit && draggable && phase === 'open'

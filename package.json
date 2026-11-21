@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.9.0"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "next dev",
@@ -18,6 +18,7 @@
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.mts",
     "setup": "node --env-file=.env.local scripts/setup.mjs",
+    "migrations:report": "node --env-file=.env.local scripts/migration-report.mjs",
     "seed": "node --env-file=.env.local scripts/seed.mjs",
     "doctor": "node --env-file=.env.local scripts/doctor.mjs",
     "backup": "node --env-file=.env.local scripts/backup.mjs",
@@ -58,7 +59,7 @@
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.13",
     "@types/google.maps": "^3.67.0",
-    "@types/node": "^26",
+    "@types/node": "^24.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/tz-lookup": "^6.1.2",

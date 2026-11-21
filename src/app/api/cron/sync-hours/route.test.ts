@@ -3,10 +3,10 @@ import { NextRequest } from 'next/server'
 
 // Focused on the one behavior this route needs covered directly: a failed
 // Google Places fetch persists a per-listing error (not just an aggregate
-// counter) so the admin sync-coverage report (src/lib/syncCoverage.ts) can
+// counter) so Watches' Google page (src/lib/googleJob.ts) can
 // show it, and a successful sync clears any stale failure it left behind.
 // Everything else here (field ownership, hours mapping, closure routing) is
-// covered where it actually lives — googlePlaces.test.ts and syncCoverage.test.ts.
+// covered where it actually lives — googlePlaces.test.ts and googleJob.test.ts.
 
 function chainable(result: unknown) {
   const builder: Record<string, unknown> = {}

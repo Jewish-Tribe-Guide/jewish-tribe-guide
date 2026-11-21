@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { saySchemaMissing, schemaMissing } from './supabase/schemaMissing'
 import { getAdminClient } from './supabase/admin'
 import type { Eruv, EruvStatus } from './eruv'
 import type { EruvLineFile } from './eruvLine'
@@ -9,7 +10,7 @@ import type { KeptEmail } from './eruvEmail'
 // where its map is. Uncached: the status changes through the day, and
 // /api/eruv reads it fresh. A missing table (the migration not run yet)
 // isn't an error: the page falls back to the old list. The maps themselves
-// are /api/eruv/maps (eruvMaps.ts), the saved copy of each eruv's own file
+// are /api/eruv/maps (its route.ts), the saved copy of each eruv's own file
 // (migration 076). 081's line_color and 074's sort_order are no longer read
 // (Nov 9): a too-pale line is darkened by itself (eruvLine.ts), and eruvim
 // are listed by name like every other place.
@@ -29,7 +30,11 @@ const LATER_COLUMNS = ['line_hide_points', 'line_missing', ...EMAIL_COLUMNS]
 // Read only where an eruv is shown or edited, so a map's fingerprint
 // (eruvMapsVersion) doesn't change with them.
 const DETAILS_COLUMN = 'details'
-const laterNamed = (message: string | undefined) => [...LATER_COLUMNS, DETAILS_COLUMN].filter((c) => !!message && message.includes(c))
+function laterNamed(message: string | undefined): string[] {
+  const named = [...LATER_COLUMNS, DETAILS_COLUMN].filter((c) => !!message && message.includes(c))
+  for (const c of named) saySchemaMissing(`eruv.${c}`)
+  return named
+}
 
 /** A select of `columns` plus the later ones, less any not there yet. */
 async function selectWithLater<T>(
@@ -176,7 +181,7 @@ function fromAdminRow(r: AdminRow): AdminEruv {
 }
 
 export function eruvTableMissing(message: string | undefined): boolean {
-  return !!message && /\beruv\b/.test(message) && /(does not exist|schema cache)/.test(message)
+  return schemaMissing('eruv', message)
 }
 
 /** A community's active eruvim, by name. `available` is false

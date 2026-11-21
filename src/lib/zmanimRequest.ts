@@ -8,6 +8,8 @@
 // CDN/Data Cache never gets a hit.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { dayInTimezone } from './isoDay'
+
 /** Two decimals is ~1.1 km. Sunset and candle-lighting move by seconds over
  *  that distance, and the card shows minutes. */
 export const ZMANIM_COORD_DECIMALS = 2
@@ -23,7 +25,7 @@ export function roundZmanimCoord(n: number): number {
  *  and without it, just after midnight, it could hand back yesterday's
  *  times for "today" (Nov 18 review, item 14). */
 export function zmanimDate(now: number, timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now))
+  return dayInTimezone(timezone, now)
 }
 
 /** The path + query a client should request for a location. */

@@ -1,4 +1,5 @@
 import type { Finding } from './watchFindings'
+import { addDays } from './isoDay'
 import type { StatusChange } from './email'
 import { readWeekLines } from './scheduleUpdate'
 import { TIMES_PART_LABELS } from './timesParts'
@@ -65,12 +66,6 @@ const fromLine = (watchName: string | null | undefined): string => (watchName &&
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
-/** YYYY-MM-DD in the community's time zone. */
-export function dayIn(at: Date, timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at)
-}
-
-const addDays = (day: string, n: number) => new Date(Date.parse(`${day}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
 const shortDate = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 
 /** "This week’s times", "Next week’s times", or "Times for Nov 29":

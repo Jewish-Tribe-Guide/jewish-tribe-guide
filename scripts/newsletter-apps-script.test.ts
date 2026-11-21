@@ -15,7 +15,7 @@ import { fillNewsletterScript } from '../src/lib/newsletterScript'
 const SOURCE = readFileSync(join(__dirname, 'newsletter-apps-script.js'), 'utf8')
 
 /** `list`: the mailing list it came through, as its List-Post header says. */
-type Message = { id: string; from: string; list?: string }
+type Message = { id: string; from: string; list?: string; raw?: string }
 type Thread = { id: string; last: number; messages: Message[] }
 
 function run({
@@ -46,6 +46,10 @@ function run({
     getId: () => m.id,
     getFrom: () => m.from,
     getHeader: (name: string) => (name === 'List-Post' && m.list ? `<mailto:${m.list}>` : ''),
+    getRawContent: () => {
+      if (m.raw === undefined) throw new Error('no raw content here')
+      return m.raw
+    },
     getSubject: () => 'Shabbos',
     getDate: () => new Date('2026-10-16T14:00:00Z'),
     getPlainBody: () => 'Mincha 6pm',
@@ -171,6 +175,34 @@ describe('the Gmail script', () => {
     expect(searches).toContain('in:inbox newer_than:14d list:(jcor-ne-philadelphia@groups.io)')
     expect(posted).toEqual(['up'])
     expect(payloads[0]).toMatchObject({ from: 'Moshe Levi via groups.io <mlevi=gmail.com@groups.io>', list: 'jcor-ne-philadelphia@groups.io' })
+  })
+
+  // The site sets an eruv's status only when Gmail found its address sent
+  // the email (emailAuth.ts, Nov 20). Gmail's own header is the first: one
+  // the sender wrote, further down, is never sent instead.
+  it('sends Gmail’s own Authentication-Results header with each email', () => {
+    const raw = [
+      'Delivered-To: guide@gmail.com',
+      'ARC-Authentication-Results: i=1; mx.google.com; dkim=pass header.i=@groups.io',
+      'Authentication-Results: mx.google.com;',
+      '       dkim=pass header.i=@groups.io header.s=20240830;',
+      '       dmarc=pass (p=NONE) header.from=groups.io',
+      'From: JCOR NE <JCOR-NE-Philadelphia@groups.io>',
+      'Authentication-Results: mx.google.com; dkim=pass header.i=@groups.io; written=by-the-sender',
+      '',
+      'Authentication-Results: in the body',
+    ].join('\r\n')
+    const { payloads } = run({
+      senders: ['jcor-ne-philadelphia@groups.io'],
+      inbox: [
+        { id: 't1', last: 2, messages: [{ id: 'up', from: 'JCOR NE <JCOR-NE-Philadelphia@groups.io>', raw }] },
+        { id: 't2', last: 1, messages: [{ id: 'old', from: 'JCOR NE <JCOR-NE-Philadelphia@groups.io>' }] },
+      ],
+    })
+    const sent = Object.fromEntries(payloads.map((p) => [p.messageId, p.auth]))
+    expect(sent.up).toBe('mx.google.com; dkim=pass header.i=@groups.io header.s=20240830; dmarc=pass (p=NONE) header.from=groups.io')
+    // A message whose raw content can't be read still goes, without it.
+    expect(sent.old).toBe('')
   })
 
   it('searches nothing when no sender has been added yet', () => {

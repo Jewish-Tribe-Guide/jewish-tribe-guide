@@ -39,7 +39,7 @@ export const POST = adminWrite(async (request: NextRequest, { community, admin }
   const body = (await request.json().catch(() => null)) as { action?: unknown; address?: unknown } | null
   try {
     if (body?.action === 'google') {
-      const row = await loadSyncableListing(id)
+      const row = await loadSyncableListing(community.slug, id)
       if (!row) return unchanged(Response.json({ ok: true, read: false }))
       const result = await syncOneListing(row)
       if (result.outcome === 'synced' && result.statusChange) await sendStatusChangeDigest([result.statusChange]).catch(() => {})

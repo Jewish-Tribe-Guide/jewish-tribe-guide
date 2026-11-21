@@ -196,7 +196,7 @@ export const PATCH = adminWrite(async (request: NextRequest, { community, admin 
  *  does; tonight's run settles one that doesn't. */
 async function syncApprovedListing(community: string, listingId: string): Promise<void> {
   try {
-    const row = await loadSyncableListing(listingId)
+    const row = await loadSyncableListing(community, listingId)
     if (!row || row.details.googleSyncedAt) return
     const result = await syncOneListing(row)
     if (result.outcome !== 'synced') return

@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from 'react'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 import { useBackdropClose } from '@/lib/useBackdropClose'
 import BackIconButton from '@/components/BackIconButton'
+import { useDialogFocus } from '@/lib/useDialogFocus'
 
 type Props = {
   isOpen: boolean
@@ -36,6 +37,7 @@ type Props = {
 export default function ActionDialog({ isOpen, onClose, title, children, onBack: stepBack, listingShaped }: Props) {
   useBodyScrollLock(isOpen)
   const backdrop = useBackdropClose(onClose)
+  const dialogRef = useDialogFocus(isOpen)
 
   useEffect(() => {
     if (!isOpen) return
@@ -75,7 +77,7 @@ export default function ActionDialog({ isOpen, onClose, title, children, onBack:
       >
         {/* The same box as the listing dialog: max-w-md, and a max height
             that leaves room for the send button hanging below it. */}
-        <div className="relative w-full max-w-md" role="dialog" aria-modal="true" aria-label={title}>
+        <div ref={dialogRef} className="relative w-full max-w-md" role="dialog" aria-modal="true" aria-label={title}>
           <div className="dialog-in flex max-h-[calc(85vh-4.5rem)] w-full flex-col rounded-xl border border-slate-200 bg-white shadow-xl">
             <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-6 py-5">
               <div className="min-w-0 flex-1">
@@ -99,6 +101,7 @@ export default function ActionDialog({ isOpen, onClose, title, children, onBack:
       role="presentation"
     >
       <div
+        ref={dialogRef}
         className="dialog-in flex w-full max-w-xl max-h-[85vh] flex-col rounded-xl border border-slate-200 bg-white shadow-xl"
         role="dialog"
         aria-modal="true"

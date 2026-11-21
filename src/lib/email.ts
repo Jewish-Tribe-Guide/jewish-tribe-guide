@@ -161,13 +161,16 @@ function formatDetailValue(v: unknown, field?: CategoryField): string {
 // Supabase project the write-test suites use (see README "Integration
 // tests"), which means a submission/edit/moderation action taken while just
 // clicking around locally fires a REAL email (Resend isn't environment-aware
-// on its own). NODE_ENV !== 'production' mirrors the same signal
-// dev-login/route.ts already uses to gate the local-admin bypass — anything
-// other than a real `next build`/Vercel deploy gets prefixed, so a real
-// inbox can filter/folder on "[DEV]" and know at a glance it's nothing to
-// act on.
+// on its own). Anything but the live site gets prefixed, so a real inbox
+// can filter/folder on "[DEV]" and know at a glance it's nothing to act on.
+//
+// The live site is VERCEL_ENV === 'production', the same gate Sentry uses
+// (src/instrumentation.ts). It used to be NODE_ENV, which is 'production'
+// on every `next build` — a Vercel preview (which reads the dev database)
+// and the test suites' `next start` included — so their emails went out
+// untagged, looking like the live site's (the health sweep, Nov 20).
 function taggedSubject(subject: string): string {
-  return process.env.NODE_ENV === 'production' ? subject : `[DEV] ${subject}`
+  return process.env.VERCEL_ENV === 'production' ? subject : `[DEV] ${subject}`
 }
 
 /** "Philly Jewish Guide" <notifications@…>: the inbox shows the

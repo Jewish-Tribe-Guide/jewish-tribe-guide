@@ -4,6 +4,7 @@
 // Gmail script sends. Server-only.
 
 import { createHash } from 'node:crypto'
+import { dayInTimezone } from '@/lib/isoDay'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { listCategories } from '@/lib/categoryStore'
@@ -46,6 +47,9 @@ export type NewsletterEmail = {
   text: string
   /** Its first PDF or picture, if any: shuls often send the times as one. */
   attachment: { mime: string; b64: string } | null
+  /** Gmail's Authentication-Results header for it: who Gmail found really
+   *  sent it (emailAuth.ts). Missing from a script copied before Nov 20. */
+  auth?: string | null
 }
 
 /** What became of it, for the script: `unknown`, `unlinked` and a failure
@@ -220,7 +224,7 @@ async function readAndFile(
     // A newsletter's week holds what it gives, never the usual times it
     // left out (the user, Oct 28). Dates past a week's length come back as
     // their own weeks (datedAsWeeks).
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: where.timezone }).format(new Date())
+    const today = dayInTimezone(where.timezone, Date.now())
     const applied = update.u.filter(changesAnything).reduce<ReturnType<typeof applyUpdate>>(
       (sofar, u) => {
         const next = applyUpdate(sofar.minyanim, sofar.schedules, u, u.kind === 'week' ? { onlyRead: { today } } : {})

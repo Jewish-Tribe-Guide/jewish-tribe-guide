@@ -1,5 +1,6 @@
 import { lineFetchUrl, missingNames, parseLineFile, sameLine, shownMap, readableLines, type EruvLineFile } from './eruvLine'
 import type { EruvMapSource } from './eruvStore'
+import { publicFetch } from './menuReader'
 
 // ── Reading the eruvim's maps (Oct 12) ──────────────────────────────────────
 // The guide shows each eruv's own map, read from its file and shown as the
@@ -16,7 +17,7 @@ import type { EruvMapSource } from './eruvStore'
 
 const TIMEOUT_MS = 15_000
 
-export async function readLineFile(url: string, fetchImpl: typeof fetch = fetch): Promise<{ ok: true; file: EruvLineFile } | { ok: false; error: string }> {
+export async function readLineFile(url: string, fetchImpl: typeof fetch = publicFetch): Promise<{ ok: true; file: EruvLineFile } | { ok: false; error: string }> {
   try {
     const res = await fetchImpl(lineFetchUrl(url), { signal: AbortSignal.timeout(TIMEOUT_MS), cache: 'no-store' })
     if (!res.ok) return { ok: false, error: `The map answered ${res.status}` }
@@ -48,7 +49,7 @@ export function savedMap(source: Pick<EruvMapSource, 'lineLeaveOut' | 'lineHideP
 export async function readEruvMap(
   source: Pick<EruvMapSource, 'lineUrl' | 'rawLine' | 'lineLeaveOut' | 'lineHidePoints'>,
   now: Date,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch = publicFetch,
 ): Promise<MapRead> {
   const at = now.toISOString()
   const read = await readLineFile(source.lineUrl, fetchImpl)

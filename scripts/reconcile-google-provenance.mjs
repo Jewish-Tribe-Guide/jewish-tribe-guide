@@ -162,7 +162,7 @@ for (const r of rows) {
   const websiteKey = websiteKeyByCategory.get(r.category)
   // Only checkable at all when this category has a Website field — a
   // category without one has nothing for 'website' to mean, same as the
-  // live sync/resolveGoogleFields treat it (see syncCoverage.ts).
+  // live sync/resolveGoogleFields treat it (see websiteKeyOf in googleJob.ts).
   const checkableFields = websiteKey ? ['name', 'phone', 'hours', 'website'] : ['name', 'phone', 'hours']
 
   // Name — exact match means the submitter kept what autofill supplied.

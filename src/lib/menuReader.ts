@@ -187,6 +187,29 @@ export function troubleClause(t: Trouble): string {
 /** The pictures a model can read. */
 const PICTURE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
+/** fetch, for an address an admin or visitor typed: only the public
+ *  internet, every redirect checked the same way (`publicUrl`). Throws, as
+ *  fetch does for a host it can't reach, so a caller's own catch says why.
+ *  The eruv readers used plain fetch on their saved addresses (the health
+ *  sweep, Nov 20). Takes fetch's shape, so it's a fetcher's default. */
+export async function publicFetch(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  { fetchImpl, resolve = dnsLookup }: { fetchImpl?: typeof fetch; resolve?: Lookup } = {},
+): Promise<Response> {
+  const send = fetchImpl ?? fetch
+  let next = input instanceof Request ? input.url : String(input)
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const url = await publicUrl(next, resolve)
+    if (!url) throw new Error('Not a public web address')
+    const res = await send(url, { ...init, redirect: 'manual' })
+    const to = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null
+    if (!to) return res
+    next = new URL(to, url).toString()
+  }
+  throw new Error('Too many redirects')
+}
+
 /** A public page or PDF, following a few redirects, each one checked. Null
  *  when it can't be read. The body is text for a page, base64 for a PDF.
  *  `headers` in place of the menu reader's own: a watch asks as a browser

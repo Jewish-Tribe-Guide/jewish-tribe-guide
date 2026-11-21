@@ -334,6 +334,14 @@ describe('shulRowByShul', () => {
     expect(shulRowByShul([zoom], opts(7 * 60)).zoom).toEqual({ text: 'Shacharis 8 AM', tone: 'minyan', note: 'Zoom' })
   })
 
+  // "8am" was words to the reader this used (the health sweep, Nov 20):
+  // skipped as the next minyan and said under the row instead.
+  it('takes a time written without minutes as the next minyan, not as words', () => {
+    const plain = shul('plain', [m({ days: ['mon'], time: '8am' }), m({ id: 'y', days: ['mon'], tefillah: 'mincha', time: '1:45 p.m.' })])
+    expect(shulRowByShul([plain], opts(7 * 60)).plain).toEqual({ text: 'Shacharis 8 AM', tone: 'minyan' })
+    expect(shulRowByShul([plain], opts(9 * 60)).plain).toEqual({ text: 'Mincha 1:45 PM', tone: 'minyan' })
+  })
+
   it('says a minyan today with words for a time under the next one, which skips it', () => {
     const bnai = shul('bnai', [
       m({ tefillah: 'mincha_maariv', days: ['mon'], time: 'Call to Confirm' }),

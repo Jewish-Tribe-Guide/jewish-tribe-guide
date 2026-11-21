@@ -1,4 +1,5 @@
 import { scheduleProposal, type ProposalRow, type WeekProposal } from '@/lib/timesProposal'
+import { dayInTimezone } from '@/lib/isoDay'
 import { TIMES_PART_LABELS } from '@/lib/timesParts'
 import { eruvStanding, findingFor, statusPill, websiteWatchOf } from '@/lib/eruvJob'
 import { detailsRows } from '@/lib/eruvWebsite'
@@ -127,7 +128,7 @@ export function pageSays(w: Pick<Watch, 'active' | 'lastRunAt' | 'lastOkAt' | 'l
   if (h.state === 'stale') return `not read since ${day(h.lastRunAt)}`
   return null
 }
-const isoDay = (now: number) => new Date(now).toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+const isoDay = (now: number) => dayInTimezone('America/New_York', now)
 
 /** Google's fields, its website's and the ones a person checked, each in
  *  a box of its own: "Name and contact", or "Hours and contact" when it
@@ -359,7 +360,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
   }
 
   // An eruv: its status, from its status page or its emails; its details
-  // from its website; its map. The Eruv page's boxes (EruvJob.tsx).
+  // from its website; its map.
   const eruv = jobs.eruvim?.eruvim.find((x) => x.id === id)
   if (eruv) {
     const d = jobs.eruvim!

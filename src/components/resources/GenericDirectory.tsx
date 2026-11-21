@@ -67,6 +67,7 @@ import { tellUsPlaceholder } from '@/lib/tellUs'
 import { pointerHover } from '@/lib/pointerHover'
 import { TappedMinyanContext, type TappedMinyan } from './TappedMinyan'
 import { stepsIn } from '@/lib/stepAddress'
+import SearchAnnouncer from '@/components/SearchAnnouncer'
 
 /** How a change to the address is recorded. `replace`: in place, no step.
  *  `step`: a step the browser's Back undoes, named in history.state so the
@@ -1873,6 +1874,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               />
             </div>
           )}
+          {/* What the search found, for a screen reader (SearchAnnouncer). */}
+          <SearchAnnouncer query={search} count={typed && !minyanimView ? filtered.length : null} units={['listing', 'listings']} />
         </div>
         {headingInToolbar && (heroOverlap ? <div className={`desktop:pt-[48px] ${controlsStuck ? 'lg:pt-0' : ''}`}>{listHeading}</div> : listHeading)}
       </div>

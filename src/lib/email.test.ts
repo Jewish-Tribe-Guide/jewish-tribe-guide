@@ -116,10 +116,11 @@ describe('sendEmail', () => {
 
     beforeEach(() => {
       vi.stubEnv('RESEND_API_KEY', 'key_123')
-      // Stubbed to 'production' here so these tests exercise send mechanics
+      // Stubbed to the live site here so these tests exercise send mechanics
       // (from/replyTo/errors) independent of the [DEV] tagging behavior,
       // which has its own dedicated tests below.
       vi.stubEnv('NODE_ENV', 'production')
+      vi.stubEnv('VERCEL_ENV', 'production')
       sendSpy = vi.fn().mockResolvedValue({ data: { id: 'abc' }, error: null })
       vi.mocked(Resend).mockImplementation(
         function () { return { emails: { send: sendSpy } } } as unknown as typeof Resend,
@@ -603,6 +604,23 @@ describe('sendEmail', () => {
 
       it('prefixes the subject with [DEV] in any non-production environment', async () => {
         vi.stubEnv('NODE_ENV', 'development')
+        vi.stubEnv('VERCEL_ENV', '')
+        await sendEmail({ to: 'a@example.com', subject: 'New listing suggestion', html: '<p>hi</p>' })
+        expect(sendSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ subject: '[DEV] New listing suggestion' }),
+        )
+      })
+
+      // A Vercel preview, and the test suites' `next start`, are production
+      // builds: NODE_ENV says 'production' there too. A preview reads the dev
+      // database, so its emails went out looking like the live site's (the
+      // health sweep, Nov 20). Only Vercel's own VERCEL_ENV tells live apart.
+      it.each([
+        ['a Vercel preview', 'preview'],
+        ['a production build run locally (the test suites)', ''],
+      ])('prefixes [DEV] on %s, though NODE_ENV is production', async (_where, vercelEnv) => {
+        vi.stubEnv('NODE_ENV', 'production')
+        vi.stubEnv('VERCEL_ENV', vercelEnv)
         await sendEmail({ to: 'a@example.com', subject: 'New listing suggestion', html: '<p>hi</p>' })
         expect(sendSpy).toHaveBeenCalledWith(
           expect.objectContaining({ subject: '[DEV] New listing suggestion' }),
@@ -666,6 +684,7 @@ describe('sendSubmissionNotification — an edit shows what changed', () => {
   beforeEach(() => {
     vi.stubEnv('RESEND_API_KEY', 'key_123')
     vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('VERCEL_ENV', 'production')
     sendSpy = vi.fn().mockResolvedValue({ data: { id: 'abc' }, error: null })
     vi.mocked(Resend).mockImplementation(
       function () { return { emails: { send: sendSpy } } } as unknown as typeof Resend,
@@ -720,6 +739,7 @@ function harness() {
   beforeEach(() => {
     vi.stubEnv('RESEND_API_KEY', 'key_123')
     vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('VERCEL_ENV', 'production')
     state.spy = vi.fn().mockResolvedValue({ data: { id: 'x' }, error: null })
     vi.mocked(Resend).mockImplementation(
       function () { return { emails: { send: state.spy } } } as unknown as typeof Resend,

@@ -164,12 +164,12 @@ describe('syncOneListing', () => {
 describe('loadSyncableListing', () => {
   it('returns nothing for a listing with no place id — there is nothing to sync against', async () => {
     mockFrom.mockReturnValue(chainable({ data: { ...row, details: {} } }))
-    expect(await loadSyncableListing('r1')).toBeNull()
+    expect(await loadSyncableListing('philly', 'r1')).toBeNull()
   })
 
   it('returns the row when there is a place id', async () => {
     mockFrom.mockReturnValue(chainable({ data: row }))
-    expect(await loadSyncableListing('r1')).toMatchObject({ id: 'r1' })
+    expect(await loadSyncableListing('philly', 'r1')).toMatchObject({ id: 'r1' })
   })
 
   // Approving a removal archives the listing. Syncing it then would ask Google
@@ -180,8 +180,17 @@ describe('loadSyncableListing', () => {
     const builder = chainable({ data: null })
     mockFrom.mockReturnValue(builder)
 
-    expect(await loadSyncableListing('r1')).toBeNull()
+    expect(await loadSyncableListing('philly', 'r1')).toBeNull()
     const eq = builder.eq as ReturnType<typeof vi.fn>
     expect(eq).toHaveBeenCalledWith('status', 'approved')
+  })
+
+  // A community admin's Google read can't reach another community's listing
+  // by its id (the health sweep, Nov 20).
+  it('only loads a listing of the community asked for', async () => {
+    const builder = chainable({ data: row })
+    mockFrom.mockReturnValue(builder)
+    await loadSyncableListing('philly', 'r1')
+    expect(builder.eq as ReturnType<typeof vi.fn>).toHaveBeenCalledWith('community_id', 'philly')
   })
 })

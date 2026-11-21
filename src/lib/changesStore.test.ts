@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // answered by `answer(table, columns, ins)`, `ins` being its `.in()` filters.
 type Answer = (table: string, columns: string, ins: Record<string, readonly string[]>) => { data: unknown; error: unknown }
 const m = vi.hoisted(() => ({ answer: (() => ({ data: [], error: null })) as Answer, selects: [] as [string, string][] }))
+const report = vi.hoisted(() => vi.fn())
+vi.mock('./serverError', () => ({ reportServerError: report }))
 vi.mock('./supabase/admin', () => ({
   getAdminClient: () => ({
     from: (table: string) => {
@@ -55,6 +57,8 @@ describe('reading the log for What changed', () => {
     const [row] = await listChangeLogUncached('philly')
     expect(row).toMatchObject({ id: 1, changes: null, hidden: false })
     expect(m.selects.filter(([t]) => t === 'activity')).toHaveLength(3)
+    expect(report).toHaveBeenCalledWith(expect.stringMatching(/^\[schema\] activity\.changes isn’t in the database/))
+    expect(report).toHaveBeenCalledWith(expect.stringMatching(/^\[schema\] activity\.hidden_at isn’t in the database/))
   })
 
   // Dev shares its project with the write suites, whose fixtures' rows

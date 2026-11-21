@@ -13,11 +13,12 @@ function req(authorization?: string): Request {
   })
 }
 
-function mockSupabaseUser(result: { email?: string; error?: unknown }) {
+function mockSupabaseUser(result: { email?: string; error?: unknown; confirmed?: boolean }) {
+  const confirmedAt = result.confirmed === false ? null : '2026-11-20T00:00:00Z'
   vi.mocked(createClient).mockReturnValue({
     auth: {
       getUser: vi.fn().mockResolvedValue({
-        data: { user: result.email ? { email: result.email } : null },
+        data: { user: result.email ? { email: result.email, email_confirmed_at: confirmedAt } : null },
         error: result.error ?? null,
       }),
     },
@@ -75,6 +76,11 @@ describe('getInboxViewer', () => {
   it('returns null for a valid token whose email is admin-only, not inbox-allowlisted', async () => {
     mockSupabaseUser({ email: 'admin-only@example.com' })
     expect(await getInboxViewer(req('Bearer goodtoken'))).toBeNull()
+  })
+
+  it('returns null for an allowlisted email that was never confirmed', async () => {
+    mockSupabaseUser({ email: 'inbox@example.com', confirmed: false })
+    expect(await getInboxViewer(req('Bearer unconfirmed'))).toBeNull()
   })
 
   it('returns the email when the token is valid and inbox-allowlisted', async () => {

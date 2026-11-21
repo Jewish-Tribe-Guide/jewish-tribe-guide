@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJobs } from './fetchJobs'
 import type { JobKey } from '@/lib/watchJobReads'
@@ -96,24 +96,32 @@ export function coverageOf(jobs: Jobs): Map<string, PlaceCoverage> | null {
 }
 
 const lastSeen = new Map<string, Jobs>()
-/** Jobs switched so far: a read asked before one answers with the list as
- *  it was, and must not put that back (job-off's Links, Nov 16). */
-let switches = 0
+type Switch = { community: string; kind: NightKindId; off: boolean }
+/** Every job switched so far, in order. Its length is the count a read
+ *  checks: a read asked before a switch answers with the list as it was,
+ *  and must not put that back (job-off's Links, Nov 16). */
+const switchLog: Switch[] = []
 
 /** A job just turned off or on, as the server confirmed: what Watches
  *  shows on its way there. It shows what it last saw, then reads again,
  *  and the job's own read (runs) is the slowest of them, so it showed the
  *  job as it was for seconds (PR 390's CI, Nov 16: Links still listed). */
 export function noteJobSwitched(community: string, kind: NightKindId, off: boolean) {
-  switches++
+  switchLog.push({ community, kind, off })
   const seen = lastSeen.get(community)
   if (seen) lastSeen.set(community, switched(seen, kind, off))
   // And every screen holding the jobs now, whose list is remembered again
-  // each time it changes.
+  // each time it changes. A screen Next keeps hidden isn't here (its
+  // effects are off): it catches up from switchLog when it shows again.
   for (const follow of following) follow(community, kind, off)
 }
 
 const following = new Set<(community: string, kind: NightKindId, off: boolean) => void>()
+
+/** The switches of `community` from `since` on. */
+function switchesSince(community: string, since: number): Switch[] {
+  return switchLog.slice(since).filter((s) => s.community === community)
+}
 
 function switched(jobs: Jobs, kind: NightKindId, off: boolean): Jobs {
   if (!jobs.runs) return jobs
@@ -209,16 +217,19 @@ export function useWatchJobsAndReload(token: string, { ready = true }: { ready?:
   const community = useCommunitySlug()
   const api = useAdminApi(token)
   const [jobs, setJobs] = useState<Jobs>(() => lastSeen.get(community) ?? {})
+  // The switches this screen's list already has: all of them when it opens
+  // (lastSeen has them), then each one it follows.
+  const caughtUp = useRef(switchLog.length)
 
   const load = useCallback(async (given?: readonly JobKey[]) => {
     // Passed as a callback too (`.then(reload)`, onTried): anything but a
     // list of jobs is every job.
     const changed = Array.isArray(given) ? given : ALL_JOBS
-    const asOf = switches
+    const asOf = switchLog.length
     const fill = <K extends keyof Jobs>(key: K, value: Jobs[K]) => {
       // Which jobs are off, as they were before a switch since: kept as the
       // switch left them; a read after it brings the new list.
-      if (key === 'runs' && asOf !== switches) return
+      if (key === 'runs' && asOf !== switchLog.length) return
       setJobs((j) => ({ ...j, [key]: value }))
     }
     const failed = (key: keyof Jobs) => setJobs((j) => (j[key] === undefined ? { ...j, [key]: null } : j))
@@ -226,6 +237,21 @@ export function useWatchJobsAndReload(token: string, { ready = true }: { ready?:
     const rest = ALL_JOBS.filter((k) => !changed.includes(k))
     if (rest.length) void loadJobs(api, fill, failed, rest)
   }, [api])
+
+  // Before it's remembered again below: a screen Next kept hidden comes
+  // back with the list it had, and a job switched meanwhile (Add a watch's
+  // Turn on) must not go back to how it was (job-off, PR 405's CI, Nov 20).
+  useEffect(() => {
+    const missed = switchesSince(community, caughtUp.current)
+    caughtUp.current = switchLog.length
+    if (missed.length) setJobs((j) => missed.reduce((acc, s) => switched(acc, s.kind, s.off), j))
+    const follow = (c: string, kind: NightKindId, off: boolean) => {
+      caughtUp.current = switchLog.length
+      if (c === community) setJobs((j) => switched(j, kind, off))
+    }
+    following.add(follow)
+    return () => void following.delete(follow)
+  }, [community])
 
   useEffect(() => {
     lastSeen.set(community, jobs)
@@ -238,14 +264,6 @@ export function useWatchJobsAndReload(token: string, { ready = true }: { ready?:
     const t = setTimeout(() => void loadDishes(api).then((dishes) => dishes && setJobs((j) => ({ ...j, dishes }))), MENU_READING_POLL_MS)
     return () => clearTimeout(t)
   }, [reading, jobs.dishes, api])
-
-  useEffect(() => {
-    const follow = (c: string, kind: NightKindId, off: boolean) => {
-      if (c === community) setJobs((j) => switched(j, kind, off))
-    }
-    following.add(follow)
-    return () => void following.delete(follow)
-  }, [community])
 
   useLoadOnMount(useCallback(() => void (ready && load()), [load, ready]))
   return { jobs, reload: load }

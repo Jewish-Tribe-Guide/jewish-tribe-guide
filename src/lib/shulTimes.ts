@@ -109,7 +109,7 @@ export function partOf({ date, tefillah }: { date: string; tefillah?: Tefillah }
 }
 
 /** A part's dates in the week: Sunday to Friday, or Friday and Shabbos. */
-function partDates(part: Part, week: WeekContext['week']): string[] {
+export function partDates(part: Part, week: { from: string; to: string }): string[] {
   return datesBetween(week.from, week.to).filter((d) => (part === 'shabbos' ? weekdayOf(d) === 'fri' || weekdayOf(d) === 'sat' : weekdayOf(d) !== 'sat'))
 }
 

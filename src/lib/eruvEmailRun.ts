@@ -7,9 +7,13 @@ import { listEmailedEruvim, saveEmailRead } from '@/lib/eruvStore'
 import { readEruvEmail } from '@/lib/eruvEmail'
 import { senderAddress } from '@/lib/newsletter'
 import type { NewsletterEmail } from '@/lib/newsletterRun'
+import { sentFrom } from '@/lib/emailAuth'
+import { reportServerError } from '@/lib/serverError'
 
-/** What became of it, for the script: every one is done with. */
-export type EruvEmailResult = { status: 'eruv'; eruv: string; read: 'up' | 'down' | 'unclear' | 'no_status' | 'already' }
+/** What became of it, for the script: every one is done with.
+ *  `unverified`: Gmail didn't find the eruv's address sent it, so it was
+ *  not read (emailAuth.ts). */
+export type EruvEmailResult = { status: 'eruv'; eruv: string; read: 'up' | 'down' | 'unclear' | 'no_status' | 'already' | 'unverified' }
 
 /** The addresses eruv status emails come from, for the Gmail script. */
 export async function eruvSenders(community: string): Promise<string[]> {
@@ -29,6 +33,17 @@ export async function receiveEruvEmail(community: string, email: NewsletterEmail
   const eruv = (await listEmailedEruvim(community)).find((e) => addresses.includes(e.statusEmail))
   if (!eruv) return null
   const done = (read: EruvEmailResult['read']): EruvEmailResult => ({ status: 'eruv', eruv: eruv.id, read })
+
+  // Its From and List-Post are only words in the email: Gmail's own check
+  // of who sent it decides (the health sweep, Nov 20). A script copied
+  // before then sends none, and is taken on its word as before, said to
+  // Sentry so the script gets copied again.
+  const verified = sentFrom(email.auth, eruv.statusEmail!)
+  if (verified === false) {
+    reportServerError(`[inbound/eruv] an email for ${eruv.id} Gmail didn’t find was from ${eruv.statusEmail}: not read`, email.auth)
+    return done('unverified')
+  }
+  if (verified === null) reportServerError('[inbound/eruv] the Gmail script sends no Authentication-Results: copy it again from Newsletters')
 
   const sentAt = email.date ?? now
   const latest = Math.max(...[eruv.statusCheckedAt, eruv.statusErrorAt, eruv.statusEmailKept?.sentAt].map((t) => (t ? Date.parse(t) : 0)))

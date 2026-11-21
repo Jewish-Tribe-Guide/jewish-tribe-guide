@@ -230,6 +230,24 @@ function listOf(m) {
   return found ? found[1].toLowerCase() : ''
 }
 
+/** Gmail's own Authentication-Results header for a message: who Gmail
+ *  found really sent it, which the site checks before an eruv's status
+ *  email goes live. The first one in the message's headers, which Gmail
+ *  adds above the sender's own: a sender can write one of their own
+ *  further down, so getHeader, which doesn't say which it gives, isn't
+ *  used. '' when it can't be read. */
+function authOf(m) {
+  try {
+    var raw = m.getRawContent()
+    var end = raw.search(/\r?\n\r?\n/)
+    var head = raw.slice(0, end < 0 ? 100000 : end).replace(/\r?\n[ \t]+/g, ' ')
+    var found = head.match(/^Authentication-Results:[ \t]*(.*)$/im)
+    return found ? found[1].slice(0, 4000) : ''
+  } catch (e) {
+    return ''
+  }
+}
+
 /** Today, as a day number: short, for the remembered list. */
 function today() {
   return Math.floor(Date.now() / 86400000)
@@ -254,5 +272,6 @@ function emailOf(m) {
     date: m.getDate().toISOString(),
     text: m.getPlainBody(),
     attachment: attachment,
+    auth: authOf(m),
   }
 }

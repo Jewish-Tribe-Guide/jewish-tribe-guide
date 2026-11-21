@@ -866,7 +866,104 @@ Nov 14, later, the user's yes to both:
   sits beside Feedback · About · Privacy at the bottom now, in Safari as
   it already did in the home-screen app.
 
-## The health sweep (Nov 20; fix-first 1-8 built on `claude/health-fixes`, Soon and Later not started)
+## The health sweep (Nov 20; fix-first 1-8 merged in PR 403, Soon built in PRs 404–411, Later not started)
+
+### Report: the Soon list (Nov 20, an unattended run)
+
+Every Soon item is built, some in part (each says what's left). PR 404
+(merged) took three; from 405 on, one PR per item, against main, each
+stacked on the one before, so merging the last brings in all of them.
+Every fix has a test that failed against the old code first; each
+commit says how many. Nothing was written to live, and no migration was
+run anywhere.
+
+Built:
+
+- [PR 404](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/404)
+  paged reads, hidden communities' API, reader spend: merged before
+  this run.
+- [PR 405](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/405)
+  knip in CI (before this run): green.
+- [PR 406](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/406)
+  the two admin-write failures: green.
+- [PR 407](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/407)
+  security: 2 red, neither from its own change. `home-preview-spot:33`
+  (a test race, fixed in 411) and e2e `listing-detail.spec.ts:537`
+  on the computer (Request removal, then Back to the listing: the name
+  wasn't there). Both passed on 408 and 409, which carry 407's code.
+- [PR 408](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/408)
+  migrations, the code side: green.
+- [PR 409](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/409)
+  dependencies: green.
+- [PR 410](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/410)
+  accessibility, the first two of four: 1 red, `home-preview-spot:33`
+  again.
+- [PR 411](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/411)
+  small cleanup, and the `home-preview-spot` fix: green.
+
+Found and not fixed:
+
+- Admin-write waits shorter than a busy test database, the shape 406
+  fixed twice: `todo-scroll:75`, `main-dishes`, `category-editor`,
+  `community-editor:61`. Not looked into.
+- e2e `listing-detail.spec.ts:537` (above): once, not looked into.
+- 25 of 104 older migrations can't be told run or not from what they
+  made (a policy, an index, a data fix).
+- 5 moderate `npm audit` findings, all `glob`/`minimatch` in Sentry's
+  build plugin, build time only; they wait on Sentry.
+- The sheets' "Drag to resize" handle and the Nearby sheet's still don't
+  work from a keyboard.
+- The readers that find a time inside running text (hours, calendar
+  titles, the shul page and schedule readers, ask) weren't merged with
+  the clock reader: they answer a different question.
+- Watches' days are on New York's clock in three files: right for Philly
+  and UES only.
+- Rebuilding a fresh project from the migrations folder (grants, a
+  restore drill) is untouched.
+
+For the user:
+
+1. **Turnstile and Upstash keys on Vercel's Production.** PR 404 (merged)
+   makes a missing key refuse on live: contributions and the AI readers
+   stop. Sentry shows nothing unresolved, and a refusal would be
+   reported there, so they're probably set. Worth a look.
+2. Run migrations 103, 104 and 105: dev, then live. Then say whether
+   live gets 067 (Today's settings) now or when Today comes back.
+3. Say whether to drop `site_settings.contribution_note` (a migration).
+4. Copy the Gmail script again from Newsletters into the guide's Gmail.
+   Then say whether an eruv email with no Authentication-Results header
+   should be refused outright.
+5. Check Database → Backups on live, and run the first live copy
+   (`npm run backup -- --prod`, read-only).
+6. Sentry cron monitors: set `SENTRY_CRON_MONITORS=on` in Vercel's
+   Production once Sentry's plan is checked (it bills past a free
+   allowance).
+7. The next production build's log should say Node 24.
+8. A design call: on a phone, You's saved places and searches can only
+   be removed by a swipe.
+9. Merging 411 brings in 405–410 too. 407's and 410's red runs predate
+   the preview test's fix; 411 carries it.
+
+Surprises:
+
+- Next keeps a screen you leave alive but asleep (`<Activity>`), so
+  Watches came back from Add a watch as it was before a switch (406).
+- The log's "Submission not found" was the test's own cleanup deleting a
+  row mid-approve, not the cause.
+- An eruv's status could be set by an email anyone could fake: the From
+  line wasn't checked against Gmail's verdict (407).
+- Since Nov 20 every suite hits the one test project at once, and waits
+  that were enough before aren't.
+- Live is missing migration 067; dev has everything but 105.
+- This Mac runs Node 26; CI and live run 24.
+- Taking focus into dialogs made the form editor's preview (a picture of
+  a form, under `inert`) steal the admin's typing. An existing unit test
+  caught it (2 runs in 5) and it was fixed before pushing.
+- A shul's "8am" was never its next minyan.
+- `.env.example` held two real email addresses. It had never been
+  committed, so they never reached the public repo.
+- `home-preview-spot:33`, seen three times, was the test pressing Forward
+  before the page's own step back had landed.
 
 The user (Nov 20): use the lull to check the site is "actually being
 built/run the right way". Six read-only reviewers (dead code and
@@ -874,7 +971,8 @@ structure, security, database, running the site, accessibility and
 robustness, dependencies), each finding checked before it went on the
 list. Marked **checked** where I confirmed it myself; the rest are read
 from code by a reviewer. The user's order (Nov 20): fix-first 1-8 as
-listed. All eight built; Soon and Later wait for the user to pick.
+listed. All eight built (PR 403), then the Soon list (the report above).
+Later waits for the user to pick.
 
 Fix first:
 
@@ -954,6 +1052,36 @@ Fix first:
 
 Soon:
 
+- Two admin-write tests failed on PR 405's first CI run and passed on
+  its rerun: `places.spec.ts:53` (the archive's status stayed
+  "approved", the server logging "Submission not found: Cannot coerce…")
+  and `job-off.spec.ts:12` (Links not shown after Turn on). **Built Nov
+  20** (`claude/vanishing-rows`). Neither was a flake.
+  - places: the archive took 10.4s in that run. It is six database calls
+    one after another, and the test project was carrying e2e's seven
+    servers and the other suites at once (locally, a burst of 120 reads
+    delays one read beside it by 1–2s). The test polled the database for
+    5s, gave up, and its cleanup then deleted the suggestion the server
+    was still approving: "Submission not found" was that, not the cause.
+    It now waits on the archive's own answer, and Bring it back's. With a
+    6s delay put into the archive route: old test red, new green (the
+    delay isn't committed).
+  - job-off: a real bug. Next keeps a route it leaves behind React's
+    `<Activity>`, its state kept and its effects off, so the Watches that
+    came back from Add a watch was the one from before. It had missed the
+    Turn on, showed Links off until its own read answered (over 5s on
+    CI), and remembered that for the next screen. `useWatchJobs` keeps a
+    log of switches now, and a screen catches up on the ones it missed
+    when it shows again. Unit test red 1/1 against the old hook; the e2e
+    test holds Watches' read back, red against the old hook in a real
+    browser. The same test failed Nov 14 and Nov 16.
+  - Since Nov 20 every suite runs at once against the one test project.
+    Other admin-write CI failures since Nov 12 with the same shape (a
+    wait shorter than a busy database) and not looked into here:
+    `todo-scroll.spec.ts:75` (4 times on Nov 20, `claude/bands-and-search`),
+    `main-dishes` (3), `category-editor` (3), `community-editor:61` (1),
+    and "Cannot coerce" once more in a moderation Reject (run 43954048161,
+    Nov 16), probably the same cleanup race.
 - Reads cut off at 1,000 rows with no error: vote counts first (checked).
   **Built Nov 20**: every list read of a table that grows pages through
   `readAll` (`src/lib/readAll.ts`), ordered to the key so pages don't
@@ -964,6 +1092,34 @@ Soon:
 - Migrations: nothing records which ran where; `contribution_note`
   drift; 16 "table missing" fallbacks hide a missed one; a fresh project
   can't be rebuilt from the folder (no grants since 056 was removed).
+  **Built Nov 20, the code side** (`claude/health-migrations`):
+  - Migration 105 makes `migration_ran`, and every migration from it on
+    writes its own name there (`migrationsRecordThemselves.test.ts` fails
+    on one that doesn't, red 1/2 without 105). `npm run migrations:report`
+    (`-- --prod` for live; it only selects) lists what's recorded, and for
+    each older migration looks for the tables and columns it made
+    (`scripts/migrationFootprint.mjs`), less what a later one dropped or
+    renamed. One that makes neither (a policy, an index, a data fix) is
+    "can't tell": 25 of 104.
+  - Read Nov 20: dev, everything seen except 105. **Live: 067
+    (`today_home`) not run**, its three `site_settings` columns missing.
+    Harmless while Today is parked (the read is `select *`, and only a
+    save of Today's settings needs them, which says so), but it is the
+    one older migration live doesn't have.
+  - The "table missing" fallbacks (13 reading Postgres' wording, 4 more
+    dropping a later column) now go through
+    `src/lib/supabase/schemaMissing.ts`, which tells the log and Sentry
+    once per name per server ("[schema] watch isn't in the database…").
+    The page still carries on without it. `schemaMissingReported.test.ts`
+    fails on a store checking the wording itself. Red 8/8 against the old
+    stores.
+  - **For the user:** run 105, dev then live. Then decide on 067 for
+    live (run it, or leave it until Today comes back).
+  - Not done: `site_settings.contribution_note` is still there on dev
+    and live (read Nov 20). Migration 033 was deleted with the feature
+    (Aug 27), but nothing dropped the column. Dropping it is a migration,
+    so it's the user's call. Rebuilding a fresh project from the folder (grants, and the
+    restore drill) is untouched.
 - Hidden communities' data through the public API routes. **Built Nov
   20**: the proxy now sees the public API routes too, and answers 404 to
   `?community=<hidden>` without that community's preview cookie; the
@@ -972,10 +1128,85 @@ Soon:
   the old proxy. A preview cookie set before this only covers the pages:
   reopen the preview link (an admin's console sets it again on load).
 - Focus in dialogs and sheets, drag handles keyboard can't use, search
-  results silent to screen readers, swipe-only actions.
+  results silent to screen readers, swipe-only actions. **Built Nov 20,
+  the first two of four** (`claude/health-a11y`):
+  - Dialogs: none moved the focus. Add's box opened and Tab walked the
+    page under the backdrop. Every modal one (9: the sheet every box uses,
+    Filters, the action dialog's two shapes, the form's two, the photo
+    crop, the add picker, a dropped pin) now takes it from
+    `useDialogFocus` (`src/lib/useDialogFocus.ts`): in on opening, round
+    inside on Tab, back to what opened it on closing, only the top one of
+    two. `dialogsTakeFocus.test.ts` fails on an `aria-modal` dialog
+    without it (9 against the old code). A dialog in an admin's preview
+    (drawn in its own frame, under `inert`) takes none: the form editor's
+    preview did, and pulled the focus out of the field being typed in
+    when it finished loading (caught by `FormsManager.test.tsx`, 2 runs
+    in 5).
+  - Search: the home's lines, You's, and a category page's list now tell a
+    screen reader what they found ("3 results", "2 listings", "Nothing
+    found for …") through `SearchAnnouncer`, a hidden status line.
+  - Proved in a real browser, phone and computer
+    (`e2e/focus-and-announcements.spec.ts`): red 8/8 against the old code.
+    The first try passed on a computer and failed on a phone: the sheet
+    has controls only a computer shows, and the trap counted one as its
+    first, so Shift+Tab walked out. It counts only what's shown now
+    (unit test red against that draft).
+  - Not done: the sheet's "Drag to resize" handle and the Nearby sheet's
+    handle are buttons a keyboard can't reach or work (no tabindex, no
+    keys), so the Nearby list can't be opened up without a drag. The
+    category split and the map sidebar's handles already take arrow keys.
+  - **For the user:** on a phone, You's saved places and searches are
+    removed only by a swipe (the bookmark is computer-only, on purpose by
+    its comment). Each can still be unsaved where it was saved (a place's
+    listing, the save beside a search's box on its page), but not from
+    You's list without the swipe. Whether a phone gets a visible remove
+    there is a design call. Every other swipe (category rows, the map
+    list) is a shortcut to actions the opened listing also has.
 - Eruv status set from an unauthenticated email (inferred), admin sign-in
   not checking the email is confirmed (depends on Supabase settings),
   a cross-community Google sync route, eruv fetchers with no SSRF guard.
+  **Built Nov 20** (`claude/health-security`), all four:
+  - Sign-in: a token for an email never confirmed is refused by the admin
+    and inbox checks (`confirmedEmail.ts`). Live and dev both have
+    "Confirm email" on today (read from `/auth/v1/settings`: signups open,
+    `mailer_autoconfirm: false`), so nobody could do this yet; it no longer
+    rests on that setting. Every admin here signs in by magic link, which
+    confirms. Red 3/3 against the old checks.
+  - Google read on a place (`found` route, and approving a suggestion):
+    `loadSyncableListing` takes the admin's community and reads only its
+    listings. Before, an admin of one community could run a Google read on,
+    and write to, another's listing by its id. Red 3/3.
+  - The eruv readers (status page, map file, website watch) fetched their
+    saved addresses with plain fetch. They use `publicFetch`
+    (`menuReader.ts`) now: public internet only, every redirect checked,
+    as the menu reader already was. Red 3/3.
+  - Eruv emails: confirmed from code that nothing checked who sent one. The
+    route needs the script's key, but the script picks emails by their
+    From and List-Post headers, which anyone can write; a spoofed email
+    that reached the inbox would set the eruv's status at once. Gmail's
+    own verdict is in each email's Authentication-Results header. The
+    script now sends it (the first one, the header Gmail added, from the
+    raw message), and an eruv email is read only when DKIM, SPF or DMARC
+    passed for the eruv's address's domain (`emailAuth.ts`); otherwise
+    `unverified`, not read, reported to Sentry. Red 5/5. **For the user:**
+    copy the Gmail script again from Newsletters into the guide's Gmail.
+    Until then the old script sends no header, and an eruv email is read
+    as before, with a Sentry issue "the Gmail script sends no
+    Authentication-Results" each time. Once it's copied, say whether an
+    email with no header should be refused outright (one line in
+    `eruvEmailRun.ts`).
+  - Seen once in this branch's admin-write run, not reproduced (0 of 6
+    alone): `home-preview-spot.spec.ts:33`, browser Forward after "← Back
+    to editor" left the editor showing instead of the full-size preview.
+    Nothing here touches the admin screens; its trace was lost to the
+    rerun. Next time, read the trace before rerunning. **Fixed Nov 20**
+    (`claude/health-cleanup`), after it failed on PRs 407 and 410 too: a
+    test race. "← Back to editor" shows the editor at once, and its step
+    back in history (`useScreenHistory` queues it) lands a moment later;
+    the test's Forward came before it, did nothing, and the step back
+    then closed the preview. The test now waits for the address at each
+    step. With the step back delayed 400ms in a scratch copy: the old
+    test red at the CI's line, the new one green.
 - Spend: no site-wide cap on the AI photo readers; Turnstile and rate
   limits fail open when their keys are missing. **Built Nov 20**: the
   two photo readers share a day of 300 reads (`PHOTO_READS_A_DAY` in
@@ -990,8 +1221,45 @@ Soon:
 - Dependabot's one group can't pass CI (container tag) and has blocked
   updates since September; Playwright held at 1.63 for production's
   Chromium (PR 402); `npm audit fix` is free; Node declared four ways.
+  **Built Nov 20** (`claude/health-deps`):
+  - Dependabot leaves `@playwright/test`, `playwright-core` and
+    `@sparticuz/chromium` alone (moved by hand, together, checked on a
+    preview), and `@types/node`'s majors. Every group PR since September
+    carried the Playwright family, so CI's container-tag test failed it.
+    PR 402 already holds 1.63.
+  - `npm audit fix`, no `--force`, lock file only: Sentry 10.75 → 10.78
+    (the critical one, a tunnel-route bypass), undici, zod,
+    typescript-eslint, dompurify. 15 findings down to 5 moderate. All 5 are
+    `glob`/`minimatch` inside Sentry's build plugin, used at build time
+    only, and they wait on Sentry moving its pin.
+  - Node: `.nvmrc` (24) is the one place now. `engines` was `>=20.9.0`,
+    which lets Vercel take the newest major it has; it's `24.x`, so live
+    runs what CI tests. CI's two `setup-node`s read `.nvmrc`, and
+    `@types/node` went from 26 to 24. `versionsAgree.test.ts`, red 7/8
+    against the old files. **For the user:** the next production build's
+    log should say Node 24. Live's Node couldn't be read from here: the
+    Vercel token can't open the project, and Sentry had no recent server
+    events. This Mac runs Node 26; `nvm use` picks up `.nvmrc`.
 - Two time parsers disagree ("8am" is Infinity in `parseTimeToMinutes`,
-  checked); date helpers copied 8–9 times; `partDates` twice.
+  checked); date helpers copied 8–9 times; `partDates` twice. **Built
+  Nov 20** (`claude/health-cleanup`):
+  - One clock-time reader, `src/lib/clockMinutes.ts`;
+    `parseTimeToMinutes` is it with Infinity for words. A shul's "8am" or
+    "7 PM" used to sort last and was never its next minyan: the row skipped
+    it and said "Shacharis today: 8am" under the next one as if it were
+    words. The editors called it a time they couldn't read. Red 3/3: the
+    old test that pinned "7am" as unreadable, flipped; an agreement test;
+    and the row in `upcomingDavening.test.ts`.
+  - `src/lib/isoDay.ts` holds `addDays` (6 copies) and `dayInTimezone`
+    (17 copies in 16 files; `activity.ts` re-exports it for its 8
+    importers). `partDates` is shulTimes'. `oneDayHelper.test.ts` fails on
+    a new copy of any of the three (red 3/3).
+  - Not merged, on purpose: the parsers that find a time *inside* running
+    text (hours, calendar titles, the shul page and schedule readers,
+    ask). They answer a different question. `nightKinds.ts`,
+    `watchJobList.ts` and `openedPlaceBoxes.ts` still hard-code New
+    York's clock for the Watches page's days: right for Philly and UES,
+    wrong for a community in another time zone.
 - knip: a 4-line config takes it from 42 files / 243 exports to 0 / 31
   real ones; put it in CI. **Built Nov 20**: `knip.json` names the entry
   points knip can't see (scripts, Playwright setup files, the service
@@ -1003,9 +1271,24 @@ Soon:
   which refuse to load without the test project's keys (CI's lint job
   has none), so it listed every spec as unused. The specs and configs
   are listed as entry points instead.
-  Still open: stale comments (11 names that no longer exist).
+  Stale comments (11 names that no longer exist): **Built Nov 20**
+  (`claude/health-cleanup`), each pointed at what replaced it, or the
+  pointer dropped where nothing did. Not testable: a test can't tell a
+  comment's history ("this was X") from a pointer ("see X"), so the
+  historical mentions were left as they are.
 - Preview emails go out without [DEV] (checked); `.env.example` has
-  never been committed, `.gitignore` drops it (checked).
+  never been committed, `.gitignore` drops it (checked). **Built Nov 20**
+  (`claude/health-cleanup`):
+  - The [DEV] tag goes by `VERCEL_ENV === 'production'`, Sentry's gate.
+    It was `NODE_ENV`, which is 'production' on every build, a preview
+    (dev database) and the suites' `next start` included. Red 2/2.
+  - `.env.example` is in the repo: `!.env.example` after `.env*`. It
+    held two real email addresses (an admin's and the guide's inbox); the
+    repo is public, so they're `example.com` now. It named none of 15
+    settings the code reads (`OPENAI_API_KEY`, the server Places key,
+    `DEV_ADMIN_BYPASS_SECRET`, the `PROD_*` read keys with a warning,
+    …). `envExample.test.ts` fails on a setting the code reads that it
+    doesn't name, or a value that isn't a placeholder. Red 3/3.
 
 Later or bigger: the two 2,000-line screens (map, category page);
 foreign keys and transactions for deletes and approvals; `details`

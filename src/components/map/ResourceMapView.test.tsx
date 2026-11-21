@@ -1909,7 +1909,7 @@ describe('ResourceMapView — back to the category (phone)', () => {
 // address this screen writes comes back a moment later as new initial*
 // props. Re-applied, a late one undid the visitor's next move: on phones,
 // "Clear search" right after a reading put the question, its category and
-// Open now straight back (e2e/map-reader.spec.ts). An echo is ignored; a
+// Open now straight back. An echo is ignored; a
 // real navigation still applies.
 describe('ResourceMapView — its own address-bar writes coming back', () => {
   afterEach(() => window.history.replaceState(null, '', '/test-community/map'))

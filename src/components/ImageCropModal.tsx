@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useDialogFocus } from '@/lib/useDialogFocus'
 
 // The on-screen crop stage's LONGER side (in CSS px), regardless of the
 // source photo's own dimensions or the eventual output size — same idea as
@@ -49,6 +50,7 @@ type Props = {
  *  `aspect`'s shape; the image is drawn oversized and panned/scaled within
  *  it, and only the visible frame is ever exported. */
 export default function ImageCropModal({ source, shape, aspect = 1, onCancel, onConfirm }: Props) {
+  const dialogRef = useDialogFocus()
   // The stage's own box, in CSS px — the longer side is pinned to
   // STAGE_MAX_PX and the other derived from `aspect`, so a square crop gets
   // the same stage size this always had and a wide crop gets a stage that's
@@ -169,7 +171,7 @@ export default function ImageCropModal({ source, shape, aspect = 1, onCancel, on
   }
 
   return (
-    <div className="overlay-in fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4" role="dialog" aria-modal="true">
+    <div ref={dialogRef} className="overlay-in fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-xl">
         <p className="mb-3 text-sm font-semibold text-slate-800">Reposition photo</p>
 

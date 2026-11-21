@@ -1,4 +1,5 @@
 import { getAdminClient } from './supabase/admin'
+import { schemaMissing } from './supabase/schemaMissing'
 import type { Reading } from './questionReader'
 
 // The question reader's memory (question_reading, migration 062): a question
@@ -11,14 +12,8 @@ import type { Reading } from './questionReader'
 // missed searches: an admin screen. A reading approved back when the tab
 // could approve still counts as a rule (findReading, /api/ask/read).
 
-let warned = false
 function tableMissing(message: string | undefined): boolean {
-  const missing = !!message && /question_reading/.test(message) && /(does not exist|schema cache)/.test(message)
-  if (missing && !warned) {
-    warned = true
-    console.warn('[question-reader] no question_reading table (migration 062): reading every question afresh')
-  }
-  return missing
+  return schemaMissing('question_reading', message)
 }
 
 /** A remembered reading, and whether a person approved it. */

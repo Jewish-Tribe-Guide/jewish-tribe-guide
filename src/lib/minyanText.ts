@@ -1,3 +1,4 @@
+import { clockMinutes } from './clockMinutes'
 import { TEFILLAH_LABELS, TEFILLAH_ORDER, ZMAN_ANCHOR_LABELS, type Minyan } from './davening'
 import type { MinyanBox } from './minyanimBox'
 
@@ -10,19 +11,7 @@ import type { MinyanBox } from './minyanimBox'
 // then shared, and the home screen's first load grew 8 KB (budgets.spec,
 // Oct 10; measured 392 KB without the import, 400 KB with it).
 
-/** "7:15am", "19:30", "7 AM" as minutes from midnight; null for words
- *  ("Call to confirm") or nothing. */
-export function clockMinutes(time: string): number | null {
-  const t = time.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?$/i)
-  if (!t) return null
-  let h = Number(t[1])
-  const m = t[2] ? Number(t[2]) : 0
-  const half = t[3]?.toLowerCase().replace(/\./g, '')
-  if (h > 23 || m > 59 || (!half && !t[2])) return null
-  if (half === 'pm' && h !== 12) h += 12
-  if (half === 'am' && h === 12) h = 0
-  return h * 60 + m
-}
+export { clockMinutes }
 
 /** "7:15 AM", "6 PM": every time on the guide written one way. */
 export function clockText(minutes: number): string {

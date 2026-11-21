@@ -24,6 +24,18 @@ describe('readEruvPage', () => {
     expect(await readEruvPage('u', NOW, failing)).toMatchObject({ ok: false, error: 'timed out' })
     expect(failing).toHaveBeenCalledTimes(2)
   })
+  // The status page is an address an admin saved: only the public internet
+  // is read (the health sweep, Nov 20).
+  it('by default, an address that isn’t the public internet isn’t read', async () => {
+    const sent = vi.fn(async () => new Response('<h2>The Eruv is Up!</h2>'))
+    vi.stubGlobal('fetch', sent)
+    try {
+      expect(await readEruvPage('http://169.254.169.254/latest/', NOW)).toMatchObject({ ok: false, error: 'Not a public web address' })
+      expect(sent).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
   // Lower Merion's page answers in half a second, but a read from the live
   // site now and then got no answer at all (Oct 17, twice), and the eruv
   // showed "Couldn’t read their status" until the next try.
