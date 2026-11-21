@@ -349,7 +349,10 @@ With no choice made it's the first two categories with hours, as before
 
 Found and not fixed:
 
-- e2e `listing-detail.spec.ts:537` (above): once, not looked into.
+- e2e `listing-detail.spec.ts:537`: fixed Nov 21. A test race: it pressed
+  the browser's Back as soon as Request removal showed, before the
+  router had written its address, so Back left the listing. It now waits
+  for the address (4 of 4 red on the old test with router requests slowed).
 - 25 of 104 older migrations can't be told run or not from what they
   made (a policy, an index, a data fix).
 - 5 moderate `npm audit` findings, all `glob`/`minimatch` in Sentry's
@@ -755,8 +758,10 @@ site's own address.
 
 - Mekor watch: one place on Google is filed once. The Brodsky Center was
   filed twice on Nov 4 (two names on Mekor's list, one Google place).
-  **Live queue still holds both** (the user's to reject one; 7 Mekor new
-  places waiting, 14–30 days old).
+  The user rejected the longer-named copy Nov 18; checked on live Nov 21,
+  read only: one copy waits, and nothing came back. 6 Mekor new places
+  wait (Cinnaholic, Nothing Bundt Cakes, Magical Sweet Shop, Penn Hillel's
+  Dining Commons, Temple's Kosher Corner, the Brodsky Center).
 
 Still open:
 
