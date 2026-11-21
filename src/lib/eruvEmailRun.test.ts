@@ -62,11 +62,15 @@ describe('receiveEruvEmail', () => {
     expect(m.reportServerError).toHaveBeenCalledTimes(2)
   })
 
-  // A script copied before Nov 20 sends no header: read as before, and
-  // Sentry asks for the script to be copied again.
-  it('with no check from Gmail to go by, reads it as before and says so', async () => {
-    expect(await receiveEruvEmail('philly', email({ auth: undefined }), { timezone: TZ })).toMatchObject({ read: 'up' })
-    expect(m.reportServerError).toHaveBeenCalledWith(expect.stringContaining('copy it again'))
+  // A script copied before Nov 20 sends no header, and nothing then vouches
+  // for the sender: not read (the user, Nov 21), and Sentry asks for the
+  // script to be copied again.
+  it('with no check from Gmail to go by, doesn’t read it, and says so', async () => {
+    for (const auth of [undefined, null, '', '  ']) {
+      expect(await receiveEruvEmail('philly', email({ auth }), { timezone: TZ })).toMatchObject({ read: 'unverified' })
+    }
+    expect(m.saveEmailRead).not.toHaveBeenCalled()
+    expect(m.reportServerError).toHaveBeenCalledWith(expect.stringContaining('copy the Gmail script again'))
   })
 
   it('is not for it when the sender is no eruv’s: the newsletter reader takes it', async () => {

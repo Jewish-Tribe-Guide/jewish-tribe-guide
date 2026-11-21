@@ -948,8 +948,8 @@ For the user:
 4. Copy the Gmail script again from Newsletters into the guide's Gmail
    (live admin, Update the script, since Nov 21: a running script had
    no way to get the script again).
-   Then say whether an eruv email with no Authentication-Results header
-   should be refused outright.
+   Done Nov 21. An eruv email with no Authentication-Results header is
+   now refused too (the user, Nov 21).
 5. Check Database → Backups on live, and run the first live copy
    (`npm run backup -- --prod`, read-only).
 6. Sentry cron monitors: the plan has one (checked Nov 21), so set
@@ -1220,12 +1220,10 @@ Soon:
     raw message), and an eruv email is read only when DKIM, SPF or DMARC
     passed for the eruv's address's domain (`emailAuth.ts`); otherwise
     `unverified`, not read, reported to Sentry. Red 5/5. **For the user:**
-    copy the Gmail script again from Newsletters into the guide's Gmail.
-    Until then the old script sends no header, and an eruv email is read
-    as before, with a Sentry issue "the Gmail script sends no
-    Authentication-Results" each time. Once it's copied, say whether an
-    email with no header should be refused outright (one line in
-    `eruvEmailRun.ts`).
+    copy the Gmail script again from Newsletters into the guide's Gmail
+    (done Nov 21). An email with no header is refused too since Nov 21
+    (the user's call): `unverified`, not read, and Sentry says to copy
+    the script again. Red 1/1 against the old read-it-anyway.
   - Seen once in this branch's admin-write run, not reproduced (0 of 6
     alone): `home-preview-spot.spec.ts:33`, browser Forward after "← Back
     to editor" left the editor showing instead of the full-size preview.
