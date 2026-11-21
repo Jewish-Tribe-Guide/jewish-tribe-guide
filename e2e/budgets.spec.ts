@@ -191,19 +191,21 @@ test.describe('home screen weight', () => {
     const fromCards = () => prefetched.filter((u) => u.includes('davening=1'))
 
     if (isMobile) {
-      // The page itself prefetches its own route; that's the sign this sees
-      // prefetches at all, and the cards' would have come with it.
-      // Next prefetches when the browser is idle, which a busy CI runner
-      // can leave past expect's 5s (Nov 20 and 21, this poll the failure).
-      await expect.poll(() => prefetched.length, { message: 'any prefetch at all', timeout: 15_000 }).toBeGreaterThan(0)
-      await page.waitForTimeout(1_500)
       // From Friday to havdalah the phone's own Right now is the candles
       // card, whose Minyanim link goes to the same ?davening=1 page and
       // prefetches rightly, so a computer card's prefetch can't be told
       // from it: this failed every Friday (Nov 13). Checked the rest of
-      // the week.
-      const ownLink = await page.getByTestId('right-now').locator('a[href*="davening=1"]').count()
-      test.skip(ownLink > 0, 'the phone shows its own Minyanim link today (Friday to havdalah)')
+      // the week. Decided before waiting for prefetches: the waits below
+      // timed out in CI on Nov 20 and 21 (both inside that window) for a
+      // test that was going to skip anyway.
+      // The page itself prefetches its own route; that's the sign this sees
+      // prefetches at all, and the cards' would have come with it.
+      // Next prefetches when the browser is idle, which a busy CI runner
+      // can leave past expect's 5s.
+      const ownLink = () => page.getByTestId('right-now').locator('a[href*="davening=1"]').count()
+      await expect.poll(async () => prefetched.length > 0 || (await ownLink()) > 0, { message: 'any prefetch at all', timeout: 15_000 }).toBe(true)
+      test.skip((await ownLink()) > 0, 'the phone shows its own Minyanim link today (Friday to havdalah)')
+      await page.waitForTimeout(1_500)
       expect(fromCards(), 'the Next minyan card’s link, on a phone').toEqual([])
     } else {
       // The positive control: on a computer the card is real, and its link
