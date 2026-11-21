@@ -38,6 +38,12 @@ export default defineConfig({
     // run for real, writing to and deleting from production data.
     exclude: ['src/**/*.integration.test.ts', 'node_modules/**'],
     setupFiles: ['./vitest.setup.ts'],
+    // Above the findBy*/waitFor wait in vitest.setup.ts (5s), so a slow wait
+    // fails as itself instead of as the test's own timeout. Equal to it, as
+    // both were from Nov 20, a test running out of budget mid-wait landed at
+    // exactly 5000ms (main, Nov 21: ModerationQueue's "1 of 2" again).
+    // src/test/unitTimeouts.test.ts holds the order.
+    testTimeout: 15_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],

@@ -967,6 +967,10 @@ Surprises:
   committed, so they never reached the public repo.
 - `home-preview-spot:33`, seen three times, was the test pressing Forward
   before the page's own step back had landed.
+- The unit suite's 5s findBy wait (PR 405) equalled Vitest's 5s test
+  budget, so a slow CI run failed at exactly 5000ms (main, Nov 21,
+  ModerationQueue's "1 of 2"). Tests get 15s now, and
+  `src/test/unitTimeouts.test.ts` holds the budget at twice the wait.
 
 The user (Nov 20): use the lull to check the site is "actually being
 built/run the right way". Six read-only reviewers (dead code and
