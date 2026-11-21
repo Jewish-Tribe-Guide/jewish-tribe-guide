@@ -91,7 +91,7 @@ export default function SearchBox({
         // now owns keeping the examples current.
         placeholder={placeholder}
         aria-label={label}
-        className={`min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-400 focus:outline-none ${box ? 'text-[15.5px]' : 'px-3 text-[15px]'}`}
+        className={`min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-400 focus:outline-none ${box ? 'text-[0.96875rem]' : 'px-3 text-[0.9375rem]'}`}
       />
       {query && interactive && (
         <button

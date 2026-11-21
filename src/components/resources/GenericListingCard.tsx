@@ -418,11 +418,11 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               twice as tall as the rest. */}
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
-            <p className="min-w-0 flex-1 truncate font-semibold text-slate-900 desktop:text-[18px]" data-testid="row-name">
+            <p className="min-w-0 flex-1 truncate font-semibold text-slate-900 desktop:text-[1.125rem]" data-testid="row-name">
               {pageRow ? (
                 <>
                   {item.name}
-                  {place && <span className="font-normal text-[13.5px] text-slate-500"> · {place}</span>}
+                  {place && <span className="font-normal text-[0.84375rem] text-slate-500"> · {place}</span>}
                 </>
               ) : onNameClick ? (
                 // A span, not the whole <p>, carries the click/hover — the <p>
@@ -440,7 +440,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               )}
             </p>
             {!!likes && likes > 0 && (
-              <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold text-slate-500" aria-label={`${likes} like${likes === 1 ? '' : 's'}`}>
+              <span className="flex shrink-0 items-center gap-1 text-[0.8125rem] font-semibold text-slate-500" aria-label={`${likes} like${likes === 1 ? '' : 's'}`}>
                 {/* The canvas's grey outline thumb, not the 👍 emoji: an
                     emoji's own colours shouted over the row's facts. */}
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[13px] w-[13px]" data-testid="row-likes-icon">
@@ -452,7 +452,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             )}
             </div>
             {facts.length > 0 && (
-              <p className="truncate text-[13.5px] text-slate-600" data-testid="row-facts">
+              <p className="truncate text-[0.84375rem] text-slate-600" data-testid="row-facts">
                 {facts.map((fact, i) => (
                   <span key={`${fact.text}:${i}`}>
                     {i > 0 && <span aria-hidden="true" className="px-1 text-slate-400">·</span>}
@@ -464,11 +464,11 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               </p>
             )}
             {itemsLine && (
-              <p className="truncate text-[13.5px] text-slate-700" data-testid="row-items">
+              <p className="truncate text-[0.84375rem] text-slate-700" data-testid="row-items">
                 {itemsLine}
               </p>
             )}
-            {!pageRow && subtitle && <p className="truncate text-[13px] text-muted">{subtitle}</p>}
+            {!pageRow && subtitle && <p className="truncate text-[0.8125rem] text-muted">{subtitle}</p>}
             {note && (
               // The place's own description ("Vegan Fast Food") stands out a
               // little from the lines around it: the opened listing's dark
@@ -476,7 +476,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               // It says what the place is (the user, Oct 16: "sticks out but
               // not too much"). A grey note is the quiet kind ("Times not
               // confirmed by anyone yet").
-              <p className={`truncate ${note.kind === 'note' ? 'text-[14px] font-medium text-slate-800' : `text-[13px] ${NOTE_TONE[note.tone]}`}`} title={note.title} data-testid="row-note">
+              <p className={`truncate ${note.kind === 'note' ? 'text-[0.875rem] font-medium text-slate-800' : `text-[0.8125rem] ${NOTE_TONE[note.tone]}`}`} title={note.title} data-testid="row-note">
                 {note.tone === 'caution' && (
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 inline h-3.5 w-3.5 -translate-y-px">
                     <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />

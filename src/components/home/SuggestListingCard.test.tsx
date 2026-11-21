@@ -74,7 +74,7 @@ describe('SuggestListingCard', () => {
     expect(box).toHaveClass('flex-col', '@[540px]:flex-row')
     expect(box).not.toHaveClass('@[920px]:min-h-[240px]')
     expect(box.parentElement).toHaveClass('@container')
-    expect(screen.getByRole('heading', { name: 'Know a place we’re missing?' })).toHaveClass('text-[21px]')
+    expect(screen.getByRole('heading', { name: 'Know a place we’re missing?' })).toHaveClass('text-[1.3125rem]')
     expect(screen.getByRole('button', { name: 'Suggest a listing' })).toHaveClass('h-10')
   })
 })

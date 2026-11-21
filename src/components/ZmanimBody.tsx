@@ -183,7 +183,7 @@ function ReadyState({ data, now, picked }: { data: ZmanimData; now: number; pick
         </div>
       )}
 
-      <p className="pt-1 text-[11px] text-muted">
+      <p className="pt-1 text-[0.6875rem] text-muted">
         Zmanim from{' '}
         <a
           href="https://www.hebcal.com"

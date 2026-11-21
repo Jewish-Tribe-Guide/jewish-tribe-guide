@@ -28,7 +28,7 @@ import { useAdminApiFor } from './useAdminApi'
 type Give = Extract<BrokenAct, { kind: 'give' | 'add' }>
 
 const isEmail = (g: Give) => g.kind === 'give' && (g.change.kind === 'newsletter' || g.change.kind === 'eruv-status')
-const inputClass = 'w-full min-h-12 rounded-xl border border-slate-300 bg-white px-3.5 text-[16px] text-slate-900'
+const inputClass = 'w-full min-h-12 rounded-xl border border-slate-300 bg-white px-3.5 text-[1rem] text-slate-900'
 
 export default function TodoBroken({
   placeId,
@@ -218,7 +218,7 @@ export default function TodoBroken({
       >
         <PlaceCard title={giving.label}>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13.5px] font-semibold text-slate-500">{email ? 'Its email address' : `A link to ${lower}`}</span>
+            <span className="text-[0.84375rem] font-semibold text-slate-500">{email ? 'Its email address' : `A link to ${lower}`}</span>
             <input
               type={email ? 'email' : 'url'}
               value={given}
@@ -231,8 +231,8 @@ export default function TodoBroken({
           </label>
           {menu && (
             <>
-              <p className="m-0 text-center text-[13.5px] text-slate-500">or</p>
-              <label className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-slate-300 bg-white text-[15px] font-bold text-primary ${busy !== null ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}>
+              <p className="m-0 text-center text-[0.84375rem] text-slate-500">or</p>
+              <label className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-slate-300 bg-white text-[0.9375rem] font-bold text-primary ${busy !== null ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}>
                 <CameraIcon className="h-4 w-4" />
                 Add photos of the menu
                 <input
@@ -263,8 +263,8 @@ export default function TodoBroken({
         <dl className="m-0 flex flex-col">
           {googleRows(loaded.item, loaded.category).map((f) => (
             <div key={f.label} className="border-t border-slate-100 py-2.5 first:border-t-0 first:pt-0">
-              <dt className="text-[13.5px] text-slate-500">{f.label}</dt>
-              <dd className={`m-0 text-[15px] [overflow-wrap:anywhere] ${f.value ? 'text-slate-900' : 'text-slate-400'}`}>{f.value ?? 'Not on the listing'}</dd>
+              <dt className="text-[0.84375rem] text-slate-500">{f.label}</dt>
+              <dd className={`m-0 text-[0.9375rem] [overflow-wrap:anywhere] ${f.value ? 'text-slate-900' : 'text-slate-400'}`}>{f.value ?? 'Not on the listing'}</dd>
             </div>
           ))}
         </dl>

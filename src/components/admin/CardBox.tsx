@@ -116,8 +116,8 @@ function Automatic({ name }: { name: string }) {
     <div className="flex min-h-11 items-center gap-1 pl-1 pr-1">
       {NO_HANDLE}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5 py-2">
-        <span className="text-[15px] font-medium text-slate-900">{name}</span>
-        <span className="text-[13px] text-slate-600">Automatic</span>
+        <span className="text-[0.9375rem] font-medium text-slate-900">{name}</span>
+        <span className="text-[0.8125rem] text-slate-600">Automatic</span>
       </span>
     </div>
   )
@@ -139,18 +139,18 @@ function Sample({ page, name, outline }: { page: CardPage; name: string; outline
   return (
     <div aria-hidden="true" className="flex max-w-[520px] items-start gap-3 rounded-[10px] border border-slate-200 bg-white px-3 py-3">
       <span
-        className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg text-[14px] font-bold text-slate-600 ${photo ? 'bg-slate-200' : 'bg-slate-100'} ${outline === 'first' ? outlined : ''}`}
+        className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg text-[0.875rem] font-bold text-slate-600 ${photo ? 'bg-slate-200' : 'bg-slate-100'} ${outline === 'first' ? outlined : ''}`}
       >
         {initialsOf(name)}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className={`flex items-baseline gap-2 ${outline === 'first' ? outlined : ''}`}>
           <span className="min-w-0 flex-1 truncate">
-            <b className="text-[15px] text-slate-900">{name}</b>
-            {page.hasAddress && <span className="text-[13.5px] text-slate-500"> · Neighborhood</span>}
+            <b className="text-[0.9375rem] text-slate-900">{name}</b>
+            {page.hasAddress && <span className="text-[0.84375rem] text-slate-500"> · Neighborhood</span>}
           </span>
           {page.upvotes && (
-            <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold text-slate-500">
+            <span className="flex shrink-0 items-center gap-1 text-[0.8125rem] font-semibold text-slate-500">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[13px] w-[13px]">
                 <path d="M7 10v12" />
                 <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
@@ -159,7 +159,7 @@ function Sample({ page, name, outline }: { page: CardPage; name: string; outline
             </span>
           )}
         </span>
-        <span className={`truncate text-[13.5px] text-slate-600 ${outline === 'second' ? outlined : ''}`}>
+        <span className={`truncate text-[0.84375rem] text-slate-600 ${outline === 'second' ? outlined : ''}`}>
           {facts.length
             ? facts.map((f, i) => (
                 <span key={`${f.text}:${i}`}>
@@ -169,7 +169,7 @@ function Sample({ page, name, outline }: { page: CardPage; name: string; outline
               ))
             : ' '}
         </span>
-        <span className={`truncate text-[14px] font-medium text-slate-800 ${outline === 'third' ? outlined : ''}`}>{third}</span>
+        <span className={`truncate text-[0.875rem] font-medium text-slate-800 ${outline === 'third' ? outlined : ''}`}>{third}</span>
       </span>
     </div>
   )
@@ -197,10 +197,10 @@ export function ShowOnLine({
           on.has(f.key) ? (
             <div key={f.key} className="flex min-h-[52px] items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-b-0">
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-[15px] font-semibold text-slate-900">{f.label}</span>
-                <span className="text-[13px] text-slate-600">{kind(f)}</span>
+                <span className="text-[0.9375rem] font-semibold text-slate-900">{f.label}</span>
+                <span className="text-[0.8125rem] text-slate-600">{kind(f)}</span>
               </span>
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[12px] font-semibold text-slate-700">On the card</span>
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[0.75rem] font-semibold text-slate-700">On the card</span>
             </div>
           ) : (
             <AdminRow key={f.key} onClick={() => onPick(f.key)} name={f.label} line={kind(f)} />

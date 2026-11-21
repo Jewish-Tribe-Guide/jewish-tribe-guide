@@ -297,12 +297,12 @@ function ScheduleForm({
               <input aria-label="Note" value={m.notes ?? ''} onChange={(e) => setRow(m.id, { notes: e.target.value || undefined })} placeholder="Note (optional)" className={`${fieldClass} min-w-[8rem] flex-1`} />
             </div>
             {unreadable && (
-              <p className="text-[12.5px] font-semibold leading-snug text-caution" data-testid="schedule-row-unreadable">
+              <p className="text-[0.78125rem] font-semibold leading-snug text-caution" data-testid="schedule-row-unreadable">
                 The guide can’t read “{m.time.trim()}” as a time, so it wouldn’t show. Type it like 6:30pm{RELATIVE_ELIGIBLE.includes(m.tefillah) ? ', or choose From sunset' : ''}.
               </p>
             )}
             {readFrom?.[m.id] && (
-              <p className="text-[12.5px] leading-snug text-slate-600" data-testid="schedule-row-source">
+              <p className="text-[0.78125rem] leading-snug text-slate-600" data-testid="schedule-row-source">
                 From “{readFrom[m.id].quote}”{!readFrom[m.id].checked && ' (from the photo: check it)'}
                 {readFrom[m.id].unsure && <span className="block font-semibold text-caution">Check: {readFrom[m.id].unsure}</span>}
               </p>

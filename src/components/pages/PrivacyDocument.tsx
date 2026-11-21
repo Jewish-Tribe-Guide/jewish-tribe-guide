@@ -21,9 +21,9 @@ type Props = {
 function ShortVersion({ section }: { section: PageSection }) {
   return (
     <section id={section.id} aria-labelledby={`${section.id}-h`} className={`${BOX} px-4 py-[18px] desktop:scroll-mt-24 desktop:px-9 desktop:py-[30px]`}>
-      <h2 id={`${section.id}-h`} className="mb-4 text-[19px] font-bold text-slate-900">{section.heading}</h2>
+      <h2 id={`${section.id}-h`} className="mb-4 text-[1.1875rem] font-bold text-slate-900">{section.heading}</h2>
       {section.points && !section.points.before && !section.points.after ? (
-        <ul className="flex flex-col gap-3.5 text-[15.5px] leading-[1.5] text-slate-700 desktop:gap-4 desktop:text-[16px]">
+        <ul className="flex flex-col gap-3.5 text-[0.96875rem] leading-[1.5] text-slate-700 desktop:gap-4 desktop:text-[1rem]">
           {section.points.items.map((item) => (
             <li key={item.title} className="flex gap-3.5">
               <GlyphDot name={pointGlyph(item.title)} />
@@ -35,7 +35,7 @@ function ShortVersion({ section }: { section: PageSection }) {
           ))}
         </ul>
       ) : (
-        <SectionBody section={section} className="text-[16px] leading-[1.7] text-slate-700" />
+        <SectionBody section={section} className="text-[1rem] leading-[1.7] text-slate-700" />
       )}
     </section>
   )
@@ -58,7 +58,7 @@ export default function PrivacyDocument({ title, updated, body }: Props) {
           <div className="flex flex-col gap-3 desktop:gap-4">
             <h1 className="sr-only desktop:hidden">{title}</h1>
             {updated && <p className="mx-0.5 text-sm font-semibold text-slate-500 desktop:hidden">{updated}</p>}
-            {lead && <div className={`${BOX} rich-text px-4 py-[18px] text-[16px] leading-[1.7] text-slate-700 desktop:px-9 desktop:py-[30px]`} dangerouslySetInnerHTML={{ __html: lead }} />}
+            {lead && <div className={`${BOX} rich-text px-4 py-[18px] text-[1rem] leading-[1.7] text-slate-700 desktop:px-9 desktop:py-[30px]`} dangerouslySetInnerHTML={{ __html: lead }} />}
             {first && <ShortVersion section={first} />}
             {rest.length > 0 && <PrivacyDetails sections={rest} />}
           </div>

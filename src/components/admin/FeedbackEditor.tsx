@@ -76,7 +76,7 @@ export default function FeedbackEditor({ token, onBack }: { token: string; onBac
       <div className="flex items-start gap-6">
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-[10px] px-4 py-2.5 min-h-[52px] md:bg-transparent md:border-0 md:p-0 md:min-h-0">
-            <span aria-hidden="true" className="flex-1 text-[15px] font-semibold text-slate-900 md:flex-none md:order-last">On the site</span>
+            <span aria-hidden="true" className="flex-1 text-[0.9375rem] font-semibold text-slate-900 md:flex-none md:order-last">On the site</span>
             <AdminSwitch checked={draft.feedbackEnabled} onChange={(on) => set('feedbackEnabled', on)} label="On the site" />
           </div>
           <AdminBox>
@@ -120,7 +120,7 @@ export default function FeedbackEditor({ token, onBack }: { token: string; onBac
  *  on the right; on a phone the card first, then the form. */
 function FeedbackFormLook({ heading }: { heading: string }) {
   const [device, setDevice] = useState<'computer' | 'phone'>('computer')
-  const box = 'mt-1 w-full rounded-[8px] border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] text-slate-400'
+  const box = 'mt-1 w-full rounded-[8px] border border-slate-300 bg-white px-2.5 py-1.5 text-[0.75rem] text-slate-400'
   return (
     <div className="flex flex-col gap-3">
       <div role="group" aria-label="Preview on" className="self-start inline-flex rounded-lg border border-slate-300 bg-white p-0.5">
@@ -140,16 +140,16 @@ function FeedbackFormLook({ heading }: { heading: string }) {
         inert
         className={`bg-slate-50 border border-slate-200 p-4 ${device === 'phone' ? 'w-[240px] min-h-[420px] rounded-[22px] pt-8' : 'w-[520px] rounded-[10px]'}`}
       >
-        <p className="m-0 text-[16px] font-extrabold text-slate-900">{heading}</p>
+        <p className="m-0 text-[1rem] font-extrabold text-slate-900">{heading}</p>
         <div className={device === 'phone' ? '' : 'mt-3 grid grid-cols-[minmax(0,1fr)_170px] items-start gap-3'}>
-          <div className={`rounded-[12px] border border-slate-200 bg-white p-2.5 text-[12px] font-bold text-slate-900 ${device === 'phone' ? 'mt-3' : 'col-start-2 row-start-1'}`}>Know something we don’t?</div>
+          <div className={`rounded-[12px] border border-slate-200 bg-white p-2.5 text-[0.75rem] font-bold text-slate-900 ${device === 'phone' ? 'mt-3' : 'col-start-2 row-start-1'}`}>Know something we don’t?</div>
           <div className={`rounded-[12px] border border-slate-200 bg-white p-3 ${device === 'phone' ? 'mt-2' : 'col-start-1 row-start-1'}`}>
-            <p className="m-0 text-[13px] font-extrabold text-slate-900">{device === 'phone' ? 'Anything else?' : 'What’s on your mind?'}</p>
-            <p className="mt-2 mb-0 text-[12px] font-bold text-slate-900">Your note</p>
+            <p className="m-0 text-[0.8125rem] font-extrabold text-slate-900">{device === 'phone' ? 'Anything else?' : 'What’s on your mind?'}</p>
+            <p className="mt-2 mb-0 text-[0.75rem] font-bold text-slate-900">Your note</p>
             <div className={`${box} h-16`}>An idea, something that didn’t work…</div>
-            <p className="mt-3 mb-0 text-[12px] font-bold text-slate-900">Email, for a reply</p>
+            <p className="mt-3 mb-0 text-[0.75rem] font-bold text-slate-900">Email, for a reply</p>
             <div className={box}>you@example.com</div>
-            <div className="mt-3 w-full rounded-[10px] bg-blue-600 px-3 py-2 text-center text-[12px] font-bold text-white">Send</div>
+            <div className="mt-3 w-full rounded-[10px] bg-blue-600 px-3 py-2 text-center text-[0.75rem] font-bold text-white">Send</div>
           </div>
         </div>
       </div>

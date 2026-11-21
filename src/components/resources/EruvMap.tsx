@@ -16,7 +16,7 @@ import { clearEruvim, drawEruvim, emphasizeEruvim, eruvDrawKey, type DrawnEruv, 
 
 export type { MapEruv } from '@/components/map/eruvLayer'
 
-const MAP_BUTTON = 'flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-white px-3 text-[13.5px] font-semibold text-slate-700 shadow-md ring-1 ring-slate-900/10 transition-colors hover:bg-slate-50'
+const MAP_BUTTON = 'flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-white px-3 text-[0.84375rem] font-semibold text-slate-700 shadow-md ring-1 ring-slate-900/10 transition-colors hover:bg-slate-50'
 
 /** Every eruv in view. */
 function frameAll(map: google.maps.Map, drawn: Map<string, DrawnEruv>) {

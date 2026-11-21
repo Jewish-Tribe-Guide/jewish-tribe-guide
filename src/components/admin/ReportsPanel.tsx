@@ -79,7 +79,7 @@ export default function ReportsPanel({ token }: { token: string }) {
         <>
           <AdminBox
             title="Listing views"
-            action={shown.views.since && <span className="text-[13px] text-slate-600">{`${shown.views.total} since ${shortDay(shown.views.since)}`}</span>}
+            action={shown.views.since && <span className="text-[0.8125rem] text-slate-600">{`${shown.views.total} since ${shortDay(shown.views.since)}`}</span>}
           >
             <ViewChart bars={shown.views.bars} />
           </AdminBox>
@@ -92,8 +92,8 @@ export default function ReportsPanel({ token }: { token: string }) {
                 <ol className="m-0 p-0 list-none">
                   {shown.topPlaces.map((p) => (
                     <li key={p.id} className="flex items-center gap-3 px-4 py-3 min-h-12 border-t border-slate-100 first:border-t-0">
-                      <span className="flex-1 min-w-0 text-[15px] font-semibold text-slate-900">{p.name}</span>
-                      <span className="text-[13px] text-slate-600 tabular-nums">{p.count}</span>
+                      <span className="flex-1 min-w-0 text-[0.9375rem] font-semibold text-slate-900">{p.name}</span>
+                      <span className="text-[0.8125rem] text-slate-600 tabular-nums">{p.count}</span>
                     </li>
                   ))}
                 </ol>
@@ -101,9 +101,9 @@ export default function ReportsPanel({ token }: { token: string }) {
             </AdminBox>
 
             <AdminBox title={`Decided ${shown.words}`}>
-              <table className="w-full text-[15px]">
+              <table className="w-full text-[0.9375rem]">
                 <thead>
-                  <tr className="text-[12.5px] text-slate-500">
+                  <tr className="text-[0.78125rem] text-slate-500">
                     <th className="px-4 pt-2.5 pb-1.5 text-left font-normal">
                       <span className="sr-only">What</span>
                     </th>
@@ -146,7 +146,7 @@ function ViewChart({ bars }: { bars: Report['views']['bars'] }) {
       <ol className="m-0 p-0 list-none flex items-end gap-1 sm:gap-3 h-44 border-b border-slate-200">
         {bars.map((b, i) => (
           <li key={i} className="flex-1 min-w-0 h-full flex flex-col justify-end items-center gap-1" aria-label={`${b.label}: ${b.count}`}>
-            <span aria-hidden="true" className="text-[11px] text-slate-600 tabular-nums">
+            <span aria-hidden="true" className="text-[0.6875rem] text-slate-600 tabular-nums">
               {b.count}
             </span>
             <span aria-hidden="true" className="w-full max-w-8 bg-primary rounded-t-[3px]" style={{ height: `${(b.count / most) * 80}%`, minHeight: b.count ? 2 : 0 }} />
@@ -155,7 +155,7 @@ function ViewChart({ bars }: { bars: Report['views']['bars'] }) {
       </ol>
       <ol aria-hidden="true" className="m-0 p-0 list-none flex gap-1 sm:gap-3 pt-1.5">
         {bars.map((b, i) => (
-          <li key={i} className="flex-1 min-w-0 text-center text-[11px] text-slate-500 whitespace-nowrap overflow-hidden">
+          <li key={i} className="flex-1 min-w-0 text-center text-[0.6875rem] text-slate-500 whitespace-nowrap overflow-hidden">
             {b.label}
           </li>
         ))}

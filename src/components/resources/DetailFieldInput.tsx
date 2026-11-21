@@ -175,7 +175,7 @@ export function DetailFieldInput({
                     type="button"
                     aria-pressed={on}
                     onClick={() => onChange(field.invertDisplay ? !yes : yes)}
-                    className={`h-10 flex-1 cursor-pointer rounded-[10px] text-[14.5px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? 'bg-white font-bold text-slate-900 shadow-sm' : 'font-semibold text-muted'}`}
+                    className={`h-10 flex-1 cursor-pointer rounded-[10px] text-[0.90625rem] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? 'bg-white font-bold text-slate-900 shadow-sm' : 'font-semibold text-muted'}`}
                   >
                     {yes ? 'Yes' : 'No'}
                   </button>
@@ -220,7 +220,7 @@ export function DetailFieldInput({
           // The marks behind the words, on a copy of the text set the same
           // way: 16px on a phone too, as globals.css sets a textarea.
           <div className="relative rounded-md bg-white">
-            <div aria-hidden="true" data-testid="note-marks" className={`${inputClass.replace('border-slate-300', 'border-transparent')} pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-transparent max-sm:text-[16px]`}>
+            <div aria-hidden="true" data-testid="note-marks" className={`${inputClass.replace('border-slate-300', 'border-transparent')} pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-transparent max-sm:text-[1rem]`}>
               {addedWords(marksFrom, (value as string) ?? '').map((r, i) =>
                 r.added ? (
                   <mark key={i} className="rounded-sm bg-yellow-200/80 text-transparent">

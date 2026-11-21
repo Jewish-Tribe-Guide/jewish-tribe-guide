@@ -110,7 +110,7 @@ export default function FieldLooks({
     <aside aria-label="How it looks" className="shrink-0 sticky top-8 self-start flex w-[376px] flex-col gap-3">
       <div>
         <h2 className="m-0 text-base font-bold text-slate-900">How it looks</h2>
-        <p className="m-0 text-[13px] text-slate-500">
+        <p className="m-0 text-[0.8125rem] text-slate-500">
           {answered === null ? 'On a made-up place' : answered ? `On ${places[0].item.name}` : `On ${places[0].item.name}, its answer made up`}
         </p>
       </div>
@@ -154,7 +154,7 @@ export default function FieldLooks({
         </Phone>
       </section>
 
-      <button type="button" onClick={onWholePage} className="self-start cursor-pointer text-[15px] font-bold text-primary hover:underline">
+      <button type="button" onClick={onWholePage} className="self-start cursor-pointer text-[0.9375rem] font-bold text-primary hover:underline">
         See the whole page
       </button>
     </aside>
@@ -176,13 +176,13 @@ function PageTop({ category }: { category: CategoryConfig }) {
           <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-lg text-slate-700">‹</span>
           <span className="text-xl font-extrabold text-ink">{category.pluralLabel}</span>
         </span>
-        <span className={`flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-600 ${FADED}`}>
+        <span className={`flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[0.8125rem] font-semibold text-slate-600 ${FADED}`}>
           <PinIcon className="h-3.5 w-3.5" />
           Set location
         </span>
       </div>
       <div className={`flex flex-col gap-3 px-4 pt-3.5 ${FADED}`}>
-        <div className="flex h-12 items-center gap-2 rounded-xl border-[1.5px] border-primary bg-white px-3 text-[15px] text-slate-500">
+        <div className="flex h-12 items-center gap-2 rounded-xl border-[1.5px] border-primary bg-white px-3 text-[0.9375rem] text-slate-500">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="h-5 w-5 shrink-0 text-primary">
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.3-4.3" />
@@ -190,10 +190,10 @@ function PageTop({ category }: { category: CategoryConfig }) {
           <span className="truncate">{askPlaceholder(category)}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-[15px] font-bold text-ink">3 listings</span>
+          <span className="text-[0.9375rem] font-bold text-ink">3 listings</span>
           <span className="flex gap-2">
-            <span className="rounded-full border border-slate-200 px-3.5 py-2 text-[14px] font-semibold text-primary">Filters</span>
-            <span className="rounded-full border border-slate-200 px-3.5 py-2 text-[14px] text-slate-500">
+            <span className="rounded-full border border-slate-200 px-3.5 py-2 text-[0.875rem] font-semibold text-primary">Filters</span>
+            <span className="rounded-full border border-slate-200 px-3.5 py-2 text-[0.875rem] text-slate-500">
               Sort <b className="font-semibold text-primary">Distance</b>
             </span>
           </span>
@@ -265,17 +265,17 @@ function ListView({ rows }: { rows: { item: DirectoryResource; where: string | n
               {initialsOf(item.name)}
             </span>
             <span className="min-w-0 flex-1">
-              <span className={`block truncate text-[15px] ${FADED}`}>
+              <span className={`block truncate text-[0.9375rem] ${FADED}`}>
                 <b className="font-bold text-ink">{item.name}</b>
                 {where && <span className="text-slate-500"> · {where}</span>}
               </span>
               {row.facts.length > 0 && (
-                <span className="block truncate text-[13.5px]">
+                <span className="block truncate text-[0.84375rem]">
                   <Parts parts={row.facts} />
                 </span>
               )}
               {row.own.map((p, i) => (
-                <span key={i} className="block truncate text-[13.5px]">
+                <span key={i} className="block truncate text-[0.84375rem]">
                   <Parts parts={[p]} />
                 </span>
               ))}
@@ -285,7 +285,7 @@ function ListView({ rows }: { rows: { item: DirectoryResource; where: string | n
       </ul>
       <span
         aria-hidden="true"
-        className={`absolute right-4 bottom-[72px] flex h-12 items-center rounded-full border border-add-edge bg-add pl-3.5 pr-[1.125rem] text-[15px] font-semibold text-ink ${FADED}`}
+        className={`absolute right-4 bottom-[72px] flex h-12 items-center rounded-full border border-add-edge bg-add pl-3.5 pr-[1.125rem] text-[0.9375rem] font-semibold text-ink ${FADED}`}
       >
         + Add
       </span>
@@ -317,7 +317,7 @@ function FiltersView({ filters }: { filters: ReturnType<typeof filtersScreen> })
             </div>
           ),
         )}
-        <span aria-hidden="true" className={`mt-1 flex h-12 items-center justify-center rounded-xl bg-primary text-[15px] font-bold text-white ${FADED}`}>
+        <span aria-hidden="true" className={`mt-1 flex h-12 items-center justify-center rounded-xl bg-primary text-[0.9375rem] font-bold text-white ${FADED}`}>
           Show 12 listings
         </span>
       </div>
@@ -338,7 +338,7 @@ function FilterChips({ legend, values, on }: { legend: string; values: { text: s
   const [chosen, setChosen] = useState<string[]>(on ? values.slice(0, 1).map((v) => v.text) : [])
   return (
     <fieldset className="m-0 border-0 p-0">
-      <legend className="mb-2 text-[13px] font-bold text-slate-500">{legend}</legend>
+      <legend className="mb-2 text-[0.8125rem] font-bold text-slate-500">{legend}</legend>
       <div className="flex flex-wrap gap-2">
         {values.map((v) => (
           <FilterChip
@@ -374,17 +374,17 @@ function ListingSheet({ listing, field, item, where }: { listing: ListingScreen;
           {initialsOf(item.name)}
         </span>
         <div className="min-w-0 flex-1">
-          <p className={`m-0 text-[22px] font-extrabold leading-tight text-ink ${FADED}`}>{item.name}</p>
-          <p className="m-0 mt-1 text-[14.5px]">
+          <p className={`m-0 text-[1.375rem] font-extrabold leading-tight text-ink ${FADED}`}>{item.name}</p>
+          <p className="m-0 mt-1 text-[0.90625rem]">
             <Parts parts={[...listing.kind, ...(where ? [{ text: where, mine: false }] : [])]} />
           </p>
           {listing.facts.length > 0 && (
-            <p className="m-0 mt-0.5 text-[15px] font-bold">
+            <p className="m-0 mt-0.5 text-[0.9375rem] font-bold">
               <Parts parts={listing.facts} strong />
             </p>
           )}
           {listing.tagline && (
-            <p className="m-0 mt-0.5 text-[14.5px]">
+            <p className="m-0 mt-0.5 text-[0.90625rem]">
               {listing.tagline.mine ? (
                 <mark data-mine="" className={`${OUTLINE} px-1 text-slate-900`}>
                   {listing.tagline.text}
@@ -407,8 +407,8 @@ function ListingSheet({ listing, field, item, where }: { listing: ListingScreen;
       <div className="mt-4 flex flex-col gap-3 px-4">
         {listing.boxes.map((b) => (
           <div key={b.title} data-mine={b.mine ? '' : undefined} className={b.mine ? `${OUTLINE} rounded-xl px-4 py-3` : 'rounded-xl border border-slate-200 px-4 py-3'}>
-            <p className={`m-0 text-[15px] font-bold text-ink ${b.mine ? '' : FADED}`}>{b.title}</p>
-            {b.label && <p className="m-0 mt-1 text-[13px] font-semibold text-slate-500">{b.label}</p>}
+            <p className={`m-0 text-[0.9375rem] font-bold text-ink ${b.mine ? '' : FADED}`}>{b.title}</p>
+            {b.label && <p className="m-0 mt-1 text-[0.8125rem] font-semibold text-slate-500">{b.label}</p>}
             {/* Davening times as the listing draws them, not a line. */}
             {b.mine && field.type === 'minyanim' && isMinyanim(item[field.key]) ? (
               <UsualTimes minyanim={item[field.key]} />
@@ -458,13 +458,13 @@ function AddingSheet({
                   {initialsOf(item.name)}
                 </span>
               )}
-              <span className="whitespace-nowrap text-[15px] font-bold text-ink">{r.title}</span>
+              <span className="whitespace-nowrap text-[0.9375rem] font-bold text-ink">{r.title}</span>
             </span>
             <span className="min-w-0 truncate text-sm text-slate-500">{r.text || (i > 0 ? where : '') || ''}</span>
           </div>
         ))}
         <div className="flex flex-col gap-3 rounded-xl border border-slate-300 px-3 pb-3">
-          <p className={`m-0 flex items-center justify-between px-1 pt-3 text-[15px] font-bold text-ink ${FADED}`}>
+          <p className={`m-0 flex items-center justify-between px-1 pt-3 text-[0.9375rem] font-bold text-ink ${FADED}`}>
             {screen.title}
             <span aria-hidden="true" className="text-slate-400">
               ⌃
@@ -481,13 +481,13 @@ function AddingSheet({
               </div>
             ),
           )}
-          <span aria-hidden="true" className={`flex h-11 items-center justify-center rounded-full border border-slate-300 text-[15px] font-bold text-primary ${FADED}`}>
+          <span aria-hidden="true" className={`flex h-11 items-center justify-center rounded-full border border-slate-300 text-[0.9375rem] font-bold text-primary ${FADED}`}>
             Done
           </span>
         </div>
         {screen.after.map((r) => (
           <div key={r.title} data-testid="adding-after" className={`flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3.5 ${FADED}`}>
-            <span className="whitespace-nowrap text-[15px] font-bold text-ink">{r.title}</span>
+            <span className="whitespace-nowrap text-[0.9375rem] font-bold text-ink">{r.title}</span>
           </div>
         ))}
       </div>

@@ -271,11 +271,11 @@ export default function MinyanimView({
         />
         {(upcoming.length === 0 || named?.length === 0) && (
           <div className="border-t border-slate-100 bg-primary/[0.07] px-4 py-3" data-testid="minyanim-answer">
-            <p className="text-[14.5px] font-semibold leading-snug text-slate-900">{answer}</p>
+            <p className="text-[0.90625rem] font-semibold leading-snug text-slate-900">{answer}</p>
           </div>
         )}
         {festival && (
-          <p className="border-t border-slate-100 px-4 py-2.5 text-[13.5px] leading-snug text-slate-600">
+          <p className="border-t border-slate-100 px-4 py-2.5 text-[0.84375rem] leading-snug text-slate-600">
             {day.name ?? festival}. <b>{postedCount} of {shulCount} shuls</b> have posted {festival} times
             {day.yomTov ? '.' : '; the rest show their regular times, marked.'}
           </p>
@@ -296,7 +296,7 @@ export default function MinyanimView({
                     <path d="M12 5v14M5 12h14" />
                   </svg>
                 </span>
-                <span className="text-[15px] font-bold text-primary">{addLabel}</span>
+                <span className="text-[0.9375rem] font-bold text-primary">{addLabel}</span>
               </button>
             </li>
           )}
@@ -316,7 +316,7 @@ export default function MinyanimView({
       )}
       {past.length > 0 && (
         <div className="mt-1">
-          <button type="button" onClick={() => setEarlier((v) => !v)} aria-expanded={earlier} className="flex min-h-11 w-full cursor-pointer items-center gap-1 text-[14px] font-bold text-primary">
+          <button type="button" onClick={() => setEarlier((v) => !v)} aria-expanded={earlier} className="flex min-h-11 w-full cursor-pointer items-center gap-1 text-[0.875rem] font-bold text-primary">
             Earlier today · {past.length}
             <ChevronRightIcon className={`h-4 w-4 transition-transform ${earlier ? '-rotate-90' : 'rotate-90'}`} />
           </button>
@@ -331,12 +331,12 @@ export default function MinyanimView({
       )}
       {notPostedShuls.length > 0 && (
         <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3" data-testid="minyanim-not-posted">
-          <p className="text-[14px] font-bold text-caution">
+          <p className="text-[0.875rem] font-bold text-caution">
             Not posted for {day.name ?? festival} · {notPostedShuls.length} {notPostedShuls.length === 1 ? 'shul' : 'shuls'}
           </p>
           {canAdd ? (
             <>
-              <p className="mt-0.5 text-[13px] leading-snug text-amber-900">Their regular times may not apply. Have a shul’s message or flyer? Add it here.</p>
+              <p className="mt-0.5 text-[0.8125rem] leading-snug text-amber-900">Their regular times may not apply. Have a shul’s message or flyer? Add it here.</p>
               <ul className="mt-1.5" data-testid="not-posted-shuls">
                 {(notPostedOpen ? notPostedIds : notPostedIds.slice(0, 4)).map((id) => {
                   const shul = byId.get(id)
@@ -345,15 +345,15 @@ export default function MinyanimView({
                   return (
                     <li key={id} className="border-t border-amber-200 py-2">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 truncate text-[14px] text-amber-900">
+                        <span className="min-w-0 truncate text-[0.875rem] text-amber-900">
                           <b className="text-slate-900">{shul.name}</b>
                           {howFar(shul) ? ` · ${howFar(shul)}` : ''}
                         </span>
                         {sentTimes.includes(id) ? (
-                          <span className="shrink-0 text-[13px] font-semibold text-emerald-700">✓ Sent</span>
+                          <span className="shrink-0 text-[0.8125rem] font-semibold text-emerald-700">✓ Sent</span>
                         ) : (
                           addingTimes !== id && (
-                            <button type="button" onClick={() => setAddingTimes(id)} className="shrink-0 cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
+                            <button type="button" onClick={() => setAddingTimes(id)} className="shrink-0 cursor-pointer text-[0.84375rem] font-bold text-primary hover:underline">
                               Add their times
                             </button>
                           )
@@ -376,12 +376,12 @@ export default function MinyanimView({
               </ul>
             </>
           ) : (
-            <p className="mt-0.5 text-[13px] leading-snug text-amber-900">
+            <p className="mt-0.5 text-[0.8125rem] leading-snug text-amber-900">
               Their regular times may not apply. {notPostedShuls.slice(0, 3).join(', ')}
               {notPostedShuls.length > 3 && !notPostedOpen ? `, +${notPostedShuls.length - 3}` : ''}
             </p>
           )}
-          <button type="button" onClick={() => setNotPostedOpen((v) => !v)} className="mt-1 cursor-pointer text-[13.5px] font-bold text-primary">
+          <button type="button" onClick={() => setNotPostedOpen((v) => !v)} className="mt-1 cursor-pointer text-[0.84375rem] font-bold text-primary">
             {notPostedOpen ? 'Hide their regular times' : canAdd && notPostedIds.length > 4 ? `+${notPostedIds.length - 4} more shuls · their regular times` : 'Their regular times'}
           </button>
           {notPostedOpen && (
@@ -450,10 +450,10 @@ export function MinyanRow({
   const tag = whose(posting, false, checkedAt ? { at: checkedAt, timezone } : undefined)
   const body = (
     <>
-        <span className="w-[4.5rem] shrink-0 text-[16.5px] font-extrabold text-slate-900">{clockTime(slot.minutes)}</span>
+        <span className="w-[4.5rem] shrink-0 text-[1.03125rem] font-extrabold text-slate-900">{clockTime(slot.minutes)}</span>
         <span className="min-w-0">
-          <span className="block truncate text-[15px] font-bold text-slate-900">{slot.shulName}</span>
-          <span className="block text-[13.5px] text-slate-600">
+          <span className="block truncate text-[0.9375rem] font-bold text-slate-900">{slot.shulName}</span>
+          <span className="block text-[0.84375rem] text-slate-600">
             {TEFILLAH_LABELS[slot.tefillah]}
             {kind ? ` · ${kind}` : ''}
             {slot.notes ? ` · ${slot.notes}` : ''}
@@ -463,7 +463,7 @@ export function MinyanRow({
             {slot.signUp && <SignUpMark className="ml-1.5 align-[1px]" />}
           </span>
           {tag && (
-            <span className={`mt-0.5 block text-[13px] ${posting.kind === 'schedule' ? 'font-semibold text-green-700' : posting.kind === 'not-posted' ? 'font-semibold text-caution' : 'text-slate-500'}`} data-testid="minyan-whose">
+            <span className={`mt-0.5 block text-[0.8125rem] ${posting.kind === 'schedule' ? 'font-semibold text-green-700' : posting.kind === 'not-posted' ? 'font-semibold text-caution' : 'text-slate-500'}`} data-testid="minyan-whose">
               {posting.kind === 'schedule' ? '✓ ' : posting.kind === 'not-posted' ? '⚠ ' : ''}
               {tag}
             </span>
@@ -523,7 +523,7 @@ function DayTabs({ days, index, onPick }: { days: readonly DateFacts[]; index: n
               aria-selected={on}
               title={date}
               onClick={() => onPick(i)}
-              className={`shrink-0 cursor-pointer whitespace-nowrap rounded-full border px-2.5 py-1 text-[13px] font-semibold ${on ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-ink hover:bg-slate-50'}`}
+              className={`shrink-0 cursor-pointer whitespace-nowrap rounded-full border px-2.5 py-1 text-[0.8125rem] font-semibold ${on ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-ink hover:bg-slate-50'}`}
             >
               {day}
               {name && <span className={`font-medium ${on ? 'text-white/80' : 'text-slate-500'}`}> · {name}</span>}

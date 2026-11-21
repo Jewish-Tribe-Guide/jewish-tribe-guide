@@ -160,9 +160,9 @@ export default function MobileTabsEditor({
 
       <div className="flex flex-col gap-2.5 px-4 pb-4 pt-2">
         {tabs.length >= MAX_MOBILE_TABS ? (
-          <p className="m-0 text-[13px] text-slate-600">Five tabs at most. Take one off to add another.</p>
+          <p className="m-0 text-[0.8125rem] text-slate-600">Five tabs at most. Take one off to add another.</p>
         ) : available.length === 0 ? (
-          <p className="m-0 text-[13px] text-slate-600">Every place a tab can open is on the bar.</p>
+          <p className="m-0 text-[0.8125rem] text-slate-600">Every place a tab can open is on the bar.</p>
         ) : (
           <AddMenu wide label="Add a tab" options={available} onPick={add} />
         )}

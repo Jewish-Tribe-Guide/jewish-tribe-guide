@@ -151,7 +151,7 @@ export default function CategoryMap({ category, items, searchActive, highlight, 
   }, [itemsKey, walkKey, pinnedKey, color, category.icon, category.label, category.id, walkCategory])
 
   const button =
-    'flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-white px-3 text-[13.5px] font-semibold text-slate-700 shadow-md ring-1 ring-slate-900/10 transition-colors hover:bg-slate-50'
+    'flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-white px-3 text-[0.84375rem] font-semibold text-slate-700 shadow-md ring-1 ring-slate-900/10 transition-colors hover:bg-slate-50'
 
   return (
     <div data-testid="category-map" className="relative h-full w-full">

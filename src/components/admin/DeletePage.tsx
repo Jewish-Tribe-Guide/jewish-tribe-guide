@@ -48,13 +48,13 @@ export default function DeletePage({ token, category, onDeleted }: { token: stri
   return (
     <div className="flex flex-col gap-3">
       {!asking && (
-        <button type="button" onClick={() => void ask()} className="self-start min-h-11 px-1 text-[15px] font-semibold text-red-700 hover:underline cursor-pointer">
+        <button type="button" onClick={() => void ask()} className="self-start min-h-11 px-1 text-[0.9375rem] font-semibold text-red-700 hover:underline cursor-pointer">
           Delete this page
         </button>
       )}
       {asking && (
         <section aria-label="Delete this page" className="flex flex-col gap-3 rounded-[10px] border border-red-200 bg-red-50 p-4">
-          <p className="m-0 text-[15px] text-red-900">
+          <p className="m-0 text-[0.9375rem] text-red-900">
             {!eruv
               ? `Delete ${name} and every place on it?`
               : counts

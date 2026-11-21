@@ -30,7 +30,7 @@ import { useAdminApi } from './useAdminApi'
 const button = 'inline-flex items-center justify-center gap-1.5 min-h-11 px-4 rounded-lg text-sm font-semibold cursor-pointer disabled:opacity-60'
 const primary = `${button} border border-primary bg-primary text-white`
 const secondary = `${button} border border-slate-300 bg-white text-slate-900 hover:bg-slate-50`
-const field = 'min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-[15px] text-slate-900'
+const field = 'min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-[0.9375rem] text-slate-900'
 
 /** How many rows show before "Show all". */
 const SHOWN = 50
@@ -114,7 +114,7 @@ function WatchesRow({ href, line }: { href: string; line: string | undefined }) 
       <span className="min-w-0 flex-1">
         <span className="block text-base font-extrabold text-ink">Watches</span>
         {/* Keeps its height while the count loads, so the list doesn't jump. */}
-        <span className="mt-0.5 block min-h-[1.3em] text-[14px] leading-snug text-slate-700">{line}</span>
+        <span className="mt-0.5 block min-h-[1.3em] text-[0.875rem] leading-snug text-slate-700">{line}</span>
       </span>
     </Link>
   )
@@ -294,7 +294,7 @@ export default function PlacesList({ token }: { token: string }) {
       {adding === '' && (
         <AdminBox title="Add a place">
           <div className="flex flex-wrap items-end gap-2 p-4">
-            <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-[13px] text-slate-600">
+            <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-[0.8125rem] text-slate-600">
               Which category
               <select value={addCategory} onChange={(e) => setAddCategory(e.target.value)} className={field}>
                 <option value="">Pick one</option>
@@ -380,7 +380,7 @@ export default function PlacesList({ token }: { token: string }) {
               aside={categoriesById.get(p.category)?.label}
             />
           ))}
-          <div className="flex items-center gap-3 px-4 py-3 text-[13.5px] text-slate-600">
+          <div className="flex items-center gap-3 px-4 py-3 text-[0.84375rem] text-slate-600">
             <span className="flex-1">
               {shown.length} of {rows.length}
             </span>

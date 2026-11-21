@@ -28,11 +28,11 @@ import { useAdminApiFor } from './useAdminApi'
 // where it was read, Read it again or Change the page it's read from.
 
 const CHANGED = 'border-amber-200 bg-yellow-50'
-const SOURCE_LINK = 'self-start min-h-8 cursor-pointer text-[15px] font-semibold text-primary hover:underline disabled:opacity-50'
+const SOURCE_LINK = 'self-start min-h-8 cursor-pointer text-[0.9375rem] font-semibold text-primary hover:underline disabled:opacity-50'
 const MARK: Record<Exclude<WaitRow['mark'], 'same'>, string> = { new: 'New', gone: 'Going', changed: 'Changed' }
 
 function Tag({ children }: { children: ReactNode }) {
-  return <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-amber-800">{children}</span>
+  return <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[0.78125rem] font-extrabold text-amber-800">{children}</span>
 }
 
 /** A box's rows that change something, or all of them when none is
@@ -95,7 +95,7 @@ export default function TodoReading({
   if (!g) {
     return (
       <PlaceFrame name={name} subline={subline} position={position} switches={switches}>
-        <p className="m-0 text-[15px] text-slate-600">Nothing waits here now.</p>
+        <p className="m-0 text-[0.9375rem] text-slate-600">Nothing waits here now.</p>
       </PlaceFrame>
     )
   }
@@ -146,7 +146,7 @@ export default function TodoReading({
       source={
         <SourceCard name={g.page ? g.page.text.charAt(0).toUpperCase() + g.page.text.slice(1) : 'Its source'} rest={g.when ? ` · ${g.when}` : undefined}>
           {g.page?.url && changing === null && (
-            <a href={g.page.url} target="_blank" rel="noopener noreferrer" className="self-start text-[15px] font-semibold text-primary hover:underline">
+            <a href={g.page.url} target="_blank" rel="noopener noreferrer" className="self-start text-[0.9375rem] font-semibold text-primary hover:underline">
               {g.page.text}
             </a>
           )}
@@ -163,14 +163,14 @@ export default function TodoReading({
           {menu && changing !== null && (
             <span className="flex flex-col gap-2">
               <label className="flex flex-col gap-1.5">
-                <span className="text-[13.5px] font-semibold text-slate-500">A link to its menu</span>
+                <span className="text-[0.84375rem] font-semibold text-slate-500">A link to its menu</span>
                 <input
                   type="url"
                   value={changing}
                   onChange={(e) => setChanging(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && changing.trim() && giveLink()}
                   placeholder="https://"
-                  className="w-full min-h-12 rounded-xl border border-slate-300 bg-white px-3.5 text-[16px] text-slate-900"
+                  className="w-full min-h-12 rounded-xl border border-slate-300 bg-white px-3.5 text-[1rem] text-slate-900"
                   autoFocus
                 />
               </label>
@@ -193,9 +193,9 @@ export default function TodoReading({
         {g.lines.map((l) => (
           <section key={l.label} aria-label={l.label} className={`flex items-start gap-3 rounded-2xl border px-4 py-2.5 ${CHANGED}`}>
             <span className="min-w-0 flex-1">
-              <span className="block text-[16px] font-extrabold text-slate-900">{l.label}</span>
-              <span className="mt-0.5 block text-[14px] leading-snug text-slate-700 [overflow-wrap:anywhere]">{l.value}</span>
-              {l.old !== null && <span className="mt-1 block text-[13.5px] text-slate-500 [overflow-wrap:anywhere]">Was {l.old}</span>}
+              <span className="block text-[1rem] font-extrabold text-slate-900">{l.label}</span>
+              <span className="mt-0.5 block text-[0.875rem] leading-snug text-slate-700 [overflow-wrap:anywhere]">{l.value}</span>
+              {l.old !== null && <span className="mt-1 block text-[0.84375rem] text-slate-500 [overflow-wrap:anywhere]">Was {l.old}</span>}
             </span>
             {l.old === null ? <Tag>New</Tag> : <ChangedTag />}
           </section>
@@ -206,15 +206,15 @@ export default function TodoReading({
               {lit(b).map((r, j) => (
                 <li key={j} data-mark={r.mark} className={`-mx-2.5 flex min-h-11.5 items-center gap-2.5 rounded-xl px-2.5 py-1.5 ${r.mark === 'same' ? '' : 'bg-yellow-50'}`}>
                   <span className="min-w-0 flex-1">
-                    <span className={`block text-[15.5px] ${r.mark === 'gone' ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{r.name}</span>
+                    <span className={`block text-[0.96875rem] ${r.mark === 'gone' ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{r.name}</span>
                     {(r.sub || r.flag) && (
-                      <span className="block text-[13.5px] text-slate-500">
+                      <span className="block text-[0.84375rem] text-slate-500">
                         {r.sub}
                         {r.flag && <span className="text-amber-800"> · {r.flag}</span>}
                       </span>
                     )}
                   </span>
-                  {r.right && <span className="text-right text-[14px] tabular-nums">{r.right}</span>}
+                  {r.right && <span className="text-right text-[0.875rem] tabular-nums">{r.right}</span>}
                   {r.mark !== 'same' && <Tag>{MARK[r.mark]}</Tag>}
                 </li>
               ))}
@@ -225,8 +225,8 @@ export default function TodoReading({
           <PlaceCard>
             {g.facts.map((x) => (
               <div key={x.label} className="flex flex-col gap-0.5">
-                <h2 className="m-0 text-[15px] font-bold text-slate-900">{x.label}</h2>
-                <p className="m-0 text-[15px] text-slate-700 [overflow-wrap:anywhere]">
+                <h2 className="m-0 text-[0.9375rem] font-bold text-slate-900">{x.label}</h2>
+                <p className="m-0 text-[0.9375rem] text-slate-700 [overflow-wrap:anywhere]">
                   {x.url ? (
                     <a href={x.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                       {x.value}
@@ -237,7 +237,7 @@ export default function TodoReading({
                 </p>
               </div>
             ))}
-            {g.note && <p className="m-0 text-[13.5px] text-slate-500">{g.note}</p>}
+            {g.note && <p className="m-0 text-[0.84375rem] text-slate-500">{g.note}</p>}
           </PlaceCard>
         )}
       </div>

@@ -128,12 +128,12 @@ function Block({ title, icon, more, children, testId, wide, last }: { title: str
   return (
     <section data-testid={testId} data-wide={wide || undefined} className={`${last ? 'desktop:order-last ' : ''}desktop:rounded-2xl desktop:border desktop:border-slate-200 desktop:bg-white desktop:px-5 desktop:py-4`}>
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="flex items-center gap-1.5 text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500">
+        <h2 className="flex items-center gap-1.5 text-[0.78125rem] font-extrabold uppercase tracking-[0.06em] text-slate-500">
           {icon}
           {title}
         </h2>
         {more && (
-          <Link href={more.href} prefetch={false} className="shrink-0 whitespace-nowrap text-[14px] font-bold text-primary hover:underline">
+          <Link href={more.href} prefetch={false} className="shrink-0 whitespace-nowrap text-[0.875rem] font-bold text-primary hover:underline">
             {more.label}
           </Link>
         )}
@@ -160,10 +160,10 @@ function PlaceRow({ item, category, categories, title, sub, right, onOpen }: { i
     <button type="button" onClick={onOpen} className="flex w-full cursor-pointer items-center gap-3 border-t border-slate-100 py-2.5 text-left first:border-t-0 hover:bg-slate-50">
       <CategoryIcon icon={category.icon} categoryId={category.id} iconImageUrl={photo} initials={initialsOf(item.name)} shape="square" color={getCategoryColor([...categories], category.id)} className="h-11 w-11 text-lg" sizePx={44} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15.5px] font-bold text-ink">{title}</span>
-        <span className="mt-0.5 block text-[13.5px] leading-snug text-slate-600">{sub}</span>
+        <span className="block truncate text-[0.96875rem] font-bold text-ink">{title}</span>
+        <span className="mt-0.5 block text-[0.84375rem] leading-snug text-slate-600">{sub}</span>
       </span>
-      {right && <span className="shrink-0 text-[13px] font-semibold text-slate-500">{right}</span>}
+      {right && <span className="shrink-0 text-[0.8125rem] font-semibold text-slate-500">{right}</span>}
       <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
     </button>
   )
@@ -204,18 +204,18 @@ export function CandlesCard({ moment, now, nowMinutes, links, children }: { mome
   return (
     <section data-testid="today-candles" data-wide className="relative overflow-hidden rounded-2xl bg-[#13243a] px-4 py-3.5 text-white desktop:px-6 desktop:py-5">
       <div aria-hidden="true" className="pointer-events-none absolute -right-9 -top-9 h-36 w-36 rounded-full bg-[radial-gradient(circle,rgba(201,164,92,0.35),transparent_70%)]" />
-      <p className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-300">
+      <p className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-slate-300">
         <CandleIcon className="h-4 w-4 text-[#c9a45c]" />
         {moment.name ?? (moment.yomTov ? 'Yom Tov' : 'Shabbos')}
       </p>
-      <p className="mt-0.5 text-[28px] font-extrabold tracking-tight">{big}</p>
-      {sub.filter(Boolean).length > 0 && <p className="text-[13.5px] text-slate-300">{sub.filter(Boolean).join(' · ')}</p>}
+      <p className="mt-0.5 text-[1.75rem] font-extrabold tracking-tight">{big}</p>
+      {sub.filter(Boolean).length > 0 && <p className="text-[0.84375rem] text-slate-300">{sub.filter(Boolean).join(' · ')}</p>}
       {children}
       {links.some(([, href]) => href) && (
         <div className="mt-3 flex gap-2">
           {links.map(([label, href]) =>
             href ? (
-              <Link key={label} href={href} prefetch={false} className="flex-1 rounded-lg bg-white/10 py-2 text-center text-[13.5px] font-bold text-white hover:bg-white/20 desktop:max-w-40">
+              <Link key={label} href={href} prefetch={false} className="flex-1 rounded-lg bg-white/10 py-2 text-center text-[0.84375rem] font-bold text-white hover:bg-white/20 desktop:max-w-40">
                 {label}
               </Link>
             ) : null,
@@ -256,8 +256,8 @@ export function BeforeCandles({ listings, categories, items, schedule, from, com
             <li key={row.item} className="border-t border-slate-100 first:border-t-0">
               <Link href={candleItemHref(communitySlug, row)} prefetch={false} className="flex min-h-14 items-center gap-3 py-2.5 hover:bg-slate-50">
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[16px] font-bold leading-snug text-ink">{row.item}</span>
-                  <span className="block text-[13.5px] text-slate-600">{candleItemLine(row)}</span>
+                  <span className="block text-[1rem] font-bold leading-snug text-ink">{row.item}</span>
+                  <span className="block text-[0.84375rem] text-slate-600">{candleItemLine(row)}</span>
                 </span>
                 <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
               </Link>
@@ -265,7 +265,7 @@ export function BeforeCandles({ listings, categories, items, schedule, from, com
           ))}
         </ul>
       )}
-      {missing.length > 0 && <p className="mt-1.5 text-[13.5px] text-slate-600">No store open now lists {itemList(missing).toLowerCase()}.</p>}
+      {missing.length > 0 && <p className="mt-1.5 text-[0.84375rem] text-slate-600">No store open now lists {itemList(missing).toLowerCase()}.</p>}
     </Block>
   )
 }
@@ -291,12 +291,12 @@ function NextMinyan({ schedule, listings, from, onOpenListing, shulsHref }: Prop
   return (
     <section data-testid="today-next-minyan" className="rounded-2xl bg-primary/[0.07] px-4 py-3 desktop:px-5 desktop:py-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="flex items-center gap-1.5 text-[12px] font-extrabold uppercase tracking-[0.06em] text-slate-500">
+        <h2 className="flex items-center gap-1.5 text-[0.75rem] font-extrabold uppercase tracking-[0.06em] text-slate-500">
           <ClockIcon className="h-3.5 w-3.5" />
           Next minyan
         </h2>
         {shulsHref && (
-          <Link href={shulsHref} prefetch={false} className="shrink-0 whitespace-nowrap text-[14px] font-bold text-primary hover:underline">
+          <Link href={shulsHref} prefetch={false} className="shrink-0 whitespace-nowrap text-[0.875rem] font-bold text-primary hover:underline">
             All by time ›
           </Link>
         )}
@@ -308,7 +308,7 @@ function NextMinyan({ schedule, listings, from, onOpenListing, shulsHref }: Prop
           ))}
         </div>
       ) : shown.length === 0 ? (
-        <p className="mt-1.5 text-[14.5px] text-slate-600">Nothing listed for today or tomorrow.</p>
+        <p className="mt-1.5 text-[0.90625rem] text-slate-600">Nothing listed for today or tomorrow.</p>
       ) : (
         <ul className="mt-1">
           {shown.map((line) => {
@@ -322,8 +322,8 @@ function NextMinyan({ schedule, listings, from, onOpenListing, shulsHref }: Prop
                   onClick={() => item && onOpenListing(item)}
                   className="grid w-full cursor-pointer grid-cols-[72px_minmax(0,1fr)] gap-x-2 py-1 text-left hover:underline"
                 >
-                  <span className="text-[15.5px] font-extrabold text-ink">{line.time}</span>
-                  <span className="text-[14.5px] text-slate-700">
+                  <span className="text-[0.96875rem] font-extrabold text-ink">{line.time}</span>
+                  <span className="text-[0.90625rem] text-slate-700">
                     {said(line)} · {line.shulName}
                     {miles != null && `, ${milesText(miles)}`}
                     {nearestNote}
@@ -398,8 +398,8 @@ function BrowseRow({ cards, categories, communitySlug }: Props) {
   return (
     <section data-testid="today-browse-row" className="mt-6 desktop:hidden">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500">Browse</h2>
-        <Link href={routes.browse(communitySlug)} prefetch={false} className="text-[14px] font-bold text-primary">
+        <h2 className="text-[0.78125rem] font-extrabold uppercase tracking-[0.06em] text-slate-500">Browse</h2>
+        <Link href={routes.browse(communitySlug)} prefetch={false} className="text-[0.875rem] font-bold text-primary">
           All ›
         </Link>
       </div>
@@ -407,7 +407,7 @@ function BrowseRow({ cards, categories, communitySlug }: Props) {
         {cards.slice(0, 6).map((card) => (
           <Link key={card.id ?? card.title} href={card.href} prefetch={false} className="flex w-[92px] shrink-0 flex-col items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-1 pb-2 pt-2.5 text-center">
             <CategoryIcon icon={card.icon ?? ''} categoryId={card.id} color={getCategoryColor([...categories], card.id ?? '')} className="h-9 w-9 text-base" sizePx={36} />
-            <span className="w-full truncate text-[13.5px] font-bold text-ink">{card.title}</span>
+            <span className="w-full truncate text-[0.84375rem] font-bold text-ink">{card.title}</span>
           </Link>
         ))}
       </div>
@@ -421,8 +421,8 @@ function BrowseList({ cards, categories, communitySlug }: Props) {
   return (
     <aside data-testid="today-browse" className="hidden rounded-2xl border border-slate-200 bg-white px-5 py-4 desktop:block">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500">Browse</h2>
-        <Link href={routes.map(communitySlug)} prefetch={false} className="text-[14px] font-bold text-primary hover:underline">
+        <h2 className="text-[0.78125rem] font-extrabold uppercase tracking-[0.06em] text-slate-500">Browse</h2>
+        <Link href={routes.map(communitySlug)} prefetch={false} className="text-[0.875rem] font-bold text-primary hover:underline">
           Map ›
         </Link>
       </div>
@@ -432,8 +432,8 @@ function BrowseList({ cards, categories, communitySlug }: Props) {
             <Link href={card.href} prefetch={false} className="flex items-center gap-3 border-t border-slate-100 py-2 hover:bg-slate-50">
               <CategoryIcon icon={card.icon ?? ''} categoryId={card.id} color={getCategoryColor([...categories], card.id ?? '')} className="h-9 w-9 text-base" sizePx={36} />
               <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-bold text-ink">{card.title}</span>
-                {card.count && <span className="block text-[13px] text-slate-500">{card.count}</span>}
+                <span className="block text-[0.9375rem] font-bold text-ink">{card.title}</span>
+                {card.count && <span className="block text-[0.8125rem] text-slate-500">{card.count}</span>}
               </span>
             </Link>
           </li>

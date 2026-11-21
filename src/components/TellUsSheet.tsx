@@ -704,7 +704,7 @@ export function TellUsBody({
         }
       : null
   const yourselfLink = yourself && (
-    <button type="button" onClick={yourself.run} className="flex min-h-11 w-full cursor-pointer items-center justify-center text-[15.5px] font-bold text-primary hover:underline">
+    <button type="button" onClick={yourself.run} className="flex min-h-11 w-full cursor-pointer items-center justify-center text-[0.96875rem] font-bold text-primary hover:underline">
       {yourself.label}
     </button>
   )
@@ -716,18 +716,18 @@ export function TellUsBody({
   const nothingRead = proposals.length === 0
   const firstWhy = whys.find((w) => w !== null) ?? (nothingRead ? NOTHING_READ : null)
   const allWhy = (shown.length > 0 && whys.every((w) => w !== null)) || nothingRead
-  const primary = 'h-12 w-full cursor-pointer rounded-full bg-primary px-4 text-[16px] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:bg-slate-200 disabled:text-slate-500'
+  const primary = 'h-12 w-full cursor-pointer rounded-full bg-primary px-4 text-[1rem] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:bg-slate-200 disabled:text-slate-500'
 
   if (step === 'sent') {
     return (
       <div className="space-y-3 p-1" data-testid="tell-us-sent">
-        <p className="text-[17px] font-extrabold text-slate-900">Thank you</p>
-        <p className="text-[14.5px] leading-snug text-slate-700">
+        <p className="text-[1.0625rem] font-extrabold text-slate-900">Thank you</p>
+        <p className="text-[0.90625rem] leading-snug text-slate-700">
           {sentList.length === 1 ? 'Your update is with an admin.' : `Your ${sentList.length} updates are with an admin.`} They check each one before it shows in the guide.
         </p>
         <ul className="divide-y divide-slate-100 border-y border-slate-100">
           {sentList.map((x, k) => (
-            <li key={k} className="flex justify-between gap-3 py-2 text-[14px]">
+            <li key={k} className="flex justify-between gap-3 py-2 text-[0.875rem]">
               <span className="font-semibold text-slate-900">{x.name}</span>
               <span className="text-right text-slate-500">{x.what}</span>
             </li>
@@ -735,18 +735,18 @@ export function TellUsBody({
         </ul>
         {sentIds.length > 0 && (
           <div>
-            <label htmlFor={emailId} className="block text-[13px] font-semibold text-slate-700">
+            <label htmlFor={emailId} className="block text-[0.8125rem] font-semibold text-slate-700">
               Email me when {sentList.length === 1 ? 'it’s' : 'they’re'} on the guide <span className="font-normal text-slate-500">(optional)</span>
             </label>
             <input id={emailId} type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={`${inputClass} mt-1`} autoComplete="email" />
           </div>
         )}
         {error && (
-          <p role="alert" className="text-[13.5px] text-red-700">
+          <p role="alert" className="text-[0.84375rem] text-red-700">
             {error}
           </p>
         )}
-        <button type="button" disabled={busy === 'send'} onClick={() => void done()} className="w-full cursor-pointer rounded-lg bg-primary px-4 py-2.5 text-[15px] font-bold text-white disabled:opacity-60">
+        <button type="button" disabled={busy === 'send'} onClick={() => void done()} className="w-full cursor-pointer rounded-lg bg-primary px-4 py-2.5 text-[0.9375rem] font-bold text-white disabled:opacity-60">
           Done
         </button>
       </div>
@@ -778,7 +778,7 @@ export function TellUsBody({
     >
       {writing && dragging > 0 && (
         <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl border-[3px] border-dashed border-primary bg-blue-50/90" data-testid="tell-us-drop">
-          <p className="text-[17px] font-extrabold text-primary">{photos.length >= MAX_PHOTOS ? `Up to ${MAX_PHOTOS} photos` : 'Drop to add the photo'}</p>
+          <p className="text-[1.0625rem] font-extrabold text-primary">{photos.length >= MAX_PHOTOS ? `Up to ${MAX_PHOTOS} photos` : 'Drop to add the photo'}</p>
         </div>
       )}
       {/* The photo picker, kept mounted: a "can't use it" screen's "Add a
@@ -809,7 +809,7 @@ export function TellUsBody({
       {step === 'write' && !down && (
         <>
           {/* What it's about, under the title, when that's a place's menu. */}
-          {kind === 'menu' && about && <p className="-mt-1 text-[14px] text-muted">{about.name}</p>}
+          {kind === 'menu' && about && <p className="-mt-1 text-[0.875rem] text-muted">{about.name}</p>}
           <div className="rounded-xl border-[1.5px] border-slate-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
             {/* The line inside says what to write, by place, and that it'll
                 be read for them to check (Oct 16); this names it. */}
@@ -830,9 +830,9 @@ export function TellUsBody({
                 {photos.map((p, i) => (
                   <div key={p.preview} className="relative">
                     {p.file.type === 'application/pdf' ? (
-                      <span title={p.file.name} className="flex h-16 w-16 flex-col items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[12px] font-bold text-slate-600">
+                      <span title={p.file.name} className="flex h-16 w-16 flex-col items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-[0.75rem] font-bold text-slate-600">
                         PDF
-                        <span className="w-14 truncate text-center text-[10.5px] font-normal">{p.file.name}</span>
+                        <span className="w-14 truncate text-center text-[0.65625rem] font-normal">{p.file.name}</span>
                       </span>
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element -- a local preview of the visitor's own photo
@@ -862,12 +862,12 @@ export function TellUsBody({
                 type="button"
                 disabled={photos.length >= MAX_PHOTOS}
                 onClick={() => fileInput.current?.click()}
-                className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg px-2.5 text-[14.5px] font-bold text-primary hover:bg-primary/5 disabled:cursor-default disabled:text-slate-400"
+                className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg px-2.5 text-[0.90625rem] font-bold text-primary hover:bg-primary/5 disabled:cursor-default disabled:text-slate-400"
               >
                 <CameraIcon className="h-[18px] w-[18px]" />
                 {kind === 'menu' ? 'Photos or PDF of the menu' : kind === 'times' ? 'Photo or PDF of the schedule' : 'Photo or PDF'}
               </button>
-              {photos.length > 0 && <span className="pr-2 text-[12.5px] text-slate-500">{`${photos.length} of ${MAX_PHOTOS}`}</span>}
+              {photos.length > 0 && <span className="pr-2 text-[0.78125rem] text-slate-500">{`${photos.length} of ${MAX_PHOTOS}`}</span>}
             </div>
           </div>
           <div className="pt-2">
@@ -881,13 +881,13 @@ export function TellUsBody({
 
       {step === 'result' && reading && (
         <>
-          {toast && <p className="text-center text-[13.5px] font-bold text-emerald-700">{toast}</p>}
+          {toast && <p className="text-center text-[0.84375rem] font-bold text-emerald-700">{toast}</p>}
           {queue.length > 1 && cur !== undefined && (
             <div className="flex items-center gap-2" data-testid="tell-us-count">
               <button type="button" aria-label="Previous place" onClick={() => setAt((pos - 1 + queue.length) % queue.length)} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50">
                 ‹
               </button>
-              <p className="flex-1 text-center text-[14px] font-bold text-slate-600">
+              <p className="flex-1 text-center text-[0.875rem] font-bold text-slate-600">
                 {describeAll(cur).name} · <span className="text-slate-900">{pos + 1} of {queue.length}</span>
               </p>
               <button type="button" aria-label="Next place" onClick={() => setAt((pos + 1) % queue.length)} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50">
@@ -939,7 +939,7 @@ export function TellUsBody({
                 {firstWhy.act.label}
               </button>
               {queue.length > 1 && (
-                <button type="button" onClick={() => setAt((pos + 1) % queue.length)} className="h-11 w-full cursor-pointer rounded-full border border-slate-300 text-[15px] font-bold text-slate-800 hover:bg-slate-50">
+                <button type="button" onClick={() => setAt((pos + 1) % queue.length)} className="h-11 w-full cursor-pointer rounded-full border border-slate-300 text-[0.9375rem] font-bold text-slate-800 hover:bg-slate-50">
                   Next
                 </button>
               )}
@@ -949,7 +949,7 @@ export function TellUsBody({
             cur !== undefined && (
               <div className="flex gap-2 pt-2">
                 {queue.length > 1 && (
-                  <button type="button" onClick={() => setAt((pos + 1) % queue.length)} className="h-12 cursor-pointer rounded-full border border-slate-300 px-5 text-[15px] font-bold text-slate-800 hover:bg-slate-50">
+                  <button type="button" onClick={() => setAt((pos + 1) % queue.length)} className="h-12 cursor-pointer rounded-full border border-slate-300 px-5 text-[0.9375rem] font-bold text-slate-800 hover:bg-slate-50">
                     Next
                   </button>
                 )}
@@ -986,7 +986,7 @@ export function TellUsBody({
       )}
       {step === 'kind' && adding && (
         <div className="space-y-2" data-testid="pick-kind">
-          <p className="text-[14.5px] text-slate-700">{adding.place?.name ? `What kind of place is ${adding.place.name}?` : 'What kind of place is it?'}</p>
+          <p className="text-[0.90625rem] text-slate-700">{adding.place?.name ? `What kind of place is ${adding.place.name}?` : 'What kind of place is it?'}</p>
           <div className="flex flex-wrap gap-2">
             {addable.map((c) => (
               <button
@@ -996,7 +996,7 @@ export function TellUsBody({
                   setAdding({ ...adding, category: c })
                   setStep('add', addTitle(c))
                 }}
-                className="cursor-pointer rounded-full border border-slate-300 px-3.5 py-1.5 text-[14px] font-semibold text-slate-800 hover:bg-slate-50"
+                className="cursor-pointer rounded-full border border-slate-300 px-3.5 py-1.5 text-[0.875rem] font-semibold text-slate-800 hover:bg-slate-50"
               >
                 {c.label}
               </button>
@@ -1041,7 +1041,7 @@ export function TellUsBody({
       )}
 
       {error && (
-        <p role="alert" className="text-[13.5px] text-red-700">
+        <p role="alert" className="text-[0.84375rem] text-red-700">
           {error}
         </p>
       )}
@@ -1058,7 +1058,7 @@ function ContactsPreview({ field, item, children }: { field: CategoryField; item
   return (
     <div className="rounded-2xl bg-slate-100 p-2" data-testid="contacts-preview">
       <FieldsBox item={item} title={field.label} fields={[field]} />
-      <button type="button" aria-expanded={fixing} onClick={() => setFixing((v) => !v)} className="mt-1 cursor-pointer px-2 py-1.5 text-[14px] font-bold text-primary hover:underline">
+      <button type="button" aria-expanded={fixing} onClick={() => setFixing((v) => !v)} className="mt-1 cursor-pointer px-2 py-1.5 text-[0.875rem] font-bold text-primary hover:underline">
         {fixing ? 'Done' : `Change something in ${field.label.toLowerCase()}`}
       </button>
       {fixing && <div className="mt-1 rounded-xl bg-white p-2.5">{children}</div>}
@@ -1068,7 +1068,7 @@ function ContactsPreview({ field, item, children }: { field: CategoryField; item
 
 function ChangeLines({ lines, held }: Lines) {
   return (
-    <ul className="mt-1.5 space-y-0.5 text-[14px]">
+    <ul className="mt-1.5 space-y-0.5 text-[0.875rem]">
       {lines.map((l) => (
         <li
           key={l}
@@ -1078,7 +1078,7 @@ function ChangeLines({ lines, held }: Lines) {
         </li>
       ))}
       {held.map((h) => (
-        <li key={h} className="text-[12.5px] text-slate-500">
+        <li key={h} className="text-[0.78125rem] text-slate-500">
           Not changed: {h}
         </li>
       ))}
@@ -1144,11 +1144,11 @@ function ResultCard({
         {!head ? null : chosen ? (
           <PlaceHead name={chosen.name} sub={`${chosen.categoryLabel} · ${short(chosen.address)}`} />
         ) : (
-          <p className="text-[15px] font-extrabold text-slate-900">{p.asWritten || 'A store'}</p>
+          <p className="text-[0.9375rem] font-extrabold text-slate-900">{p.asWritten || 'A store'}</p>
         )}
         {p.ask && !p.listing && (
           <div className="mt-2">
-            <p className="text-[14px] font-semibold text-slate-800">{p.ask.question}</p>
+            <p className="text-[0.875rem] font-semibold text-slate-800">{p.ask.question}</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {p.ask.choices.map((c) => (
                 <button
@@ -1156,7 +1156,7 @@ function ResultCard({
                   type="button"
                   aria-pressed={picked === c.listingId}
                   onClick={() => onPick(picked === c.listingId ? null : c.listingId)}
-                  className={`cursor-pointer rounded-full border px-3 py-1 text-[13.5px] ${picked === c.listingId ? 'border-primary bg-primary text-white' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                  className={`cursor-pointer rounded-full border px-3 py-1 text-[0.84375rem] ${picked === c.listingId ? 'border-primary bg-primary text-white' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
                 >
                   {c.label || short(c.listing.address)}
                 </button>
@@ -1169,7 +1169,7 @@ function ResultCard({
         {/* A Food place's dishes read off its menu: where, so it can be
             checked (agreed Oct 6). */}
         {p.menu && (
-          <p className="mt-1.5 text-[13px] text-slate-600" data-testid="tell-us-menu">
+          <p className="mt-1.5 text-[0.8125rem] text-slate-600" data-testid="tell-us-menu">
             Read from{' '}
             {p.menu.url ? (
               <a href={p.menu.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
@@ -1199,10 +1199,10 @@ function ResultCard({
     const notes = r ? [...r.notes, ...(r.askWhen && when === 'once' ? [r.askWhen.oneDay] : [])] : []
     return (
       <div className={`${card}`} data-testid="tell-us-card">
-        {!head ? null : r ? <PlaceHead name={r.listing.name} sub={`${r.listing.categoryLabel} · ${short(r.listing.address)}`} /> : <p className="text-[15px] font-extrabold text-slate-900">{p.asWritten || 'A place'}</p>}
+        {!head ? null : r ? <PlaceHead name={r.listing.name} sub={`${r.listing.categoryLabel} · ${short(r.listing.address)}`} /> : <p className="text-[0.9375rem] font-extrabold text-slate-900">{p.asWritten || 'A place'}</p>}
         {p.ask && !p.listing && (
           <div className="mt-2">
-            <p className="text-[14px] font-semibold text-slate-800">{p.ask.question}</p>
+            <p className="text-[0.875rem] font-semibold text-slate-800">{p.ask.question}</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {p.ask.choices.map((c) => (
                 <button
@@ -1210,7 +1210,7 @@ function ResultCard({
                   type="button"
                   aria-pressed={picked === c.listingId}
                   onClick={() => onPick(picked === c.listingId ? null : c.listingId)}
-                  className={`cursor-pointer rounded-full border px-3 py-1 text-[13.5px] ${picked === c.listingId ? 'border-primary bg-primary text-white' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                  className={`cursor-pointer rounded-full border px-3 py-1 text-[0.84375rem] ${picked === c.listingId ? 'border-primary bg-primary text-white' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
                 >
                   {c.label || short(c.listing.address)}
                 </button>
@@ -1220,7 +1220,7 @@ function ResultCard({
         )}
         {r?.askWhen && (
           <div className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2">
-            <p className="text-[14px] font-semibold text-amber-900">{r.askWhen.question}</p>
+            <p className="text-[0.875rem] font-semibold text-amber-900">{r.askWhen.question}</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {(
                 [
@@ -1233,7 +1233,7 @@ function ResultCard({
                   type="button"
                   aria-pressed={when === w}
                   onClick={() => onWhen(w)}
-                  className={`cursor-pointer rounded-full border px-3 py-1 text-[13.5px] ${when === w ? 'border-primary bg-primary text-white' : 'border-amber-300 bg-white text-slate-800 hover:bg-amber-100'}`}
+                  className={`cursor-pointer rounded-full border px-3 py-1 text-[0.84375rem] ${when === w ? 'border-primary bg-primary text-white' : 'border-amber-300 bg-white text-slate-800 hover:bg-amber-100'}`}
                 >
                   {label}
                 </button>
@@ -1271,21 +1271,21 @@ function ResultCard({
                       <input value={String(shown[key] ?? '')} onChange={(e) => onFix(key, e.target.value)} className={`${inputClass} mt-1`} />
                     </label>
                   )}
-                  {f.type !== 'hours' && f.type !== 'contacts' && <p className="mt-0.5 text-[12.5px] text-slate-500">Was: {was}</p>}
+                  {f.type !== 'hours' && f.type !== 'contacts' && <p className="mt-0.5 text-[0.78125rem] text-slate-500">Was: {was}</p>}
                 </div>
               )
             })}
           </div>
         )}
         {notes.length > 0 && (
-          <div className="mt-2 text-[13px] text-slate-600">
+          <div className="mt-2 text-[0.8125rem] text-slate-600">
             <p className="font-semibold text-slate-700">Goes to the admin as a note:</p>
             {notes.map((n) => (
               <p key={n}>{n}</p>
             ))}
           </div>
         )}
-        {r?.askWhen && !when && <p className="mt-2 text-[13px] text-amber-800">Answer the question above to send it.</p>}
+        {r?.askWhen && !when && <p className="mt-2 text-[0.8125rem] text-amber-800">Answer the question above to send it.</p>}
         {r && more && <ChangeSomethingElse name={r.listing.name} onClick={() => onEditListing(r.listing.id)} />}
       </div>
     )
@@ -1298,24 +1298,24 @@ function ResultCard({
       <div className={`${card}`} data-testid="tell-us-card">
         {same ? (
           <>
-            <p className="text-[15px] font-extrabold text-slate-900">
+            <p className="text-[0.9375rem] font-extrabold text-slate-900">
               {same.name} <span className="font-normal text-slate-500">· {short(same.address)}</span>
             </p>
             <ChangeLines lines={same.lines} held={same.held} />
-            {same.lines.length === 0 && <p className="mt-1 text-[13.5px] text-slate-600">Nothing new here: the guide already has this.</p>}
-            <button type="button" onClick={() => onPick(null)} className="mt-2 cursor-pointer text-[13px] font-semibold text-slate-500 hover:text-slate-800">
+            {same.lines.length === 0 && <p className="mt-1 text-[0.84375rem] text-slate-600">Nothing new here: the guide already has this.</p>}
+            <button type="button" onClick={() => onPick(null)} className="mt-2 cursor-pointer text-[0.8125rem] font-semibold text-slate-500 hover:text-slate-800">
               No, it’s a different place
             </button>
           </>
         ) : (
           <>
-            <p className="text-[12px] font-bold tracking-wide text-emerald-700 uppercase">New to the guide{p.categoryLabel ? ` · ${p.categoryLabel}` : ''}</p>
-            <p className="mt-0.5 text-[15px] font-extrabold text-slate-900">
+            <p className="text-[0.75rem] font-bold tracking-wide text-emerald-700 uppercase">New to the guide{p.categoryLabel ? ` · ${p.categoryLabel}` : ''}</p>
+            <p className="mt-0.5 text-[0.9375rem] font-extrabold text-slate-900">
               {p.place.name}
               {p.place.address && <span className="font-normal text-slate-500"> · {p.place.address}</span>}
             </p>
             {carries.length > 0 && (
-              <ul className="mt-1 text-[14px]">
+              <ul className="mt-1 text-[0.875rem]">
                 {carries.map((i) => (
                   <li key={i.name} className="font-semibold text-emerald-700">
                     + {i.name}
@@ -1325,16 +1325,16 @@ function ResultCard({
               </ul>
             )}
             {[p.place.kosherCert && `Kosher symbol: ${p.place.kosherCert}`, p.place.meatDairy, p.place.phone, p.place.website, p.place.notes].filter(Boolean).map((t) => (
-              <p key={t as string} className="mt-1 text-[13px] text-slate-600">
+              <p key={t as string} className="mt-1 text-[0.8125rem] text-slate-600">
                 {t}
               </p>
             ))}
             {p.maybe.length > 0 && (
               <div className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2">
-                <p className="text-[13.5px] font-semibold text-amber-900">Already in the guide?</p>
+                <p className="text-[0.84375rem] font-semibold text-amber-900">Already in the guide?</p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {p.maybe.map((m) => (
-                    <button key={m.id} type="button" onClick={() => onPick(m.id)} className="cursor-pointer rounded-full border border-amber-300 bg-white px-3 py-1 text-[13px] text-slate-800 hover:bg-amber-100">
+                    <button key={m.id} type="button" onClick={() => onPick(m.id)} className="cursor-pointer rounded-full border border-amber-300 bg-white px-3 py-1 text-[0.8125rem] text-slate-800 hover:bg-amber-100">
                       It’s {m.name}, {short(m.address)}
                     </button>
                   ))}
@@ -1346,7 +1346,7 @@ function ResultCard({
             <button
               type="button"
               onClick={onFill}
-              className="mt-2.5 w-full cursor-pointer rounded-lg border-[1.5px] border-primary px-4 py-2 text-[14.5px] font-bold text-primary hover:bg-primary/5"
+              className="mt-2.5 w-full cursor-pointer rounded-lg border-[1.5px] border-primary px-4 py-2 text-[0.90625rem] font-bold text-primary hover:bg-primary/5"
             >
               Find it and fill it in
             </button>
@@ -1360,11 +1360,11 @@ function ResultCard({
     const minyanim = p.minyanimKey ? regularMinyanim(p.item[p.minyanimKey]) : []
     return (
       <div className={card} data-testid="tell-us-card">
-        <p className="text-[15px] font-extrabold text-slate-900">
+        <p className="text-[0.9375rem] font-extrabold text-slate-900">
           {p.listing.name} <span className="font-normal text-slate-500">· davening times</span>
         </p>
         {timesSent ? (
-          <p className="mt-1 text-[13.5px] font-semibold text-emerald-700">Sent. An admin checks the times before they show.</p>
+          <p className="mt-1 text-[0.84375rem] font-semibold text-emerald-700">Sent. An admin checks the times before they show.</p>
         ) : (
           p.update && (
           <UpdateTimesBox
@@ -1392,10 +1392,10 @@ function ResultCard({
 function WhyBlock({ head, line, action }: { head: string; line: string; action?: { label: string; run: () => void } }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3" data-testid="tell-us-why">
-      <p className="text-[16.5px] leading-snug font-extrabold text-slate-900">{head}</p>
-      <p className="mt-1 text-[15px] leading-snug text-slate-700">{line}</p>
+      <p className="text-[1.03125rem] leading-snug font-extrabold text-slate-900">{head}</p>
+      <p className="mt-1 text-[0.9375rem] leading-snug text-slate-700">{line}</p>
       {action && (
-        <button type="button" onClick={action.run} className="mt-2.5 h-11 w-full cursor-pointer rounded-full border-[1.5px] border-primary text-[15px] font-bold text-primary hover:bg-primary/5">
+        <button type="button" onClick={action.run} className="mt-2.5 h-11 w-full cursor-pointer rounded-full border-[1.5px] border-primary text-[0.9375rem] font-bold text-primary hover:bg-primary/5">
           {action.label}
         </button>
       )}
@@ -1410,7 +1410,7 @@ function HoursFix({ label, children }: { label: string; children: React.ReactNod
   return open ? (
     <>{children}</>
   ) : (
-    <button type="button" onClick={() => setOpen(true)} className="cursor-pointer text-[13.5px] font-semibold text-primary hover:underline">
+    <button type="button" onClick={() => setOpen(true)} className="cursor-pointer text-[0.84375rem] font-semibold text-primary hover:underline">
       Change the {label.toLowerCase()}
     </button>
   )
@@ -1421,9 +1421,9 @@ function HoursFix({ label, children }: { label: string; children: React.ReactNod
 function PlaceHead({ name, sub }: { name: string; sub: string }) {
   return (
     <div>
-      <p className="text-[18px] leading-tight font-extrabold text-slate-900">{name}</p>
-      <p className="mt-0.5 text-[13.5px] text-slate-500">{sub}</p>
-      <span className="mt-1.5 inline-flex h-[22px] items-center rounded-full bg-slate-100 px-2 text-[12px] font-bold text-slate-600">Read by AI</span>
+      <p className="text-[1.125rem] leading-tight font-extrabold text-slate-900">{name}</p>
+      <p className="mt-0.5 text-[0.84375rem] text-slate-500">{sub}</p>
+      <span className="mt-1.5 inline-flex h-[22px] items-center rounded-full bg-slate-100 px-2 text-[0.75rem] font-bold text-slate-600">Read by AI</span>
     </div>
   )
 }
@@ -1431,7 +1431,7 @@ function PlaceHead({ name, sub }: { name: string; sub: string }) {
 /** The rest of a listing, one tap away: you came to say one thing. */
 function ChangeSomethingElse({ name, onClick }: { name: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="mt-2.5 cursor-pointer text-left text-[14px] font-bold text-primary hover:underline">
+    <button type="button" onClick={onClick} className="mt-2.5 cursor-pointer text-left text-[0.875rem] font-bold text-primary hover:underline">
       Change something else about {name} ›
     </button>
   )
@@ -1445,8 +1445,8 @@ function WeekChange({ label, before, after }: { label: string; before: unknown; 
   const text = (h: StructuredHours[DayKey] | undefined) => (h === undefined ? 'Not listed' : h === null ? 'Closed' : `${fmt12(h.open)}–${fmt12(h.close)}`)
   return (
     <section className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2" data-testid="tell-us-week">
-      <h3 className="text-[15px] font-extrabold text-slate-900">{label}</h3>
-      <ul className="mt-1 text-[14px]">
+      <h3 className="text-[0.9375rem] font-extrabold text-slate-900">{label}</h3>
+      <ul className="mt-1 text-[0.875rem]">
         {DAYS.map((d) => {
           const changed = d in a && JSON.stringify(d in b ? b[d] : 'unset') !== JSON.stringify(a[d])
           return (

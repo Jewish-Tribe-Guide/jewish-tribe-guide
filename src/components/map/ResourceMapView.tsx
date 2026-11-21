@@ -1598,7 +1598,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               ;(e.target as HTMLInputElement).blur()
             }
           }}
-          className="min-w-0 flex-1 bg-transparent px-3 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent px-3 text-[0.9375rem] text-slate-900 placeholder:text-slate-400 focus:outline-none"
         />
         {/* Not while a place is open: ← is the way back then, and the
             corner ✕ (Close map) stays the only ✕ on screen. */}
@@ -1867,7 +1867,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     >
       <SlidersIcon className="h-4 w-4" />
       Filters
-      {filtersOn > 0 && <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[11px] text-primary">{filtersOn}</span>}
+      {filtersOn > 0 && <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[0.6875rem] text-primary">{filtersOn}</span>}
     </button>
   )
   const leadingChips = filtersButton

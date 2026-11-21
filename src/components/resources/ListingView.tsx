@@ -244,7 +244,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   // Food's description goes up beside the picture, under the hours and
   // hechsher (Oct 15); anywhere else it's under the whole header.
   const taglineText = tagline && (
-    <p className={`${isFood ? 'mt-1' : 'mt-2.5'} text-[15px] leading-snug text-slate-800`} data-testid="listing-tagline">
+    <p className={`${isFood ? 'mt-1' : 'mt-2.5'} text-[0.9375rem] leading-snug text-slate-800`} data-testid="listing-tagline">
       {String(item[tagline.key]).trim()}
     </p>
   )
@@ -274,7 +274,7 @@ export default function ListingView({ item, category, color, place = null, upvot
           <div className="flex items-start gap-2">
             {/* The name links to the listing's own page: the address to send
                 someone, and from the map, the way to its category. */}
-            <Title className={`min-w-0 flex-1 font-extrabold leading-tight tracking-tight text-slate-900 ${wide ? 'text-[26px]' : 'text-[22px]'}`}>
+            <Title className={`min-w-0 flex-1 font-extrabold leading-tight tracking-tight text-slate-900 ${wide ? 'text-[1.625rem]' : 'text-[1.375rem]'}`}>
               <Link href={path} className="hover:underline">
                 {item.name}
               </Link>
@@ -286,7 +286,7 @@ export default function ListingView({ item, category, color, place = null, upvot
             )}
             {upvote}
           </div>
-          <p className="mt-1 text-[14.5px] leading-snug text-muted">
+          <p className="mt-1 text-[0.90625rem] leading-snug text-muted">
             {kindLine}
             {distance && (
               <>
@@ -296,7 +296,7 @@ export default function ListingView({ item, category, color, place = null, upvot
             )}
           </p>
           {status.length > 0 && (
-            <p className="mt-1.5 text-[15.5px] leading-snug" data-testid="listing-status">
+            <p className="mt-1.5 text-[0.96875rem] leading-snug" data-testid="listing-status">
               {status.map((part, i) => (
                 <span key={`${part.text}:${i}`}>
                   {i > 0 && <span className="text-slate-500"> · </span>}
@@ -315,7 +315,7 @@ export default function ListingView({ item, category, color, place = null, upvot
             </p>
           )}
           {facts.length > 0 && !factsWithStatus && (
-            <p className="mt-1 text-[14.5px] font-bold text-slate-900" data-testid="listing-facts">
+            <p className="mt-1 text-[0.90625rem] font-bold text-slate-900" data-testid="listing-facts">
               {facts.join(' · ')}
             </p>
           )}
@@ -336,7 +336,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   // ── What the search found here ─────────────────────────────────────────
   const foundBox = found && (found.items.length > 0 || found.fields.length > 0) && (
     <div className="rounded-lg bg-primary/[0.07] px-3 py-2.5" data-testid="search-found">
-      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-primary-dark">Matches your search</p>
+      <p className="mb-1.5 text-[0.6875rem] font-bold uppercase tracking-wide text-primary-dark">Matches your search</p>
       {found.items.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {found.items.map((m) => (
@@ -398,7 +398,7 @@ export default function ListingView({ item, category, color, place = null, upvot
     (joinAbout.length > 0 || joinFooter) && (
       <Card testId="listing-join-box" footer={joinFooter} onEdit={onlyBox ? undefined : editRows(rowIds.has('about') ? 'Link and description' : contactTitle, ['contact', 'about'])}>
         {joinAbout.map((f) => (
-          <p key={f.key} className="whitespace-pre-line pt-2.5 text-[15.5px] leading-snug text-slate-800">{String(item[f.key]).trim()}</p>
+          <p key={f.key} className="whitespace-pre-line pt-2.5 text-[0.96875rem] leading-snug text-slate-800">{String(item[f.key]).trim()}</p>
         ))}
       </Card>
     )
@@ -427,14 +427,14 @@ export default function ListingView({ item, category, color, place = null, upvot
   const leadInBox = !!leadKey && (boxesOf(category).some((b) => b.fields.some((f) => f.key === leadKey)) || !!fixedPlace(leadKey))
   const leadBody = lead && (
     <>
-      {lead.text && <p className="whitespace-pre-line text-[15.5px] leading-snug text-slate-800">{String(item[lead.text.key]).trim()}</p>}
+      {lead.text && <p className="whitespace-pre-line text-[0.96875rem] leading-snug text-slate-800">{String(item[lead.text.key]).trim()}</p>}
       {lead.href && (
         <a
           href={lead.href}
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => track('listing_action', { action: lead.field.linkLabel ?? lead.field.label })}
-          className={`mt-3 mb-1 flex h-12 w-full items-center justify-center gap-2 rounded-full px-5 text-[15.5px] font-bold text-white transition-colors sm:max-w-sm ${
+          className={`mt-3 mb-1 flex h-12 w-full items-center justify-center gap-2 rounded-full px-5 text-[0.96875rem] font-bold text-white transition-colors sm:max-w-sm ${
             isWhatsAppLink(lead.href) ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-primary hover:bg-primary-dark'
           }`}
         >
@@ -457,7 +457,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const caveatBox = caveatFirst && (
     <section className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3" data-testid="listing-caveat-box">
       <h2 className="text-base font-extrabold text-caution">{caveatTitle(category.detailFields)}</h2>
-      <p className="mt-0.5 text-[15px] leading-snug text-slate-800">{caveat!.title ?? 'Not everything here is kosher.'}</p>
+      <p className="mt-0.5 text-[0.9375rem] leading-snug text-slate-800">{caveat!.title ?? 'Not everything here is kosher.'}</p>
     </section>
   )
 
@@ -544,7 +544,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const bigShown = (where: 'contact' | 'about') =>
     bigIn(where).map(({ f, node, named }) => (
       <div key={f.key} data-testid="placed-big" className="py-2.5">
-        {!named && <p className="text-[12px] font-extrabold uppercase tracking-wide text-muted">{f.label}</p>}
+        {!named && <p className="text-[0.75rem] font-extrabold uppercase tracking-wide text-muted">{f.label}</p>}
         {node}
       </div>
     ))
@@ -676,7 +676,7 @@ export default function ListingView({ item, category, color, place = null, upvot
     <div className="divide-y divide-slate-100">
       {caveat?.title && !caveatFirst && (
         <Row>
-          <span className="block text-[13px] font-semibold text-caution">{caveatTitle(category.detailFields)}</span>
+          <span className="block text-[0.8125rem] font-semibold text-caution">{caveatTitle(category.detailFields)}</span>
           <span className="text-caution" data-testid="listing-caveat-note">{caveat.title}</span>
         </Row>
       )}
@@ -702,7 +702,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       )}
       {otherHours.map((f) => (
         <Row key={f.key} icon={<ClockIcon className="h-[17px] w-[17px]" />}>
-          {otherHours.length > 1 && <span className="block text-[13px] text-muted">{f.label}</span>}
+          {otherHours.length > 1 && <span className="block text-[0.8125rem] text-muted">{f.label}</span>}
           <HoursRow value={item[f.key]} now={now} candlesAt={candlesAt} />
         </Row>
       ))}
@@ -728,7 +728,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       ))}
       {detailFields.map((f) => (
         <Row key={f.key}>
-          {!f.hideLabel && <span className="block text-[13px] text-muted">{f.label}</span>}
+          {!f.hideLabel && <span className="block text-[0.8125rem] text-muted">{f.label}</span>}
           {f.type === 'tel' ? (
             <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="tap-44 inline-block text-primary hover:underline">{formatPhone(String(item[f.key]))}</a>
           ) : (
@@ -745,7 +745,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       )}
       {otherTags.map((f) => (
         <Row key={f.key}>
-          <span className="block text-[13px] text-muted">{f.label}</span>
+          <span className="block text-[0.8125rem] text-muted">{f.label}</span>
           {[...selectValues(item[f.key]), ...selectValues(item[`${f.key}_sometimes`]).map((t) => `${t} (sometimes)`)].join(', ')}
         </Row>
       ))}
@@ -784,11 +784,11 @@ export default function ListingView({ item, category, color, place = null, upvot
       <div className="space-y-3 pt-2.5">
         {aboutFields.map((f) =>
           f.type === 'textarea' ? (
-            <p key={f.key} className="whitespace-pre-line text-[15px] leading-relaxed text-slate-800">{String(item[f.key]).trim()}</p>
+            <p key={f.key} className="whitespace-pre-line text-[0.9375rem] leading-relaxed text-slate-800">{String(item[f.key]).trim()}</p>
           ) : (
             // Put in About by the admin: its name over what it says.
-            <div key={f.key} data-testid="about-field" className="text-[15px] text-slate-800">
-              {!f.hideLabel && <span className="block text-[13px] text-muted">{f.label}</span>}
+            <div key={f.key} data-testid="about-field" className="text-[0.9375rem] text-slate-800">
+              {!f.hideLabel && <span className="block text-[0.8125rem] text-muted">{f.label}</span>}
               {f.type === 'tel' ? (
                 <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="text-primary hover:underline">{fieldText(f, item[f.key])}</a>
               ) : f.type === 'url' ? (
@@ -939,7 +939,7 @@ export function OnwardSection({
   const frame = `rounded-2xl border border-slate-200 bg-white px-4 ${aside ? 'pt-4 pb-4' : 'pt-4 pb-3'}`
   return (
     <section className={`${frame} ${className}`} data-testid={aside ? 'listing-onward-aside' : 'listing-onward'}>
-      <h2 className="text-[17px] font-extrabold text-slate-900">
+      <h2 className="text-[1.0625rem] font-extrabold text-slate-900">
         {category.hasAddress === false ? `Other ${category.pluralLabel}` : `More ${category.pluralLabel.toLowerCase()} near here`}
       </h2>
       <div className="mt-2">
@@ -951,7 +951,7 @@ export function OnwardSection({
         <button
           type="button"
           onClick={onward.seeAll.onClick}
-          className="mt-2 flex h-11 w-full cursor-pointer items-center justify-center rounded-xl border border-slate-300 text-[15px] font-bold text-primary hover:bg-slate-50"
+          className="mt-2 flex h-11 w-full cursor-pointer items-center justify-center rounded-xl border border-slate-300 text-[0.9375rem] font-bold text-primary hover:bg-slate-50"
         >
           {onward.seeAll.label}
         </button>
@@ -1092,7 +1092,7 @@ function SetLocationRow({ item }: { item: DirectoryResource }) {
               track('listing_action', { action: 'Unset location' })
               location.unsetListingAnchor()
             }}
-            className="cursor-pointer text-[14px] font-semibold text-primary hover:underline"
+            className="cursor-pointer text-[0.875rem] font-semibold text-primary hover:underline"
             data-testid="set-location"
           >
             Undo
@@ -1111,7 +1111,7 @@ function SetLocationRow({ item }: { item: DirectoryResource }) {
           Set as my location
         </button>
       )}
-      <span className="block text-[13px] text-muted">{set ? 'The guide’s distances are from here' : 'The guide’s distances, from here'}</span>
+      <span className="block text-[0.8125rem] text-muted">{set ? 'The guide’s distances are from here' : 'The guide’s distances, from here'}</span>
     </Row>
   )
 }
@@ -1119,7 +1119,7 @@ function SetLocationRow({ item }: { item: DirectoryResource }) {
 /** A one-link listing's Join or Visit and its Share (board B6): one look for
  *  both, so changing it here changes both. */
 const LIGHT_PILL =
-  'flex h-10 min-w-0 shrink cursor-pointer items-center justify-center gap-2 rounded-full bg-primary/10 px-4 text-[15px] font-semibold text-primary transition-colors hover:bg-primary/15'
+  'flex h-10 min-w-0 shrink cursor-pointer items-center justify-center gap-2 rounded-full bg-primary/10 px-4 text-[0.9375rem] font-semibold text-primary transition-colors hover:bg-primary/15'
 
 function ShareButton({ path, name, pill = false }: { path: string; name: string; pill?: boolean }) {
   const { share, copied } = useShareLink(path, name)
@@ -1143,7 +1143,7 @@ function ShareButton({ path, name, pill = false }: { path: string; name: string;
 
 function Row({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex items-start gap-3 py-3 text-[15px] leading-snug text-slate-800">
+    <div className="flex items-start gap-3 py-3 text-[0.9375rem] leading-snug text-slate-800">
       <span className="mt-0.5 w-[17px] shrink-0 text-slate-400">{icon}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
@@ -1155,20 +1155,20 @@ function WeekLines({ value, now, candlesAt, compact = false }: { value: unknown;
   const week = compactWeek(value, now, { keepRuns: compact })
   if (!week) {
     const text = formatTodayHours(value, now)
-    return text ? <p className="text-[15px] text-slate-800">{text}</p> : null
+    return text ? <p className="text-[0.9375rem] text-slate-800">{text}</p> : null
   }
   const candles = candlesAt != null ? clockTime(candlesAt) : null
   return (
     <div className={compact ? '' : 'divide-y divide-slate-200/70'}>
       {week.map((line) => (
-        <div key={line.label} className={`grid grid-cols-[7.5rem_1fr] gap-2.5 ${compact ? 'py-0.5 text-[14.5px]' : 'py-1.5 text-[15px]'} ${line.isToday && !compact ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
+        <div key={line.label} className={`grid grid-cols-[7.5rem_1fr] gap-2.5 ${compact ? 'py-0.5 text-[0.90625rem]' : 'py-1.5 text-[0.9375rem]'} ${line.isToday && !compact ? 'font-bold text-slate-900' : 'text-slate-700'}`}>
           <span>
             {line.label}
             {line.isToday && !compact && ' · today'}
           </span>
           <span>
             {line.text}
-            {line.isToday && candles && !compact && <span className="block text-[13px] font-medium text-muted">Candle lighting is {candles}</span>}
+            {line.isToday && candles && !compact && <span className="block text-[0.8125rem] font-medium text-muted">Candle lighting is {candles}</span>}
           </span>
         </div>
       ))}
@@ -1257,7 +1257,7 @@ function ItemsCard({
       // line of its own above it.
       footer={
         rows.length > ITEMS_SHOWN && (
-          <button type="button" onClick={() => setAll((v) => !v)} className="inline-flex min-h-9 cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary" data-testid="items-all">
+          <button type="button" onClick={() => setAll((v) => !v)} className="inline-flex min-h-9 cursor-pointer items-center gap-1 text-[0.90625rem] font-bold text-primary" data-testid="items-all">
             {all ? 'Fewer' : `All ${rows.length} ${say.nouns}`}
             <ChevronRightIcon className={`h-4 w-4 transition-transform ${all ? '-rotate-90' : ''}`} />
           </button>
@@ -1265,7 +1265,7 @@ function ItemsCard({
       }
       action={
         menuUrl && (
-          <a href={menuUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[14px] font-bold text-primary hover:underline" data-testid="full-menu">
+          <a href={menuUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[0.875rem] font-bold text-primary hover:underline" data-testid="full-menu">
             Full menu
           </a>
         )
@@ -1284,15 +1284,15 @@ function ItemsCard({
                 onClick={() => setOpen(isOpen ? null : key)}
                 className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 py-2 text-left"
               >
-                <span className={`text-[15px] font-semibold ${matched.has(m.name) ? 'text-primary-dark' : 'text-slate-900'}`}>
+                <span className={`text-[0.9375rem] font-semibold ${matched.has(m.name) ? 'text-primary-dark' : 'text-slate-900'}`}>
                   {m.name}
-                  {m.sometimes && <span className="ml-1.5 text-[12.5px] font-semibold text-caution">{say.sometimes}</span>}
+                  {m.sometimes && <span className="ml-1.5 text-[0.78125rem] font-semibold text-caution">{say.sometimes}</span>}
                 </span>
                 {isOpen ? (
                   <ChevronRightIcon className="h-4 w-4 shrink-0 -rotate-90 text-slate-500" />
                 ) : (
                   <span className="flex shrink-0 items-center gap-1">
-                    {seen && <span className={`whitespace-nowrap text-[13px] ${seen.old ? 'text-caution' : 'text-muted'}`}>{seen.text}</span>}
+                    {seen && <span className={`whitespace-nowrap text-[0.8125rem] ${seen.old ? 'text-caution' : 'text-muted'}`}>{seen.text}</span>}
                     <ChevronRightIcon className="h-4 w-4 rotate-90 text-slate-400" />
                   </span>
                 )}
@@ -1305,14 +1305,14 @@ function ItemsCard({
         {/* What this visitor added: theirs alone until an admin checks it. */}
         {api.added.map((a) => (
           <li key={`added:${a.name}`} data-testid="listing-item-added" className="py-2">
-            <span className="text-[15px] font-semibold text-slate-900">
+            <span className="text-[0.9375rem] font-semibold text-slate-900">
               {a.name}
-              {a.sometimes && <span className="ml-1.5 text-[12.5px] font-semibold text-caution">{say.sometimes}</span>}
+              {a.sometimes && <span className="ml-1.5 text-[0.78125rem] font-semibold text-caution">{say.sometimes}</span>}
             </span>
             {/* No Undo (agreed Oct 1): it only waits for a check, as the
                 "where did you see it?" box's does, and a wrong one is
                 simply rejected there. */}
-            <p role="status" className="mt-0.5 text-[13px] leading-snug text-muted">
+            <p role="status" className="mt-0.5 text-[0.8125rem] leading-snug text-muted">
               Added by you · waiting for a check
             </p>
           </li>
@@ -1322,12 +1322,12 @@ function ItemsCard({
         (add ? (
           // Plain, as "+ Add their times" is (the user, Oct 10: the
           // outlined pill was louder than anything else in a box).
-          <button type="button" onClick={add.run} className="mt-0.5 inline-flex cursor-pointer items-center gap-1.5 py-1 text-[14.5px] font-bold text-primary" data-testid="items-add">
+          <button type="button" onClick={add.run} className="mt-0.5 inline-flex cursor-pointer items-center gap-1.5 py-1 text-[0.90625rem] font-bold text-primary" data-testid="items-add">
             <PlusIcon className="h-4 w-4" />
             {add.label}
           </button>
         ) : (
-          <p className="pt-0.5 text-[14.5px] text-slate-700">None listed yet.</p>
+          <p className="pt-0.5 text-[0.90625rem] text-slate-700">None listed yet.</p>
         ))}
     </Card>
   )
@@ -1336,7 +1336,7 @@ function ItemsCard({
 function GoneNote({ at, clock }: { at: string; clock: number | null }) {
   const timezone = useCommunityTimezone()
   return (
-    <p className="-mt-1 pb-2 text-[13px] font-semibold leading-snug text-caution">
+    <p className="-mt-1 pb-2 text-[0.8125rem] font-semibold leading-snug text-caution">
       Reported gone {dayText(at, clock, timezone)} · we’ll check before taking it off
     </p>
   )
@@ -1348,7 +1348,7 @@ function ItemAnswer({ mark: m, api, clock, say }: { mark: ItemMark; api: ItemMar
   const timezone = useCommunityTimezone()
   const { mine, busy, error } = api.stateOf(m)
   const button =
-    'flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border border-slate-300 bg-white text-[14.5px] font-bold text-slate-900 transition-colors hover:bg-slate-50 disabled:cursor-default disabled:opacity-60'
+    'flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border border-slate-300 bg-white text-[0.90625rem] font-bold text-slate-900 transition-colors hover:bg-slate-50 disabled:cursor-default disabled:opacity-60'
   const undo = mine?.undoable && (
     <button type="button" disabled={busy} onClick={() => api.undo(m)} className="ml-1.5 cursor-pointer font-bold text-primary hover:underline disabled:opacity-50">
       {busy ? 'Undoing…' : 'Undo'}
@@ -1359,10 +1359,10 @@ function ItemAnswer({ mark: m, api, clock, say }: { mark: ItemMark; api: ItemMar
       {m.goneAt && !mine ? (
         <GoneNote at={m.goneAt} clock={clock} />
       ) : (
-        !mine && <p className="text-[13px] leading-snug text-muted">{lastSeenText(m, clock, timezone)}</p>
+        !mine && <p className="text-[0.8125rem] leading-snug text-muted">{lastSeenText(m, clock, timezone)}</p>
       )}
       {mine ? (
-        <p role="status" className={`text-[14px] leading-snug ${mine.kind === 'seen' ? 'text-emerald-700' : 'text-caution'}`}>
+        <p role="status" className={`text-[0.875rem] leading-snug ${mine.kind === 'seen' ? 'text-emerald-700' : 'text-caution'}`}>
           {mine.kind === 'seen'
             ? '✓ Thanks! Marked as seen today.'
             : mine.undoable
@@ -1383,9 +1383,9 @@ function ItemAnswer({ mark: m, api, clock, say }: { mark: ItemMark; api: ItemMar
           )}
         </div>
       )}
-      {busy && !mine && <p className="mt-1.5 text-[13px] text-muted">Sending…</p>}
+      {busy && !mine && <p className="mt-1.5 text-[0.8125rem] text-muted">Sending…</p>}
       {error && (
-        <p role="alert" className="mt-1.5 text-[13.5px] text-red-700">
+        <p role="alert" className="mt-1.5 text-[0.84375rem] text-red-700">
           {error}
         </p>
       )}
@@ -1475,12 +1475,12 @@ function GroupBox({
             </Row>
           )
         })}
-        {lead && shut && <p className="py-2.5 text-[15px] leading-relaxed whitespace-pre-line text-slate-700">{lead.first}</p>}
+        {lead && shut && <p className="py-2.5 text-[0.9375rem] leading-relaxed whitespace-pre-line text-slate-700">{lead.first}</p>}
         {!shut && (
           <div className="space-y-2.5 py-2.5" data-testid="listing-group-more">
             {hasWeek && now && <WeekLines value={item[hoursF!.key]} now={now} candlesAt={candlesAt} />}
             {texts.map((t, i) => (
-              <p key={i} className="text-[15px] leading-relaxed whitespace-pre-line text-slate-700">
+              <p key={i} className="text-[0.9375rem] leading-relaxed whitespace-pre-line text-slate-700">
                 {t}
               </p>
             ))}
@@ -1488,7 +1488,7 @@ function GroupBox({
         )}
       </div>
       {foldable && (
-        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex cursor-pointer items-center gap-1 py-1.5 text-[14.5px] font-bold text-primary">
+        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex cursor-pointer items-center gap-1 py-1.5 text-[0.90625rem] font-bold text-primary">
           {/* "More", whatever's folded: "Week and notes" was one more
               thing to read (the user, Oct 10). */}
           {open ? 'Less' : 'More'}
@@ -1534,7 +1534,7 @@ function NearbyRow({
           {place && <span className="text-sm text-muted"> · {place}</span>}
         </span>
         {facts.length > 0 ? (
-          <span className="mt-0.5 block truncate text-[13.5px] text-slate-600">
+          <span className="mt-0.5 block truncate text-[0.84375rem] text-slate-600">
             {facts.map((f, i) => (
               <span key={`${f.text}:${i}`}>
                 {i > 0 && <span className="px-1 text-slate-400">·</span>}
@@ -1543,7 +1543,7 @@ function NearbyRow({
             ))}
           </span>
         ) : (
-          description && <span className="mt-0.5 block truncate text-[13.5px] text-slate-600">{description}</span>
+          description && <span className="mt-0.5 block truncate text-[0.84375rem] text-slate-600">{description}</span>
         )}
       </span>
     </button>

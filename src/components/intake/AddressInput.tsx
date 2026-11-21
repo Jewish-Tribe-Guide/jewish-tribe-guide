@@ -301,7 +301,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
               {(() => {
                 const note = suggestionNote?.(s.prediction.placeId)
                 return note ? (
-                  <span className="mt-1 inline-block rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-semibold text-green-700">{note}</span>
+                  <span className="mt-1 inline-block rounded-full bg-green-50 px-2 py-0.5 text-[0.6875rem] font-semibold text-green-700">{note}</span>
                 ) : null
               })()}
             </button>

@@ -18,7 +18,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 // 13px below 390 wide, 14px from there (the user, Nov 17): a phone that
 // draws text as Linux does (Android, CI) made Synagogues' row 8px too wide
 // at 360 at 14px. ROW_TEXT is MinyanSwitch's too, so the row reads as one.
-export const ROW_TEXT = 'text-[13px] min-[390px]:text-[14px]'
+export const ROW_TEXT = 'text-[0.8125rem] min-[390px]:text-[0.875rem]'
 
 /** Sort and the list heading's Filters (ListHeading): an outlined button a
  *  thumb can find, 40px tall; solid blue while it has something on

@@ -33,8 +33,8 @@ export type NewslettersLoaded = {
 export const STOPPED_AFTER_MS = 3 * 60 * 60 * 1000
 
 const SMALL_BUTTON = 'rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
-const BUTTON = 'min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-[14.5px] font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50'
-const PRIMARY = 'min-h-11 rounded-lg bg-primary px-4 text-[14.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50'
+const BUTTON = 'min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-[0.90625rem] font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50'
+const PRIMARY = 'min-h-11 rounded-lg bg-primary px-4 text-[0.90625rem] font-semibold text-white hover:opacity-90 disabled:opacity-50'
 
 /** "3:00 PM" today, else "Oct 27, 3:00 PM". */
 export function checkedWhen(iso: string, now: number): string {
@@ -58,7 +58,7 @@ function Status({ data, now, onSetUp, onUpdate }: { data: NewslettersLoaded; now
     return (
       <div className="flex items-center gap-3 rounded-[10px] border border-slate-200 bg-white px-4 py-3.5">
         <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-400" />
-        <span className="flex-1 text-[15px] font-semibold text-slate-900">Not set up yet</span>
+        <span className="flex-1 text-[0.9375rem] font-semibold text-slate-900">Not set up yet</span>
       </div>
     )
   }
@@ -68,8 +68,8 @@ function Status({ data, now, onSetUp, onUpdate }: { data: NewslettersLoaded; now
     <div className={`flex flex-wrap items-center gap-3 rounded-[10px] border px-4 py-3 ${stopped ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white'}`}>
       <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${stopped ? 'bg-amber-600' : 'bg-green-700'}`} />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[15px] font-semibold text-slate-900 [overflow-wrap:anywhere]">{stopped ? `Stopped checking ${where}` : `Checking ${where}`}</span>
-        <span className={`text-[13px] ${stopped ? 'font-semibold text-amber-800' : 'text-slate-600'}`}>Last checked {checkedWhen(data.checkedAt, now)} · Read now {data.readNow ? 'on' : 'off'}</span>
+        <span className="text-[0.9375rem] font-semibold text-slate-900 [overflow-wrap:anywhere]">{stopped ? `Stopped checking ${where}` : `Checking ${where}`}</span>
+        <span className={`text-[0.8125rem] ${stopped ? 'font-semibold text-amber-800' : 'text-slate-600'}`}>Last checked {checkedWhen(data.checkedAt, now)} · Read now {data.readNow ? 'on' : 'off'}</span>
       </span>
       {stopped || !data.readNow ? (
         <button type="button" onClick={onSetUp} className={BUTTON}>
@@ -93,8 +93,8 @@ function Step({ n, title, line, children }: { n: number; title: React.ReactNode;
         {n}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1 pt-0.5">
-        <span className="text-[15px] font-semibold text-slate-900">{title}</span>
-        {line && <span className="text-[13.5px] text-slate-600">{line}</span>}
+        <span className="text-[0.9375rem] font-semibold text-slate-900">{title}</span>
+        {line && <span className="text-[0.84375rem] text-slate-600">{line}</span>}
         {children}
       </span>
     </li>
@@ -115,14 +115,14 @@ function CopyScript({ script }: { script: string }) {
   return (
     <>
       <span className="mt-1.5 flex flex-wrap items-center gap-2.5">
-        <code className="min-w-0 flex-[1_1_320px] overflow-hidden whitespace-pre rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12.5px] leading-relaxed text-slate-700">
+        <code className="min-w-0 flex-[1_1_320px] overflow-hidden whitespace-pre rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[0.78125rem] leading-relaxed text-slate-700">
           {scriptPreview(script)}
         </code>
         <button type="button" onClick={() => void copy()} className={PRIMARY}>
           {copied ? 'Copied' : 'Copy the script'}
         </button>
       </span>
-      {copied === false && <span className="text-[13px] text-red-700">Couldn’t copy. Try again.</span>}
+      {copied === false && <span className="text-[0.8125rem] text-red-700">Couldn’t copy. Try again.</span>}
     </>
   )
 }
@@ -194,7 +194,7 @@ function SetUp({ script, onLink }: { script: string; onLink: (url: string) => Pr
               {trying ? 'Trying it…' : 'Save'}
             </button>
           </span>
-          {linkError && <span className="text-[13px] font-semibold text-red-700">{linkError}</span>}
+          {linkError && <span className="text-[0.8125rem] font-semibold text-red-700">{linkError}</span>}
         </Step>
       </ol>
     </AdminBox>
@@ -321,7 +321,7 @@ export default function NewslettersPage({ token }: { token: string }) {
       {data.available ? (
         <Status data={data} now={now} onSetUp={() => setSetUpAgain((s) => !s)} onUpdate={() => setUpdating((u) => !u)} />
       ) : (
-        <p className="rounded-[10px] border border-slate-200 bg-white px-4 py-3.5 text-[15px] text-slate-600">Shul emails can’t be set up here yet.</p>
+        <p className="rounded-[10px] border border-slate-200 bg-white px-4 py-3.5 text-[0.9375rem] text-slate-600">Shul emails can’t be set up here yet.</p>
       )}
       {showSteps && <SetUp script={data.script!} onLink={saveLink} />}
       {!showSteps && updating && data.script && <UpdateScript script={data.script} />}
@@ -364,8 +364,8 @@ export default function NewslettersPage({ token }: { token: string }) {
                   <AdminRow href={`${base}/watches/${pageFrom(n.page, 'job/newsletters')}`} name={n.shul} line={line} />
                 ) : (
                   <div className="flex flex-col gap-0.5 px-4 py-2.5">
-                    <span className="text-[15px] font-semibold text-slate-900 [overflow-wrap:anywhere]">{n.shul ?? n.email}</span>
-                    <span className="text-[13px] font-semibold text-amber-800">{n.status}</span>
+                    <span className="text-[0.9375rem] font-semibold text-slate-900 [overflow-wrap:anywhere]">{n.shul ?? n.email}</span>
+                    <span className="text-[0.8125rem] font-semibold text-amber-800">{n.status}</span>
                     {!n.shul && (
                       <LinkSender
                         places={data.places}

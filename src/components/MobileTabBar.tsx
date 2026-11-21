@@ -147,7 +147,7 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
               // since an emoji carries its own color and would otherwise read
               // as permanently selected.
               <span
-                className={`flex h-6 w-6 items-center justify-center text-[19px] leading-none ${
+                className={`flex h-6 w-6 items-center justify-center text-[1.1875rem] leading-none ${
                   active ? '' : 'opacity-45 grayscale'
                 }`}
                 aria-hidden="true"

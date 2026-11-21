@@ -248,7 +248,7 @@ export default function EruvListing({
           <legend className={editorFieldLabel}>Parts shown</legend>
           <div className="mt-1 flex flex-col gap-1.5">
             {names.map((n) => (
-              <label key={n} className="flex items-center gap-2 text-[15px] text-slate-800">
+              <label key={n} className="flex items-center gap-2 text-[0.9375rem] text-slate-800">
                 <input type="checkbox" checked={!leaveOut.includes(n)} onChange={(e) => setLeaveOut(e.target.checked ? leaveOut.filter((x) => x !== n) : [...leaveOut, n])} />
                 {n}
               </label>
@@ -257,7 +257,7 @@ export default function EruvListing({
         </fieldset>
       )}
       {eruv.rawLine.marks?.length ? (
-        <label className="flex items-center gap-2 text-[15px] text-slate-800">
+        <label className="flex items-center gap-2 text-[0.9375rem] text-slate-800">
           <input type="checkbox" checked={!hideMarks} onChange={(e) => setHideMarks(!e.target.checked)} />
           Its markers
         </label>
@@ -281,7 +281,7 @@ export default function EruvListing({
             </div>
           )}
           {eruv.statusUrl && (
-            <label className="flex items-center gap-2 text-[13px] text-slate-700">
+            <label className="flex items-center gap-2 text-[0.8125rem] text-slate-700">
               <input
                 type="checkbox"
                 checked={eruv.statusDated}
@@ -520,8 +520,8 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
   const websiteRead = draft.website.trim() ? read('Website', <SourceWords line={{ text: 'Its website' }} />) : read('Nothing', <SourceWords line={{ text: 'Nothing reads this' }} />)
   const rows: { id: AddEruvRow; title: string; summary: string; filled: boolean; source?: { job: string; amber: boolean }; line?: ReactNode; body: ReactNode }[] = [
     { id: 'name', title: draft.name.trim() || 'Name', summary: draft.covers.trim(), filled: true, body: <>{input('name', 'Name')}{input('covers', 'What it covers', true)}</> },
-    { id: 'status', title: 'Status', summary: status.word, filled: !!draft.status.trim(), ...read(status.job, status.line), body: <p className="m-0 text-[15px] text-slate-500">{status.none}</p> },
-    { id: 'map', title: 'Map', summary: map.word, filled: !!draft.map.trim(), ...read(map.job, map.line), body: <p className="m-0 text-[15px] text-slate-500">{map.none}</p> },
+    { id: 'status', title: 'Status', summary: status.word, filled: !!draft.status.trim(), ...read(status.job, status.line), body: <p className="m-0 text-[0.9375rem] text-slate-500">{status.none}</p> },
+    { id: 'map', title: 'Map', summary: map.word, filled: !!draft.map.trim(), ...read(map.job, map.line), body: <p className="m-0 text-[0.9375rem] text-slate-500">{map.none}</p> },
     { id: 'hotline', title: 'Hotline', summary: draft.hotline.trim(), filled: !!draft.hotline.trim(), ...websiteRead, body: input('hotline', 'Hotline') },
     { id: 'alertsUrl', title: 'Alerts', summary: draft.alertsUrl.trim() && shortUrl(draft.alertsUrl.trim()), filled: !!draft.alertsUrl.trim(), ...websiteRead, body: input('alertsUrl', 'Alerts') },
     { id: 'website', title: 'Website', summary: draft.website.trim() && shortUrl(draft.website.trim()), filled: !!draft.website.trim(), ...read('Nothing', <SourceWords line={{ text: 'Nothing reads this' }} />), body: input('website', 'Website') },
@@ -564,7 +564,7 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
         />
       ) : (
         <div className="space-y-4" data-testid="editor-list">
-          <p className="-mt-1 text-[14px] text-muted">Goes live as soon as you add it, with no review.</p>
+          <p className="-mt-1 text-[0.875rem] text-muted">Goes live as soon as you add it, with no review.</p>
           <ul className="space-y-2">
             {rows
               .filter((r) => !inEmpty(r))

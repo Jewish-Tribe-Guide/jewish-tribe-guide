@@ -14,7 +14,7 @@ import DragList, { AddListButton } from './DragList'
 // matches. Used by a field made here and by a ready-made field whose
 // choices are the community's (fieldRules' choicesEditable).
 
-const input = 'w-full min-h-12 rounded-[10px] border border-slate-300 bg-white px-3.5 text-[15px] text-slate-900 placeholder:text-slate-400'
+const input = 'w-full min-h-12 rounded-[10px] border border-slate-300 bg-white px-3.5 text-[0.9375rem] text-slate-900 placeholder:text-slate-400'
 const row = 'flex min-h-[60px] items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-b-0'
 type Option = NonNullable<CategoryField['options']>[number]
 
@@ -40,7 +40,7 @@ function ChoiceName({ option, options, onRename }: { option: Option; options: re
         if (e.key === 'Enter') e.currentTarget.blur()
         if (e.key === 'Escape') setText(option.label)
       }}
-      className="flex-1 min-w-0 min-h-10 rounded-lg border border-transparent bg-transparent px-2 -mx-2 text-[15px] font-semibold text-slate-900 hover:border-slate-200 focus:border-slate-300 focus:bg-white"
+      className="flex-1 min-w-0 min-h-10 rounded-lg border border-transparent bg-transparent px-2 -mx-2 text-[0.9375rem] font-semibold text-slate-900 hover:border-slate-200 focus:border-slate-300 focus:bg-white"
     />
   )
 }
@@ -105,8 +105,8 @@ export default function ChoiceList({
       {f.type === 'select' && (
         <div className={`${row} border-t border-slate-200`}>
           <span className="flex flex-1 min-w-0 flex-col">
-            <span className="text-[15px] font-semibold text-slate-900">Other</span>
-            <span className="text-[13px] text-slate-600">A box to type in</span>
+            <span className="text-[0.9375rem] font-semibold text-slate-900">Other</span>
+            <span className="text-[0.8125rem] text-slate-600">A box to type in</span>
           </span>
           <AdminSwitch checked={!!f.allowOther} onChange={(on) => onChange({ allowOther: on })} label="Other, a box to type in" />
         </div>

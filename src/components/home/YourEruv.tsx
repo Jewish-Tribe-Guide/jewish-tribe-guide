@@ -50,13 +50,13 @@ export default function YourEruv({ communitySlug, href, now }: { communitySlug: 
   return (
     <Link href={`${href}?item=${encodeURIComponent(nearest.id)}`} prefetch={false} data-wide data-testid="today-eruv" className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3.5">
       <span className="min-w-0 flex-1">
-        <span className="block text-[11.5px] font-extrabold tracking-[0.06em] text-muted">NEAREST ERUV</span>
-        <span className="mt-0.5 block text-[17px] font-extrabold text-slate-900">{nearest.name}</span>
+        <span className="block text-[0.71875rem] font-extrabold tracking-[0.06em] text-muted">NEAREST ERUV</span>
+        <span className="mt-0.5 block text-[1.0625rem] font-extrabold text-slate-900">{nearest.name}</span>
         <span className="mt-1 flex items-baseline gap-2">
           <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${TONE_DOT[view.tone]}`} />
-          <span className={`text-[15px] font-extrabold ${TONE_WORDS[view.tone]}`}>{view.label}</span>
+          <span className={`text-[0.9375rem] font-extrabold ${TONE_WORDS[view.tone]}`}>{view.label}</span>
         </span>
-        {view.checked && <span className="mt-0.5 block text-[13px] text-muted">{view.checked}</span>}
+        {view.checked && <span className="mt-0.5 block text-[0.8125rem] text-muted">{view.checked}</span>}
       </span>
       <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
     </Link>

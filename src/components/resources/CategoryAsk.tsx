@@ -94,7 +94,7 @@ export default function CategoryAsk({ category, search, onSearch, scope, onSubmi
         {/* The search is this category's, and says so where there's
             room. Its ✕ asks the whole guide instead, with whatever has
             been typed. */}
-        <span className={`hidden h-7 shrink-0 items-center gap-1 ${onPhoto ? 'rounded-full' : 'rounded-lg'} bg-primary/10 pl-2.5 pr-1 text-[13px] font-semibold text-primary sm:flex`}>
+        <span className={`hidden h-7 shrink-0 items-center gap-1 ${onPhoto ? 'rounded-full' : 'rounded-lg'} bg-primary/10 pl-2.5 pr-1 text-[0.8125rem] font-semibold text-primary sm:flex`}>
           in {scopeLabel}
           <Link
             href={q && communitySlug ? routes.ask(communitySlug, q) : routes.home(communitySlug ?? '')}
@@ -116,7 +116,7 @@ export default function CategoryAsk({ category, search, onSearch, scope, onSubmi
             if (e.key === 'Enter') onSubmit?.()
           }}
           enterKeyHint="search"
-          className="min-w-0 flex-1 bg-transparent text-[15.5px] text-ink placeholder:text-slate-400 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+          className="min-w-0 flex-1 bg-transparent text-[0.96875rem] text-ink placeholder:text-slate-400 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
         />
         {search && save && (
           <>

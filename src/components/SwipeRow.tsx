@@ -663,7 +663,7 @@ export default function SwipeRow({
               >
                 <ActionGlyph action={action} />
               </span>
-              <span className="text-[10px] font-semibold leading-none text-slate-600">{action.label}</span>
+              <span className="text-[0.625rem] font-semibold leading-none text-slate-600">{action.label}</span>
             </button>
           ))}
         </div>

@@ -72,7 +72,7 @@ export default function ListHeading({ label, count, noun = !label, total, filter
       {/* Wraps rather than running off the side of a narrow phone. */}
       <div className={`flex min-h-9 flex-wrap items-center gap-x-2 lg:gap-x-3 ${makeRoom ? 'lg:justify-between' : 'justify-between'}`}>
         {!lead && (
-        <h2 className={`shrink-0 text-[15px] font-bold text-ink ${headingClass}`}>
+        <h2 className={`shrink-0 text-[0.9375rem] font-bold text-ink ${headingClass}`}>
           {label ? (
             <>
               {label} <span className="font-medium text-slate-500">· {countText}</span>
@@ -99,7 +99,7 @@ export default function ListHeading({ label, count, noun = !label, total, filter
                 </svg>
                 Filters
                 {filters.active > 0 && (
-                  <span className="ml-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-white px-1 text-[11px] font-bold text-primary">
+                  <span className="ml-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-white px-1 text-[0.6875rem] font-bold text-primary">
                     {filters.active}
                   </span>
                 )}
@@ -144,7 +144,7 @@ export default function ListHeading({ label, count, noun = !label, total, filter
  *  "Not open now · 16". */
 export function GroupHeading({ label, count }: { label: string; count: number }) {
   return (
-    <h2 className="pb-2 pt-6 text-[15px] font-bold text-ink">
+    <h2 className="pb-2 pt-6 text-[0.9375rem] font-bold text-ink">
       {label} <span className="font-medium text-slate-500">· {count}</span>
     </h2>
   )
@@ -181,11 +181,11 @@ export function ClosedGroupLine({
       className="flex w-full cursor-pointer items-center gap-3 border-b border-slate-300 px-1 py-3 text-left"
     >
       <span className="min-w-0 flex-1">
-        <span className={`block text-[16.5px] font-extrabold ${open ? 'text-primary' : 'text-ink'}`}>
+        <span className={`block text-[1.03125rem] font-extrabold ${open ? 'text-primary' : 'text-ink'}`}>
           {label} <span className="font-medium text-slate-500">· {count}</span>
         </span>
         {/* Open, its rows say it themselves. */}
-        {nearest && !open && <span className="mt-0.5 block truncate text-[13px] text-slate-500">Nearest: {nearest}</span>}
+        {nearest && !open && <span className="mt-0.5 block truncate text-[0.8125rem] text-slate-500">Nearest: {nearest}</span>}
       </span>
       <svg
         aria-hidden="true"
@@ -217,5 +217,5 @@ function MapGlyph({ className }: { className: string }) {
 }
 
 function TextAction({ children }: { children: ReactNode }) {
-  return <span className="flex shrink-0 items-center py-1.5 text-[13.5px] font-bold text-primary">{children}</span>
+  return <span className="flex shrink-0 items-center py-1.5 text-[0.84375rem] font-bold text-primary">{children}</span>
 }

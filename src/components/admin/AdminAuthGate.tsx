@@ -337,7 +337,7 @@ export default function AdminAuthGate({
     return (
       <AdminShell title={shellTitle} subtitle={shellSubtitle}>
         <p className="text-sm text-slate-700">Couldn’t check your access.</p>
-        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="mt-3 min-h-11 cursor-pointer rounded-full bg-primary px-5 text-[15px] font-bold text-white">
+        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="mt-3 min-h-11 cursor-pointer rounded-full bg-primary px-5 text-[0.9375rem] font-bold text-white">
           Try again
         </button>
       </AdminShell>

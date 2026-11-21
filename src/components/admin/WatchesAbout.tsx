@@ -43,8 +43,8 @@ export default function WatchesAbout() {
         <ul className="m-0 p-0 list-none divide-y divide-slate-100">
           {READS.map((r) => (
             <li key={r.who} className="flex flex-col gap-0.5 px-4 py-3">
-              <span className="text-[15px] font-semibold text-slate-900">{r.who}</span>
-              <span className="text-[15px] leading-normal text-slate-700">{r.what}</span>
+              <span className="text-[0.9375rem] font-semibold text-slate-900">{r.who}</span>
+              <span className="text-[0.9375rem] leading-normal text-slate-700">{r.what}</span>
             </li>
           ))}
         </ul>

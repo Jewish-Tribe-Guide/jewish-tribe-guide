@@ -20,7 +20,7 @@ import { loadPlaces } from '@/lib/loadPlaces'
  *  of notes, which this is: gold is kept for candle lighting and Shabbos. */
 export function SignUpMark({ className = '' }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center whitespace-nowrap rounded-full bg-amber-50 px-2 py-px text-[12px] font-bold text-amber-800 ring-1 ring-amber-200/70 ${className}`} data-testid="sign-up-mark">
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full bg-amber-50 px-2 py-px text-[0.75rem] font-bold text-amber-800 ring-1 ring-amber-200/70 ${className}`} data-testid="sign-up-mark">
       {SIGN_UP_MARK}
     </span>
   )
@@ -39,11 +39,11 @@ export function SignUpButton({ signUp }: { signUp: MinyanSignUp }) {
         href={action.href}
         {...(link ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
         onClick={() => track('listing_action', { action: link ? 'Sign up for a minyan' : 'Text to sign up for a minyan' })}
-        className="mt-1 flex h-10.5 w-full cursor-pointer items-center justify-center rounded-full bg-primary px-4 text-[15px] font-bold text-white hover:bg-primary-dark"
+        className="mt-1 flex h-10.5 w-full cursor-pointer items-center justify-center rounded-full bg-primary px-4 text-[0.9375rem] font-bold text-white hover:bg-primary-dark"
       >
         {action.label}
       </a>
-      {action.phone && <p className="text-center text-[14px] font-semibold text-slate-800 select-all">{action.phone}</p>}
+      {action.phone && <p className="text-center text-[0.875rem] font-semibold text-slate-800 select-all">{action.phone}</p>}
     </>
   )
 }
@@ -66,8 +66,8 @@ export function SignUpBox({ names, section, signUp, allSignUp, button = true }: 
   const heading = allSignUp ? 'Check the group before you go' : `${section ?? names.join(', ')}: check the group first`
   return (
     <div className={`space-y-1.5 rounded-lg bg-primary/[0.07] px-3.5 py-3 ${allSignUp ? '' : 'mt-3'}`} data-testid="sign-up-box">
-      <p className="text-[15px] font-extrabold leading-snug text-ink">{heading}</p>
-      <p className="text-[13.5px] leading-snug text-slate-700">
+      <p className="text-[0.9375rem] font-extrabold leading-snug text-ink">{heading}</p>
+      <p className="text-[0.84375rem] leading-snug text-slate-700">
         {one || allSignUp ? 'It only runs' : 'They only run'} on days enough people sign up.{allSignUp ? '' : ' Their other times are regular.'}
       </p>
       {button && <SignUpButton signUp={signUp} />}
@@ -105,7 +105,7 @@ function useWhatsAppGroups(): { name: string; link: string }[] {
   return groups
 }
 
-const field = 'h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-[15px] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none'
+const field = 'h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-[0.9375rem] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none'
 
 /** Whether a link typed for a group can be opened: a web link. */
 export const signUpLinkOk = (link: string | undefined) => !link?.trim() || /^https?:\/\/\S+$/i.test(link.trim())
@@ -123,7 +123,7 @@ export function SignUpFields({ signUp, onChange }: { signUp: MinyanSignUp | unde
   const picked = groups.find((g) => g.link === signUp?.link)
   return (
     <div className="space-y-2" data-testid="sign-up-fields">
-      <p className="text-[14px] font-bold text-slate-700">Only on days enough people sign up?</p>
+      <p className="text-[0.875rem] font-bold text-slate-700">Only on days enough people sign up?</p>
       <div className="flex gap-1 rounded-xl bg-slate-100 p-[3px]" role="group" aria-label="Only on days enough people sign up?">
         {([false, true] as const).map((yes) => (
           <button
@@ -131,7 +131,7 @@ export function SignUpFields({ signUp, onChange }: { signUp: MinyanSignUp | unde
             type="button"
             aria-pressed={on === yes}
             onClick={() => onChange(yes ? (signUp ?? {}) : undefined)}
-            className={`h-10 flex-1 cursor-pointer rounded-[10px] text-[14.5px] ${on === yes ? 'bg-white font-bold text-slate-900 shadow-sm' : 'font-semibold text-muted'}`}
+            className={`h-10 flex-1 cursor-pointer rounded-[10px] text-[0.90625rem] ${on === yes ? 'bg-white font-bold text-slate-900 shadow-sm' : 'font-semibold text-muted'}`}
           >
             {yes ? 'Yes' : 'No'}
           </button>
@@ -139,7 +139,7 @@ export function SignUpFields({ signUp, onChange }: { signUp: MinyanSignUp | unde
       </div>
       {signUp && (
         <div className="space-y-2 pt-1">
-          <p className="text-[14px] font-bold text-slate-700">Where do they sign up?</p>
+          <p className="text-[0.875rem] font-bold text-slate-700">Where do they sign up?</p>
           {groups.length > 0 && (
             <select
               value={picked?.link ?? ''}
@@ -164,8 +164,8 @@ export function SignUpFields({ signUp, onChange }: { signUp: MinyanSignUp | unde
             aria-label="The group’s link"
             className={field}
           />
-          {!signUpLinkOk(signUp.link) && <p className="text-[13px] text-caution">Paste the whole link, starting https://</p>}
-          <p className="pt-1 text-[13.5px] text-muted">Invite-only? Someone to text to be added:</p>
+          {!signUpLinkOk(signUp.link) && <p className="text-[0.8125rem] text-caution">Paste the whole link, starting https://</p>}
+          <p className="pt-1 text-[0.84375rem] text-muted">Invite-only? Someone to text to be added:</p>
           <div className="flex gap-2">
             <input type="text" value={signUp.name ?? ''} maxLength={40} onChange={(e) => set({ name: e.target.value || undefined })} placeholder="Name" aria-label="Who to text" className={`${field} min-w-0 flex-1`} />
             <input type="tel" value={signUp.phone ?? ''} maxLength={24} onChange={(e) => set({ phone: e.target.value || undefined })} placeholder="Phone" aria-label="Their phone" className={`${field} min-w-0 flex-1`} />

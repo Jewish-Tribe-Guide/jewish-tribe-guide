@@ -193,7 +193,7 @@ export function findLookalike(
 function AlreadyListed({ listing, reason, category }: { listing: DirectoryResource; reason: string; category: CategoryConfig }) {
   const community = useCommunitySlug()
   return (
-    <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[14px] text-amber-900">
+    <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[0.875rem] text-amber-900">
       <span className="font-semibold">{listing.name} is already in the guide.</span> {reason}{' '}
       <Link href={routes.listing(community, category.id, listingSlug(listing))} className="font-semibold text-primary hover:underline">
         View it
@@ -240,7 +240,7 @@ export function ChoiceButtons({ field, value, onChange, labelHidden = false }: {
               // Picked, filled blue with a tick, as a picked filter is
               // (FilterChip; the user, Nov 9: "align that with blue of
               // filter select").
-              className={`flex h-10 cursor-pointer items-center gap-1 rounded-full border-[1.5px] text-[14.5px] font-bold ${on ? 'border-primary bg-primary pl-3 pr-4 text-white' : 'border-slate-300 bg-white px-4 text-slate-600'}`}
+              className={`flex h-10 cursor-pointer items-center gap-1 rounded-full border-[1.5px] text-[0.90625rem] font-bold ${on ? 'border-primary bg-primary pl-3 pr-4 text-white' : 'border-slate-300 bg-white px-4 text-slate-600'}`}
             >
               {on && (
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
@@ -564,7 +564,7 @@ export default function ListingEditor({
       {m && <ChangedTag />}
     </div>
   )
-  const wasLine = (m: { was: string | null } | null) => m?.was && <p className="mt-1 whitespace-pre-line text-[13.5px] text-muted">{m.was}</p>
+  const wasLine = (m: { was: string | null } | null) => m?.was && <p className="mt-1 whitespace-pre-line text-[0.84375rem] text-muted">{m.was}</p>
   /** The field whose label the row's title says (a one-field row). */
   const titleField = (r: EditorRow): CategoryField | null => {
     const only = r.fields.filter(visible)
@@ -625,7 +625,7 @@ export default function ListingEditor({
   const tags = (r: EditorRow) => (
     <>
       {changed.has(r.id) && <ChangedTag />}
-      {needed(r) && <span className="shrink-0 rounded-full bg-red-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-red-700">Needed</span>}
+      {needed(r) && <span className="shrink-0 rounded-full bg-red-100 px-2.5 py-0.5 text-[0.78125rem] font-extrabold text-red-700">Needed</span>}
     </>
   )
   // A short row, open: its fields inside its card, Done under them. Its
@@ -639,8 +639,8 @@ export default function ListingEditor({
   const empty = rows.filter((r) => rowIsEmpty(r, values) && !needed(r))
   const listScreen = (
     <div className="space-y-4" data-testid="editor-list">
-      {creating && fromGoogle && !adminSubmit && <p className="-mt-1 text-[14px] text-muted">Filled in from Google</p>}
-      {adminSubmit && <p className="-mt-1 text-[14px] text-muted">Goes live as soon as you add it, with no review.</p>}
+      {creating && fromGoogle && !adminSubmit && <p className="-mt-1 text-[0.875rem] text-muted">Filled in from Google</p>}
+      {adminSubmit && <p className="-mt-1 text-[0.875rem] text-muted">Goes live as soon as you add it, with no review.</p>}
       {creating && existingListings && <Lookalike existing={existingListings} draft={draft} category={category} />}
       <ul className="space-y-2">
         {filled.map((r) => {
@@ -879,7 +879,7 @@ export default function ListingEditor({
               {off.map((f) => {
                 const word = (f.shortLabel ?? f.label).toLowerCase()
                 return (
-                  <button key={f.key} type="button" onClick={() => setRevealed((x) => ({ ...x, [f.key]: true }))} className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 text-[15px] font-bold text-primary">
+                  <button key={f.key} type="button" onClick={() => setRevealed((x) => ({ ...x, [f.key]: true }))} className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 text-[0.9375rem] font-bold text-primary">
                     <PlusIcon className="h-4 w-4" />
                     Add {article(word)} {word}
                   </button>
@@ -926,7 +926,7 @@ export default function ListingEditor({
           setDetail(sk, withNoMinyan(readSchedules(details[sk]), r.week!, { id: crypto.randomUUID(), now: new Date().toISOString() }))
           setOpenId(null)
         }}
-        className="min-h-11 w-full cursor-pointer text-center text-[15px] font-bold text-primary hover:underline"
+        className="min-h-11 w-full cursor-pointer text-center text-[0.9375rem] font-bold text-primary hover:underline"
       >
         {noMinyanText(r)}
       </button>
@@ -940,7 +940,7 @@ export default function ListingEditor({
       {boxRows.map((r) => (
         <section key={r.id} aria-label={rowTitle(r)} className="space-y-3 rounded-[14px] border border-slate-200 bg-white p-4" data-testid={`editor-open-${r.id}`}>
           {!child && (
-            <h2 className="m-0 flex items-center gap-2 text-[17px] font-bold text-slate-900">
+            <h2 className="m-0 flex items-center gap-2 text-[1.0625rem] font-bold text-slate-900">
               {rowTitle(r)}
               {/* A one-field row says its field in the title: Changed goes there. */}
               {(() => {
@@ -958,7 +958,7 @@ export default function ListingEditor({
     <div className="space-y-4" data-testid="editor-box">
       {boxRows.map((r) => (
         <div key={r.id} className="space-y-4" data-testid={`editor-open-${r.id}`}>
-          {boxRows.length > 1 && !child && <h3 className="text-[15px] font-extrabold text-slate-900">{rowTitle(r)}</h3>}
+          {boxRows.length > 1 && !child && <h3 className="text-[0.9375rem] font-extrabold text-slate-900">{rowTitle(r)}</h3>}
           {rowBody(r)}
         </div>
       ))}

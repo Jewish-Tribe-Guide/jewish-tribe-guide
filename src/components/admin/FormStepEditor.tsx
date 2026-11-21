@@ -78,7 +78,7 @@ export default function FormStepEditor({
     onChange({ when: next.length > 0 ? next : undefined })
   }
 
-  const fieldLabel = 'block text-[11px] font-medium text-slate-600 mb-0.5'
+  const fieldLabel = 'block text-[0.6875rem] font-medium text-slate-600 mb-0.5'
 
   return (
     <div className="border border-slate-200 rounded-md p-3 bg-slate-50/50 space-y-2">
@@ -127,7 +127,7 @@ export default function FormStepEditor({
       )}
 
       {s.optionsSource && (
-        <p className="text-[11px] text-muted italic">
+        <p className="text-[0.6875rem] text-muted italic">
           Choices for this step are generated automatically (the live hospital list) — nothing to edit here.
         </p>
       )}
@@ -140,7 +140,7 @@ export default function FormStepEditor({
       {/* Condition builder — when every row holds, the step shows. */}
       <div className="border-t border-slate-200 pt-2 mt-1">
         <span className={fieldLabel}>Only show this step when…</span>
-        {conditions.length === 0 && <p className="text-[11px] text-muted mb-1">Always shown.</p>}
+        {conditions.length === 0 && <p className="text-[0.6875rem] text-muted mb-1">Always shown.</p>}
         <div className="space-y-1.5">
           {conditions.map((c, i) => (
             <div key={i} className="flex flex-wrap items-center gap-1.5">

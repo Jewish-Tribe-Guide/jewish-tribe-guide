@@ -334,7 +334,7 @@ export default function ImageUploadField({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={value} alt="" className="h-full w-full object-cover" />
           ) : (
-            <span className="text-[10px] text-slate-400">
+            <span className="text-[0.625rem] text-slate-400">
               {uploading ? '…' : 'None'}
             </span>
           )}
@@ -439,9 +439,9 @@ export default function ImageUploadField({
               uploaders keep both — see the prop's own doc. */}
           {showRepositionHint && (
             value.trim() ? (
-              <span className="text-[11px] text-muted">Click the preview to reposition/re-zoom it</span>
+              <span className="text-[0.6875rem] text-muted">Click the preview to reposition/re-zoom it</span>
             ) : (
-              <span className="text-[11px] text-muted">
+              <span className="text-[0.6875rem] text-muted">
                 or drag an image onto the preview, or click it and paste one (⌘V / Ctrl+V)
               </span>
             )
@@ -462,7 +462,7 @@ export default function ImageUploadField({
         />
       </div>
 
-      {error && <span className="block text-[11px] text-red-600 mt-1">{error}</span>}
+      {error && <span className="block text-[0.6875rem] text-red-600 mt-1">{error}</span>}
 
       {/* The trigger for this (when collapsed) now lives in the button row
           above, next to Upload image — see its own comment. */}
@@ -478,7 +478,7 @@ export default function ImageUploadField({
               input still needs an accessible name once the caption's gone
               (aria-label below), since nothing else in the DOM labels it. */}
           {!collapseUrlInput && (
-            <span className="block text-[11px] text-muted mb-1">…or paste an image URL directly</span>
+            <span className="block text-[0.6875rem] text-muted mb-1">…or paste an image URL directly</span>
           )}
           <input
             aria-label={collapseUrlInput ? 'Image URL' : undefined}
@@ -500,7 +500,7 @@ export default function ImageUploadField({
           />
         </label>
       )}
-      {helpText && <span className="block text-[11px] text-muted mt-1">{helpText}</span>}
+      {helpText && <span className="block text-[0.6875rem] text-muted mt-1">{helpText}</span>}
       {challenged && challengeMounted && <TurnstileWidget ref={challengeRef} appearance="interaction-only" onVerify={onChallenge} />}
 
       {cropSource && (

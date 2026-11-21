@@ -106,7 +106,7 @@ export default function FieldPicker({
         !error && <p className="text-sm text-muted">Loading…</p>
       ) : shown.length === 0 && typed ? (
         <AdminBox>
-          <p className="m-0 px-4 py-3 text-[15px] text-slate-600">No ready-made field called “{typed}”</p>
+          <p className="m-0 px-4 py-3 text-[0.9375rem] text-slate-600">No ready-made field called “{typed}”</p>
           {canMake && <AdminRow onClick={() => onScreen({ at: 'make', name: ownName })} name={`Make your own: ${ownName}`} />}
         </AdminBox>
       ) : (
@@ -170,7 +170,7 @@ function Look({
         <button
           type="button"
           onClick={() => onAdd(field ? { ...row, field, partner } : row)}
-          className="self-start min-h-12 px-[22px] rounded-[10px] bg-primary text-white text-[15px] font-bold hover:bg-primary/90 cursor-pointer"
+          className="self-start min-h-12 px-[22px] rounded-[10px] bg-primary text-white text-[0.9375rem] font-bold hover:bg-primary/90 cursor-pointer"
         >
           Add to {pageName}
         </button>
@@ -195,12 +195,12 @@ function Samples({ field, pageName, pageLabel }: { field: CategoryField; pageNam
       {onRow && (
         <Pane title="In the list">
           <div className="flex items-center gap-2.5 rounded-[10px] border border-slate-100 p-2.5">
-            <span aria-hidden="true" className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-indigo-100 text-[13px] font-bold text-indigo-800">
+            <span aria-hidden="true" className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-indigo-100 text-[0.8125rem] font-bold text-indigo-800">
               {pageName.charAt(0).toUpperCase()}
             </span>
             <span className="flex-1 min-w-0 flex flex-col gap-1">
               <b className="text-sm">A {pageLabel.toLowerCase() || 'place'}</b>
-              {rowShows ? <span className={`${chip} self-start`}>{rowShows}</span> : <span className="text-[13px] text-slate-600">{f.label}</span>}
+              {rowShows ? <span className={`${chip} self-start`}>{rowShows}</span> : <span className="text-[0.8125rem] text-slate-600">{f.label}</span>}
             </span>
             <Chevron />
           </div>
@@ -231,7 +231,7 @@ function Samples({ field, pageName, pageLabel }: { field: CategoryField; pageNam
 const box = 'block rounded-md border border-slate-300 bg-white'
 function AddSample({ field: f, options }: { field: CategoryField; options: string[] }) {
   const rows = (names: readonly string[], cell: string) => (
-    <div className="flex flex-col gap-1.5 text-[13px]">
+    <div className="flex flex-col gap-1.5 text-[0.8125rem]">
       {names.map((n) => (
         <span key={n} className="flex items-center gap-2">
           <span className="w-24 shrink-0">{n}</span>
@@ -243,7 +243,7 @@ function AddSample({ field: f, options }: { field: CategoryField; options: strin
   switch (f.type) {
     case 'select':
       return (
-        <div className="flex flex-col gap-1.5 text-[13px]">
+        <div className="flex flex-col gap-1.5 text-[0.8125rem]">
           {options.slice(0, 4).map((o) => (
             <span key={o} className="flex items-center gap-2">
               <span aria-hidden="true" className={`h-4 w-4 border-[1.5px] border-slate-400 ${f.multiSelect ? 'rounded-[4px]' : 'rounded-full'}`} />
@@ -267,12 +267,12 @@ function AddSample({ field: f, options }: { field: CategoryField; options: strin
     case 'contacts':
       return rows(['Name', 'Phone'], '')
     case 'tel':
-      return <span className={`${box} h-8 px-2 text-[13px] leading-8 text-slate-400`}>A phone number</span>
+      return <span className={`${box} h-8 px-2 text-[0.8125rem] leading-8 text-slate-400`}>A phone number</span>
     case 'url':
       return (
         <>
-          <span className={`${box} h-8 px-2 text-[13px] leading-8 text-slate-400`}>https://</span>
-          <span className="self-start rounded-full border border-slate-300 px-3 py-1 text-[13px] font-semibold text-primary">{f.linkLabel || 'Open the link'}</span>
+          <span className={`${box} h-8 px-2 text-[0.8125rem] leading-8 text-slate-400`}>https://</span>
+          <span className="self-start rounded-full border border-slate-300 px-3 py-1 text-[0.8125rem] font-semibold text-primary">{f.linkLabel || 'Open the link'}</span>
         </>
       )
     case 'tags':

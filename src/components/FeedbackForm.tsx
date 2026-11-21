@@ -28,9 +28,9 @@ type Props = {
 // on focus; a blue ring when focused. White, not the board's grey: grey
 // read as switched off beside a pale Send (the user, Nov 16).
 const FIELD =
-  'mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-[16px] text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-[3px] focus:ring-blue-600/15'
-const LABEL = 'block text-[15px] font-bold text-slate-900'
-const BIG_BUTTON = 'flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] text-[16px] font-bold transition'
+  'mt-2 block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-[1rem] text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-[3px] focus:ring-blue-600/15'
+const LABEL = 'block text-[0.9375rem] font-bold text-slate-900'
+const BIG_BUTTON = 'flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] text-[1rem] font-bold transition'
 
 export default function FeedbackForm({ successMessage, afterTellUs = false, onSentChange }: Props) {
   const community = useCommunitySlug()
@@ -84,8 +84,8 @@ export default function FeedbackForm({ successMessage, afterTellUs = false, onSe
       <span className="mx-auto mb-3.5 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
         <PageGlyph name="tick" className="h-7 w-7" />
       </span>
-      <h2 className="text-[21px] font-extrabold tracking-tight text-slate-900">Thanks, it’s sent</h2>
-      <p className="mt-1.5 text-[16px] leading-normal text-slate-600">{successMessage}</p>
+      <h2 className="text-[1.3125rem] font-extrabold tracking-tight text-slate-900">Thanks, it’s sent</h2>
+      <p className="mt-1.5 text-[1rem] leading-normal text-slate-600">{successMessage}</p>
       <button
         type="button"
         onClick={resetForm}
@@ -105,7 +105,7 @@ export default function FeedbackForm({ successMessage, afterTellUs = false, onSe
 
   const formBox = (
     <section aria-labelledby="feedback-form-title" className={`${BOX} px-4 pb-5 pt-[18px] desktop:px-9 desktop:pb-[30px] desktop:pt-[30px]`}>
-      <h2 id="feedback-form-title" className={`mb-3.5 text-[19px] font-extrabold tracking-tight text-slate-900 desktop:mb-[18px] desktop:text-[22px]`}>
+      <h2 id="feedback-form-title" className={`mb-3.5 text-[1.1875rem] font-extrabold tracking-tight text-slate-900 desktop:mb-[18px] desktop:text-[1.375rem]`}>
         {formTitle}
       </h2>
       <form onSubmit={handleSubmit}>

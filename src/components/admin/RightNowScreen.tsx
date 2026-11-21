@@ -74,7 +74,7 @@ export function ScreenHeader({ title, onBack, onRemove }: { title: string; onBac
           <path d="M7.5 1.5l-6 6 6 6" />
         </svg>
       </button>
-      <h2 className="m-0 flex-1 text-[17px] font-bold text-slate-900">{title}</h2>
+      <h2 className="m-0 flex-1 text-[1.0625rem] font-bold text-slate-900">{title}</h2>
       {onRemove && (
         <button type="button" onClick={onRemove} className="cursor-pointer rounded-lg px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
           Take off the page
@@ -135,8 +135,8 @@ export default function RightNowScreen({
     <section data-testid="right-now-screen" aria-label="Right Now" className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <ScreenHeader title="Right Now" onBack={onBack} onRemove={onRemove} />
       <div {...part('weekday', 'px-5 pt-4 pb-2')}>
-        <h3 className="m-0 text-[15px] font-bold text-slate-900">Saturday night to Thursday</h3>
-        <p className="m-0 mb-1.5 text-[13.5px] text-muted">Two at most</p>
+        <h3 className="m-0 text-[0.9375rem] font-bold text-slate-900">Saturday night to Thursday</h3>
+        <p className="m-0 mb-1.5 text-[0.84375rem] text-muted">Two at most</p>
         {!data ? (
           <div aria-hidden="true" className="my-2 h-40 animate-pulse rounded-lg bg-slate-100" />
         ) : (
@@ -153,8 +153,8 @@ export default function RightNowScreen({
                       onChange={() => onChoose(on ? shown.filter((id) => id !== category.id) : [...shown, category.id])}
                       className="h-5 w-5 accent-primary"
                     />
-                    <span className={`text-[15.5px] text-slate-900 ${on ? 'font-bold' : 'font-medium'}`}>{category.pluralLabel}</span>
-                    <span className="text-[14px] text-muted">{ANSWER_WORDS[answer]}</span>
+                    <span className={`text-[0.96875rem] text-slate-900 ${on ? 'font-bold' : 'font-medium'}`}>{category.pluralLabel}</span>
+                    <span className="text-[0.875rem] text-muted">{ANSWER_WORDS[answer]}</span>
                   </label>
                 </li>
               )
@@ -163,15 +163,15 @@ export default function RightNowScreen({
         )}
       </div>
       <div {...part('erev', 'border-t border-t-slate-200 px-5 pt-4 pb-5')}>
-        <h3 className="m-0 text-[15px] font-bold text-slate-900">Friday, until candles</h3>
-        <p className="m-0 mb-1.5 text-[13.5px] text-muted">Erev Yom Tov the same</p>
+        <h3 className="m-0 text-[0.9375rem] font-bold text-slate-900">Friday, until candles</h3>
+        <p className="m-0 mb-1.5 text-[0.84375rem] text-muted">Erev Yom Tov the same</p>
         <Shows>Candle lighting, with the eruv</Shows>
         {/* The one part of Friday with something to set: a blue dot, its
             items under it (board W1). */}
         <Shows dot="bg-primary">Shabbos shopping, which looks for</Shows>
         <div className="mt-1.5 flex flex-wrap items-center gap-2 pl-4">
           {items.map((item) => (
-            <span key={item} className="inline-flex items-center gap-1 rounded-full bg-slate-100 py-1 pl-3 pr-1 text-[14.5px] font-semibold text-slate-900">
+            <span key={item} className="inline-flex items-center gap-1 rounded-full bg-slate-100 py-1 pl-3 pr-1 text-[0.90625rem] font-semibold text-slate-900">
               {item}
               <button
                 type="button"
@@ -198,7 +198,7 @@ export default function RightNowScreen({
             />
           ) : (
             items.length < MAX_BEFORE_CANDLE_ITEMS && (
-              <button type="button" onClick={() => setAdding('')} className="cursor-pointer rounded-full border border-dashed border-slate-400 px-3 py-1.5 text-[14.5px] font-semibold text-primary hover:bg-slate-50">
+              <button type="button" onClick={() => setAdding('')} className="cursor-pointer rounded-full border border-dashed border-slate-400 px-3 py-1.5 text-[0.90625rem] font-semibold text-primary hover:bg-slate-50">
                 + Add
               </button>
             )
@@ -207,8 +207,8 @@ export default function RightNowScreen({
       </div>
       {/* Nothing in it can take focus, so it takes it itself. */}
       <div {...part('shabbos', 'border-t border-t-slate-200 bg-slate-50 px-5 pt-4 pb-5')} tabIndex={onDay ? 0 : undefined}>
-        <h3 className="m-0 text-[15px] font-bold text-slate-900">Candles to havdalah</h3>
-        <p className="m-0 mb-1.5 text-[13.5px] text-muted">Yom Tov the same</p>
+        <h3 className="m-0 text-[0.9375rem] font-bold text-slate-900">Candles to havdalah</h3>
+        <p className="m-0 mb-1.5 text-[0.84375rem] text-muted">Yom Tov the same</p>
         <Shows>Candle lighting, with the eruv</Shows>
         <Shows quiet>Nothing open, nothing to buy</Shows>
       </div>
@@ -219,7 +219,7 @@ export default function RightNowScreen({
 /** One thing the site shows then, which has nothing to set. */
 function Shows({ children, quiet = false, dot = 'bg-slate-400' }: { children: React.ReactNode; quiet?: boolean; dot?: string }) {
   return (
-    <p className={`m-0 flex items-center gap-2.5 py-1.5 text-[15px] ${quiet ? 'text-muted' : 'text-slate-900'}`}>
+    <p className={`m-0 flex items-center gap-2.5 py-1.5 text-[0.9375rem] ${quiet ? 'text-muted' : 'text-slate-900'}`}>
       <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
       {children}
     </p>

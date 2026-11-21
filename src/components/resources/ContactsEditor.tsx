@@ -14,7 +14,7 @@ import { ChevronRightIcon, PlusIcon } from '@/components/icons'
 // filled them in, and six boxes a person made the hospital the longest
 // screen on the site.
 
-const input = 'h-11.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-[15.5px] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none'
+const input = 'h-11.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-[0.96875rem] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none'
 
 export default function ContactsEditor({
   field,
@@ -74,15 +74,15 @@ export default function ContactsEditor({
 
   return (
     <div data-testid={`contacts-${field.key}`}>
-      <p className="pb-0.5 text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-muted">{field.label}</p>
+      <p className="pb-0.5 text-[0.78125rem] font-extrabold uppercase tracking-[0.04em] text-muted">{field.label}</p>
       <ul className="divide-y divide-slate-200/70">
         {entries.map((e, i) => (
           <li key={`${e.name}:${i}`}>
             <button type="button" onClick={() => setOpen(i)} className="flex min-h-13 w-full cursor-pointer items-center gap-2.5 py-2 text-left">
               <span className="min-w-0 flex-1">
-                <span className="block text-[15.5px] font-bold text-slate-900">{e.name}</span>
+                <span className="block text-[0.96875rem] font-bold text-slate-900">{e.name}</span>
                 {(e.phones?.length || e.email) && (
-                  <span className="mt-0.5 block truncate text-[13.5px] text-muted">{[...(e.phones ?? []).map(formatPhone), e.email].filter(Boolean).join(' · ')}</span>
+                  <span className="mt-0.5 block truncate text-[0.84375rem] text-muted">{[...(e.phones ?? []).map(formatPhone), e.email].filter(Boolean).join(' · ')}</span>
                 )}
               </span>
               <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
@@ -93,7 +93,7 @@ export default function ContactsEditor({
       <button
         type="button"
         onClick={() => setOpen('new')}
-        className="mt-2 flex h-11.5 w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-300 bg-white text-[15px] font-bold text-primary hover:bg-slate-50"
+        className="mt-2 flex h-11.5 w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-300 bg-white text-[0.9375rem] font-bold text-primary hover:bg-slate-50"
       >
         <PlusIcon className="h-4 w-4" />
         Add a person
@@ -118,25 +118,25 @@ function Person({ start, under, onDone, onRemove }: { start: ContactEntry; under
   }
   const line = (label: string, value: string, change: (v: string) => void, props: { type?: string; placeholder?: string } = {}) => (
     <label className="block space-y-1.5">
-      <span className="block text-[14px] font-bold text-slate-700">{label}</span>
+      <span className="block text-[0.875rem] font-bold text-slate-700">{label}</span>
       <input value={value} onChange={(e) => change(e.target.value)} className={input} {...props} />
     </label>
   )
   return (
     <div className="space-y-4" data-testid="contact-one">
-      <p className="-mt-1 text-[14px] text-muted">{under}</p>
+      <p className="-mt-1 text-[0.875rem] text-muted">{under}</p>
       {line('Name', entry.name, (v) => set({ name: v }))}
       {start.who && line('Who', entry.who ?? '', (v) => set({ who: v }))}
       {line('Phone', phones, setPhones, { type: 'tel' })}
       {line('Email', entry.email ?? '', (v) => set({ email: v }), { type: 'email' })}
       {start.web && line('Website', entry.web ?? '', (v) => set({ web: v }))}
       {line('Note (optional)', entry.note ?? '', (v) => set({ note: v }), { placeholder: 'Call to arrange' })}
-      <button type="button" onClick={done} className="h-12 w-full cursor-pointer rounded-full bg-primary text-[16px] font-bold text-white">
+      <button type="button" onClick={done} className="h-12 w-full cursor-pointer rounded-full bg-primary text-[1rem] font-bold text-white">
         Done
       </button>
       {onRemove && (
         <p className="text-center">
-          <button type="button" onClick={onRemove} className="min-h-11 cursor-pointer text-[15px] font-bold text-red-700">
+          <button type="button" onClick={onRemove} className="min-h-11 cursor-pointer text-[0.9375rem] font-bold text-red-700">
             Remove this person
           </button>
         </p>

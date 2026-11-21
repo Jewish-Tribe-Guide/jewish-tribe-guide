@@ -88,7 +88,7 @@ export default function TrustBand({ facts, region, communitySlug }: Props) {
         className="flex h-12 w-full cursor-pointer items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 text-left hover:bg-slate-50"
       >
         <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-700" />
-        <span className="min-w-0 flex-1 truncate text-[14px] leading-none text-slate-500">
+        <span className="min-w-0 flex-1 truncate text-[0.875rem] leading-none text-slate-500">
           <span className="font-extrabold text-ink">Kept up by the community</span> · {placesCount(facts)}
         </span>
         <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
@@ -127,7 +127,7 @@ function TrustSheet({ open, facts, region, communitySlug, onClose, desktop = fal
           Something wrong? Open the place and tap <strong className="font-bold text-ink">{EDIT_LISTING_LABEL}</strong>.
         </Row>
       </ul>
-      <Link href={routes.about(communitySlug)} className="mt-4 flex min-h-11 items-center justify-between border-t border-slate-200 pt-3 text-[15px] font-semibold text-ink hover:underline">
+      <Link href={routes.about(communitySlug)} className="mt-4 flex min-h-11 items-center justify-between border-t border-slate-200 pt-3 text-[0.9375rem] font-semibold text-ink hover:underline">
         About the guide
         <ChevronRightIcon className="h-4 w-4 text-slate-400" />
       </Link>
@@ -178,8 +178,8 @@ export function DesktopTrustBand({ facts, region, communitySlug }: Props) {
             <ShieldCheck className="h-6 w-6" />
           </span>
           <span>
-            <span className="block whitespace-nowrap text-[17px] font-extrabold text-ink">Kept up by the community</span>
-            <span className="block text-[13px] text-slate-500">{trustLine(facts)}</span>
+            <span className="block whitespace-nowrap text-[1.0625rem] font-extrabold text-ink">Kept up by the community</span>
+            <span className="block text-[0.8125rem] text-slate-500">{trustLine(facts)}</span>
           </span>
         </span>
         {sentence === undefined ? (
@@ -211,8 +211,8 @@ function Point({ icon, tone, title, children }: { icon: React.ReactNode; tone: s
     <span className="flex min-w-0 flex-1 items-start gap-2.5">
       <span className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full ${tone}`}>{icon}</span>
       <span className="min-w-0">
-        <span className="block text-[14px] font-extrabold text-ink">{title}</span>
-        <span className="line-clamp-2 text-[12.5px] leading-snug text-slate-600">{children}</span>
+        <span className="block text-[0.875rem] font-extrabold text-ink">{title}</span>
+        <span className="line-clamp-2 text-[0.78125rem] leading-snug text-slate-600">{children}</span>
       </span>
     </span>
   )
@@ -223,8 +223,8 @@ function Row({ icon, tone, title, children }: { icon: React.ReactNode; tone: str
     <li className="flex items-start gap-3">
       <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${tone}`}>{icon}</span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-extrabold text-ink">{title}</span>
-        <span className="block text-[14px] leading-snug text-slate-700">{children}</span>
+        <span className="block text-[0.9375rem] font-extrabold text-ink">{title}</span>
+        <span className="block text-[0.875rem] leading-snug text-slate-700">{children}</span>
       </span>
     </li>
   )

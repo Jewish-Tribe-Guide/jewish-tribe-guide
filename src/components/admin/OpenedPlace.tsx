@@ -98,12 +98,12 @@ function SourceForm({ label, email, save, busy, onSave, onCancel, readFor = 'tim
         if (value.trim()) onSave(value.trim())
       }}
     >
-      <label className="flex max-w-lg flex-col gap-1 text-[12.5px] text-slate-600">
+      <label className="flex max-w-lg flex-col gap-1 text-[0.78125rem] text-slate-600">
         {label}
         <input value={value} onChange={(e) => setValue(e.target.value)} className={INPUT} autoFocus />
       </label>
       {isEmail && (
-        <span className="text-[13px] text-slate-600">
+        <span className="text-[0.8125rem] text-slate-600">
           <Mail />
           An email: read for its {readFor}. Subscribe the guide’s inbox to it too.
         </span>
@@ -125,7 +125,7 @@ function SourceForm({ label, email, save, busy, onSave, onCancel, readFor = 'tim
 export function WaitingBox({ box }: { box: WaitBox }) {
   return (
     <div className="grid gap-1.5 pt-1.5" data-testid="waiting-box">
-      <span data-testid="waiting-part" className="flex items-center gap-2 text-[13.5px] font-bold text-slate-900">
+      <span data-testid="waiting-part" className="flex items-center gap-2 text-[0.84375rem] font-bold text-slate-900">
         {box.name}
         {box.tag && <Pill tone="amber">{box.tag}</Pill>}
       </span>
@@ -187,11 +187,11 @@ function CheckedRow({ line, onChange }: { line: CheckedLine; onChange?: () => vo
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="[overflow-wrap:anywhere]">{line.value}</span>
         {line.marks?.map((m) => (
-          <span key={m.name} className="text-[12.5px] text-slate-700 [overflow-wrap:anywhere]" data-testid="checked-mark">
+          <span key={m.name} className="text-[0.78125rem] text-slate-700 [overflow-wrap:anywhere]" data-testid="checked-mark">
             {m.name} · {m.mark}
           </span>
         ))}
-        <span className="text-[12.5px] text-slate-500 [overflow-wrap:anywhere]">
+        <span className="text-[0.78125rem] text-slate-500 [overflow-wrap:anywhere]">
           {f.mail && <Mail />}
           {f.links.length ? (
             f.links.map((l, i) => (
@@ -207,7 +207,7 @@ function CheckedRow({ line, onChange }: { line: CheckedLine; onChange?: () => vo
         </span>
       </span>
       {onChange ? (
-        <button type="button" onClick={onChange} className={`text-[13px] ${LINK}`}>
+        <button type="button" onClick={onChange} className={`text-[0.8125rem] ${LINK}`}>
           Change
         </button>
       ) : (
@@ -308,7 +308,7 @@ export default function OpenedPlace({
   const notRead = opened.again.length > 0 && (
     <section aria-label="Not read" className="flex flex-col">
       {opened.again.map((a) => (
-        <span key={a.key} className="flex flex-wrap items-baseline justify-between gap-x-3 border-t border-slate-100 py-2 text-[13.5px]">
+        <span key={a.key} className="flex flex-wrap items-baseline justify-between gap-x-3 border-t border-slate-100 py-2 text-[0.84375rem]">
           <span className="min-w-0 text-slate-600 [overflow-wrap:anywhere]">Not read · {a.what}</span>
           <button type="button" disabled={busy !== null} onClick={() => void run(`again-${a.key}`, () => readAgain(a))} className={LINK}>
             {busy === `again-${a.key}` ? 'Reading…' : 'Read it again'}
@@ -379,7 +379,7 @@ export default function OpenedPlace({
   const notChecked = place.state === 'not_checked' && opened.problems.length > 0
   const shell = 'flex flex-col gap-3 [&>*]:shrink-0'
   const listing = place.listing && (
-    <a href={place.listing} target="_blank" rel="noopener noreferrer" className={`self-start py-1 text-[13.5px] ${LINK}`}>
+    <a href={place.listing} target="_blank" rel="noopener noreferrer" className={`self-start py-1 text-[0.84375rem] ${LINK}`}>
       Open its listing
     </a>
   )
@@ -408,7 +408,7 @@ export default function OpenedPlace({
             const act = (b: { work: () => Promise<unknown> }) => () => void run(key, b.work)
             return (
               <div key={g.key} className="flex flex-col border-b border-slate-100 pb-3 pt-2.5" data-testid="waiting-group">
-                <span className="pb-1 text-[13px] font-semibold text-slate-600">
+                <span className="pb-1 text-[0.8125rem] font-semibold text-slate-600">
                   From {g.page ? <PageLink {...g.page} /> : 'its source'}
                   {g.when && ` · ${g.when}`}
                 </span>
@@ -419,7 +419,7 @@ export default function OpenedPlace({
                         <span>{l.label}</span>
                         <span className="flex min-w-0 flex-col [overflow-wrap:anywhere]">
                           <span className="font-semibold">{l.value}</span>
-                          {l.old !== null && <span className="text-[12.5px] text-slate-500">Was {l.old}</span>}
+                          {l.old !== null && <span className="text-[0.78125rem] text-slate-500">Was {l.old}</span>}
                         </span>
                       </span>
                     ))}
@@ -432,7 +432,7 @@ export default function OpenedPlace({
                     <span className="min-w-0 [overflow-wrap:anywhere]">{x.url ? <PageLink text={x.value} url={x.url} /> : x.value}</span>
                   </span>
                 ))}
-                {g.note && <span className="border-t border-slate-100 pb-0.5 pt-2.5 text-[12.5px] text-slate-500">{g.note}</span>}
+                {g.note && <span className="border-t border-slate-100 pb-0.5 pt-2.5 text-[0.78125rem] text-slate-500">{g.note}</span>}
                 {main && (
                   <div className="flex flex-wrap items-center gap-2 pt-2.5">
                     <button type="button" disabled={busy !== null} onClick={act(main)} className={GO}>
@@ -461,13 +461,13 @@ export default function OpenedPlace({
                   for (const s of opened.reads) await readStep(s)
                 })
               }
-              className={`self-start py-2.5 text-[13.5px] ${LINK}`}
+              className={`self-start py-2.5 text-[0.84375rem] ${LINK}`}
             >
               {busy === 'read' ? 'Reading…' : opened.pages === 1 ? 'Read it again' : 'Read them again'}
             </button>
           )}
           {w.checked.length > 0 && (
-            <button type="button" aria-expanded={more} onClick={() => setMore((m) => !m)} className="flex items-center gap-1.5 pb-1 pt-2.5 text-left text-[13.5px] text-slate-500">
+            <button type="button" aria-expanded={more} onClick={() => setMore((m) => !m)} className="flex items-center gap-1.5 pb-1 pt-2.5 text-left text-[0.84375rem] text-slate-500">
               {more ? <Down /> : <Right />}
               {w.checked.length} more up to date
             </button>
@@ -640,7 +640,7 @@ export default function OpenedPlace({
         <div className="flex flex-col rounded-[10px] border border-slate-200 bg-white px-3.5 pb-3.5 pt-1">
           {opened.problems.map((p) => (
             <div key={p.key} className="flex flex-col border-b border-slate-100 pb-3 pt-2.5" data-testid="problem">
-              <span className="flex flex-wrap items-baseline gap-1 pb-1 text-[13px] font-semibold text-amber-800">
+              <span className="flex flex-wrap items-baseline gap-1 pb-1 text-[0.8125rem] font-semibold text-amber-800">
                 {p.page && (
                   <>
                     <PageLink {...p.page} />
@@ -675,7 +675,7 @@ export default function OpenedPlace({
             </div>
           ))}
           {lines.length > 0 && (
-            <button type="button" aria-expanded={more} onClick={() => setMore((m) => !m)} className="flex items-center gap-1.5 pb-1 pt-2.5 text-left text-[13.5px] text-slate-500">
+            <button type="button" aria-expanded={more} onClick={() => setMore((m) => !m)} className="flex items-center gap-1.5 pb-1 pt-2.5 text-left text-[0.84375rem] text-slate-500">
               {more ? <Down /> : <Right />}
               {lines.length} more checked
             </button>

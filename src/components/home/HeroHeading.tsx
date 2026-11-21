@@ -183,8 +183,8 @@ export default function HeroHeading({
         <section className="pt-5 desktop:hidden" data-testid="today-hero">
           {/* Held open while the day isn't known yet, so the title doesn't
               jump down when it arrives. */}
-          <p className="min-h-5 text-[13.5px] font-semibold text-slate-500">{today.dayLine}</p>
-          <h1 className="mt-0.5 text-[26px] font-extrabold leading-tight tracking-tight text-ink">{settings.heroTitle}</h1>
+          <p className="min-h-5 text-[0.84375rem] font-semibold text-slate-500">{today.dayLine}</p>
+          <h1 className="mt-0.5 text-[1.625rem] font-extrabold leading-tight tracking-tight text-ink">{settings.heroTitle}</h1>
           {ui.search.landing && (
             <div ref={phoneShellRef} className="mt-3" {...phoneFocus}>
               <SearchBox query={query} onQueryChange={handleQueryChange} onSubmit={onSearchSubmit} interactive={interactive} placeholder={settings.searchPlaceholder} onFocus={reopen} />
@@ -258,8 +258,8 @@ export default function HeroHeading({
         {/* Wider than the search (880 against 688) so the 48px headline sits on
             one line, about the box's width, instead of wrapping (Nov 11). */}
         <div className="mx-auto flex min-h-[360px] max-w-[880px] flex-col items-center px-4 pt-[72px] pb-14 text-center">
-          {today && <p className="mb-2 min-h-6 text-[16px] font-semibold text-white/80">{today.dayLine}</p>}
-          <h1 className="text-[48px] font-extrabold leading-tight tracking-tight text-white text-balance">{headline}</h1>
+          {today && <p className="mb-2 min-h-6 text-[1rem] font-semibold text-white/80">{today.dayLine}</p>}
+          <h1 className="text-[3rem] font-extrabold leading-tight tracking-tight text-white text-balance">{headline}</h1>
           {ui.search.landing && (
             <div ref={searchShellRef} className="relative mt-6 w-full max-w-[688px] text-left">
               <SearchBox

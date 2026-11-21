@@ -78,9 +78,9 @@ export default function SearchLines({
             <LineLink line={line} first={i === 0} onPick={onPick}>
               <LineIcon line={line} categories={categories} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[15.5px] font-bold text-ink">{line.title}</span>
+                <span className="block truncate text-[0.96875rem] font-bold text-ink">{line.title}</span>
                 {line.sub && (
-                  <span className={`flex items-center gap-1.5 text-[13.5px] ${i === 0 ? 'font-semibold text-blue-900' : 'text-slate-500'}`}>
+                  <span className={`flex items-center gap-1.5 text-[0.84375rem] ${i === 0 ? 'font-semibold text-blue-900' : 'text-slate-500'}`}>
                     {line.tone && <span aria-hidden="true" data-testid="search-line-tone" data-tone={line.tone} className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[line.tone]}`} />}
                     <span className="truncate">{line.sub}</span>
                   </span>

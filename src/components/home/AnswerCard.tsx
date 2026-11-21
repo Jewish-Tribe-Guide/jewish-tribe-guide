@@ -68,13 +68,13 @@ export default function AnswerCard({
         {icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span data-testid={`${testId}-eyebrow`} className="block text-[12.5px] font-bold uppercase tracking-[0.12em] text-slate-500">{eyebrow}</span>
+        <span data-testid={`${testId}-eyebrow`} className="block text-[0.78125rem] font-bold uppercase tracking-[0.12em] text-slate-500">{eyebrow}</span>
         {answer === null ? (
           <span aria-hidden="true" data-testid={`${testId}-loading`} className="mt-2 block h-9 w-1/2 animate-pulse rounded bg-slate-100" />
         ) : (
-          <span data-testid={`${testId}-answer`} className="mt-1 block text-[30px] font-extrabold @md:text-[34px] leading-tight text-ink tabular-nums">{answer}</span>
+          <span data-testid={`${testId}-answer`} className="mt-1 block text-[1.875rem] font-extrabold @md:text-[2.125rem] leading-tight text-ink tabular-nums">{answer}</span>
         )}
-        {detail && <span data-testid={`${testId}-detail`} className="mt-1 block text-[15px] text-slate-600">{detail}</span>}
+        {detail && <span data-testid={`${testId}-detail`} className="mt-1 block text-[0.9375rem] text-slate-600">{detail}</span>}
       </span>
     </Link>
   )
@@ -94,8 +94,8 @@ export default function AnswerCard({
  *  the card is 540px wide, stacked under that. Needs an `@container`
  *  parent; reads the card's width, never the window's. */
 export const SIGN_OFF_CARD = 'flex h-full flex-col items-start gap-4 rounded-2xl bg-white px-7 py-6 @[540px]:flex-row @[540px]:items-center @[540px]:gap-5'
-export const SIGN_OFF_EYEBROW = 'text-[11.5px] font-extrabold uppercase tracking-[0.08em] text-slate-500'
-export const SIGN_OFF_HEADING = 'mt-1.5 text-[21px] font-extrabold leading-tight text-ink'
-export const SIGN_OFF_LINE = 'mt-1 text-[14.5px] text-slate-600'
+export const SIGN_OFF_EYEBROW = 'text-[0.71875rem] font-extrabold uppercase tracking-[0.08em] text-slate-500'
+export const SIGN_OFF_HEADING = 'mt-1.5 text-[1.3125rem] font-extrabold leading-tight text-ink'
+export const SIGN_OFF_LINE = 'mt-1 text-[0.90625rem] text-slate-600'
 export const SIGN_OFF_BUTTON =
-  'inline-flex h-10 shrink-0 cursor-pointer items-center rounded-full bg-primary px-[18px] text-[14.5px] font-bold text-white transition-colors hover:bg-primary-dark disabled:opacity-60'
+  'inline-flex h-10 shrink-0 cursor-pointer items-center rounded-full bg-primary px-[18px] text-[0.90625rem] font-bold text-white transition-colors hover:bg-primary-dark disabled:opacity-60'

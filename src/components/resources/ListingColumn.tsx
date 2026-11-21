@@ -130,11 +130,11 @@ export function ListingBar({ backLabel, onBack, position, onStep, onShowMap }: {
 
   return (
     <div className="mb-4 flex items-center justify-between gap-3" data-testid="listing-column-bar">
-      <button type="button" onClick={onBack} className="-ml-1 flex cursor-pointer items-center gap-0.5 rounded-md px-1 py-1 text-[15px] font-bold text-primary hover:underline">
+      <button type="button" onClick={onBack} className="-ml-1 flex cursor-pointer items-center gap-0.5 rounded-md px-1 py-1 text-[0.9375rem] font-bold text-primary hover:underline">
         <ChevronLeftIcon className="h-[18px] w-[18px]" />
         {backLabel}
       </button>
-      <div className="flex items-center gap-0.5 text-[13px] text-muted">
+      <div className="flex items-center gap-0.5 text-[0.8125rem] text-muted">
         {onShowMap && (
           <button type="button" onClick={onShowMap} className="mr-2 h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
             Show map

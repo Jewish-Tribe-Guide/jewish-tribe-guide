@@ -47,9 +47,9 @@ export function BoxRow({ name, sub, right, mark = 'same', why, was }: { name: Re
       data-mark={mark}
     >
       <span className="min-w-0">
-        {mark === 'gone' && why && <span className="mr-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-800">{why}</span>}
+        {mark === 'gone' && why && <span className="mr-1.5 text-[0.6875rem] font-bold uppercase tracking-wide text-amber-800">{why}</span>}
         <span className={mark === 'gone' ? 'text-slate-600 line-through' : 'text-slate-900'}>{name}</span>
-        {sub && <span className="block text-[12.5px] text-slate-500">{sub}</span>}
+        {sub && <span className="block text-[0.78125rem] text-slate-500">{sub}</span>}
       </span>
       {/* Capped, so a long rule ("Approximately 45 minutes before
           shkiya") wraps rather than squeezing the name to a word a line. */}

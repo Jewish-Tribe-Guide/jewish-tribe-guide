@@ -138,7 +138,7 @@ export default function TodoChange({
       foot={!inStep && <PlaceButtons buttons={buttons} />}
     >
       {changed.length === 0 ? (
-        <p className="m-0 text-[15px] text-slate-600">Nothing differs from the listing as it is now.</p>
+        <p className="m-0 text-[0.9375rem] text-slate-600">Nothing differs from the listing as it is now.</p>
       ) : (
         <ListingEditor
           key={`${s.id}-${part?.id ?? ''}`}
@@ -196,7 +196,7 @@ export function ChangeOnItsOwn({
   const things = [...order, ...parts.filter((p) => !order.some((o) => o.id === p.id))].map((p) => ({ ...p, done: !parts.some((x) => x.id === p.id) }))
   const switches = part ? <ThingSwitches things={things} on={part.id} onPick={setOn} /> : null
   const [onEditing] = useState(() => () => {})
-  if (!s.current) return <p className="m-0 text-[15px] text-slate-600">The listing it changes is gone.</p>
+  if (!s.current) return <p className="m-0 text-[0.9375rem] text-slate-600">The listing it changes is gone.</p>
   return (
     <TodoChange
       key={`${s.id}-${part?.id ?? ''}`}

@@ -33,7 +33,7 @@ import type { Jobs } from './useWatchJobs'
 
 type Moderate = (id: string, status: 'approved' | 'rejected', reason?: string, payload?: ResourceSubmission, part?: string) => Promise<'partial' | 'whole' | 'failed'>
 
-const button = 'inline-flex items-center justify-center min-h-11 px-5 rounded-lg border text-[15px] font-semibold cursor-pointer disabled:opacity-60'
+const button = 'inline-flex items-center justify-center min-h-11 px-5 rounded-lg border text-[0.9375rem] font-semibold cursor-pointer disabled:opacity-60'
 
 export default function TodoPlaceScreen({
   place,
@@ -166,7 +166,7 @@ export default function TodoPlaceScreen({
     return shell(
       <AdminBox>
         <div className="flex flex-col items-start gap-3 p-4">
-          <p className="m-0 text-[15px] font-semibold text-slate-900">{t.label}</p>
+          <p className="m-0 text-[0.9375rem] font-semibold text-slate-900">{t.label}</p>
           <Link href={`${adminBase(community)}/watches/${placePath(place.placeId ?? place.key, 'todo')}`} className={`${button} border-primary bg-primary text-white`}>
             Open {place.name}
           </Link>
@@ -196,7 +196,7 @@ function Header({ place, position }: { place: TodoPlace; position: PlacePosition
       title={place.name}
       right={
         <span className="flex items-center gap-3 md:-mt-3">
-          <span className="text-[13.5px] text-slate-600 whitespace-nowrap">
+          <span className="text-[0.84375rem] text-slate-600 whitespace-nowrap">
             {position.at + 1} of {position.total}
           </span>
           {position.next && (
@@ -254,13 +254,13 @@ function Feedback({
   return (
     <PlaceFrame name={name} subline={shortDay(r.createdAt)} position={position} switches={switches} error={error} foot={<PlaceButtons buttons={buttons} />}>
       <PlaceCard>
-        <p className="m-0 whitespace-pre-wrap break-words text-[17px] font-bold text-slate-900">“{first}”</p>
+        <p className="m-0 whitespace-pre-wrap break-words text-[1.0625rem] font-bold text-slate-900">“{first}”</p>
         {more.map((p, i) => (
-          <p key={i} className="m-0 whitespace-pre-wrap break-words text-[15px] text-slate-900">
+          <p key={i} className="m-0 whitespace-pre-wrap break-words text-[0.9375rem] text-slate-900">
             {p}
           </p>
         ))}
-        <p className="m-0 text-[13.5px] text-slate-500">{[r.name ?? 'No name given', r.email, sentAt.format(new Date(r.createdAt))].filter(Boolean).join(' · ')}</p>
+        <p className="m-0 text-[0.84375rem] text-slate-500">{[r.name ?? 'No name given', r.email, sentAt.format(new Date(r.createdAt))].filter(Boolean).join(' · ')}</p>
       </PlaceCard>
     </PlaceFrame>
   )

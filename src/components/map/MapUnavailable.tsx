@@ -4,7 +4,7 @@
  *  about keys is for whoever runs the site (Nov 18). */
 export default function MapUnavailable() {
   return (
-    <div role="status" className="flex h-full min-h-0 w-full flex-1 items-center justify-center rounded-2xl bg-slate-100 px-8 text-center text-[14px] text-slate-600">
+    <div role="status" className="flex h-full min-h-0 w-full flex-1 items-center justify-center rounded-2xl bg-slate-100 px-8 text-center text-[0.875rem] text-slate-600">
       The map couldn’t load. Everything on it is in the list.
     </div>
   )

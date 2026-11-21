@@ -48,7 +48,7 @@ export default function FindPlace({
   return (
     <div className="space-y-3" data-testid="find-place">
       <div>
-        <label htmlFor={id} className="mb-1 block text-[14px] font-semibold text-slate-800">
+        <label htmlFor={id} className="mb-1 block text-[0.875rem] font-semibold text-slate-800">
           Name or address
         </label>
         <AddressInput
@@ -75,13 +75,13 @@ export default function FindPlace({
       </div>
       {matches.length > 0 && (
         <div>
-          <p className="text-[12px] font-bold tracking-wide text-slate-500 uppercase">In the guide</p>
+          <p className="text-[0.75rem] font-bold tracking-wide text-slate-500 uppercase">In the guide</p>
           <ul className="mt-1 divide-y divide-slate-100 rounded-lg border border-slate-200">
             {matches.map((l) => (
               <li key={l.id}>
                 <button type="button" onClick={() => onListing(l)} className="w-full cursor-pointer px-3 py-2 text-left hover:bg-slate-50">
-                  <span className="block text-[14.5px] font-semibold text-slate-900">{l.name}</span>
-                  {l.address && <span className="block text-[12.5px] text-slate-500">{l.address.split(',')[0]}</span>}
+                  <span className="block text-[0.90625rem] font-semibold text-slate-900">{l.name}</span>
+                  {l.address && <span className="block text-[0.78125rem] text-slate-500">{l.address.split(',')[0]}</span>}
                 </button>
               </li>
             ))}
@@ -89,7 +89,7 @@ export default function FindPlace({
         </div>
       )}
       <p className="text-center">
-        <button type="button" onClick={onBlank} className="cursor-pointer text-[13.5px] font-semibold text-primary hover:underline">
+        <button type="button" onClick={onBlank} className="cursor-pointer text-[0.84375rem] font-semibold text-primary hover:underline">
           Not on Google? Fill it in yourself
         </button>
       </p>

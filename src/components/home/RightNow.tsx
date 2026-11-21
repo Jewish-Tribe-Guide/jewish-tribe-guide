@@ -209,9 +209,9 @@ function PhotoRow({ category, categories, href, big, small, button, wide }: { ca
         )}
         <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-slate-900/85 via-slate-900/65 to-slate-900/25" />
         <span className="relative min-w-0 flex-1">
-          <span className="block text-[13px] font-semibold text-white/90">{category.pluralLabel}</span>
-          <span className="block text-[19px] font-extrabold leading-tight">{big}</span>
-          {small && <span className="block truncate text-[12.5px] text-white/85">{small}</span>}
+          <span className="block text-[0.8125rem] font-semibold text-white/90">{category.pluralLabel}</span>
+          <span className="block text-[1.1875rem] font-extrabold leading-tight">{big}</span>
+          {small && <span className="block truncate text-[0.78125rem] text-white/85">{small}</span>}
         </span>
       </Link>
     </li>

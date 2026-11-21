@@ -66,26 +66,26 @@ export default function TellUsItems({
 
   return (
     <section className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 pt-2.5 pb-2" data-testid="tell-us-items">
-      <h3 className="text-[15px] font-extrabold text-slate-900">{w.heading} · {rest.length + changing.filter((i) => i.availability !== 'stopped').length}</h3>
+      <h3 className="text-[0.9375rem] font-extrabold text-slate-900">{w.heading} · {rest.length + changing.filter((i) => i.availability !== 'stopped').length}</h3>
       <ul className="mt-1">
         {changing.map((i) =>
           i.availability === 'stopped' ? (
             <li key={i.name} className="-mx-1.5 mt-1 rounded-lg bg-red-50 px-1.5 py-2">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[15px] font-semibold text-slate-500 line-through">{i.name}</span>
-                <span className="text-[12.5px] font-bold text-red-700">No longer here</span>
+                <span className="text-[0.9375rem] font-semibold text-slate-500 line-through">{i.name}</span>
+                <span className="text-[0.78125rem] font-bold text-red-700">No longer here</span>
               </div>
-              <button type="button" onClick={() => set(i.name, null)} className="mt-0.5 cursor-pointer text-[13px] font-bold text-primary">
+              <button type="button" onClick={() => set(i.name, null)} className="mt-0.5 cursor-pointer text-[0.8125rem] font-bold text-primary">
                 Keep it
               </button>
             </li>
           ) : (
             <li key={i.name} className="-mx-1.5 mt-1 rounded-lg bg-emerald-50 px-1.5 py-2">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[15px] font-bold text-slate-900">{i.name}</span>
-                <span className="text-[12.5px] font-bold text-emerald-700">{w.isNew}</span>
+                <span className="text-[0.9375rem] font-bold text-slate-900">{i.name}</span>
+                <span className="text-[0.78125rem] font-bold text-emerald-700">{w.isNew}</span>
               </div>
-              <p className="mt-0.5 text-[13px] text-slate-700">
+              <p className="mt-0.5 text-[0.8125rem] text-slate-700">
                 {i.availability === 'sometimes' ? w.sometimes : w.always}{' '}
                 <button
                   type="button"
@@ -105,7 +105,7 @@ export default function TellUsItems({
         )}
       </ul>
       {held.length > 0 && (
-        <ul className="mt-1 text-[12.5px] text-slate-500">
+        <ul className="mt-1 text-[0.78125rem] text-slate-500">
           {held.map((h) => (
             <li key={h}>Not changed: {h}</li>
           ))}
@@ -123,13 +123,13 @@ export default function TellUsItems({
           onClose={() => setAdding(false)}
         />
       ) : (
-        <button type="button" onClick={() => setAdding(true)} className="mt-1 flex min-h-11 w-full cursor-pointer items-center gap-2 border-t border-slate-200 text-left text-[15px] font-bold text-primary">
+        <button type="button" onClick={() => setAdding(true)} className="mt-1 flex min-h-11 w-full cursor-pointer items-center gap-2 border-t border-slate-200 text-left text-[0.9375rem] font-bold text-primary">
           <PlusIcon className="h-4 w-4" />
           {w.another}
         </button>
       )}
       {rest.length > 0 && (
-        <p className="border-t border-slate-200 pt-2 text-[13.5px] leading-snug text-slate-500">
+        <p className="border-t border-slate-200 pt-2 text-[0.84375rem] leading-snug text-slate-500">
           <b className="text-slate-700">Already listed · {rest.length}</b> {(all ? rest : rest.slice(0, 6)).join(', ')}
           {rest.length > 6 && (
             <button type="button" onClick={() => setAll((v) => !v)} className="ml-1 cursor-pointer font-bold text-primary">
@@ -152,7 +152,7 @@ function AddAnother({ words, listed, taken, onAdd, onClose }: { words: { prompt:
   const marks: ItemMark[] = listed.map((n) => ({ name: n, key: '', sometimes: false, seenAt: null, goneAt: null }))
   const suggestions = itemSuggestions(name, marks, 4).filter((x) => !taken.some((t) => same(t, x.name)))
   const add = (what: string) => onAdd({ name: addedItemName(what), availability: sometimes ? 'sometimes' : 'always', doubt: null })
-  const row = 'flex min-h-11 w-full cursor-pointer items-center border-t border-slate-100 px-3 text-left text-[15px] text-slate-900 first:border-t-0 hover:bg-slate-50 disabled:cursor-default disabled:text-slate-400'
+  const row = 'flex min-h-11 w-full cursor-pointer items-center border-t border-slate-100 px-3 text-left text-[0.9375rem] text-slate-900 first:border-t-0 hover:bg-slate-50 disabled:cursor-default disabled:text-slate-400'
   // No Cancel (Oct 10): left empty, it folds away when focus leaves it;
   // Escape still closes it.
   return (
@@ -163,7 +163,7 @@ function AddAnother({ words, listed, taken, onAdd, onClose }: { words: { prompt:
         if (!name && !e.currentTarget.contains(e.relatedTarget as Node | null)) onClose()
       }}
     >
-      <label htmlFor={inputId} className="text-[14px] font-bold text-slate-900">
+      <label htmlFor={inputId} className="text-[0.875rem] font-bold text-slate-900">
         {words.prompt}
       </label>
       <input
@@ -185,18 +185,18 @@ function AddAnother({ words, listed, taken, onAdd, onClose }: { words: { prompt:
             <button key={x.name} type="button" disabled={!!x.listed} onClick={() => add(x.name)} className={row}>
               <span className="py-2">
                 {x.name}
-                {x.listed && <span className="block text-[12.5px]">Already listed here</span>}
+                {x.listed && <span className="block text-[0.78125rem]">Already listed here</span>}
               </span>
             </button>
           ))}
           {!suggestions.some((x) => same(x.name, name)) && !alreadyListed(marks, name) && (
-            <button type="button" onClick={() => add(name)} className={`${row} bg-slate-50 text-[14.5px] text-slate-600`}>
+            <button type="button" onClick={() => add(name)} className={`${row} bg-slate-50 text-[0.90625rem] text-slate-600`}>
               Add “{name}” as typed
             </button>
           )}
         </div>
       )}
-      <label className="mt-2 flex min-h-10 cursor-pointer items-center gap-2.5 text-[14.5px] text-slate-900">
+      <label className="mt-2 flex min-h-10 cursor-pointer items-center gap-2.5 text-[0.90625rem] text-slate-900">
         <input type="checkbox" checked={sometimes} onChange={(e) => setSometimes(e.target.checked)} className="h-5 w-5 accent-primary" />
         {words.sometimes}
       </label>
@@ -204,7 +204,7 @@ function AddAnother({ words, listed, taken, onAdd, onClose }: { words: { prompt:
         type="button"
         disabled={name.length < 2 || !!alreadyListed(marks, name)}
         onClick={() => add(name)}
-        className="mt-1 h-11 w-full cursor-pointer rounded-full border-[1.5px] border-primary text-[15px] font-bold text-primary hover:bg-primary/5 disabled:cursor-default disabled:border-slate-200 disabled:text-slate-400"
+        className="mt-1 h-11 w-full cursor-pointer rounded-full border-[1.5px] border-primary text-[0.9375rem] font-bold text-primary hover:bg-primary/5 disabled:cursor-default disabled:border-slate-200 disabled:text-slate-400"
       >
         Add it
       </button>

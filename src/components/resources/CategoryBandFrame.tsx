@@ -48,11 +48,11 @@ export function HeroTitle({ eyebrow, title, line }: { eyebrow?: string | null; t
   return (
     <>
       {/* Held open while it loads, so the title doesn't move down. */}
-      <p className="min-h-[19.5px] text-[13px] font-bold uppercase tracking-[0.14em] text-white/85" data-testid="category-hero-count">
+      <p className="min-h-[19.5px] text-[0.8125rem] font-bold uppercase tracking-[0.14em] text-white/85" data-testid="category-hero-count">
         {eyebrow}
       </p>
-      <h1 className="mt-1.5 text-[44px] font-extrabold leading-[1.05]">{title}</h1>
-      {line && <p className="mt-2 flex items-center gap-1.5 text-[15px] text-white/90">{line}</p>}
+      <h1 className="mt-1.5 text-[2.75rem] font-extrabold leading-[1.05]">{title}</h1>
+      {line && <p className="mt-2 flex items-center gap-1.5 text-[0.9375rem] text-white/90">{line}</p>}
     </>
   )
 }

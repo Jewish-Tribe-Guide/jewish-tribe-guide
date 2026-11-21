@@ -1728,14 +1728,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         heroOverlap={heroOverlap}
         hero={
           <>
-            <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-white/85" data-testid="category-hero-count">
+            <p className="text-[0.8125rem] font-bold uppercase tracking-[0.14em] text-white/85" data-testid="category-hero-count">
               {items.length} {items.length === 1 ? 'place' : 'places'}
             </p>
             {/* The page's h1 on a computer. A phone's is DirectoryHeader's
                 (hidden here), whose title the site header shows. */}
-            <h1 className="mt-1.5 text-[44px] font-extrabold leading-[1.05]">{category.pluralLabel}</h1>
+            <h1 className="mt-1.5 text-[2.75rem] font-extrabold leading-[1.05]">{category.pluralLabel}</h1>
             {anchorLabel ? (
-              <p className="mt-2 flex items-center gap-1.5 text-[15px] text-white/90">
+              <p className="mt-2 flex items-center gap-1.5 text-[0.9375rem] text-white/90">
                 <PinIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {anchorLabel}
               </p>
@@ -2139,7 +2139,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           under an empty list too; not in the list heading, which is for
           arranging the list. No arrow after it (the user, Oct 10). */}
       {category.externalLink && (
-        <p data-testid="external-link" className="mt-5 text-center text-[13.5px] text-slate-500">
+        <p data-testid="external-link" className="mt-5 text-center text-[0.84375rem] text-slate-500">
           Not listed here?{' '}
           <a href={category.externalLink.url} target="_blank" rel="noopener noreferrer" className="font-bold text-primary hover:underline">
             {category.externalLink.label}
@@ -2178,7 +2178,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           </div>
           {/* While the line is dragged far enough to hide the map. */}
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 hidden items-center justify-center group-data-[snap=map]/split:flex">
-            <span className="rounded-full bg-slate-900/85 px-4 py-2 text-[14px] font-semibold text-white shadow-lg">Let go to hide the map</span>
+            <span className="rounded-full bg-slate-900/85 px-4 py-2 text-[0.875rem] font-semibold text-white shadow-lg">Let go to hide the map</span>
           </div>
         </div>
       )}

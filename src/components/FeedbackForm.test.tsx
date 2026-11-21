@@ -64,7 +64,7 @@ describe('FeedbackForm — the board’s form', () => {
   // 16px or more, or an iPhone zooms the page in when a field is tapped.
   it('draws its fields at 16px', () => {
     renderWithProviders(<FeedbackForm successMessage="Thanks!" />)
-    for (const label of ['Your note', 'Email, for a reply']) expect(screen.getByLabelText(label)).toHaveClass('text-[16px]')
+    for (const label of ['Your note', 'Email, for a reply']) expect(screen.getByLabelText(label)).toHaveClass('text-[1rem]')
   })
 
   // The user, Nov 16: grey boxes read as switched off ("That makes me

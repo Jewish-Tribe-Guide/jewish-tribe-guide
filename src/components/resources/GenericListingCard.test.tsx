@@ -105,8 +105,8 @@ describe('GenericListingCard — collapsed', () => {
       { content: { categories: [category] } },
     )
     const name = screen.getByTestId('row-name')
-    expect(name).toHaveClass('desktop:text-[18px]')
-    expect(name).not.toHaveClass('text-[18px]')
+    expect(name).toHaveClass('desktop:text-[1.125rem]')
+    expect(name).not.toHaveClass('text-[1.125rem]')
     const picture = document.querySelector('.desktop\\:h-12.desktop\\:w-12')
     expect(picture).not.toBeNull()
     expect(picture).toHaveClass('h-10', 'w-10')
@@ -800,7 +800,7 @@ describe('GenericListingCard — the row', () => {
       expect(screen.getByTestId('row-note')).toHaveTextContent('“Reception will open the door”')
       // Oct 16: in the opened listing's ink, not the grey of where it is,
       // and a little heavier and bigger than the lines around it.
-      expect(screen.getByTestId('row-note')).toHaveClass('text-slate-800', 'font-medium', 'text-[14px]')
+      expect(screen.getByTestId('row-note')).toHaveClass('text-slate-800', 'font-medium', 'text-[0.875rem]')
       expect(screen.getByTestId('row-note')).not.toHaveClass('text-slate-500')
       unmount()
 

@@ -100,12 +100,12 @@ export default function AddScheduleBox({ item, festival, onSent, onClose }: { it
       {step === 'choose' && (
         <div className="space-y-2">
           <button type="button" onClick={() => setStep('paste')} className={`${big} border-primary bg-primary/5`}>
-            <span className="text-[15.5px] font-extrabold text-slate-900">Paste their message</span>
-            <span className="mt-0.5 text-[13px] leading-snug text-slate-600">The WhatsApp message or email the shul sent. The guide reads the times out of it for you to check.</span>
+            <span className="text-[0.96875rem] font-extrabold text-slate-900">Paste their message</span>
+            <span className="mt-0.5 text-[0.8125rem] leading-snug text-slate-600">The WhatsApp message or email the shul sent. The guide reads the times out of it for you to check.</span>
           </button>
           <button type="button" disabled={busy === 'read'} onClick={() => fileInput.current?.click()} className={`${big} border-slate-200`}>
-            <span className="text-[15.5px] font-extrabold text-slate-900">{busy === 'read' ? 'Reading…' : 'Add a photo or PDF'}</span>
-            <span className="mt-0.5 text-[13px] leading-snug text-slate-600">The flyer they emailed, or the schedule on the shul’s board. Read the same way.</span>
+            <span className="text-[0.96875rem] font-extrabold text-slate-900">{busy === 'read' ? 'Reading…' : 'Add a photo or PDF'}</span>
+            <span className="mt-0.5 text-[0.8125rem] leading-snug text-slate-600">The flyer they emailed, or the schedule on the shul’s board. Read the same way.</span>
           </button>
           <input
             ref={fileInput}
@@ -120,7 +120,7 @@ export default function AddScheduleBox({ item, festival, onSent, onClose }: { it
               start('read', (token) => void read(token, { file: f }))
             }}
           />
-          <button type="button" onClick={() => setStep('type')} className="cursor-pointer text-[14.5px] font-bold text-primary hover:underline">
+          <button type="button" onClick={() => setStep('type')} className="cursor-pointer text-[0.90625rem] font-bold text-primary hover:underline">
             Or type them in ›
           </button>
         </div>
@@ -128,7 +128,7 @@ export default function AddScheduleBox({ item, festival, onSent, onClose }: { it
 
       {step === 'paste' && (
         <div>
-          <label htmlFor={textId} className="text-[14px] font-bold text-slate-900">
+          <label htmlFor={textId} className="text-[0.875rem] font-bold text-slate-900">
             Their message
           </label>
           <textarea
@@ -139,13 +139,13 @@ export default function AddScheduleBox({ item, festival, onSent, onClose }: { it
             maxLength={8000}
             onChange={(e) => setText(e.target.value)}
             placeholder="Paste the schedule they sent"
-            className="mt-1.5 w-full rounded-[10px] border-2 border-slate-300 px-3 py-2 text-[15px] text-slate-900 outline-none focus:border-primary"
+            className="mt-1.5 w-full rounded-[10px] border-2 border-slate-300 px-3 py-2 text-[0.9375rem] text-slate-900 outline-none focus:border-primary"
           />
           <button
             type="button"
             disabled={text.trim().length < 10 || busy === 'read'}
             onClick={() => start('read', (token) => void read(token, { text }))}
-            className="mt-2 h-10 w-full cursor-pointer rounded-[10px] bg-primary text-[14.5px] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
+            className="mt-2 h-10 w-full cursor-pointer rounded-[10px] bg-primary text-[0.90625rem] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
           >
             {busy === 'read' ? 'Reading…' : 'Read the times'}
           </button>
@@ -155,22 +155,22 @@ export default function AddScheduleBox({ item, festival, onSent, onClose }: { it
       {step === 'check' && reading && (
         <div className="mb-2 space-y-2" data-testid="schedule-read">
           {!file && text && (
-            <div className="rounded-[10px] bg-slate-100 px-3 py-2 text-[12.5px] leading-relaxed whitespace-pre-line text-slate-700">
+            <div className="rounded-[10px] bg-slate-100 px-3 py-2 text-[0.78125rem] leading-relaxed whitespace-pre-line text-slate-700">
               <b className="text-slate-900">What you pasted</b>
               {'\n'}
               {text}
             </div>
           )}
           {file && reading.sourceUrl && (
-            <a href={reading.sourceUrl} target="_blank" rel="noopener noreferrer" className="block text-[13px] font-semibold text-primary hover:underline">
+            <a href={reading.sourceUrl} target="_blank" rel="noopener noreferrer" className="block text-[0.8125rem] font-semibold text-primary hover:underline">
               Your {file.type === 'application/pdf' ? 'PDF' : 'photo'} ↗
             </a>
           )}
-          <p className="text-[13.5px] leading-snug text-slate-700">
+          <p className="text-[0.84375rem] leading-snug text-slate-700">
             Read into the guide’s times. <b>Check each one</b>: under each is what it came from.
           </p>
-          {reading.times.length === 0 && <p className="text-[13.5px] font-semibold text-caution">No times could be read from it. Type them in below.</p>}
-          {reading.missing && <p className="text-[13px] leading-snug text-caution">{reading.missing} Those days show “not posted”, not a guess.</p>}
+          {reading.times.length === 0 && <p className="text-[0.84375rem] font-semibold text-caution">No times could be read from it. Type them in below.</p>}
+          {reading.missing && <p className="text-[0.8125rem] leading-snug text-caution">{reading.missing} Those days show “not posted”, not a guess.</p>}
         </div>
       )}
 
@@ -190,21 +190,21 @@ export default function AddScheduleBox({ item, festival, onSent, onClose }: { it
             type="button"
             disabled={!ready || busy === 'send'}
             onClick={() => start('send', (token) => void send(token))}
-            className="h-10 flex-1 cursor-pointer rounded-[10px] bg-primary text-[14.5px] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
+            className="h-10 flex-1 cursor-pointer rounded-[10px] bg-primary text-[0.90625rem] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
           >
             {busy === 'send' ? 'Sending…' : 'Send for a check'}
           </button>
         </div>
       )}
-      <button type="button" onClick={onClose} className="mt-2 cursor-pointer text-[14px] font-bold text-slate-500 hover:text-slate-700">
+      <button type="button" onClick={onClose} className="mt-2 cursor-pointer text-[0.875rem] font-bold text-slate-500 hover:text-slate-700">
         Cancel
       </button>
       {error && (
-        <p role="alert" className="mt-2 text-[13.5px] text-red-700">
+        <p role="alert" className="mt-2 text-[0.84375rem] text-red-700">
           {error}
         </p>
       )}
-      <p className="mt-2 text-[12.5px] leading-snug text-muted">
+      <p className="mt-2 text-[0.78125rem] leading-snug text-muted">
         {step === 'check' ? 'What you sent goes with it, so the admin checks the times against it. ' : ''}An admin checks them before anyone sees them.
       </p>
       {busy && turnstileActive && <TurnstileWidget key={attempt} onVerify={(token) => pending.current(token)} />}

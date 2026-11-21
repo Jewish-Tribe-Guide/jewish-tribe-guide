@@ -16,7 +16,7 @@ export function AddButton({ onClick, label = 'Add' }: { onClick: () => void; lab
       // for the accessible name whatever the visible text grows into. Admin's
       // Places says what it adds, for a screen reader.
       aria-label={label}
-      className="fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 z-40 flex h-12 desktop:h-14 items-center justify-center gap-1.5 desktop:gap-2 rounded-full border desktop:border-[1.5px] border-add-edge bg-add pl-3.5 pr-[1.125rem] desktop:pl-[1.125rem] desktop:pr-[1.375rem] text-ink text-[15px] desktop:text-[17px] font-semibold shadow-[0_4px_12px_rgba(19,36,58,0.14)] desktop:shadow-[0_6px_16px_rgba(19,36,58,0.14)] cursor-pointer active:scale-95 transition-transform"
+      className="fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 z-40 flex h-12 desktop:h-14 items-center justify-center gap-1.5 desktop:gap-2 rounded-full border desktop:border-[1.5px] border-add-edge bg-add pl-3.5 pr-[1.125rem] desktop:pl-[1.125rem] desktop:pr-[1.375rem] text-ink text-[0.9375rem] desktop:text-[1.0625rem] font-semibold shadow-[0_4px_12px_rgba(19,36,58,0.14)] desktop:shadow-[0_6px_16px_rgba(19,36,58,0.14)] cursor-pointer active:scale-95 transition-transform"
     >
       <PlusIcon className="h-5 w-5 desktop:h-[22px] desktop:w-[22px] shrink-0" />
       <span className="whitespace-nowrap">Add</span>

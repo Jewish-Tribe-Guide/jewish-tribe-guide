@@ -93,7 +93,7 @@ export default function TeamManager({ token, me }: { token: string; me: string }
           {adminEmails.map((email) =>
             confirming === email ? (
               <li key={email} className={`${row} flex-wrap bg-slate-50`}>
-                <span className="flex-1 min-w-0 text-[15px] font-semibold text-slate-900 break-all">Remove {email}?</span>
+                <span className="flex-1 min-w-0 text-[0.9375rem] font-semibold text-slate-900 break-all">Remove {email}?</span>
                 <button
                   type="button"
                   onClick={() => changeTeam('DELETE', email, 'Could not remove that admin.')}
@@ -108,7 +108,7 @@ export default function TeamManager({ token, me }: { token: string; me: string }
               </li>
             ) : (
               <li key={email} className={row}>
-                <span className="flex-1 min-w-0 text-[15px] font-semibold text-slate-900 break-all">{email}</span>
+                <span className="flex-1 min-w-0 text-[0.9375rem] font-semibold text-slate-900 break-all">{email}</span>
                 {sameEmail(email, me) ? (
                   <span className="text-xs font-semibold text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-px">You</span>
                 ) : (
@@ -149,7 +149,7 @@ export default function TeamManager({ token, me }: { token: string; me: string }
             {busy && !confirming ? 'Adding…' : 'Add admin'}
           </button>
         </form>
-        {listError && <p className="m-0 px-4 pb-3 text-[13px] text-red-700">{listError}</p>}
+        {listError && <p className="m-0 px-4 pb-3 text-[0.8125rem] text-red-700">{listError}</p>}
       </AdminBox>
 
       <AdminBox title="Emails to you">
@@ -160,13 +160,13 @@ export default function TeamManager({ token, me }: { token: string; me: string }
           ] as const
         ).map(([field, label]) => (
           <div key={field} className="flex items-center gap-3 px-4 py-3 min-h-[52px] border-b border-slate-100 last:border-b-0">
-            <span aria-hidden="true" className="flex-1 text-[15px] text-slate-900">
+            <span aria-hidden="true" className="flex-1 text-[0.9375rem] text-slate-900">
               {label}
             </span>
             <AdminSwitch checked={prefs[field]} onChange={(on) => setPreference(field, on)} label={label} />
           </div>
         ))}
-        {prefError && <p className="m-0 px-4 pb-3 text-[13px] text-red-700">{prefError}</p>}
+        {prefError && <p className="m-0 px-4 pb-3 text-[0.8125rem] text-red-700">{prefError}</p>}
       </AdminBox>
     </div>
   )

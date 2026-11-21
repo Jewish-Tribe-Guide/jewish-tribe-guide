@@ -20,7 +20,7 @@ export default function ThingSwitches({ things, on, onPick }: { things: Thing[];
             role="tab"
             aria-selected={t.id === on}
             onClick={() => onPick(t.id)}
-            className={`${scrolls ? 'flex-none px-3' : 'flex-1 min-w-0 px-2'} min-h-[38px] flex items-center justify-center gap-1.5 rounded-lg text-[13.5px] font-bold cursor-pointer ${
+            className={`${scrolls ? 'flex-none px-3' : 'flex-1 min-w-0 px-2'} min-h-[38px] flex items-center justify-center gap-1.5 rounded-lg text-[0.84375rem] font-bold cursor-pointer ${
               t.id === on ? 'bg-white text-slate-900 shadow-[0_1px_3px_rgba(15,23,42,0.12)]' : 'text-slate-600'
             }`}
           >

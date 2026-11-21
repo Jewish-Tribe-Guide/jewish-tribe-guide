@@ -40,10 +40,10 @@ function ContactLines({ entry }: { entry: ContactEntry }) {
   ]
   return (
     <div className="py-2.5" data-testid="contact">
-      {entry.from && <p className="text-[12.5px] font-bold text-muted">From {entry.from}</p>}
-      <p className="text-[15px] font-bold leading-snug text-slate-900">{entry.name}</p>
-      {entry.who && <p className="text-[14px] leading-snug text-slate-700">{entry.who}</p>}
-      {entry.note && <p className="mt-0.5 text-[14px] leading-snug whitespace-pre-line text-slate-700">{entry.note}</p>}
+      {entry.from && <p className="text-[0.78125rem] font-bold text-muted">From {entry.from}</p>}
+      <p className="text-[0.9375rem] font-bold leading-snug text-slate-900">{entry.name}</p>
+      {entry.who && <p className="text-[0.875rem] leading-snug text-slate-700">{entry.who}</p>}
+      {entry.note && <p className="mt-0.5 text-[0.875rem] leading-snug whitespace-pre-line text-slate-700">{entry.note}</p>}
       {rows.length > 0 && (
         <div className="mt-1 divide-y divide-slate-100">
           {rows.map((r) => (
@@ -51,7 +51,7 @@ function ContactLines({ entry }: { entry: ContactEntry }) {
               key={r.key}
               href={r.href}
               {...(r.web ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-              className={`flex min-h-11 items-center gap-2.5 break-all font-bold text-primary hover:underline ${r.small ? 'text-[14.5px]' : 'text-[15px]'}`}
+              className={`flex min-h-11 items-center gap-2.5 break-all font-bold text-primary hover:underline ${r.small ? 'text-[0.90625rem]' : 'text-[0.9375rem]'}`}
             >
               {r.icon}
               {r.text}
@@ -78,19 +78,19 @@ export function BoxField({ field: f, item }: { field: CategoryField; item: Direc
   const text = fieldText(f, item[f.key])
   if (f.type === 'url') {
     return (
-      <a href={text} target="_blank" rel="noopener noreferrer" className="tap-44 block py-2 text-[15px] font-semibold text-primary hover:underline">
+      <a href={text} target="_blank" rel="noopener noreferrer" className="tap-44 block py-2 text-[0.9375rem] font-semibold text-primary hover:underline">
         {f.linkLabel ?? f.label}
       </a>
     )
   }
   if (f.type === 'tel') {
     return (
-      <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="tap-44 block py-2 text-[15px] font-bold text-primary hover:underline">
+      <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="tap-44 block py-2 text-[0.9375rem] font-bold text-primary hover:underline">
         {text}
       </a>
     )
   }
-  return <p className="py-2 text-[15px] leading-snug whitespace-pre-line text-slate-700">{text}</p>
+  return <p className="py-2 text-[0.9375rem] leading-snug whitespace-pre-line text-slate-700">{text}</p>
 }
 
 /** A box the admin named, of the fields they put in it, in their order.
@@ -131,7 +131,7 @@ export function FieldsBox({
         <div key={f.key} className={headed && i > 0 ? 'mt-1 border-t border-slate-200' : ''}>
           {/* A box drawn in this one names itself (Card, inside one). */}
           {headed && !drawn.has(f.key) && (
-            <p className="pt-2.5 text-[12px] font-extrabold uppercase tracking-wide text-muted">
+            <p className="pt-2.5 text-[0.75rem] font-extrabold uppercase tracking-wide text-muted">
               {f.label}
               {count(f) > 1 && ` · ${count(f)}`}
             </p>

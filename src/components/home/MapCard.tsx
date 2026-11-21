@@ -83,19 +83,19 @@ export default function MapCard({ href, photo, categoryNames, onOpen }: Props) {
           </span>
         )}
         {desktop && photo?.credit && (
-          <span data-testid="home-map-card-credit" className="absolute bottom-2.5 right-3.5 rounded bg-white/80 px-1.5 py-0.5 text-[11px] text-slate-600">
+          <span data-testid="home-map-card-credit" className="absolute bottom-2.5 right-3.5 rounded bg-white/80 px-1.5 py-0.5 text-[0.6875rem] text-slate-600">
             {photo.credit}
           </span>
         )}
       </div>
       <div className="relative mx-auto flex h-full max-w-7xl px-4 sm:px-6">
       <div className="flex w-[440px] flex-col justify-center gap-3.5">
-        <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-slate-600">One map</p>
-        <h2 className="text-[46px] font-extrabold leading-[1.05] text-ink">Everything on one map</h2>
+        <p className="text-[0.8125rem] font-bold uppercase tracking-[0.14em] text-slate-600">One map</p>
+        <h2 className="text-[2.875rem] font-extrabold leading-[1.05] text-ink">Everything on one map</h2>
         <p className="text-lg text-slate-700">{mapCardLine(categoryNames)}</p>
         {/* No chevron on the button (the user, Nov 11): the words are the
             action, and the whole card is the link. */}
-        <span data-testid="map-card-button" className="mt-2 inline-flex h-[52px] w-fit items-center rounded-full bg-primary px-[26px] text-[17px] font-bold text-white transition-colors group-hover:bg-primary-dark">
+        <span data-testid="map-card-button" className="mt-2 inline-flex h-[52px] w-fit items-center rounded-full bg-primary px-[26px] text-[1.0625rem] font-bold text-white transition-colors group-hover:bg-primary-dark">
           Open the map
         </span>
       </div>

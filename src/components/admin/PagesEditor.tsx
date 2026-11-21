@@ -101,7 +101,7 @@ export default function PagesEditor({ token }: { token: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="m-0 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[15px] text-amber-900">One copy for every community</p>
+      <p className="m-0 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[0.9375rem] text-amber-900">One copy for every community</p>
 
       <div className="flex flex-wrap items-center gap-3">
         <div role="group" aria-label="Page" className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5">

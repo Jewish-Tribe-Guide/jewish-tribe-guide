@@ -126,9 +126,9 @@ export function PinnedBlock({ communitySlug, from, now }: { communitySlug: strin
   return (
     <section data-testid="today-pinned" className="desktop:rounded-2xl desktop:border desktop:border-slate-200 desktop:bg-white desktop:px-5 desktop:py-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500">Pinned</h2>
+        <h2 className="text-[0.78125rem] font-extrabold uppercase tracking-[0.06em] text-slate-500">Pinned</h2>
         {places.length > ON_TODAY && (
-          <Link href={routes.you(communitySlug)} prefetch={false} className="shrink-0 whitespace-nowrap text-[14px] font-bold text-primary hover:underline">
+          <Link href={routes.you(communitySlug)} prefetch={false} className="shrink-0 whitespace-nowrap text-[0.875rem] font-bold text-primary hover:underline">
             All {places.length} ›
           </Link>
         )}
@@ -164,8 +164,8 @@ function TodayPinnedRow({ place, communitySlug, from, now }: { place: PinnedPlac
     <Link href={placeHref(communitySlug, place)} prefetch={false} className="flex items-center gap-3 border-t border-slate-100 py-2.5 first:border-t-0 hover:bg-slate-50">
       <PlaceIcon place={place} color={getCategoryColor(categories, category.id)} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15.5px] font-bold text-ink">{placeName(place)}</span>
-        <span className="mt-0.5 block text-[13.5px] text-slate-600">
+        <span className="block truncate text-[0.96875rem] font-bold text-ink">{placeName(place)}</span>
+        <span className="mt-0.5 block text-[0.84375rem] text-slate-600">
           {/* "Eruv", as its listing says: the page's name is the page's. */}
           {place.kind === 'eruv' ? 'Eruv' : category.label}
           {status && (
@@ -178,7 +178,7 @@ function TodayPinnedRow({ place, communitySlug, from, now }: { place: PinnedPlac
           )}
         </span>
       </span>
-      {miles != null && <span className="shrink-0 text-[13px] font-semibold text-slate-500">{milesText(miles)}</span>}
+      {miles != null && <span className="shrink-0 text-[0.8125rem] font-semibold text-slate-500">{milesText(miles)}</span>}
       <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
     </Link>
   )

@@ -69,16 +69,16 @@ export default function TodoList({
 
       {places.length === 0 ? (
         setupToGo > 0 ? (
-          <p className="m-0 text-[15px] text-slate-600">Nothing else to do.</p>
+          <p className="m-0 text-[0.9375rem] text-slate-600">Nothing else to do.</p>
         ) : (
           <AdminEmpty>
-            <span className="block text-[17px] font-bold text-slate-900">Nothing to do</span>
+            <span className="block text-[1.0625rem] font-bold text-slate-900">Nothing to do</span>
             <span className="block mt-1">Every place was read this morning</span>
           </AdminEmpty>
         )
       ) : (
         <>
-          <label className="flex items-center gap-2 h-11 rounded-[10px] border border-slate-300 bg-white px-3 text-[15px]">
+          <label className="flex items-center gap-2 h-11 rounded-[10px] border border-slate-300 bg-white px-3 text-[0.9375rem]">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#64748b" strokeWidth="1.8" aria-hidden="true">
               <circle cx="7" cy="7" r="4.5" />
               <path d="M10.5 10.5L14 14" />
@@ -127,7 +127,7 @@ export default function TodoList({
                     name={
                       <span className="flex items-baseline gap-2">
                         <span className="min-w-0 flex-1">{p.name}</span>
-                        {p.at && <span className="flex-none text-[12.5px] font-normal text-slate-500">{shortDay(p.at)}</span>}
+                        {p.at && <span className="flex-none text-[0.78125rem] font-normal text-slate-500">{shortDay(p.at)}</span>}
                       </span>
                     }
                     line={placeLine(p)}

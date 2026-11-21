@@ -181,11 +181,11 @@ export default function CampaignBannerCard() {
             Happening now
           </p>
           {/* h2 — same heading-order reasoning as the mobile block above. */}
-          <h2 className="max-w-[32ch] text-[24px] font-extrabold text-ink">
+          <h2 className="max-w-[32ch] text-[1.5rem] font-extrabold text-ink">
             {banner.title}
           </h2>
           {banner.subtitle && (
-            <p className="mt-1 max-w-[44ch] text-[15px] text-slate-600">{banner.subtitle}</p>
+            <p className="mt-1 max-w-[44ch] text-[0.9375rem] text-slate-600">{banner.subtitle}</p>
           )}
         </div>
 

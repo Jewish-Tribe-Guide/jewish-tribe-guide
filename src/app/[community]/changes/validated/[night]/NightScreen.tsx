@@ -27,12 +27,12 @@ export default function NightScreen({ night }: { night: NamedNight }) {
   return (
     <main data-testid="night-page" className={`mx-auto w-full max-w-3xl flex-1 px-4 ${TAB_BAR_CLEARANCE} pt-5 sm:px-6 desktop:pb-12 desktop:pt-8 animate-[fadeIn_180ms_ease-out]`}>
       <div className="hidden desktop:block">
-        <Link href={routes.changes(community.slug)} className="mb-1.5 block text-[15px] font-bold text-primary hover:underline">
+        <Link href={routes.changes(community.slug)} className="mb-1.5 block text-[0.9375rem] font-bold text-primary hover:underline">
           ‹ What changed
         </Link>
       </div>
-      <h1 className="sr-only text-[34px] font-extrabold leading-tight text-ink desktop:not-sr-only desktop:block">{title}</h1>
-      <p data-testid="night-when" className="mt-0.5 text-[15px] text-slate-600 desktop:mt-1.5">
+      <h1 className="sr-only text-[2.125rem] font-extrabold leading-tight text-ink desktop:not-sr-only desktop:block">{title}</h1>
+      <p data-testid="night-when" className="mt-0.5 text-[0.9375rem] text-slate-600 desktop:mt-1.5">
         {now === null ? ' ' : nightWhen(night, now, timezone)}
       </p>
       {night.groups.map((g) => (
@@ -47,18 +47,18 @@ function Group({ title, names }: { title: string; names: string[] }) {
   const shown = all ? names : names.slice(0, SHOWN)
   return (
     <section data-testid="night-group" className="mt-5">
-      <h2 className="text-[13px] font-extrabold uppercase tracking-[0.05em] text-slate-500">
+      <h2 className="text-[0.8125rem] font-extrabold uppercase tracking-[0.05em] text-slate-500">
         {title} · {names.length}
       </h2>
       <ul className="mt-2 rounded-2xl border border-slate-200 bg-white px-4 [&>li:first-child]:border-t-0">
         {shown.map((name, i) => (
-          <li key={i} className="border-t border-slate-100 py-2.5 text-[15px] text-ink">
+          <li key={i} className="border-t border-slate-100 py-2.5 text-[0.9375rem] text-ink">
             {name}
           </li>
         ))}
         {names.length > shown.length && (
           <li className="border-t border-slate-100 py-2.5">
-            <button type="button" onClick={() => setAll(true)} className="text-[15px] font-bold text-primary hover:underline">
+            <button type="button" onClick={() => setAll(true)} className="text-[0.9375rem] font-bold text-primary hover:underline">
               Show all {names.length}
             </button>
           </li>

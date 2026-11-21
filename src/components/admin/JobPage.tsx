@@ -84,7 +84,7 @@ function AddToJob({ kind, token, onDone }: { kind: NightKindId; token: string; o
     <AdminBox>
       <div className="flex flex-col gap-3 p-4">
         {add.place && (
-          <label className="flex flex-col gap-1.5 text-[13px] text-slate-600">
+          <label className="flex flex-col gap-1.5 text-[0.8125rem] text-slate-600">
             {add.place}
             <select value={place} onChange={(e) => setPlace(e.target.value)} className={adminInputClass}>
               <option value="">Pick one</option>
@@ -96,7 +96,7 @@ function AddToJob({ kind, token, onDone }: { kind: NightKindId; token: string; o
             </select>
           </label>
         )}
-        <label className="flex flex-col gap-1.5 text-[13px] text-slate-600">
+        <label className="flex flex-col gap-1.5 text-[0.8125rem] text-slate-600">
           Its page
           <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={add.placeholder} className={adminInputClass} />
         </label>
@@ -134,7 +134,7 @@ export function TurnOffJob({ kind, name, count, token }: { kind: NightKindId; na
 
   if (!asking) {
     return (
-      <button type="button" onClick={() => setAsking(true)} className="min-h-11 cursor-pointer text-[15px] font-semibold text-slate-600">
+      <button type="button" onClick={() => setAsking(true)} className="min-h-11 cursor-pointer text-[0.9375rem] font-semibold text-slate-600">
         Turn off this job
       </button>
     )
@@ -167,7 +167,7 @@ function NightRow({ night }: { night: KindNight }) {
   return (
     <li className="flex min-h-10 items-center justify-between gap-2 border-b border-slate-100 px-3 text-sm last:border-b-0">
       <span className="font-semibold text-slate-900">{night.date}</span>
-      {night.tone === 'good' ? <GoodMark label={night.result} /> : night.tone === 'bad' ? <BadMark label={night.result} /> : <span className="text-[13px] text-slate-400">{night.result}</span>}
+      {night.tone === 'good' ? <GoodMark label={night.result} /> : night.tone === 'bad' ? <BadMark label={night.result} /> : <span className="text-[0.8125rem] text-slate-400">{night.result}</span>}
     </li>
   )
 }
@@ -224,15 +224,15 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
       {adding && known && <AddToJob kind={known.id} token={token} onDone={async () => { setAdding(false); await reload() }} />}
       <div className="rounded-[10px] border border-slate-200 bg-white px-4 py-3.5">
         <p className="m-0 text-lg font-semibold text-slate-900">{statusLine(job)}</p>
-        {job.schedule && <p className="m-0 mt-0.5 text-[13px] text-slate-600">{job.schedule}</p>}
-        {job.scheduleMore && <p className="m-0 text-[13px] text-slate-600">{job.scheduleMore}</p>}
+        {job.schedule && <p className="m-0 mt-0.5 text-[0.8125rem] text-slate-600">{job.schedule}</p>}
+        {job.scheduleMore && <p className="m-0 text-[0.8125rem] text-slate-600">{job.scheduleMore}</p>}
       </div>
       {job.misses.length > 0 && (
         <AdminBox title={job.id === 'links' ? 'Needs a look' : 'Not read last night'}>
           {job.misses.map((m, i) => (m.page ? <AdminRow key={i} href={opens(m.page)} name={m.name} line={<span className="text-amber-800">{m.why}</span>} /> : (
             <div key={i} className="px-4 py-2.5">
-              <p className="m-0 text-[15px] font-semibold text-slate-900">{m.name}</p>
-              <p className="m-0 text-[13px] text-amber-800">{m.why}</p>
+              <p className="m-0 text-[0.9375rem] font-semibold text-slate-900">{m.name}</p>
+              <p className="m-0 text-[0.8125rem] text-amber-800">{m.why}</p>
             </div>
           )))}
         </AdminBox>
@@ -241,17 +241,17 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
         <AdminBox title={`All ${everything.length} tracked`}>
           {tracked.map((t, i) => (t.page ? <AdminRow key={i} href={opens(t.page)} name={t.name} /> : (
             <div key={i} className="flex min-h-11 items-center gap-2 px-4 py-2">
-              <span className="flex-1 text-[15px] font-semibold text-slate-900">{t.name}</span>
-              <span className={`text-[13px] ${t.bad ? 'text-amber-800' : 'text-slate-500'}`}>{t.status}</span>
+              <span className="flex-1 text-[0.9375rem] font-semibold text-slate-900">{t.name}</span>
+              <span className={`text-[0.8125rem] ${t.bad ? 'text-amber-800' : 'text-slate-500'}`}>{t.status}</span>
               {t.watch && (
-                <button type="button" onClick={() => void list(t.watch!.id, t.watch!.active ? 'pause' : 'resume')} className="min-h-11 cursor-pointer whitespace-nowrap text-[13px] font-semibold text-primary">
+                <button type="button" onClick={() => void list(t.watch!.id, t.watch!.active ? 'pause' : 'resume')} className="min-h-11 cursor-pointer whitespace-nowrap text-[0.8125rem] font-semibold text-primary">
                   {t.watch.active ? 'Stop' : 'Read again'}
                 </button>
               )}
             </div>
           )))}
           {everything.length > TRACKED_SHOWN && (
-            <button type="button" aria-expanded={all} onClick={() => setAll((a) => !a)} className="min-h-11 w-full cursor-pointer px-4 text-left text-[15px] font-semibold text-slate-900">
+            <button type="button" aria-expanded={all} onClick={() => setAll((a) => !a)} className="min-h-11 w-full cursor-pointer px-4 text-left text-[0.9375rem] font-semibold text-slate-900">
               {all ? 'Show fewer' : `Show all ${everything.length}`}
             </button>
           )}

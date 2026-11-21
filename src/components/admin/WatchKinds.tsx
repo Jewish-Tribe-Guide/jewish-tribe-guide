@@ -50,7 +50,7 @@ export function JobsNotLoaded({ jobs }: { jobs: Jobs }) {
   const names = jobsNotLoaded(jobs)
   if (names.length === 0) return null
   return (
-    <p className="text-[12.5px] font-medium text-amber-800 sm:text-[13px]" data-testid="jobs-not-loaded">
+    <p className="text-[0.78125rem] font-medium text-amber-800 sm:text-[0.8125rem]" data-testid="jobs-not-loaded">
       Not loaded: {names.join(' · ')}
     </p>
   )
