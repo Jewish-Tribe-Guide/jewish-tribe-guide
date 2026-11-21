@@ -5,6 +5,7 @@
 //   node --env-file=.env.local scripts/merge-food-categories.mjs
 
 import { createClient } from '@supabase/supabase-js'
+import { patchListing } from './patchListing.mjs'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -85,7 +86,7 @@ console.log('✅ Restaurant category renamed → Food Establishments, foodType f
 
 const { data: restaurants, error: rErr } = await supabase
   .from('resource')
-  .select('id, details')
+  .select('id, community_id, details')
   .eq('category', 'restaurant')
 
 if (rErr) { console.error('❌ Failed to fetch restaurant listings:', rErr.message); process.exit(1) }
@@ -93,7 +94,7 @@ if (rErr) { console.error('❌ Failed to fetch restaurant listings:', rErr.messa
 let stamped = 0
 for (const row of restaurants ?? []) {
   const details = { ...(row.details ?? {}), foodType: 'Restaurant' }
-  const { error } = await supabase.from('resource').update({ details }).eq('id', row.id)
+  const error = await patchListing(supabase, row, details).then(() => null, (e) => e)
   if (error) console.error(`  ❌ ${row.id}:`, error.message)
   else stamped++
 }
@@ -103,7 +104,7 @@ console.log(`✅ Stamped ${stamped} restaurant listings with foodType = 'Restaur
 
 const { data: bakeries, error: bErr } = await supabase
   .from('resource')
-  .select('id, details')
+  .select('id, community_id, details')
   .eq('category', 'bakery-cafe')
 
 if (bErr) { console.error('❌ Failed to fetch bakery-cafe listings:', bErr.message); process.exit(1) }
@@ -111,7 +112,7 @@ if (bErr) { console.error('❌ Failed to fetch bakery-cafe listings:', bErr.mess
 let moved = 0
 for (const row of bakeries ?? []) {
   const details = { ...(row.details ?? {}), foodType: 'Bakery & Cafe' }
-  const { error } = await supabase.from('resource').update({ category: 'restaurant', details }).eq('id', row.id)
+  const error = await patchListing(supabase, row, details, { category: 'restaurant' }).then(() => null, (e) => e)
   if (error) console.error(`  ❌ ${row.id}:`, error.message)
   else moved++
 }
@@ -121,7 +122,7 @@ console.log(`✅ Moved ${moved} bakery-cafe listings → restaurant (foodType = 
 
 const { data: iceCreams, error: iErr } = await supabase
   .from('resource')
-  .select('id, details')
+  .select('id, community_id, details')
   .eq('category', 'ice-cream')
 
 if (iErr) { console.error('❌ Failed to fetch ice-cream listings:', iErr.message); process.exit(1) }
@@ -129,7 +130,7 @@ if (iErr) { console.error('❌ Failed to fetch ice-cream listings:', iErr.messag
 let moved2 = 0
 for (const row of iceCreams ?? []) {
   const details = { ...(row.details ?? {}), foodType: 'Ice Cream' }
-  const { error } = await supabase.from('resource').update({ category: 'restaurant', details }).eq('id', row.id)
+  const error = await patchListing(supabase, row, details, { category: 'restaurant' }).then(() => null, (e) => e)
   if (error) console.error(`  ❌ ${row.id}:`, error.message)
   else moved2++
 }

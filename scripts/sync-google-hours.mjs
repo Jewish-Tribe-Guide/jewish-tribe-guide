@@ -26,6 +26,7 @@
 //   node --env-file=.env.local scripts/sync-google-hours.mjs --dry-run
 
 import { createClient } from '@supabase/supabase-js'
+import { patchListing } from './patchListing.mjs'
 
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
@@ -123,7 +124,7 @@ function describeHoursChange(before, after) {
 
 const { data: rows, error } = await s
   .from('resource')
-  .select('id,name,phone,address,details')
+  .select('id,community_id,name,phone,address,details')
   .eq('status', 'approved')
   .not('details->>placeId', 'is', null)
 if (error) throw new Error(error.message)
@@ -212,7 +213,8 @@ for (const r of rows) {
     continue
   }
 
-  await s.from('resource').update(update).eq('id', r.id)
+  const { details: next, ...columns } = update
+  await patchListing(s, r, next, columns)
   done++
   console.log(`✅ ${r.name} — ${result.business_status ?? 'OPERATIONAL'}`)
   await sleep(200)

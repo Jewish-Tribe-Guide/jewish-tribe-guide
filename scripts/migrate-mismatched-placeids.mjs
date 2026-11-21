@@ -27,6 +27,7 @@
 // confirmed match) does nothing on a later run.
 
 import { createClient } from '@supabase/supabase-js'
+import { patchListing } from './patchListing.mjs'
 
 const APPLY = process.argv.includes('--apply')
 
@@ -67,7 +68,7 @@ async function fetchGoogleName(placeId) {
 
 const { data: rows, error } = await s
   .from('resource')
-  .select('id,name,details')
+  .select('id,community_id,name,details')
   .eq('status', 'approved')
   .not('details->>placeId', 'is', null)
 if (error) throw new Error(error.message)
@@ -101,7 +102,7 @@ for (const r of rows) {
     delete details.businessStatus
     delete details.googleSyncedAt
     delete details.googleFields
-    await s.from('resource').update({ details }).eq('id', r.id)
+    await patchListing(s, r, details)
   }
   await sleep(200)
 }

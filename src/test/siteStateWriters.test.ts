@@ -61,6 +61,41 @@ describe('a listing’s details are changed key by key', () => {
     expect(whole, 'write it with patchListing (src/lib/listingPatch.ts)').toEqual([])
   })
 
+  // Scripts too (Nov 21, after 112 ran): a script's whole write keeps
+  // working for people's words, but whatever it changes among the site's
+  // keys is ignored, and the script still says it did it. A script that
+  // names one of those keys writes through scripts/patchListing.mjs. A write
+  // that sets `state` itself (a fixture reset, sync-dev-from-prod's copy of
+  // live's whole rows) keeps it, so it may write whole.
+  it('no script writes the site’s keys except through patchListing.mjs', () => {
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20240101000110_resource_state.sql'), 'utf8')
+    const keys = [...sql.match(/site_state_keys\(\)[\s\S]*?array\[([\s\S]*?)\]/)![1].matchAll(/'(\w+)'/g)].map((k) => k[1])
+    expect(keys).toContain('googleFields')
+    const SCRIPTS = join(process.cwd(), 'scripts')
+    const whole = readdirSync(SCRIPTS)
+      .filter((name) => /\.m?js$/.test(name) && name !== 'patchListing.mjs')
+      .flatMap((name) => {
+        const source = readFileSync(join(SCRIPTS, name), 'utf8')
+        const named = keys.filter((key) => new RegExp(`\\b${key}\\b`).test(source))
+        if (named.length === 0) return []
+        return resourceChains(source)
+          .filter(mayWriteDetails)
+          .filter((chain) => !/\bstate\b/.test(chain) && !(name === 'sync-dev-from-prod.mjs' && /upsert\(scrubbed/.test(chain)))
+          .map((chain) => `${name} (names ${named.join(', ')}): ${chain.split('\n')[0].trim()}`)
+      })
+    expect(whole, 'write it with scripts/patchListing.mjs').toEqual([])
+  })
+
+  // A fixture upserted over an existing row is an update, so since 112 it
+  // keeps that row's confirmations and Google record unless it resets
+  // `state` too: the next run starts with whatever the last one confirmed.
+  it('a script’s listing upsert resets state', () => {
+    const source = readFileSync(join(process.cwd(), 'scripts/run-test-project-server.mjs'), 'utf8')
+    const upserts = resourceChains(source).filter((chain) => /\.upsert\(/.test(chain))
+    expect(upserts.length).toBeGreaterThan(0)
+    expect(upserts.filter((chain) => !/\bstate:\s*\{\}/.test(chain))).toEqual([])
+  })
+
   it('catches one', () => {
     expect(mayWriteDetails("from('resource').update({ details }).eq('id', id)")).toBe(true)
     expect(mayWriteDetails("from('resource').update(update).eq('id', id)")).toBe(true)
