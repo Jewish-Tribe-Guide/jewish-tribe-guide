@@ -52,11 +52,28 @@ export async function withdrawPending(submissionId: string, listingId: string): 
     .eq('target_id', listingId)
     .eq('status', 'pending')
     .eq('operation', 'update')
-    .gte('created_at', new Date(Date.now() - UNDO_WITHIN_MS).toISOString())
+    .gte('created_at', undoSince())
     .select('id')
   if (error) throw new Error(error.message)
   return (data ?? []).length > 0
 }
+
+/** Whether withdrawPending would withdraw it now, without withdrawing it
+ *  (the same filters). */
+export async function ownRemovalWaiting(submissionId: string, listingId: string): Promise<boolean> {
+  const { data, error } = await getAdminClient()
+    .from('submission')
+    .select('id')
+    .eq('id', submissionId)
+    .eq('target_id', listingId)
+    .eq('status', 'pending')
+    .eq('operation', 'update')
+    .gte('created_at', undoSince())
+  if (error) throw new Error(error.message)
+  return (data ?? []).length > 0
+}
+
+const undoSince = () => new Date(Date.now() - UNDO_WITHIN_MS).toISOString()
 
 /** Whether a "Not anymore" on this item is still waiting in the queue: a
  *  pending edit to the listing whose list leaves the item out (item/gone

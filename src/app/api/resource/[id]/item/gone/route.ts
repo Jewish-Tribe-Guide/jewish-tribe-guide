@@ -11,7 +11,7 @@ import { getCategoryById } from '@/lib/categoryStore'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
 import { removalSubmission } from '@/lib/itemMarks'
-import { isIso, parseItemTap, UUID, withdrawPending, type MarkRow } from '@/lib/itemMarkRoutes'
+import { goneReportWaiting, isIso, ownRemovalWaiting, parseItemTap, UUID, withdrawPending, type MarkRow } from '@/lib/itemMarkRoutes'
 import { editableCommunity, failsBotCheck, openListingWrite } from '@/lib/listingWrite'
 
 // POST /api/resource/:id/item/gone   { field, item, turnstileToken, company }
@@ -63,14 +63,24 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
   const row = ((data ?? []) as MarkRow[])[0]
   if (!row) return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
   if (!row.out_changed) {
-    // Someone said so already; it's with an admin.
-    return Response.json({ ok: true, item: row.out_label, goneAt: row.out_at, changed: false })
+    // Someone said so already; it's with an admin. Unless nothing waits for
+    // one: a warning left up when filing it failed (Nov 21, the save
+    // survey). Then this files it, and the warning is reviewed after all.
+    let waiting = true
+    try {
+      waiting = await goneReportWaiting(id, tap.field, row.out_label)
+    } catch (err) {
+      reportServerError('[item/gone] could not read the queue:', err)
+    }
+    if (waiting) return Response.json({ ok: true, item: row.out_label, goneAt: row.out_at, changed: false })
   }
 
   // The warning is up; now the removal. If it can't be filed, the warning
   // comes back down: a warning nobody will ever review would stay forever.
-  const undoMark = () =>
-    admin.rpc('unmark_item', {
+  // If it can't come down either, Sentry hears: the next "Not anymore" on
+  // the item files the removal (above).
+  const undoMark = async () => {
+    const { error: undoErr } = await admin.rpc('unmark_item', {
       p_id: id,
       p_field: tap.field,
       p_label: row.out_label,
@@ -79,6 +89,8 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
       p_previous: null,
       p_restore_gone: null,
     })
+    if (undoErr) reportServerError(`[item/gone] a warning on ${id} (${row.out_label}) is up with nothing in the queue:`, undoErr)
+  }
   let submissionId: string
   try {
     const listing = await getResourceById(id, row.out_community)
@@ -130,15 +142,21 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
     return Response.json({ ok: false, error: 'Which report?' }, { status: 400 })
   }
 
-  let withdrawn: boolean
+  // The warning comes down before the removal leaves the queue (Nov 21,
+  // the save survey). The other way, a warning that failed to come down
+  // stayed up with nothing in the queue, and trying again found the
+  // removal gone and changed nothing. Now a failure here changes nothing
+  // and Undo can be tried again; one at the withdrawal leaves a removal
+  // with no warning, which an admin still sees and decides.
+  let waiting: boolean
   try {
-    withdrawn = await withdrawPending(submissionId, id)
+    waiting = await ownRemovalWaiting(submissionId, id)
   } catch (err) {
-    reportServerError('[item/gone] could not withdraw the removal:', err)
+    reportServerError('[item/gone] could not read the removal:', err)
     return Response.json({ ok: false, error: 'Could not undo that.' }, { status: 502 })
   }
   // Already reviewed (or too late): the admin's decision stands.
-  if (!withdrawn) return Response.json({ ok: true, changed: false })
+  if (!waiting) return Response.json({ ok: true, changed: false })
 
   const admin = getAdminClient()
   const { data, error } = await admin.rpc('unmark_item', {
@@ -150,7 +168,15 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
     p_previous: null,
     p_restore_gone: null,
   })
-  if (error) reportServerError('[item/gone] unmark_item failed:', error)
+  if (error) {
+    reportServerError('[item/gone] unmark_item failed:', error)
+    return Response.json({ ok: false, error: 'Could not undo that.' }, { status: 502 })
+  }
+  try {
+    await withdrawPending(submissionId, id)
+  } catch (err) {
+    reportServerError('[item/gone] the warning is down, but the removal stays in the queue:', err)
+  }
   const row = ((data ?? []) as { out_community: string; out_changed: boolean }[])[0]
   if (typeof body.activityId === 'number' && Number.isSafeInteger(body.activityId)) {
     await removeVisitorActivity(body.activityId, id, 'item_reported_gone')
