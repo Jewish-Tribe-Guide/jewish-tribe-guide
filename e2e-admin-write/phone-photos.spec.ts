@@ -26,7 +26,10 @@ test('a new campaign fits a phone, with the banner shown as it will look', async
   const visible = page.locator(':visible')
   await page.getByRole('button', { name: /Add a campaign/ }).and(visible).click({ timeout: 30_000 })
   const form = page.getByTestId('campaign-banner-form').and(visible)
-  await expect(form).toBeVisible()
+  // Its own address, so the screen mounts again and loads the campaigns and
+  // categories a second time: the same allowance as the first load (CI, Nov
+  // 21: still "Loading…" at 5s).
+  await expect(form).toBeVisible({ timeout: 30_000 })
   await form.getByLabel('Starts').fill('2026-09-11')
   await form.getByLabel('Ends').fill('2026-09-30')
 
