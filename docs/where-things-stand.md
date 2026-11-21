@@ -905,7 +905,8 @@ Found and not fixed:
 
 - Admin-write waits shorter than a busy test database, the shape 406
   fixed twice: `todo-scroll:75`, `main-dishes`, `category-editor`,
-  `community-editor:61`. Not looked into.
+  `community-editor:61`. Not looked into. `missed-searches:47` was one more (PR 417,
+  Nov 21): Dismiss's row waits on the save, now 20s.
 - e2e `listing-detail.spec.ts:537` (above): once, not looked into.
 - 25 of 104 older migrations can't be told run or not from what they
   made (a policy, an index, a data fix).
@@ -931,7 +932,9 @@ For the user:
    settings) waits on live until Today comes back (decided Nov 21).
 3. Run migration 106 (drops the unused `site_settings.contribution_note`):
    dev, then live.
-4. Copy the Gmail script again from Newsletters into the guide's Gmail.
+4. Copy the Gmail script again from Newsletters into the guide's Gmail
+   (live admin, Update the script, since Nov 21: a running script had
+   no way to get the script again).
    Then say whether an eruv email with no Authentication-Results header
    should be refused outright.
 5. Check Database → Backups on live, and run the first live copy
@@ -965,6 +968,10 @@ Surprises:
   committed, so they never reached the public repo.
 - `home-preview-spot:33`, seen three times, was the test pressing Forward
   before the page's own step back had landed.
+- The unit suite's 5s findBy wait (PR 405) equalled Vitest's 5s test
+  budget, so a slow CI run failed at exactly 5000ms (main, Nov 21,
+  ModerationQueue's "1 of 2"). Tests get 15s now, and
+  `src/test/unitTimeouts.test.ts` holds the budget at twice the wait.
 
 The user (Nov 20): use the lull to check the site is "actually being
 built/run the right way". Six read-only reviewers (dead code and
