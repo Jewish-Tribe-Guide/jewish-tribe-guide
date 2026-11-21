@@ -1224,11 +1224,10 @@ for that exact change, in the same conversation. Show the dry run first.
 4. **Migration 083 (`confirmed_by_visitor`) is run on both databases**
    (the user, Oct 18): a visitor's Yes on a whole listing says "Confirmed
    by community".
-   **Check 077 and 082 on the live database, now that the code is live.**
-   Tables and columns through 081 are there. 077 (eruv suggestions, a
-   database rule) and 082 (confirming a contact box, a database function)
-   can't be seen through the API: without them a public eruv suggestion
-   (a fix or, since Nov 9, a new eruv) fails to send and Yes under a contact box says "Didn't save". 067's
+   077 and 082 are on live too (checked Nov 21 with the user's OK, by
+   writes that keep nothing): an eruv suggestion got past the type rule
+   to the community key, and confirm_section took 'contact' and answered
+   from its cooldown without writing. 067's
    columns (Today) are missing too, harmless while Today is held back.
 6. **Shul newsletters** (built Oct 18 on `redesign/shul-newsletters`, not
    merged; no migration). The guide's Gmail (phillyjewishguide@gmail.com)
