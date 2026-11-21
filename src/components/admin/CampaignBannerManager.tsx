@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { parseOkJson } from '@/lib/fetchJson'
-import { useCommunityTimezone } from '@/lib/communityContext'
+import { useCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
 import { useAdminApi } from './useAdminApi'
 import { useNow } from '@/lib/useNow'
 import type { CategoryConfig } from '@/lib/categories'
@@ -50,6 +50,19 @@ const EMPTY_FORM: FormState = {
   destination: 'map',
 }
 
+// The campaigns and categories as last loaded, kept between screens, as
+// CategoryManager keeps its list. Each campaign is its own address, and a
+// new address is a new CampaignBannerManager, so opening one, or Add,
+// waited on both loads again behind "Loading…" (CI, Nov 21: still loading
+// at 5s). The kept copy shows at once; the screen still asks again, and
+// what comes back replaces it.
+let kept: { community: string; banners: CampaignBanner[]; categories: CategoryConfig[] } | null = null
+
+/** Tests: nothing kept from the one before. */
+export function forgetCampaigns(): void {
+  kept = null
+}
+
 export default function CampaignBannerManager({
   token,
   openId,
@@ -73,10 +86,12 @@ export default function CampaignBannerManager({
   // place — the exact chicken-and-egg this admin-only fetch avoids. Same
   // /api/admin/categories route (listCategoriesUncached, everything
   // regardless of active) CategoryManager.tsx uses for its own list.
-  const [categories, setCategories] = useState<CategoryConfig[] | null>(null)
+  const community = useCommunitySlug()
+  const keptHere = kept?.community === community ? kept : null
+  const [categories, setCategories] = useState<CategoryConfig[] | null>(keptHere?.categories ?? null)
   const listingCategories = (categories ?? []).filter((c) => c.kind === 'listing')
 
-  const [banners, setBanners] = useState<CampaignBanner[] | null>(null)
+  const [banners, setBanners] = useState<CampaignBanner[] | null>(keptHere?.banners ?? null)
   const [error, setError] = useState<string | null>(null)
   const load = useCallback(async () => {
     setError(null)
@@ -87,10 +102,11 @@ export default function CampaignBannerManager({
       ])
       setBanners(bannersBody.banners)
       setCategories(categoriesBody.categories)
+      kept = { community, banners: bannersBody.banners, categories: categoriesBody.categories }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [api])
+  }, [api, community])
 
   useLoadOnMount(load)
 
