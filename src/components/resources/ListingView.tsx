@@ -276,7 +276,7 @@ export default function ListingView({ item, category, color, place = null, upvot
                 someone, and from the map, the way to its category. */}
             <Title className={`min-w-0 flex-1 font-extrabold leading-tight tracking-tight text-slate-900 ${wide ? 'text-[1.625rem]' : 'text-[1.375rem]'}`}>
               <Link href={path} className="hover:underline">
-                {item.name}
+                <bdi>{item.name}</bdi>
               </Link>
             </Title>
             {/* Save, beside the thumbs-up (Oct 13, board YouSave): the
@@ -398,7 +398,7 @@ export default function ListingView({ item, category, color, place = null, upvot
     (joinAbout.length > 0 || joinFooter) && (
       <Card testId="listing-join-box" footer={joinFooter} onEdit={onlyBox ? undefined : editRows(rowIds.has('about') ? 'Link and description' : contactTitle, ['contact', 'about'])}>
         {joinAbout.map((f) => (
-          <p key={f.key} className="whitespace-pre-line pt-2.5 text-[0.96875rem] leading-snug text-slate-800">{String(item[f.key]).trim()}</p>
+          <p key={f.key} dir="auto" className="whitespace-pre-line pt-2.5 text-[0.96875rem] leading-snug text-slate-800">{String(item[f.key]).trim()}</p>
         ))}
       </Card>
     )
@@ -427,7 +427,7 @@ export default function ListingView({ item, category, color, place = null, upvot
   const leadInBox = !!leadKey && (boxesOf(category).some((b) => b.fields.some((f) => f.key === leadKey)) || !!fixedPlace(leadKey))
   const leadBody = lead && (
     <>
-      {lead.text && <p className="whitespace-pre-line text-[0.96875rem] leading-snug text-slate-800">{String(item[lead.text.key]).trim()}</p>}
+      {lead.text && <p dir="auto" className="whitespace-pre-line text-[0.96875rem] leading-snug text-slate-800">{String(item[lead.text.key]).trim()}</p>}
       {lead.href && (
         <a
           href={lead.href}
@@ -732,7 +732,7 @@ export default function ListingView({ item, category, color, place = null, upvot
           {f.type === 'tel' ? (
             <a href={`tel:${String(item[f.key]).replace(/\D/g, '')}`} className="tap-44 inline-block text-primary hover:underline">{formatPhone(String(item[f.key]))}</a>
           ) : (
-            <span className={f.type === 'textarea' ? 'whitespace-pre-line' : undefined}>{String(item[f.key]).trim()}</span>
+            <span dir="auto" className={f.type === 'textarea' ? 'whitespace-pre-line' : undefined}>{String(item[f.key]).trim()}</span>
           )}
         </Row>
       ))}
@@ -784,7 +784,7 @@ export default function ListingView({ item, category, color, place = null, upvot
       <div className="space-y-3 pt-2.5">
         {aboutFields.map((f) =>
           f.type === 'textarea' ? (
-            <p key={f.key} className="whitespace-pre-line text-[0.9375rem] leading-relaxed text-slate-800">{String(item[f.key]).trim()}</p>
+            <p key={f.key} dir="auto" className="whitespace-pre-line text-[0.9375rem] leading-relaxed text-slate-800">{String(item[f.key]).trim()}</p>
           ) : (
             // Put in About by the admin: its name over what it says.
             <div key={f.key} data-testid="about-field" className="text-[0.9375rem] text-slate-800">
@@ -1475,12 +1475,12 @@ function GroupBox({
             </Row>
           )
         })}
-        {lead && shut && <p className="py-2.5 text-[0.9375rem] leading-relaxed whitespace-pre-line text-slate-700">{lead.first}</p>}
+        {lead && shut && <p dir="auto" className="py-2.5 text-[0.9375rem] leading-relaxed whitespace-pre-line text-slate-700">{lead.first}</p>}
         {!shut && (
           <div className="space-y-2.5 py-2.5" data-testid="listing-group-more">
             {hasWeek && now && <WeekLines value={item[hoursF!.key]} now={now} candlesAt={candlesAt} />}
             {texts.map((t, i) => (
-              <p key={i} className="text-[0.9375rem] leading-relaxed whitespace-pre-line text-slate-700">
+              <p key={i} dir="auto" className="text-[0.9375rem] leading-relaxed whitespace-pre-line text-slate-700">
                 {t}
               </p>
             ))}
@@ -1530,7 +1530,7 @@ function NearbyRow({
       <CategoryIcon icon={category.icon} categoryId={category.id} iconImageUrl={photo} initials={initialsOf(item.name)} shape="square" color={color} className="h-12 w-12 text-xl" sizePx={48} />
       <span className="min-w-0 flex-1">
         <span className="block truncate">
-          <span className="text-base font-bold text-slate-900">{item.name}</span>
+          <bdi className="text-base font-bold text-slate-900">{item.name}</bdi>
           {place && <span className="text-sm text-muted"> · {place}</span>}
         </span>
         {facts.length > 0 ? (

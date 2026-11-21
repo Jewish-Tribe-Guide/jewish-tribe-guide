@@ -421,7 +421,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             <p className="min-w-0 flex-1 truncate font-semibold text-slate-900 desktop:text-[1.125rem]" data-testid="row-name">
               {pageRow ? (
                 <>
-                  {item.name}
+                  <bdi>{item.name}</bdi>
                   {place && <span className="font-normal text-[0.84375rem] text-slate-500"> · {place}</span>}
                 </>
               ) : onNameClick ? (
@@ -433,7 +433,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                   className="cursor-pointer hover:underline hover:text-primary transition-colors"
                   onClick={(e) => { e.stopPropagation(); onNameClick() }}
                 >
-                  {item.name}
+                  <bdi>{item.name}</bdi>
                 </span>
               ) : (
                 item.name

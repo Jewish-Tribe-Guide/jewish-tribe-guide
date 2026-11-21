@@ -1329,9 +1329,15 @@ Soon:
 Later or bigger: the two 2,000-line screens (map, category page);
 foreign keys and transactions for deletes and approvals; `details`
 holding app state; log retention; redundant indexes; an old-iOS floor
-decision; rem font sizes; `dir="auto"` for Hebrew; the parked Today
+decision; the parked Today
 features (keep or delete); `/inbox` per community; this file's size;
 Partial Prefetching before Next 17.
+
+Done Nov 21 (`claude/later-list`): font sizes are rem (999 classes;
+`remFontSizes.test.ts` fails on a px one), so text follows the browser's
+text size. Hebrew keeps its own direction: listing names sit in `<bdi>`,
+written notes and descriptions carry `dir="auto"`, and so do the text
+boxes people type into (never a phone or number box).
 
 Checked and not so: the nightly email does record a failed send, as a
 warning, not a failure.

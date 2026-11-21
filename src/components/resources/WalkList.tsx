@@ -522,7 +522,7 @@ function Row({ row, target, field, place }: { row: WalkRow; target: CategoryConf
           <span className="text-[0.75rem] font-semibold text-slate-500"> min</span>
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[0.9375rem] font-bold text-slate-900">{item.name}</span>
+          <span className="block truncate text-[0.9375rem] font-bold text-slate-900"><bdi>{item.name}</bdi></span>
           {line && <span className="mt-0.5 block truncate text-[0.8125rem] text-slate-500">{line}</span>}
         </span>
       </Link>

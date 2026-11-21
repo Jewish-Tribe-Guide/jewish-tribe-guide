@@ -43,7 +43,7 @@ function ContactLines({ entry }: { entry: ContactEntry }) {
       {entry.from && <p className="text-[0.78125rem] font-bold text-muted">From {entry.from}</p>}
       <p className="text-[0.9375rem] font-bold leading-snug text-slate-900">{entry.name}</p>
       {entry.who && <p className="text-[0.875rem] leading-snug text-slate-700">{entry.who}</p>}
-      {entry.note && <p className="mt-0.5 text-[0.875rem] leading-snug whitespace-pre-line text-slate-700">{entry.note}</p>}
+      {entry.note && <p dir="auto" className="mt-0.5 text-[0.875rem] leading-snug whitespace-pre-line text-slate-700">{entry.note}</p>}
       {rows.length > 0 && (
         <div className="mt-1 divide-y divide-slate-100">
           {rows.map((r) => (
@@ -90,7 +90,7 @@ export function BoxField({ field: f, item }: { field: CategoryField; item: Direc
       </a>
     )
   }
-  return <p className="py-2 text-[0.9375rem] leading-snug whitespace-pre-line text-slate-700">{text}</p>
+  return <p dir="auto" className="py-2 text-[0.9375rem] leading-snug whitespace-pre-line text-slate-700">{text}</p>
 }
 
 /** A box the admin named, of the fields they put in it, in their order.

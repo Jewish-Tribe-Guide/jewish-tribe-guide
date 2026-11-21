@@ -1188,3 +1188,15 @@ describe('ListingView — the map tile', () => {
     expect(screen.queryByTestId('listing-map-tile')).toBeNull()
   })
 })
+
+// Nov 21 (the health sweep): a name or note written in Hebrew keeps its own
+// direction, so its punctuation and numbers land where a reader expects,
+// inside a page that stays left to right.
+describe('ListingView — Hebrew text', () => {
+  it('isolates the name and lets a written description pick its own direction', () => {
+    view({ item: { ...judah, name: 'בית מדרש (חדש)', googleDescription: 'שיעור בשעה 8:00.' } })
+    const name = screen.getByRole('heading', { name: 'בית מדרש (חדש)' })
+    expect(name.querySelector('bdi')).toHaveTextContent('בית מדרש (חדש)')
+    expect(screen.getByText('שיעור בשעה 8:00.').closest('[dir="auto"]')).not.toBeNull()
+  })
+})

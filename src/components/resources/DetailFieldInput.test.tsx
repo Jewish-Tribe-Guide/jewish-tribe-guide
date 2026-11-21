@@ -183,3 +183,18 @@ it('titles a field with labelOverride when given one, keeping the required mark'
   expect(screen.getByLabelText('Phone *')).toBeInTheDocument()
   expect(screen.queryByText(/Women's Phone/)).not.toBeInTheDocument()
 })
+
+// Nov 21: typing Hebrew into a text box runs right to left; a phone number or
+// a number never flips.
+describe('text direction', () => {
+  it('lets words choose their direction, never a phone number', () => {
+    renderField({ key: 'notes', label: 'Notes', type: 'textarea' }, 'שלום')
+    expect(screen.getByRole('textbox')).toHaveAttribute('dir', 'auto')
+    cleanup()
+    renderField({ key: 'nickname', label: 'Nickname', type: 'text' }, '')
+    expect(screen.getByRole('textbox')).toHaveAttribute('dir', 'auto')
+    cleanup()
+    renderField({ key: 'phone', label: 'Phone', type: 'tel' }, '')
+    expect(screen.getByRole('textbox')).not.toHaveAttribute('dir')
+  })
+})

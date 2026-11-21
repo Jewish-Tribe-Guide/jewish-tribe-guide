@@ -125,7 +125,7 @@ export function SectionCard({
       )
     } else if (f.type === 'textarea') {
       parts.push(
-        <p key={f.key} className="mt-1 whitespace-pre-line text-[0.9375rem] leading-snug text-slate-700">
+        <p key={f.key} dir="auto" className="mt-1 whitespace-pre-line text-[0.9375rem] leading-snug text-slate-700">
           {text}
         </p>,
       )
@@ -173,7 +173,7 @@ function ShabbosField({ field, item }: { field: CategoryField; item: DirectoryRe
     <Line label={field.label}>
       {text ? (
         <>
-          <span className={field.type === 'select' || field.type === 'boolean' ? 'font-semibold text-slate-900' : 'whitespace-pre-line'}>{text}</span>
+          <span dir="auto" className={field.type === 'select' || field.type === 'boolean' ? 'font-semibold text-slate-900' : 'whitespace-pre-line'}>{text}</span>
           {view && live && (
             <>
               {' · '}

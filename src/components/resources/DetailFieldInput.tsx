@@ -32,7 +32,7 @@ function GrowingTextarea({ value, ...rest }: TextareaHTMLAttributes<HTMLTextArea
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`
   }, [value])
-  return <textarea ref={ref} value={value} {...rest} />
+  return <textarea ref={ref} dir="auto" value={value} {...rest} />
 }
 
 export function DetailFieldInput({
@@ -270,6 +270,7 @@ export function DetailFieldInput({
       <input
         id={`detail-${field.key}`}
         type={field.type === 'number' ? 'number' : field.type === 'tel' ? 'tel' : 'text'}
+        dir={field.type === 'number' || field.type === 'tel' ? undefined : 'auto'}
         value={(value as string) ?? ''}
         onChange={(e) =>
           onChange(
@@ -354,6 +355,7 @@ function SelectOtherField({
       {showOther && (
         <input
           value={strValue}
+          dir="auto"
           onChange={(e) => onChange(e.target.value)}
           placeholder="Please specify"
           autoFocus
