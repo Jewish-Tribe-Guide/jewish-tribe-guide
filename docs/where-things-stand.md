@@ -11,6 +11,170 @@ Finished work moved out on Nov 21: every "Done …" section is in
 `docs/history.md`, in the order it was here. Look there for why something
 was built the way it was; this file is what's open.
 
+## Everything open, in one list (Nov 21)
+
+Every open item in this file, gathered in one place and checked against
+live where live could say (read only, Nov 21). The sections below hold
+the detail. "(?)" means it couldn't be checked from here and may already
+be done. Cross an item off here when it's done.
+
+Checked and done, so not listed: migrations 095–099 and 105–113 (live has
+all but 067, parked with Today), Philly's live home rows and Right now,
+the feedback wording, 077 and 082, Sababa (Not on Google since Oct 26),
+Tasty Twisters, the Brodsky duplicate, the old shul items in the queue,
+Jewish Medical Resources (not on live), PR 411, CI runs colliding.
+
+### You decide (a design or product call)
+
+1. A phone version of "How it looks" (not drawn yet).
+2. Copy dev's photos for Eruv, Hospitals, Childcare and Schools to live?
+3. Can visitors reorder their saved places on You?
+4. Separate the test database from dev's (it is also every preview's).
+5. Phone home boards drawn, not built: N1, N3, O1–O3, P1/P1b; and
+   "boxes and rows" (Flip C), parked until you pick.
+6. The computer home's middle piece (neither option picked; W7l may
+   have settled it) (?), and You and What changed as extra cells there.
+7. The "Right now" label on the computer home: may come back.
+8. What the What changed page leads with: an activity feed, or new places.
+9. A "Recent changes" box on each listing.
+10. One contact email for every community?
+11. On a phone, saved places and searches on You come off only by swipe.
+12. Two home tiles use a Google thumbnail and an iStock photo (licence?).
+13. The installed app's name and icon are Philly's for every community.
+14. In Add/Edit, hours are broken out only from Contact (a fix proposed).
+15. Held for a look with real people: showcase sections, search in the
+    header, next minyan in rows, one map switch, side by side, Explore by
+    Category showing every category instead of "More".
+16. Boards drawn, not built: M2, M3, K1, K1b, G2 (G2 may be replaced by
+    the built G3) (?). Do search lines keep their icons?
+17. "+ Add" opening on Find the place (boards 1–4, 1b–3b); later, + Add
+    by hand first with the AI as the option.
+18. Held: boxes that fold in Fields, a box's trash can, big fields as
+    rows in any box, "Within a walk", "Before it's opened", Mikvah
+    sections.
+19. Mekor's list against ours: PLNT Burger Jenkintown (IKC?), and Nothing
+    Bundt Cakes, Cherry-K there and Keystone-K here.
+20. Boards 14–15: a ready-made field, fixed or local.
+21. "Can visitors upvote places?" (both sides now say Upvote) (?)
+22. Hospitals' Eruv field takes its choices from the Eruv page?
+23. A "Kept up to date" box (recommended, not drawn).
+24. UES Grocery's "Kosher" yes/no becomes Kosher Store?
+25. A "What makes it Shabbat friendly?" note for Hotels.
+26. The rest of the field-by-field review.
+27. The "+" covers part of the third tile on the phone home.
+28. The drawings for asking for location when it helps.
+29. Admin drawing extras: a form's "On the site" switch, a campaign's
+    own photo, Reports without two tiles, header items on/off and
+    dragged (?).
+30. A mikvah's section phones and emails: in Contact, or their sections?
+31. Is the synagogue admin logic patches on patches? (The shul watch
+    rewrite may have answered it.) (?)
+32. For later: a week matching the usual times posted by the watch on
+    its own; where a minyan that isn't a shul shows; the site writing a
+    shared link's preview line itself.
+
+### You do (only you can)
+
+33. To do: 6 Mekor new places (Cinnaholic, Nothing Bundt Cakes, Magical
+    Sweet Shop, Penn Hillel's Dining Commons, Kosher Corner at Temple,
+    the Brodsky Center).
+34. To do: 5 website changes found today (Mikveh Israel, the Shtiebel,
+    Lower Merion, Sons of Israel twice).
+35. Magical Sweet Shop's hechsher: call 856-309-1100, or ask Mekor.
+36. Elkins Park's eruv sender: ask 267-415-6760.
+37. The Shtiebel's calendar: add southphiladelphiashtiebel.org/calendar
+    as its page.
+38. House of Kosher's menu link is still a PDF on live: set the catering
+    menu (?).
+39. The newsletter Gmail script: re-paste Philly's, deploy it as a web
+    app, paste its link (Read now by email stays off until then).
+40. Vercel Production: check the Turnstile and Upstash keys; set
+    SENTRY_CRON_MONITORS=nightly-email and redeploy; the next build's
+    log should say Node 24.
+41. Live backups: check Database → Backups, and run the first live copy.
+42. Migrations 103 and 104 leave nothing to see: confirm you ran them on
+    both (?).
+43. PostHog: check Session Replay's project settings.
+44. The first live morning after a deploy: each community's run shows
+    in its own tab, and Vercel's log has no "run didn't start".
+45. On the preview: the listing's small map tile, the default-location
+    map and picker, the menu reader's browser; then review the menu
+    reads.
+46. Pictures for the rest of the phone's category tiles (Networking's
+    and Eruv Information's don't work as tiles).
+47. Refuah: ask them, and read their terms.
+48. Washington (hidden): only Synagogues is set up; Map, Candle Lighting
+    and Eruv rows when it's readied, and an uptime check once visible.
+49. Auto-fix on PRs from the new account; the nightly email seen in a
+    real inbox (?).
+
+### Needs your yes, because it writes to live
+
+50. The Denomination/Nusach change (dry run ready).
+51. About and Privacy's new text.
+52. The shul watch's live data clean-up (look again first).
+53. Drop the old admin columns (tagline and the rest are still on live).
+54. Refuah watches and the hospital fields on live.
+55. Migration 067, only when Today is turned on.
+
+### Mine to build or fix (nobody waiting)
+
+56. Partial Prefetching: the public site is done on branch
+    `claude/ensure-static` (ensureStatic = 'navigation' on the community
+    layout; full e2e green, made-up addresses 404 with no proxy list). The
+    admin still fails for a community built after a deploy (bailout, or
+    React #412 inside a boundary; ensureStatic = false doesn't help).
+    Next: 'navigation' on the admin too, which needs generateStaticParams
+    on its ~10 screens with an id in the address (each split into a
+    server page and its client screen). Before Next 17.
+57. The search box, Open now and filters can drop from the address on
+    a refresh (FindResourcesConnected).
+58. "See the whole page" in the editor leaves ?field=hours in the address.
+59. Closing a listing opened from its own link uses replaceState, which
+    a Next update can overwrite.
+60. The category picker has no Escape to close.
+61. The sheets' "Drag to resize" handles don't work from a keyboard.
+62. Watches' days run on New York's clock (right for Philly and UES).
+63. A Shabbos followed by Yom Tov on Sunday shows "last Shabbos".
+64. A new place with no hours shows every day "Closed" on the deciding
+    screen; a new place still opens the old review (board 4).
+65. Right after a community is made, its admin says "Not found." once; a
+    category's preview map opens on Philadelphia; the nav count updates
+    only when To do is opened.
+66. Admin not as drawn: shul emails' unlinked-sender row and "Stopped
+    checking"; making a new key; on a phone, rows without their line,
+    the card row's chevron, Edit, then update not in a bar.
+67. The starter Food page still has the old Type; the partner shows as a
+    row of its own in a page's field list.
+68. Watches still going by address, not kind: the kosher watch, the
+    hospital watches and question reader, the map's pins.
+69. Two posts covering one week: the row edits the winner, but To do's
+    week Edit still edits a post whole.
+70. Read now never drawn or tried on a computer.
+71. Watch jobs agreed and not built (?): dishes split across menu pages,
+    each kind's last 14 nights, no Read now on a Google-and-newsletter
+    place, eruv status read more on Friday afternoons, a menu's monthly
+    re-search (Look again may cover it), the per-category job switch,
+    Mikvah photos and "Read it for", "also sent in by a visitor", a
+    per-minyan view of a schedule change, Lower Merion's full calendar.
+72. The intake wizard's problems, parked while forms are hidden.
+73. A phone that drops the page in the background: taps do nothing
+    until it reloads (not measured).
+74. One Places load makes two jobs reads.
+75. Dev's leftover test listing "E2E Admin Write 6eabdb10…".
+76. The moderation queue's "Bad Request" once; 25 old migrations that
+    can't be told run; a slim search index for the home, later; log
+    retention past ~50,000 rows a day.
+77. Flakes to watch: category-editor's Delete question, admin-write's
+    server stalls, offline.spec:109, category-open, todo-scroll, the
+    phone prefetch budget, slow test-database spells.
+
+### Waiting on others
+
+78. 5 moderate npm audit findings, in Sentry's build plugin.
+79. Sons of Israel's newsletter has sent nothing.
+80. Penn Presbyterian and Pennsylvania Hospital are empty on Refuah.
+
 ## The branch
 
 The redesign was merged into `main` on Oct 17 at 7:24 PM (#322, at
@@ -349,6 +513,10 @@ With no choice made it's the first two categories with hours, as before
 
 Found and not fixed:
 
+- admin-write `main-dishes` "Use this" (local, full suite, Nov 21): fixed
+  Nov 21. The place screen's one jobs read took over expect's 5s and each
+  retry reloaded it away; the load now gets 15s (red on the old test with
+  that read slowed 8s).
 - e2e `listing-detail.spec.ts:537`: fixed Nov 21. A test race: it pressed
   the browser's Back as soon as Request removal showed, before the
   router had written its address, so Back left the listing. It now waits
@@ -1145,8 +1313,8 @@ for that exact change, in the same conversation. Show the dry run first.
    Shtetl, Rita's, New York Bagel Bakery and Sababa Falafel (checked on
    live Nov 19): Shtetl is archived. Google says three of the four live
    Rita's and New York Bagel Bakery are closed temporarily (Rita's is
-   seasonal). Sababa Falafel has no Google place, so the nightly sync
-   skips it: setting one needs the id looked up, shown, and a yes.
+   seasonal). Sababa Falafel is marked Not on Google (since Oct 26,
+   checked on live Nov 21): nothing to do.
 3. **Check the menu reader's browser on the preview** (Oct 20): Admin →
    Main dishes → Insomnia Cookies → "Read again" should come back with
    cookies, brownies and ice cream within about 20 seconds. It's the one
@@ -1210,19 +1378,20 @@ for that exact change, in the same conversation. Show the dry run first.
      page now dates only after a kept reading found dishes on it. Their
      dates stop moving; the morning first read reads them.
    - Mike's, Bar Bombón and Mama's need a browser to draw their menu,
-     1 a night; Tasty Twisters' page is unchanged but its date is stuck at
-     Oct 22, cause not found yet.
+     1 a night. Tasty Twisters isn't stuck (checked on live Nov 21, read
+     only): its watch dates all six dishes each morning (07:02 that day);
+     Oct 22 is its menu's last AI read, which rightly stays while the page
+     doesn't change.
 
 ## Getting the branch live
 
 4. **Migration 083 (`confirmed_by_visitor`) is run on both databases**
    (the user, Oct 18): a visitor's Yes on a whole listing says "Confirmed
    by community".
-   **Check 077 and 082 on the live database, now that the code is live.**
-   Tables and columns through 081 are there. 077 (eruv suggestions, a
-   database rule) and 082 (confirming a contact box, a database function)
-   can't be seen through the API: without them a public eruv suggestion
-   (a fix or, since Nov 9, a new eruv) fails to send and Yes under a contact box says "Didn't save". 067's
+   077 and 082 are on live too (checked Nov 21 with the user's OK, by
+   writes that keep nothing): an eruv suggestion got past the type rule
+   to the community key, and confirm_section took 'contact' and answered
+   from its cooldown without writing. 067's
    columns (Today) are missing too, harmless while Today is held back.
 6. **Shul newsletters** (built Oct 18 on `redesign/shul-newsletters`, not
    merged; no migration). The guide's Gmail (phillyjewishguide@gmail.com)
