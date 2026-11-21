@@ -1,9 +1,8 @@
 'use client'
 
-import { Fragment, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useEffectEvent, useMemo, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, selectValues, type CategoryConfig } from '@/lib/categories'
-import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
@@ -15,56 +14,40 @@ import { photoProps } from '@/lib/imageHosts'
 import { NextMinyans } from './nextMinyans'
 import { CategoryBandFrame } from './CategoryBandFrame'
 import FiltersSheet from './FiltersSheet'
-import { TEFILLAH_CHOICES, WITHIN_CHOICES, milesChosen, tefillosChosen, typedTefillahChoices } from '@/lib/minyanimFilters'
+import { milesChosen, tefillosChosen } from '@/lib/minyanimFilters'
 import { kindText } from '@/lib/listingView'
 import ListHeading, { ClosedGroupLine, GroupHeading } from './ListHeading'
-import { groupListings, parseGroupBy, type ListGroup } from '@/lib/listGroups'
+import { groupListings, parseGroupBy } from '@/lib/listGroups'
 import { candlesToday, isVouchedFor } from '@/lib/listingRow'
 import { useZmanim } from '@/lib/useZmanim'
-import { usePersistedState } from '@/lib/usePersistedState'
-import { useSharedPreference } from '@/lib/useSharedPreference'
-import { GenericListingCard } from './GenericListingCard'
 import MinyanimView from './MinyanimView'
-import { PinIcon, PlusIcon } from '@/components/icons'
 import { AddButton } from '@/components/AddButton'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
 import { readMinyanimSearch } from '@/lib/minyanimSearch'
-import { withoutOpenWords, withoutSortWords, withoutTerms } from '@/lib/ask'
+import { withoutSortWords } from '@/lib/ask'
 import { neighborhoodsFor, placeName, townsFrom } from '@/lib/places'
-import { itemCounts, itemFields, listingHas, listingItems, sameItem, searchItems } from '@/lib/itemFilter'
+import { itemCounts, itemFields, listingItems } from '@/lib/itemFilter'
 import { itemName } from '@/lib/itemNames'
 import { learnFrom } from '@/lib/askReader'
 import { useLearnAfterPause } from '@/lib/useLearnAfterPause'
-import { ListingOnwardContext, type ListingOnwardSource } from './listingOnward'
+import type { ListingOnwardSource } from './listingOnward'
 import ListingColumn from './ListingColumn'
 import UpvoteButton from './UpvoteButton'
 import { useActiveCommunity, useOptionalCommunitySlug, useContributions } from '@/lib/communityContext'
-import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import CategoryAsk from './CategoryAsk'
 import MinyanSwitch from './MinyanSwitch'
-import CategoryMap, { createHighlight, useWide } from './CategoryMap'
-import { WalkOnMapContext, type WalkShown } from './walkOnMap'
-import RowLookSwitch, { useRowLook } from './RowLookSwitch'
-import { useListMapSplit } from './useListMapSplit'
-import { mapQueryString, routes } from '@/lib/routes'
-import QuestionCard, { useAskedPlaces } from './QuestionCard'
-import { parseQuestionCard, pickQuestion } from '@/lib/questionCards'
+import { WalkOnMapContext } from './walkOnMap'
+import RowLookSwitch from './RowLookSwitch'
+import { routes } from '@/lib/routes'
 import { ui } from '@/lib/uiConfig'
-import SaveButton from '@/components/SaveButton'
-import { makeSavedSearch } from '@/lib/savedSearches'
-import { useSavedSearches } from '@/lib/savedSearchesContext'
-import { categoryHref } from '@/lib/searchLands'
 import { useCategories } from '@/lib/useCategories'
 import { getCategoryColor, getCategoryTilePhoto } from '@/lib/categoryColor'
-import { SwipeRowGroup } from '@/components/SwipeRow'
 import dynamic from 'next/dynamic'
 import { tellUsPlaceholder } from '@/lib/tellUs'
-import { pointerHover } from '@/lib/pointerHover'
 import { TappedMinyanContext, type TappedMinyan } from './TappedMinyan'
-import { stepsIn } from '@/lib/stepAddress'
 import SearchAnnouncer from '@/components/SearchAnnouncer'
 
 import { LISTING_STEP, type ParamsOpts } from './directoryAddress'
@@ -75,6 +58,21 @@ import { useFiltersInAddress } from './useFiltersInAddress'
 import { useControlsStuck } from './useControlsStuck'
 import { useRowScroller } from './useRowScroller'
 import { useListingCards } from './useListingCards'
+import { useGroupOpenness } from './useGroupOpenness'
+import { filterDirectory } from './filterDirectory'
+import { useTellUs } from './useTellUs'
+import { useMapBeside } from './useMapBeside'
+import ControlsBar from './ControlsBar'
+import CategoryHero from './CategoryHero'
+import EmptyList from './EmptyList'
+import MapBeside from './MapBeside'
+import { sheetFilters } from './sheetFilters'
+import { useSearchSave } from './useSearchSave'
+import { useQuestionCard } from './useQuestionCard'
+import { rowExpanded } from './rowExpanded'
+import DirectoryList from './DirectoryList'
+import { useMinyanQuestion } from './useMinyanQuestion'
+import { useSortChoice } from './useSortChoice'
 
 // Loaded on the first tap of "+": nobody browsing pays for the box.
 const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'), { loading: () => null })
@@ -180,27 +178,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     initialFilters,
     onParamsChange,
   })
-  // Distance first, always (the user, Oct 15): with no location set, the
-  // miles from the community's centre that every row already shows, which
-  // the top of the page says it's measuring from. Popular only where there
-  // is no distance at all to sort by (a category without addresses, e.g.
-  // WhatsApp groups), until the visitor makes an explicit choice below,
-  // which then sticks regardless of what the anchor does afterward.
-  //
-  // Deliberately not a one-time lazy initializer. A saved address (or live
-  // tracking resuming) restores from localStorage in a POST-MOUNT effect —
-  // see useStoredLocation — so anchorLabel is still empty on this
-  // component's very first render even for a returning visitor who already
-  // has a location saved. This effect re-derives the default every time
-  // what there is to measure from changes instead.
+  // Distance first, always, Popular only with nothing to measure from
+  // (useSortChoice).
   const centerDistances = items.some((i) => i.milesFromCenter != null)
   const canSortByDistance = !!anchorLabel || centerDistances
-  const [sortByPopular, setSortByPopular] = useState(!canSortByDistance)
-  const touchedSort = useRef(false)
-  useEffect(() => {
-    if (touchedSort.current) return
-    setSortByPopular(!canSortByDistance)
-  }, [canSortByDistance])
+  const { sortByPopular, setSortByPopular, touchedSortRef } = useSortChoice(canSortByDistance)
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
   // The Filters sheet (see ListHeading and FiltersSheet).
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -248,28 +230,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const caps = resolveCapabilities(category.capabilities)
   const contributions = useContributions()
   const canAdd = contributions.add && caps.add
-  // "+" opens "Saw something? Tell us" (agreed Oct 5); today's Add form is
-  // one tap inside it, "Add a place".
-  const [tellOpen, setTellOpen] = useState(false)
-  // Kept on the page once opened, so it slides and fades away when closed
-  // (SiteAddButton's note).
-  const [tellMounted, setTellMounted] = useState(false)
-  if (tellOpen && !tellMounted) setTellMounted(true)
-  // The listing the box is about, when its Suggest an edit opened it, and
-  // what that Suggest an edit opened before: the listing's own editor, in
-  // place, for the box's "Edit the details myself" (Oct 6). Without one,
-  // the page's own edit (onEdit).
-  const [openItem, setOpenItem] = useState<DirectoryResource | null>(null)
-  const editYourself = useRef<(() => void) | null>(null)
-  const [tellTimes, setTellTimes] = useState(false)
-  const [tellMenu, setTellMenu] = useState(false)
-  const tellAbout = (item: DirectoryResource, edit?: () => void, opts?: { times?: boolean; menu?: boolean }) => {
-    editYourself.current = edit ?? null
-    setOpenItem(item)
-    setTellTimes(!!opts?.times)
-    setTellMenu(!!opts?.menu)
-    setTellOpen(true)
-  }
+  const { tellOpen, setTellOpen, tellMounted, openItem, setOpenItem, editYourself, tellTimes, tellMenu, tellAbout } = useTellUs()
   // Adding to a shul's times is an edit to the shul ("+ Add a minyan").
   const canEdit = contributions.edit && caps.edit
   const showSearch = ui.search.directory && caps.directorySearch
@@ -318,28 +279,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     [todayResult],
   )
 
-  // A minyan question typed over the list of shuls ("mincha tonight") is
-  // asked of Minyanim by time, as the home search would send it: the list
-  // of shuls has nothing to answer it with.
-  //
-  // Except the question the visitor just left the view on (Nov 16: search
-  // "what time is mincha today" on the home, land on Minyanim by time, tap
-  // the header's ‹, and Synagogues showed for a moment, then the view came
-  // back, since the question was still in the box). Leaving says they want
-  // the shuls; new words, or Enter, ask again.
+  // A minyan question typed over the list of shuls is asked of Minyanim by
+  // time (useMinyanQuestion).
   const minyanQuestion = hasMinyanim && !minyanimViewOn && !!todayResult?.query.minyan
-  const [leftViewOn, setLeftViewOn] = useState<string | null>(null)
-  const [viewWasOn, setViewWasOn] = useState(minyanimViewOn)
-  if (viewWasOn !== minyanimViewOn) {
-    setViewWasOn(minyanimViewOn)
-    setLeftViewOn(minyanimViewOn ? null : search)
-  }
-  const asksMinyan = minyanQuestion && search !== leftViewOn
-  useEffect(() => {
-    if (!asksMinyan) return
-    const timer = setTimeout(() => setMinyanimViewOn(true), 700)
-    return () => clearTimeout(timer)
-  }, [asksMinyan, setMinyanimViewOn])
+  useMinyanQuestion({ minyanQuestion, minyanimViewOn, setMinyanimViewOn, search })
   // ── The order the search asks for ──
   // "Pizza near me", "closest pizza": nearest first; "best pizza", "sort by
   // popularity": most liked first, while it's in the box, whatever the Sort
@@ -374,53 +317,21 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const foundOn = (item: DirectoryResource) =>
     askMatches?.get(item.id) ?? hadItems(item) ?? (item.id === reopenItemId && closedMatchFor !== reopenKey ? reopenFound : null)
 
-  const filtered = items
-    .filter((item) => {
-      if (!matchesSearch(item)) return false
-      for (const f of filterableBooleans) {
-        if (boolFilters[f.key] && !item[f.key]) return false
-      }
-      for (const f of filterableSelects) {
-        const chosen = selectFilters[f.key]
-        // A select field can hold more than one value on a single item (e.g. a
-        // place that's both a Restaurant and a Caterer) — it matches a chosen
-        // filter set if ANY of its own values is one of the chosen ones.
-        if (chosen?.length && !selectValues(item[f.key]).some((v) => chosen.includes(v))) return false
-      }
-      for (const [key, chosen] of Object.entries(hasFilters)) if (!listingHas(item, key, chosen)) return false
-      if (openNow && hasFilterableHours) {
-        // Closed businesses are never open, whatever hours they still have
-        // saved — a temporarily-closed shop kept passing this filter on last
-        // season's hours.
-        if (businessClosure(item as unknown as Record<string, unknown>)) return false
-        // Item must be open right now according to at least one filterable
-        // hours field; that waits for the time, as the rows do.
-        const isOpen = !now || hoursFields
-          .filter((f) => f.filterable)
-          .some((f) => hoursOpenNow(item[f.key], now) === true)
-        if (!isOpen) return false
-      }
-      return true
-    })
-    .sort((a, b) => {
-      // Closed businesses sink to the bottom, ahead of every other sort key.
-      // They stay in the list deliberately — the person most likely to walk to
-      // a closed shop is the one who already knows it exists, and hiding it is
-      // the one thing that guarantees they can't be warned — but they
-      // shouldn't compete for attention with places that are actually
-      // trading. Anyone who wants them gone entirely has the "Open now" filter.
-      const closedDiff =
-        Number(!!businessClosure(a as unknown as Record<string, unknown>)) -
-        Number(!!businessClosure(b as unknown as Record<string, unknown>))
-      if (closedDiff !== 0) return closedDiff
-      // Saved places don't float to the top (Oct 14): the order is what Sort
-      // says. Their badge is how they stand out.
-      return upvotes && byPopular
-        ? liveCount(b) - liveCount(a) || travelCompare(a, b)
-        : // From the centre only when Distance was chosen or asked for
-          // ("near me"); otherwise, with no location, by name.
-          travelCompare(a, b, { fromCenter: !byPopular })
-    })
+  const filtered = filterDirectory(items, {
+    matchesSearch,
+    filterableBooleans,
+    boolFilters,
+    filterableSelects,
+    selectFilters,
+    hasFilters,
+    openNow,
+    hasFilterableHours,
+    now,
+    hoursFields,
+    upvotes,
+    byPopular,
+    liveCount,
+  })
 
   // fromId is the listing open in the column (its ‹ ›, or an arrow key) —
   // direction moves through `filtered`, the same order
@@ -482,7 +393,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       document.dispatchEvent(new CustomEvent('jpc:open-location'))
       return
     }
-    touchedSort.current = true
+    touchedSortRef.current = true
     setSortByPopular(popular)
     if (askedOrder && (askedOrder === 'popular') !== popular) setSearch((prev) => withoutSortWords(prev, askedOrder))
   }
@@ -525,60 +436,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // ── Groups (see listGroups.ts) ──
   // Never a search's results: those are one list, best first.
   const grouping = typed ? null : groupListings(filtered, category, now)
-  // Closed groups (a pick-list's, like denominations) start closed, and this
-  // browser remembers which ones were opened.
-  const openGroupsKey = `jpc:open-groups:${communitySlug ?? ''}:${category.id}`
-  const loadOpenGroups = () => {
-    try {
-      const stored: unknown = JSON.parse(localStorage.getItem(openGroupsKey) ?? '[]')
-      return Array.isArray(stored) ? stored.filter((v): v is string => typeof v === 'string') : []
-    } catch {
-      return []
-    }
-  }
-  const saveOpenGroups = useCallback(
-    (ids: string[]) => {
-      try {
-        localStorage.setItem(openGroupsKey, JSON.stringify(ids))
-      } catch {
-        // Private windows and blocked storage: the groups just start closed.
-      }
-    },
-    [openGroupsKey],
-  )
-  const [openGroupIds, setOpenGroupIds] = usePersistedState<string[]>([], loadOpenGroups, saveOpenGroups)
-  // While a filter is on, every group with a match opens (those without are
-  // gone), and one closed then is closed only for as long as those filters
-  // stay as they are; it isn't remembered.
-  const filtersKey = JSON.stringify([openNow, boolFilters, selectFilters])
-  const [closedWhileFiltered, setClosedWhileFiltered] = useState<{ key: string; ids: string[] }>({ key: '', ids: [] })
-  const closedNow = closedWhileFiltered.key === filtersKey ? closedWhileFiltered.ids : []
-  // A listing arriving open (?item=, a shared link or a reload) opens its
-  // group, until that listing is closed.
-  const [reopenClosedId, setReopenClosedId] = useState<string | null>(null)
-  // A shul opened from the Next minyan card, or a place whose pin was
-  // clicked, opens its group the same way.
-  const [revealedId, setRevealedId] = useState<string | null>(null)
-  const isGroupOpen = (g: ListGroup<DirectoryResource>) =>
-    (!!reopenItemId && reopenItemId !== reopenClosedId && g.items.some((i) => i.id === reopenItemId)) ||
-    (!!revealedId && g.items.some((i) => i.id === revealedId)) ||
-    (activeFilterCount > 0 ? !closedNow.includes(g.id) : openGroupIds.includes(g.id))
-  // From what the group shows, not what's remembered: a group held open by
-  // a listing (one just read, found from its pin, arrived by a link) used to
-  // flip its remembered state underneath and stay open, so after reading a
-  // shul and coming back its group couldn't be closed (the user, Oct 11).
-  // Closing it lets go of whatever held it.
-  const toggleGroup = (g: ListGroup<DirectoryResource>) => {
-    const open = isGroupOpen(g)
-    if (open) {
-      if (revealedId && g.items.some((i) => i.id === revealedId)) setRevealedId(null)
-      if (reopenItemId && g.items.some((i) => i.id === reopenItemId)) setReopenClosedId(reopenItemId)
-    }
-    const set = (ids: string[], on: boolean) => (on ? (ids.includes(g.id) ? ids : [...ids, g.id]) : ids.filter((x) => x !== g.id))
-    // While a filter is on the list says which are closed; otherwise which are open.
-    if (activeFilterCount > 0) setClosedWhileFiltered({ key: filtersKey, ids: set(closedNow, open) })
-    else setOpenGroupIds((ids) => set(ids, !open))
-  }
+  const { revealedId, setRevealedId, setReopenClosedId, isGroupOpen, toggleGroup } = useGroupOpenness({
+    communitySlug,
+    categoryId: category.id,
+    openNow,
+    boolFilters,
+    selectFilters,
+    reopenItemId,
+    activeFilterCount,
+  })
   // ── What each row says (see listingRow.ts) ──
   // Where each place is, beside its name: its neighbourhood or its town,
   // whichever says it more tightly (placeName).
@@ -645,141 +511,36 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     setSearch('')
     clearFilters()
   }
-  const toggleBool = (key: string) => setBoolFilters((prev) => ({ ...prev, [key]: !prev[key] }))
-  // Adds or removes one value from a pick-list's chosen set.
-  const toggleSelect = (key: string, value: string) =>
-    setSelectFilters((prev) => {
-      const cur = prev[key] ?? []
-      return { ...prev, [key]: cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value] }
-    })
-  // ── What the search reads as filters ──
-  // A word an admin taught the search ("dairy" is Food type: Dairy), or
-  // "open now", narrows the list as that filter would. The Filters sheet
-  // shows it ticked and the button counts it; unticking it there takes the
-  // word out of the search, so the two never disagree. Nothing about it on
-  // the page itself: the word is in the box already (the user, Oct 10).
-  const searchResult = typed ? todayResult : minyanShulResult
-  const searchBools = new Map<string, string>()
-  const searchSelects = new Map<string, Map<string, string>>()
-  for (const t of searchResult?.taught ?? []) {
-    const field = t.categoryId === category.id && t.field ? category.detailFields.find((f) => f.key === t.field) : undefined
-    if (field?.type === 'boolean') searchBools.set(field.key, t.word)
-    else if (field?.type === 'select' && t.value !== undefined) searchSelects.set(field.key, (searchSelects.get(field.key) ?? new Map()).set(t.value, t.word))
-  }
-  // An item said ("challah") is Has: Challah, the same way (searchItems).
-  const searchHas = searchResult ? searchItems(category, items, searchResult) : new Map<string, Map<string, string>>()
-  const searchOpenNow = !!searchResult?.query.openNow && hasFilterableHours
-  // A tefillah typed in the Minyanim view ("mincha") is its chip ticked,
-  // as "dairy" is Food type: Dairy (the user, Oct 15); unticking it takes
-  // the word out of the search.
-  const typedTefillos = minyanimView ? typedTefillahChoices(search) : new Map<string, string>()
-  const sheetTefillos = [...new Set([...minyanTefillos, ...typedTefillos.keys()])]
-  const dropWord = (word: string) => setSearch((prev) => withoutTerms(prev, word.split(' ')))
-  const sheetOpenNow = openNow || searchOpenNow
-  const toggleSheetOpenNow = () => {
-    if (!sheetOpenNow) return setOpenNow(true)
-    if (searchOpenNow) setSearch((prev) => withoutOpenWords(prev))
-    setOpenNow(false)
-  }
-  const toggleSheetBool = (key: string) => {
-    const word = searchBools.get(key)
-    if (!word) return toggleBool(key)
-    dropWord(word)
-    setBoolFilters((prev) => ({ ...prev, [key]: false }))
-  }
-  const toggleSheetSelect = (key: string, value: string) => {
-    const word = searchSelects.get(key)?.get(value)
-    if (!word) return toggleSelect(key, value)
-    dropWord(word)
-    setSelectFilters((prev) => ({ ...prev, [key]: (prev[key] ?? []).filter((x) => x !== value) }))
-  }
-  const toggleSheetHas = (key: string, tag: string) => {
-    const word = searchHas.get(key)?.get(tag)
-    if (word) dropWord(word)
-    setHasFilters((prev) => {
-      const cur = prev[key] ?? []
-      const on = cur.some((x) => sameItem(x, tag)) || !!word
-      return { ...prev, [key]: on ? cur.filter((x) => !sameItem(x, tag)) : [...cur, tag] }
-    })
-  }
-  // ── Save this search (Oct 13, canvas page "you", board YouSave) ──
-  // The bookmark in the box, filled while this is a saved search: the words
-  // and the Filters chosen beyond them, as the address that opens it again.
-  // Filters the words tick (searchBools/searchSelects/searchHas, open now)
-  // aren't added: the words bring them back, so "challah" here is the same
-  // search as "challah" saved from a home line.
-  const savedSearches = useSavedSearches()
-  const typedWords = search.trim()
-  const thisSearch =
-    !typedWords || !communitySlug
-      ? null
-      : minyanimView
-        ? makeSavedSearch({ words: typedWords, kind: 'minyanim', categoryId: category.id, href: `${routes.slug(communitySlug, category.id)}?davening=1&q=${encodeURIComponent(typedWords)}` })
-        : makeSavedSearch({
-            words: typedWords,
-            kind: 'category',
-            categoryId: category.id,
-            href: categoryHref(
-              communitySlug,
-              category.id,
-              typedWords,
-              {
-                openNow,
-                bool: Object.keys(boolFilters).filter((k) => boolFilters[k]),
-                select: Object.fromEntries(Object.entries(selectFilters).filter(([, v]) => v.length)),
-                has: Object.fromEntries(Object.entries(hasFilters).filter(([, v]) => v.length)),
-              },
-              landedSearch !== null && search === landedSearch,
-            ),
-          })
-  const searchSave =
-    ui.map.pins && savedSearches && thisSearch ? (
-      <SaveButton plain saved={savedSearches.isSaved(thisSearch.key)} onToggle={() => savedSearches.toggle(thisSearch)} name={`“${typedWords}” in ${category.pluralLabel}`} />
-    ) : undefined
-
-  // The sheet's Clear all clears what it shows, the search's filter words
-  // too; the empty list's "Clear filters" (clearFilters) keeps the search.
-  // A question read into the Filters (landedSearch) goes with them: it's
-  // what they were.
-  const clearSheet = () => {
-    clearFilters()
-    setMinyanTefillos([])
-    setMinyanWithin(null)
-    if (landedSearch !== null && search === landedSearch) return setSearch('')
-    let next = search
-    for (const word of [...searchBools.values(), ...[...searchSelects.values()].flatMap((m) => [...m.values()]), ...[...searchHas.values()].flatMap((m) => [...m.values()]), ...typedTefillos.values()]) next = withoutTerms(next, word.split(' '))
-    setSearch(searchOpenNow ? withoutOpenWords(next) : next)
-  }
-  // Each ticked item as its listings spell it, so "has_m=wine" from an
-  // address ticks their "Wine" rather than adding a second chip.
-  const sheetItems = itemsToShow.map((f) => {
-    const spelled = (t: string) => f.counts.find((c) => sameItem(c.tag, t))?.tag ?? t
-    return { ...f, chosen: [...new Set([...(hasFilters[f.key] ?? []), ...(searchHas.get(f.key)?.keys() ?? [])].map(spelled))] }
+  const { searchBools, sheetTefillos, sheetOpenNow, toggleSheetOpenNow, toggleSheetBool, toggleSheetHas, clearSheet, sheetItems, sheetSelects, minyanTefillahSelect, minyanWithinSelect, onSheetSelect, minyanFilterCount, sheetFilterCount } = sheetFilters({
+    category,
+    items,
+    typed,
+    todayResult,
+    minyanShulResult,
+    hasFilterableHours,
+    minyanimView,
+    search,
+    setSearch,
+    openNow,
+    setOpenNow,
+    boolFilters,
+    setBoolFilters,
+    selectFilters,
+    setSelectFilters,
+    hasFilters,
+    setHasFilters,
+    clearFilters,
+    minyanTefillos,
+    setMinyanTefillos,
+    minyanWithin,
+    setMinyanWithin,
+    landedSearch,
+    itemsToShow,
+    selectsToShow,
+    filterableBooleans,
+    filterableSelects,
   })
-  const sheetSelects = selectsToShow.map((sel) => ({ ...sel, chosen: [...new Set([...sel.chosen, ...(searchSelects.get(sel.key)?.keys() ?? [])])] }))
-  // The Minyanim view's own two, around the page's Denomination in the
-  // sheet: Tefillah first, How far last, as the sketch has them (Oct 15).
-  const minyanTefillahSelect = { key: '@tefillah', label: 'Tefillah', values: TEFILLAH_CHOICES.map((c) => c.label), chosen: sheetTefillos, ordered: true }
-  const minyanWithinSelect = { key: '@within', label: 'How far', values: WITHIN_CHOICES.map((c) => c.label), chosen: minyanWithin ? [minyanWithin] : [], ordered: true }
-  const onSheetSelect = (key: string, value: string) => {
-    if (key === minyanTefillahSelect.key) {
-      const word = typedTefillos.get(value)
-      if (word) dropWord(word)
-      return setMinyanTefillos((prev) => (prev.includes(value) || word ? prev.filter((x) => x !== value) : [...prev, value]))
-    }
-    if (key === minyanWithinSelect.key) return setMinyanWithin((prev) => (prev === value ? null : value))
-    toggleSheetSelect(key, value)
-  }
-  const minyanFilterCount = sheetTefillos.length + (minyanWithin ? 1 : 0)
-  // What the Filters button counts: everything the sheet shows ticked, each
-  // choice one, Meat and Dairy two as Challah and Wine are (the user, Oct
-  // 27: "If it filters more than one thing in one section that still counts
-  // as multiple filters").
-  const sheetFilterCount =
-    filterableBooleans.filter((f) => boolFilters[f.key] || searchBools.has(f.key)).length +
-    filterableSelects.reduce((n, f) => n + new Set([...(selectFilters[f.key] ?? []), ...(searchSelects.get(f.key)?.keys() ?? [])]).size, 0) +
-    sheetItems.reduce((n, f) => n + f.chosen.length, 0) +
-    (sheetOpenNow ? 1 : 0)
+  const searchSave = useSearchSave({ category, communitySlug, search, minyanimView, openNow, boolFilters, selectFilters, hasFilters, landedSearch })
 
   // The page's colour: the band's when the category has no picture, and
   // the listings' initials. Called as the home calls it, so the two match.
@@ -823,76 +584,38 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         }
       })
 
-  // ── The map beside the list (see CategoryMap) ──
-  // Where the category has a map (an address and the Map capability). Below
-  // lg it's simply not there; "Hide map" gives the list the whole width,
-  // and this browser remembers it.
-  const hasMapColumn = caps.map && category.hasAddress !== false
-  // The same on every category page, including ones kept open for Back.
-  const [mapHidden, storeMapHidden] = useSharedPreference('jpc:map-hidden', (raw) => raw === '1')
-  const setMapHidden = (hidden: boolean) => storeMapHidden(hidden ? '1' : null)
-  // How the width is shared between them: draggable, and dragged far
-  // enough the map's way, hidden (useListMapSplit).
-  const { gridRef: splitRef, gridStyle: splitStyle, handleProps: splitHandle } = useListMapSplit({ onHideMap: () => setMapHidden(true) })
-  const mapBeside = hasMapColumn && !mapHidden
-  // Cards or one flat list (RowLookSwitch): being tried on the preview.
-  const [rowLook, setRowLook] = useRowLook()
-  const flat = rowLook === 'list'
-  const [highlight] = useState(createHighlight)
-  // An open listing's "Within a walk" list, opened, on the map beside it
-  // (walkOnMap.ts), where that map is on screen.
-  const [walkShown, setWalkShown] = useState<WalkShown | null>(null)
-  const wide = useWide()
-  const mapOnScreen = mapBeside && wide
-  const walkOnMap = mapOnScreen ? { show: setWalkShown, highlight } : null
-  // A pin's row, found: opened to (its group too), scrolled to, and
-  // outlined for a moment so the eye lands on it.
-  const [flashId, setFlashId] = useState<string | null>(null)
-  const flashTimer = useRef(0)
-  const findRow = (id: string) => {
-    setRevealedId(id)
-    setFlashId(id)
-    scrollItemIntoViewWhenSettled(id, 'smooth')
-    // A second click restarts the outline's time rather than ending it early.
-    window.clearTimeout(flashTimer.current)
-    flashTimer.current = window.setTimeout(() => setFlashId(null), 2500)
-  }
-  // The full Map page on the same places: this category, the search and
-  // the filters.
-  const fullMapHref = `${routes.map(activeCommunity.slug)}${mapQueryString({
-    categories: [category.id],
-    query: search.trim() || null,
+  const {
+    hasMapColumn,
+    mapHidden,
+    setMapHidden,
+    splitRef,
+    splitStyle,
+    splitHandle,
+    mapBeside,
+    rowLook,
+    setRowLook,
+    flat,
+    highlight,
+    walkShown,
+    mapOnScreen,
+    walkOnMap,
+    flashId,
+    findRow,
+    fullMapHref,
+    phoneMapHref,
+  } = useMapBeside({
+    caps,
+    category,
+    activeCommunity,
+    search,
     openNow,
-    bool: Object.keys(boolFilters).filter((k) => boolFilters[k]),
-    select: Object.fromEntries(Object.entries(selectFilters).filter(([, v]) => v.length > 0)),
-    from: category.id,
-  })}`
-  // The phone's Map button, first in the list's row (board G1, Nov 16):
-  // the Map tab on these places, with a ‹ back here. Where the category
-  // has a map at all; a computer has it beside the list.
-  const phoneMapHref = hasMapColumn ? fullMapHref : undefined
+    boolFilters,
+    selectFilters,
+    setRevealedId,
+    scrollItemIntoViewWhenSettled,
+  })
 
-  // The category's one question card (see QuestionCard), right under the
-  // place it asks about (decided Oct 4, built Oct 6: it sat after the fifth
-  // place, whichever place it asked about). The page and the card share
-  // which places this browser has been asked about, so they agree on which
-  // one is next; while a thank-you shows, the card stays under the place it
-  // thanks for. After the group lines when that place's group is shut. Not
-  // among a search's results, which are an answer.
-  const [askedPlaces, setAskedPlaces] = useAskedPlaces(category.id)
-  const [heldQuestion, setHeldQuestion] = useState<string | null>(null)
-  const questionShown = shownItems.length > 0 ? shownItems : filtered
-  const questionOn = !typed && !!parseQuestionCard(category.questionCard)
-  const questionAbout = questionOn
-    ? (heldQuestion ?? pickQuestion(category, questionShown, items, new Set(askedPlaces), (item) => rowPlaces.get(item.id) ?? null)?.item.id ?? null)
-    : null
-  const questionSpot: { section: string; id: string } | 'end' | null = (() => {
-    if (!questionAbout) return null
-    for (const section of sections) {
-      if (!section.hidden && section.items.some((item) => item.id === questionAbout)) return { section: section.key, id: questionAbout }
-    }
-    return 'end'
-  })()
+  const { questionSpot, questionCard } = useQuestionCard({ category, items, filtered, shownItems, typed, sections, rowPlaces, onEdit })
   // ── A listing opened on desktop takes the list's column (ListingColumn) ──
   // The list stays mounted underneath, hidden, so its cards (and what's
   // open or scrolled) are where they were when Back brings it back.
@@ -991,6 +714,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // to the list: a search over a listing would narrow a list no one can see.
   const deskListing = !!columnItem && !phonePage
 
+  const onRowExpanded = (item: DirectoryResource, expanded: boolean) =>
+    rowExpanded(item, expanded, { openCardIdsRef, isMobile, linkedItemId, activeCommunity, category, onParamsChange, hostedId, pagedItemId, reopenItemId, revealedId, setRevealedId, setClosedMatchFor, reopenKey, setReopenClosedId, setOpenDialogItemId })
+
   // An opened listing's last part: the places near it in the list as it's
   // filtered now, and the way back to all of them (ListingView's onward).
   const onwardSource: ListingOnwardSource = {
@@ -1000,16 +726,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     allLabel: `See all ${items.length} in ${category.pluralLabel}`,
   }
 
-  const questionCard = questionSpot && (
-    <QuestionCard
-      category={category}
-      shown={questionShown}
-      all={items}
-      place={(item) => rowPlaces.get(item.id) ?? null}
-      onEdit={onEdit}
-      asking={{ asked: askedPlaces, setAsked: setAskedPlaces, onHeld: setHeldQuestion }}
-    />
-  )
 
   // The list's own heading: how many, and Filters and Sort, the same place
   // on every category page (see ListHeading). Under the search box, or at
@@ -1077,24 +793,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         color={bandColor}
         imageUrl={tilePhoto}
         heroOverlap={heroOverlap}
-        hero={
-          <>
-            <p className="text-[0.8125rem] font-bold uppercase tracking-[0.14em] text-white/85" data-testid="category-hero-count">
-              {items.length} {items.length === 1 ? 'place' : 'places'}
-            </p>
-            {/* The page's h1 on a computer. A phone's is DirectoryHeader's
-                (hidden here), whose title the site header shows. */}
-            <h1 className="mt-1.5 text-[2.75rem] font-extrabold leading-[1.05]">{category.pluralLabel}</h1>
-            {anchorLabel ? (
-              <p className="mt-2 flex items-center gap-1.5 text-[0.9375rem] text-white/90">
-                <PinIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                {anchorLabel}
-              </p>
-            ) : addressPrompt ? (
-              <DistanceNote onPhoto className="mt-2" />
-            ) : null}
-          </>
-        }
+        hero={<CategoryHero count={items.length} title={category.pluralLabel} anchorLabel={anchorLabel} addressPrompt={addressPrompt} />}
       >
           {/* Mobile used to have its own "‹ {upLabel}" row here (UpButton,
               desktop:hidden). It's gone now that useSetScreenHeader (above)
@@ -1119,89 +818,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           </div>
           )}
 
-      {/* Controls — sticky from lg up so search/filters/sort stay reachable
-          on a long list instead of scrolling away above the fold. `top-14`
-          matches SiteHeader's own fixed `h-14` (see that component) — on
-          desktop SiteHeader itself stays pinned (no scroll-hide there), so
-          this can sit at a fixed offset rather than measuring it. This bar
-          gets its own scroll-hide instead (controlsVisible), so "always
-          reachable" doesn't also mean "permanently glued to the top of the
-          screen" while you're just reading down the list.
-          Not gated on the `desktop:` custom variant (640px) — that's wide
-          enough to fit the sticky bar but too narrow for it to be worth the
-          fixed screen real estate it costs; `lg:` (1024px) is where a phone
-          landscape or small tablet stops paying more than it gets back.
-          The sentinel above it is a 1px scroll marker, not truly zero-height
-          — an actual zero-area target can report `isIntersecting` as
-          unreliably always-false in some browsers, since there's no overlap
-          area to compute a ratio from. See controlsStuck's own doc for what
-          it's for. Plain `h-px`, not `lg:h-px`: the observer that reads it
-          is created unconditionally regardless of viewport width, so a
-          zero-height sentinel on mobile could already latch in a wrong
-          `isIntersecting` reading there — invisible at the time, since
-          `controlsStuck`'s only visible effects are `lg:`-gated, but the
-          bad reading doesn't self-correct just because the viewport later
-          crosses into `lg:` (by rotating a device, or resizing a browser
-          window past it). The docked white background then shows up on an
-          unscrolled desktop page, sourced from a mobile-era reading that
-          was already wrong before desktop-only styling ever had a chance
-          to reveal it. */}
-      <div ref={controlsSentinelRef} aria-hidden className="h-px" />
-      <div
-        ref={controlsRef}
+      <ControlsBar
+        sentinelRef={controlsSentinelRef}
+        barRef={controlsRef}
         hidden={phonePage}
-        // The "docked" look (white background, the padding it needs, the
-        // negative margin that pulls it flush against the header above, the
-        // shadow, and the hide-on-scroll transform) only ever applies once
-        // `controlsStuck` says the bar has actually engaged its sticky
-        // position. Applying `lg:-mt-3`/`lg:bg-white` unconditionally used to
-        // pull this bar's own solid background up 12px REGARDLESS of scroll
-        // position — while still sitting in normal flow, that overlapped
-        // whatever sat directly above it (DirectoryHeader's title row),
-        // clipping its bottom few pixels even on a page load with no
-        // scrolling at all. The hide-on-scroll transform had the same bug in
-        // reverse: applied unconditionally, it reacted to ANY downward
-        // scroll on the page, so the bar slid away while a visitor was still
-        // scrolling through content well above it — before it had ever
-        // become sticky, let alone been scrolled past.
-        //
-        // lg:border-x once docked: the bar's white is only a few shades off
-        // the page's own grey background, and the shadow above only reads
-        // on its bottom edge — with nothing marking the left/right edges,
-        // the two near-whites just ran together there. A thin border gives
-        // it the same framing the full-bleed results panel below already
-        // has (border-slate-200).
-        //
-        // lg:px-4 once docked, too: the search input and filter pills have
-        // no horizontal padding of their own — un-docked, they just line up
-        // flush with the grid below, which is fine there. But the moment
-        // this box gets its own visible edges (the border above), that same
-        // zero-padding reads as the search box and pills touching the frame
-        // directly, with no breathing room. The inset only appears once
-        // docked, same as the border/shadow/background it's paired with.
-        //
-        // lg:transition-all, not lg:transition-transform: the hide-on-scroll
-        // slide is the only thing that was ever animated — background,
-        // padding, margin, border and shadow all popped in/out the instant
-        // `controlsStuck` flipped, no transition at all. That's a smooth
-        // slide with several other properties snapping on top of it in the
-        // same frame, which reads as a stutter right at the moment it docks
-        // rather than one clean motion. transition-all covers all of it with
-        // the same duration, so it settles together.
-        // Not sticky where the map sits beside the list: the map stays in
-        // view instead, and the list's heading moves to the top of its
-        // column (see hasMapColumn).
-        // No margin under it when the list's heading is its last line (the
-        // categories with no map): the heading's own padding is the space
-        // above the list, as it is where the heading tops the list column.
-        // A margin as well left a gap there and nowhere else (Oct 20).
-        className={`${headingInToolbar ? (heroOverlap && controlsStuck ? 'lg:mb-[48px]' : '') : 'mb-4'} space-y-2 ${hasMapColumn ? '' : 'lg:sticky lg:top-14 lg:z-30 lg:transition-all lg:duration-300'} ${
-          hasMapColumn
-            ? ''
-            : controlsStuck
-            ? `lg:border-x lg:border-slate-200 lg:bg-white lg:px-4 lg:pt-3 lg:pb-3 lg:-mt-3 lg:shadow-[0_6px_12px_-8px_rgba(15,23,42,0.35)] ${controlsVisible ? 'lg:translate-y-0' : 'lg:-translate-y-full'}`
-            : 'lg:translate-y-0'
-        }`}
+        headingInToolbar={headingInToolbar}
+        heroOverlap={heroOverlap}
+        controlsStuck={controlsStuck}
+        hasMapColumn={hasMapColumn}
+        controlsVisible={controlsVisible}
       >
         {/* The page's one search box, limited to this category, with example searches under it and,
             once something is typed, the sentence answering it (see
@@ -1229,7 +854,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           <SearchAnnouncer query={search} count={typed && !minyanimView ? filtered.length : null} units={['listing', 'listings']} />
         </div>
         {headingInToolbar && (heroOverlap ? <div className={`desktop:pt-[48px] ${controlsStuck ? 'lg:pt-0' : ''}`}>{listHeading}</div> : listHeading)}
-      </div>
+      </ControlsBar>
 
       <div ref={splitRef} className={mapBeside ? 'group/split lg:grid lg:items-start' : undefined} style={mapBeside ? splitStyle : undefined}>
       <div className="min-w-0">
@@ -1301,188 +926,52 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // search" with its own buttons was more to read (the user, Oct 10).
         null
       ) : filtered.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-sm text-muted">
-            {hiddenByFilters
-              ? typed
-                ? `${searchMatches} match your search, but none with these filters.`
-                : 'None with these filters.'
-              : hasActiveFilters
-                ? `No ${category.pluralLabel.toLowerCase()} match your search.`
-                : `No ${category.pluralLabel.toLowerCase()} listed yet.`}
-          </p>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            {hasActiveFilters && (
-              <button
-                onClick={hiddenByFilters ? clearFilters : clearAll}
-                className="text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                {hiddenByFilters ? 'Clear filters' : 'Clear search & filters'}
-              </button>
-            )}
-            {canAdd && (
-              // The same box as the "+": adding looks the same however it
-              // starts (Oct 5).
-              <button
-                onClick={() => {
-                  setOpenItem(null)
-                  setTellOpen(true)
-                }}
-                className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer"
-              >
-                <PlusIcon className="h-4 w-4" /> Add {category.label.toLowerCase()}
-              </button>
-            )}
-          </div>
-        </div>
+        <EmptyList
+          hiddenByFilters={hiddenByFilters}
+          typed={typed}
+          searchMatches={searchMatches}
+          hasActiveFilters={hasActiveFilters}
+          pluralLabel={category.pluralLabel}
+          label={category.label}
+          canAdd={canAdd}
+          clearFilters={clearFilters}
+          clearAll={clearAll}
+          onAdd={() => {
+            setOpenItem(null)
+            setTellOpen(true)
+          }}
+        />
       ) : (
-        // One column on a phone. From sm up, a grid of 420px-minimum
-        // columns: one on a narrow window, two on a laptop, never three.
-        // Rows are two lines now (see listingRow.ts) and read best wide;
-        // three 280px columns squeezed a name and its facts line into a
-        // third of the page each.
-        //
-        // auto-fill, not auto-fit: auto-fit collapses empty tracks and hands
-        // their width to the cards that exist, so a category of two listings
-        // got two page-wide cards. auto-fill keeps the empty track as space
-        // at the end of the row.
-        //
-        // SwipeRowGroup: only one card's swipe actions stay revealed at a
-        // time, the same rule the map's nearby list follows.
-        // NextMinyans: each shul row's next minyan (shul categories only).
-        <NextMinyans enabled={hasMinyanim} items={items}>
-        <ListingOnwardContext.Provider value={onwardSource}>
-        <SwipeRowGroup>
-        <div className={grouping?.closed ? 'space-y-2' : undefined}>
-        {sections.map((section) => (
-          <div key={section.key}>
-          {section.above}
-          <div id={section.rowsId} hidden={section.hidden} className={grouping?.closed ? 'pt-2 pb-2' : undefined}>
-        {/* The flat list is one white box with a line under each row; the
-            last row's line tucks under the box's own border (-mb-px). */}
-        <div className={flat ? 'overflow-hidden rounded-xl border border-slate-200 bg-white' : undefined} data-testid={flat ? 'flat-list' : undefined}>
-        <div
-          className={
-            flat
-              ? '-mb-px sm:grid sm:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]'
-              : 'space-y-2 sm:space-y-0 sm:grid sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(420px,1fr))]'
-          }
-        >
-          {section.items.map((item) => (
-            <Fragment key={item.id}>
-            <div
-              ref={setItemRowRef(item.id)}
-              data-testid="directory-row"
-              // A row and its pin light up together (CategoryMap), on the
-              // pointer moving onto it, not on scrolling past (pointerHover).
-              {...(mapBeside ? pointerHover(() => highlight.set(item.id), () => highlight.set(null)) : {})}
-              className={
-                flat
-                  ? // An outline, drawn over the row: a ring outside it would
-                    // be cut off by the list's box.
-                    `border-b border-slate-100 ${flashId === item.id ? 'outline-2 -outline-offset-2 outline-primary/60' : ''}`
-                  : flashId === item.id
-                    ? 'rounded-xl ring-2 ring-primary/60 ring-offset-2 transition-shadow'
-                    : undefined
-              }
-            >
-            <GenericListingCard
-              ref={setCardRef(item.id)}
-              inColumn={!isMobile || item.id === pagedItemId}
-              item={item}
-              category={category}
-              showCategoryLabel={false}
-              place={rowPlaces.get(item.id) ?? null}
-              omitKey={omitKey}
-              flagUnconfirmed={flagUnconfirmed}
-              likes={upvotes && byPopular ? liveCount(item) : undefined}
-              look={rowLook}
-              candlesAt={candlesAt}
-              upvotes={upvotes}
-              count={liveCount(item)}
-              defaultExpanded={item.id === reopenItemId}
-              // Keeps ?item=<id> in the URL in sync with whichever card is
-              // actually open — a reload (or a shared link) lands back on
-              // the same expanded listing, same as `davening`/`day` do for
-              // the Minyanim view above. `replace`, not `push`: an
-              // expand/collapse is a one-off, not something that should
-              // pile up browser-back history entries the way opening an
-              // Add/Edit/Report form (which does use push, see
-              // FindResources' openAction) reasonably does.
-              // Except on a computer, opening one from the list (Oct 6): it
-              // has the page now, so it's a step Back undoes. Stepping to
-              // the next one replaces it, so Back doesn't walk back through
-              // every listing read.
-              found={foundOn(item)}
-              onExpandedChange={(expanded) => {
-                if (expanded) openCardIdsRef.current.add(item.id)
-                else openCardIdsRef.current.delete(item.id)
-                const address = new URLSearchParams(window.location.search)
-                // A phone's sheet opened from the list is a step too (Nov
-                // 18: Back left the page under it). Closed on the screen, it
-                // takes that step back, so Forward doesn't reopen it. Closed
-                // with its editor open, the editor's levels too (Nov 19):
-                // they're entries (useEditorInAddress), and one step landed
-                // on the listing's own, shut, the next Back doing nothing.
-                const stepBack =
-                  !expanded &&
-                  isMobile &&
-                  address.get('item') === item.id &&
-                  (window.history.state as { step?: string } | null)?.step === LISTING_STEP
-                const editorSteps = stepsIn(window.location.search, 'editing', item.id).length
-                if (stepBack && editorSteps > 0) window.history.go(-(1 + editorSteps))
-                else if (stepBack) window.history.back()
-                // The listing's own link names it already: `?item=` on top
-                // made a reload on a phone the list with a sheet (Nov 18).
-                else if (!(expanded && item.id === linkedItemId && window.location.pathname !== routes.slug(activeCommunity.slug, category.id))) {
-                  onParamsChange?.(
-                    // Closed in place, its editor goes from the address
-                    // with it: left there, the next listing opened under
-                    // that name came up as its editor.
-                    { item: expanded ? item.id : null, ...(expanded ? {} : { match: null, ...(editorSteps > 0 ? { editing: null } : {}) }) },
-                    // Not when the address already names it: a link, or
-                    // Forward, reopening it. (On a phone arriving from its
-                    // link, the first render still thinks it's a computer.)
-                    expanded &&
-                    !hostedId &&
-                    item.id !== pagedItemId &&
-                    item.id !== reopenItemId &&
-                    item.id !== linkedItemId &&
-                    address.get('item') !== item.id
-                      ? { step: LISTING_STEP }
-                      : { replace: true },
-                  )
-                }
-                if (!expanded && item.id === revealedId) setRevealedId(null)
-                if (!expanded && item.id === reopenItemId) {
-                  setClosedMatchFor(reopenKey)
-                  setReopenClosedId(item.id)
-                }
-                // See openDialogItemId's own note. Cleared by id rather
-                // than unconditionally: arrow-key next/prev closes
-                // one card and opens a sibling in the same commit, and the
-                // closing card's callback can run after the opening one's,
-                // which would otherwise clear the flag the new dialog just set.
-                setOpenDialogItemId((prev) => (expanded ? item.id : prev === item.id ? null : prev))
-              }}
-              onVote={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
-            />
-            </div>
-            {questionSpot !== 'end' && questionSpot?.section === section.key && questionSpot.id === item.id && (
-              <div className={flat ? 'border-b border-slate-100 p-3 sm:col-span-full' : 'sm:col-span-full'}>{questionCard}</div>
-            )}
-            </Fragment>
-          ))}
-        </div>
-        </div>
-          </div>
-          </div>
-        ))}
-        {questionSpot === 'end' && <div className="pt-2">{questionCard}</div>}
-        </div>
-        </SwipeRowGroup>
-        </ListingOnwardContext.Provider>
-        </NextMinyans>
+        <DirectoryList
+          hasMinyanim={hasMinyanim}
+          items={items}
+          onwardSource={onwardSource}
+          sections={sections}
+          closed={grouping?.closed}
+          flat={flat}
+          setItemRowRef={setItemRowRef}
+          mapBeside={mapBeside}
+          highlight={highlight}
+          flashId={flashId}
+          setCardRef={setCardRef}
+          isMobile={isMobile}
+          pagedItemId={pagedItemId}
+          category={category}
+          rowPlaces={rowPlaces}
+          omitKey={omitKey}
+          flagUnconfirmed={flagUnconfirmed}
+          upvotes={upvotes}
+          byPopular={byPopular}
+          liveCount={liveCount}
+          rowLook={rowLook}
+          candlesAt={candlesAt}
+          reopenItemId={reopenItemId}
+          foundOn={foundOn}
+          onRowExpanded={onRowExpanded}
+          onVote={(item, c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
+          questionSpot={questionSpot}
+          questionCard={questionCard}
+        />
       )}
       {/* A link an admin set for what this guide doesn't list ("Other
           Mikvahs" → mikvah.org's directory). After the last row, where
@@ -1499,39 +988,21 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       )}
       </div>
       </div>
-      {/* The map, beside the list from lg up and staying in view while the
-          list scrolls. Not rendered at all below that (CategoryMap loads
-          nothing until it's wide enough). */}
-      {/* The line between list and map: drag it to share the width
-          differently, double-click it for half and half. */}
       {mapBeside && (
-        <div
-          {...splitHandle}
-          className="group hidden cursor-col-resize touch-none items-center justify-center outline-none lg:sticky lg:top-[4.5rem] lg:flex lg:h-[min(calc(100vh-6rem),720px)]"
-        >
-          <span className="h-12 w-1.5 rounded-full bg-slate-300 transition-colors group-hover:bg-slate-500 group-focus-visible:bg-primary group-focus-visible:ring-2 group-focus-visible:ring-primary/40" />
-        </div>
-      )}
-      {mapBeside && (
-        <div className="relative hidden lg:sticky lg:top-[4.5rem] lg:block lg:h-[min(calc(100vh-6rem),720px)]">
-          <div className="h-full transition-opacity group-data-[snap=map]/split:opacity-30">
-          <CategoryMap
-            category={category}
-            items={filtered}
-            searchActive={typed || activeFilterCount > 0}
-            highlight={highlight}
-            selectedId={columnItem?.id ?? null}
-            walk={columnItem && mapOnScreen ? walkShown : null}
-            onSelect={columnItem ? (id) => switchListing(columnItem.id, id) : findRow}
-            onHide={() => setMapHidden(true)}
-            fullMapHref={fullMapHref}
-          />
-          </div>
-          {/* While the line is dragged far enough to hide the map. */}
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0 hidden items-center justify-center group-data-[snap=map]/split:flex">
-            <span className="rounded-full bg-slate-900/85 px-4 py-2 text-[0.875rem] font-semibold text-white shadow-lg">Let go to hide the map</span>
-          </div>
-        </div>
+        <MapBeside
+          handle={splitHandle}
+          map={{
+            category: category,
+            items: filtered,
+            searchActive: typed || activeFilterCount > 0,
+            highlight: highlight,
+            selectedId: columnItem?.id ?? null,
+            walk: columnItem && mapOnScreen ? walkShown : null,
+            onSelect: columnItem ? (id) => switchListing(columnItem.id, id) : findRow,
+            onHide: () => setMapHidden(true),
+            fullMapHref: fullMapHref,
+          }}
+        />
       )}
       </div>
       </CategoryBandFrame>
