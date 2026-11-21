@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { adminAreas, adminNavPosition, adminTabs, superAdminTabs, type AdminArea, type AdminTab } from './adminNav'
 
-const features = vi.hoisted(() => ({ todayHome: false, whatChanged: false }))
+const features = vi.hoisted(() => ({ todayHome: false }))
 vi.mock('./features', () => ({ features }))
 
 // Real bug: the Communities tab used to render for every community's admin,
@@ -10,17 +10,10 @@ vi.mock('./features', () => ({ features }))
 // "Only the site owner can create or browse other communities" instead of the
 // tab simply not being offered.
 describe('adminTabs', () => {
-  // What changed is held back from the site (features.ts): no tab for a
-  // page that isn't there, and the tab again once it's switched back on.
-  it('has a What changed tab only while What changed is switched on', () => {
-    expect(adminTabs('philly', false).find((t) => t.tab === 'changes')).toBeUndefined()
-    features.whatChanged = true
-    try {
-      const reports = adminAreas('philly', false).find((a) => a.area === 'reports')!
-      expect(reports.tabs.at(-1)).toEqual({ tab: 'changes', href: '/philly/admin/changes', label: 'What changed' })
-    } finally {
-      features.whatChanged = false
-    }
+  // What changed opens from a row on Reports (ReportsPanel), not a tab:
+  // Reports is one page (step 5).
+  it('has no What changed tab', () => {
+    expect(adminTabs('philly', true).find((t) => t.tab === 'changes')).toBeUndefined()
   })
 
   // The eruvim moved onto the Categories tab's Eruv row (Oct 22): no
@@ -89,19 +82,11 @@ describe('adminAreas', () => {
     expect(shape(false)[2]).toEqual(['Site', ['Home page', 'Category pages', 'Campaigns']])
   })
 
-  it('puts every tab in exactly one area, whatever is switched on', () => {
-    for (const whatChanged of [false, true]) {
-      features.whatChanged = whatChanged
-      try {
-        for (const superAdmin of [false, true]) {
-          const grouped = adminAreas('philly', superAdmin).flatMap((a) => a.tabs.map((t) => t.tab))
-          expect(new Set(grouped).size).toBe(grouped.length)
-          expect(grouped).toEqual(adminTabs('philly', superAdmin).map((t) => t.tab))
-          expect(grouped.includes('changes')).toBe(whatChanged)
-        }
-      } finally {
-        features.whatChanged = false
-      }
+  it('puts every tab in exactly one area', () => {
+    for (const superAdmin of [false, true]) {
+      const grouped = adminAreas('philly', superAdmin).flatMap((a) => a.tabs.map((t) => t.tab))
+      expect(new Set(grouped).size).toBe(grouped.length)
+      expect(grouped).toEqual(adminTabs('philly', superAdmin).map((t) => t.tab))
     }
   })
 
@@ -142,14 +127,11 @@ describe('adminNavPosition', () => {
     expect(adminNavPosition(path, 'philly', true)).toEqual({ area, tab })
   })
 
-  it('opens Reports on What changed while it is switched on', () => {
-    expect(adminNavPosition('/philly/admin/changes', 'philly', false)).toBeNull()
-    features.whatChanged = true
-    try {
-      expect(adminNavPosition('/philly/admin/changes', 'philly', false)).toEqual({ area: 'reports', tab: 'changes' })
-    } finally {
-      features.whatChanged = false
-    }
+  // The public What changed page was live, through an admin's tab or header
+  // link, while a code switch kept this screen out of the console, so an
+  // admin couldn't hide an entry visitors saw (Nov 21).
+  it('opens Reports on What changed, which Reports opens', () => {
+    expect(adminNavPosition('/philly/admin/changes', 'philly', false)).toEqual({ area: 'reports', tab: 'metrics' })
   })
 
   // A tab's path only covers itself and what's under it, not every path

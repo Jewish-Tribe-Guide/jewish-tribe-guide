@@ -539,9 +539,12 @@ The user's calls on this list, Nov 21: Today stays parked, not deleted.
 `/inbox` stays as it is: it's for forms, there are none yet, and forms
 will get something better than `/inbox` when they come. What changed
 is on the live site, as the user said: an admin's tab or header link to
-it (`changesLinked`, Nov 15) turns the page on while `features.whatChanged`
-stays off. That switch now only holds back the home's own link and the
-admin's What changed tab. Nothing to do.
+it (`changesLinked`, Nov 15) turns the page on. The code switch
+`features.whatChanged` is gone (the user, Nov 21): it had kept the
+admin's What changed screen out of the console, so an entry couldn't be
+hidden from a page visitors saw. That screen now opens from a row on
+Reports (Reports stays one page), and the category list's foot has no
+What changed link; where it shows is the admin's tabs and header.
 
 Oldest iPhone (left to me, Nov 21): **iOS 16.4, so the iPhone 8 and X
 (2017) and every one since.** That's what Next 16 builds for (Safari

@@ -106,10 +106,9 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
       area: 'reports',
       label: 'Reports',
       tabs: [
-        // One page (step 5); History opens from its last row.
+        // One page (step 5); History, Searches and What changed open from
+        // its rows.
         { tab: 'metrics', href: `${base}/metrics`, label: 'Reports' },
-        // Held back from the site for now (see features.ts).
-        ...(features.whatChanged ? [{ tab: 'changes' as const, href: `${base}/changes`, label: 'What changed' }] : []),
       ],
     },
     {
@@ -133,12 +132,12 @@ export function adminTabs(community: string, isSuperAdmin: boolean): AdminTabLin
 }
 
 // Paths a tab covers besides its own: History (/history/approved and
-// /history/rejected) and every search nobody found (/searches) are part of
-// Reports, which opens them.
+// /history/rejected), every search nobody found (/searches) and What
+// changed (/changes) are part of Reports, which opens them.
 // /site is Site on a phone: a list of its screens (board 21), and Site's
 // own tab there.
 const TAB_ALSO_COVERS: Partial<Record<AdminTab, string[]>> = {
-  metrics: ['/history', '/searches'],
+  metrics: ['/history', '/searches', '/changes'],
   home: ['/site'],
   // Forms has no tab while it's held back (see features.ts).
   categories: ['/forms'],

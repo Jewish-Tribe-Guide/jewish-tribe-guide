@@ -10,7 +10,7 @@ const nav = vi.hoisted(() => ({ pathname: '/philly/admin', count: null as number
 vi.mock('next/navigation', () => ({ usePathname: () => nav.pathname }))
 vi.mock('@/lib/communityContext', () => ({ useCommunitySlug: () => 'philly' }))
 vi.mock('@/lib/contentContext', () => ({ useSiteSettings: () => ({ name: 'Philly Jewish Guide' }) }))
-vi.mock('@/lib/features', () => ({ features: { todayHome: false, whatChanged: false } }))
+vi.mock('@/lib/features', () => ({ features: { todayHome: false } }))
 vi.mock('@/lib/useTodo', () => ({ useTodoCount: () => nav.count }))
 // Next's Link, with whether it keeps Next's scroll on navigation shown.
 vi.mock('next/link', () => ({

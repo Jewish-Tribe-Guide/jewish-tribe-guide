@@ -41,8 +41,8 @@ export default async function HomePage(props: PageProps<'/[community]'>) {
     getSiteSettings(community).catch(() => SITE_SETTINGS_DEFAULTS),
     listCommunities().catch(() => []),
     // Today's "This week" block (step 7a). Without it, no block — and not
-    // read at all while either is held back (see features.ts).
-    features.todayHome && features.whatChanged
+    // read at all while Today is held back (see features.ts).
+    features.todayHome
       ? listChangeLog(community).catch((err) => {
           console.error('[home] changes failed to load:', err)
           return null

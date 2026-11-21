@@ -13,7 +13,6 @@ import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { browseLine, shabbosMoment } from '@/lib/todayHome'
 import { routes } from '@/lib/routes'
-import { features } from '@/lib/features'
 import { withMilesFromAddress, withMilesFromCenter } from '@/lib/listingTravel'
 import type { LatLng } from '@/lib/geo'
 import { ChevronRightIcon } from '@/components/icons'
@@ -165,9 +164,6 @@ export function BrowseFoot({ communitySlug }: { communitySlug: string }) {
   return (
     <nav aria-label="About the guide" className="mt-8 border-t border-slate-200 pt-1 pb-2 text-[0.9375rem] font-bold text-primary">
       <div className="-mx-3 flex flex-wrap">
-        {/* Always here, so a quiet week (no "This week" on Today) still has a
-            way to the page — unless it's held back (see features.ts). */}
-        {features.whatChanged && <Link href={routes.changes(communitySlug)} className={FOOT_LINK}>What changed</Link>}
         {settings.feedbackEnabled && <Link href={routes.feedback(communitySlug)} className={FOOT_LINK}>Feedback</Link>}
         <Link href={routes.about(communitySlug)} className={FOOT_LINK}>About</Link>
         <Link href={routes.privacy(communitySlug)} className={FOOT_LINK}>Privacy</Link>

@@ -24,7 +24,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 // The Today home is held back from the site (features.ts); its settings are
 // tested with it switched on, and once with it off.
-const features = vi.hoisted(() => ({ todayHome: true, whatChanged: true }))
+const features = vi.hoisted(() => ({ todayHome: true }))
 vi.mock('@/lib/features', () => ({ features }))
 vi.mock('@/lib/previewDraft', () => ({
   previewUrl: (community: string) => `/${community}?preview=1`,

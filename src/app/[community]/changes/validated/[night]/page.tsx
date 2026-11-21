@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import NightScreen from './NightScreen'
-import { features } from '@/lib/features'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { changesLinked } from '@/lib/siteSettings'
 import { listCommunities } from '@/lib/communityStore'
@@ -24,7 +23,7 @@ export async function generateStaticParams() {
 }
 
 async function findNight(community: string, key: string) {
-  if (!features.whatChanged && !changesLinked(await getSiteSettings(community))) return null
+  if (!changesLinked(await getSiteSettings(community))) return null
   const nights = await listNights(community).catch(() => [])
   return nights.find((n) => n.key === key) ?? null
 }

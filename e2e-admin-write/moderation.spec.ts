@@ -13,11 +13,11 @@ import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 // don't close between them: the integration suite calls approveSubmission()
 // directly, never the UI; admin.spec.ts drives the UI, never a mutation.
 //
-// resource.category is a plain text column (no FK — see
-// supabase/migrations/20240101000027_communities.sql), so these tests don't
-// need a real category row to exist; the queue falls back to showing the raw
-// category id as the label when it can't resolve one, which is cosmetic and
-// doesn't affect the underlying approve/reject write being verified.
+// A listing's category must exist since migration 113 (Nov 21): approving
+// a new place in a category that isn't there is refused. A test that
+// approves seeds a hidden category of its own (seedCategory). One that only
+// rejects can leave its submission's category made up; the queue then shows
+// the raw id as the label, which is cosmetic.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getAdminClient() {
@@ -43,6 +43,24 @@ function listingPayload(name: string): ResourceSubmission {
 const pendingSubmissionIds: string[] = []
 const pendingResourceIds: string[] = []
 const pendingCategoryIds: string[] = []
+
+/** A hidden listing category in the write suite's community, so no other
+ *  test or page sees it; deleted after the test, with its listings. */
+async function seedCategory(supabase: ReturnType<typeof getAdminClient>): Promise<string> {
+  const categoryId = `e2e-review-${randomUUID().slice(0, 8)}`
+  const { error } = await supabase.from('category').insert({
+    id: categoryId,
+    community_id: WRITE_SUITE_COMMUNITY,
+    label: categoryId,
+    plural_label: categoryId,
+    fields: [],
+    kind: 'listing',
+    active: false,
+  })
+  if (error) throw new Error(`Could not seed the category: ${error.message}`)
+  pendingCategoryIds.push(categoryId)
+  return categoryId
+}
 
 test.afterEach(async () => {
   const supabase = getAdminClient()
@@ -159,6 +177,7 @@ test.describe('signing out', () => {
 test('clicking Approve on a pending listing makes it live', async ({ page }) => {
   const supabase = getAdminClient()
   const name = `E2E Admin Write ${randomUUID()}`
+  const categoryId = await seedCategory(supabase)
 
   const { data: submission, error } = await supabase
     .from('submission')
@@ -167,7 +186,7 @@ test('clicking Approve on a pending listing makes it live', async ({ page }) => 
       operation: 'create',
       target_type: 'listing',
       target_id: null,
-      payload: listingPayload(name),
+      payload: { ...listingPayload(name), category: categoryId },
       note: null,
       status: 'pending',
       submitted_by: { name: 'e2e-admin-write suite' },
@@ -205,20 +224,7 @@ test('opening a card, fixing the name and approving puts the fix live', async ({
   const supabase = getAdminClient()
   const sent = `E2E Admin Write ${randomUUID()} Typo`
   const fixed = sent.replace(' Typo', ' Fixed')
-  // Approving with a fix checks the listing against its category, so this
-  // one needs a real category: hidden, so no other test or page sees it.
-  const categoryId = `e2e-review-${randomUUID().slice(0, 8)}`
-  const { error: categoryError } = await supabase.from('category').insert({
-    id: categoryId,
-    community_id: WRITE_SUITE_COMMUNITY,
-    label: categoryId,
-    plural_label: categoryId,
-    fields: [],
-    kind: 'listing',
-    active: false,
-  })
-  if (categoryError) throw new Error(`Could not seed the category: ${categoryError.message}`)
-  pendingCategoryIds.push(categoryId)
+  const categoryId = await seedCategory(supabase)
 
   const { data: submission, error } = await supabase
     .from('submission')
