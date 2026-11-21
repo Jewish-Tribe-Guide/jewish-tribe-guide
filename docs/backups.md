@@ -52,13 +52,54 @@ time (`AGENTS.md`).
 - **A photo or logo is gone**: it's in our copy's `storage/<bucket>/`,
   under the same path. Upload it back to the same path in Storage.
 
+- **The whole Supabase project is gone** (or its backups can't be used):
+  rebuild it from our copy into a new project.
+  1. Make a new Supabase project.
+  2. Run every file in `supabase/migrations/` in its SQL editor, in order.
+     They rebuild every table (tried Nov 21: all 104 ran clean on a fresh
+     Postgres 17).
+  3. Put the copy in, rows and files:
+
+     ```bash
+     RESTORE_URL=https://<new>.supabase.co RESTORE_KEY=<its service role key> \
+       node --env-file=.env.local scripts/restore.mjs backups/prod-<ref>-<time> --replace
+     ```
+
+     `--replace` empties the few tables the migrations fill themselves
+     (community, eruv, page, watch, content_stamp) first; the copy is the
+     truth. It won't run against the project the copy came from or live.
+     Rows that name a photo by the old project's address are pointed at
+     the new one.
+  4. In Vercel, point `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+     and `SUPABASE_SERVICE_ROLE_KEY` at the new project, and redeploy.
+  5. Set up sign-in again in the new project's Authentication settings:
+     the site's address as the redirect, and Google sign-in if it's used.
+     Admins' accounts aren't in the copy and don't need to be: a magic
+     link makes one on first sign-in, and who is an admin is in the
+     `community` rows, which are.
+
 After any restore, run `POST /api/admin/revalidate` (or redeploy). A write
 straight to the database skips the cache refresh every admin save does, so
 the site would keep showing the old copy for up to a day.
 
 ## Not done yet
 
-- A restore has never been tried. The honest test is to load a copy into a
-  throwaway Supabase project and open the site against it.
+- **The drill (Nov 21)**: the first live copy (Nov 21, 05:33 UTC) was
+  restored into a throwaway Postgres 17 with PostgREST in front, built from
+  the migrations folder alone. Every table came back with exactly the
+  copy's count (29 tables, 3,901 rows), and the site ran on it: home,
+  Food (74 places), Synagogues. What it found:
+  - Migration 045 needs `pgcrypto`, which Supabase has on every project
+    and a bare Postgres doesn't. Nothing to do on Supabase.
+  - A copy older than the newest migration has a column the new project
+    doesn't (`contribution_note`, dropped by 106). The restore leaves such
+    a column out and says whether any row held something in it.
+  - Live has `site_settings.map_zoom_radius_miles`, which no migration
+    makes: left from before the setting moved to the Map category
+    (`category.map_zoom_radius_miles`, migration 029, which the code
+    reads). Empty in every row. Migration 107 drops it.
+  - Not tried: files (the drill had no Storage; the copy's 186 files are
+    all there and none is empty) and sign-in (no Auth). A real Supabase
+    project would cover both.
 - Nothing runs the copy on a schedule. It's a command someone has to
   remember.

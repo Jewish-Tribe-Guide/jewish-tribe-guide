@@ -919,8 +919,13 @@ Found and not fixed:
   the clock reader: they answer a different question.
 - Watches' days are on New York's clock in three files: right for Philly
   and UES only.
-- Rebuilding a fresh project from the migrations folder (grants, a
-  restore drill) is untouched.
+- Rebuilding a fresh project from the migrations folder, and a restore
+  drill: **done Nov 21** (`docs/backups.md`, "The drill"). All 104
+  migrations rebuilt it; `scripts/restore.mjs` put the first live copy
+  back, every count exact; the site ran on it. Files and sign-in weren't
+  tried (no Storage or Auth in the drill). **For the user:** run 107
+  (drops live's leftover `site_settings.map_zoom_radius_miles`), dev
+  then live.
 
 For the user:
 
