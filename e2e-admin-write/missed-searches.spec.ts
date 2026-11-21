@@ -44,7 +44,9 @@ test('a missed search is listed, dismissed for real, and restored', async ({ pag
   await expect(row).toContainText('3 times')
 
   await row.getByRole('button', { name: 'Dismiss' }).click()
-  await expect(row).not.toBeVisible()
+  // The row moves once the save answers, and the test project is shared by
+  // every suite at once: 5s wasn't always enough (PR 417, Nov 21).
+  await expect(row).not.toBeVisible({ timeout: 20_000 })
   await expect
     .poll(async () => (await supabase.from('search_miss_dismissal').select('key').eq('community_id', WRITE_SUITE_COMMUNITY).eq('key', term)).data?.length)
     .toBe(1)
@@ -52,7 +54,7 @@ test('a missed search is listed, dismissed for real, and restored', async ({ pag
   await page.getByRole('button', { name: 'Show Dismissed' }).click()
   const dismissed = page.getByTestId('missed-search').filter({ hasText: `“${term}”` })
   await dismissed.getByRole('button', { name: 'Restore' }).click()
-  await expect(row).toBeVisible()
+  await expect(row).toBeVisible({ timeout: 20_000 })
   await expect
     .poll(async () => (await supabase.from('search_miss_dismissal').select('key').eq('community_id', WRITE_SUITE_COMMUNITY).eq('key', term)).data?.length)
     .toBe(0)
@@ -74,7 +76,7 @@ test('a search asked more than once leads the page, and Dismiss there is the sam
   await expect(row).toContainText('3 searches')
   await row.getByRole('button', { expanded: false }).click()
   await row.getByRole('button', { name: 'Dismiss' }).click()
-  await expect(row).not.toBeVisible()
+  await expect(row).not.toBeVisible({ timeout: 20_000 })
   await expect
     .poll(async () => (await supabase.from('search_miss_dismissal').select('key').eq('community_id', WRITE_SUITE_COMMUNITY).eq('key', term)).data?.length)
     .toBe(1)

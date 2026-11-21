@@ -905,7 +905,8 @@ Found and not fixed:
 
 - Admin-write waits shorter than a busy test database, the shape 406
   fixed twice: `todo-scroll:75`, `main-dishes`, `category-editor`,
-  `community-editor:61`. Not looked into.
+  `community-editor:61`. Not looked into. `missed-searches:47` was one more (PR 417,
+  Nov 21): Dismiss's row waits on the save, now 20s.
 - e2e `listing-detail.spec.ts:537` (above): once, not looked into.
 - 25 of 104 older migrations can't be told run or not from what they
   made (a policy, an index, a data fix).
