@@ -14,6 +14,8 @@ const refuse = (cols: string[]) => {
   const gone = cols.find((c) => table.missing.has(c))
   return gone ? { data: null, error: { message: `column eruv.${gone} does not exist` } } : null
 }
+const report = vi.hoisted(() => vi.fn())
+vi.mock('./serverError', () => ({ reportServerError: report }))
 vi.mock('./supabase/admin', () => ({
   getAdminClient: () => ({
     from: () => {
@@ -76,6 +78,7 @@ describe('the eruv table', () => {
     const [source] = await listEruvMapSources('philly')
     expect(source).toMatchObject({ id: 'northeast', lineHidePoints: false, lineMissing: [] })
     expect(table.selects.at(-1)).not.toMatch(/line_hide_points|line_missing/)
+    expect(report).toHaveBeenCalledWith(expect.stringMatching(/^\[schema\] eruv\.line_hide_points isn’t in the database/))
   })
 
   it('saves an edit that leaves hidden markers alone, before 076', async () => {

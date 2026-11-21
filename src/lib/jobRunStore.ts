@@ -1,4 +1,5 @@
 import { reportServerError } from './serverError'
+import { schemaMissing } from './supabase/schemaMissing'
 import { cronHeartbeat } from './cronHeartbeat'
 import { getAdminClient } from './supabase/admin'
 import { NIGHTLY_JOBS, type JobId, type JobOutcome, type JobRun, type RunKinds } from './jobRuns'
@@ -38,12 +39,12 @@ function fromRow(r: Row): JobRun {
 }
 
 export function runTableMissing(message: string | undefined): boolean {
-  return !!message && /\bjob_run\b/.test(message) && /(does not exist|schema cache)/.test(message)
+  return schemaMissing('job_run', message)
 }
 
 /** Migration 101 not run yet. */
 export function communityColumnMissing(message: string | undefined): boolean {
-  return !!message && /\bcommunity_id\b/.test(message) && /(does not exist|schema cache)/.test(message)
+  return schemaMissing('community_id', message)
 }
 
 /** A community's runs and the whole site's: `community_id` null or its own. */
@@ -51,7 +52,7 @@ export const ownOrSiteRuns = (community: string) => `community_id.is.null,commun
 
 /** Migration 087 not run yet. */
 export function kindsColumnMissing(message: string | undefined): boolean {
-  return !!message && /\bkinds\b/.test(message) && /(does not exist|schema cache)/.test(message)
+  return schemaMissing('kinds', message)
 }
 
 const quietly = (what: string) => (err: unknown) => console.error(`[job-run] ${what}:`, err)

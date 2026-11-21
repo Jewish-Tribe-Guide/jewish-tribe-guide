@@ -7,6 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const m = vi.hoisted(() => ({ listRead: null as unknown, hasColumn: true, selects: [] as string[], updates: [] as Record<string, unknown>[] }))
 const missing = { message: 'column watch.last_check does not exist' }
 const row = { id: 'w1', community_id: 'philly', kind: 'website', url: 'https://x.org/', resource_id: null, label: null, active: true, created_at: 'c', created_by: null, last_run_at: null, last_ok_at: null, last_error: null, failing_since: null, last_filed: null, page_hash: null, page_changed_at: null }
+const report = vi.hoisted(() => vi.fn())
+vi.mock('./serverError', () => ({ reportServerError: report }))
 vi.mock('./supabase/admin', () => ({
   getAdminClient: () => ({
     from: () => {
@@ -54,6 +56,7 @@ describe('watchStore and migration 085', () => {
     const { watches, available } = await listWatches('philly')
     expect(available).toBe(true)
     expect(watches[0]).toMatchObject({ id: 'w1', lastCheck: null })
+    expect(report).toHaveBeenCalledWith(expect.stringMatching(/^\[schema\] watch\.last_check isn’t in the database/))
   })
 
   it('saves a run without the column, less what it found', async () => {

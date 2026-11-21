@@ -994,6 +994,34 @@ Soon:
 - Migrations: nothing records which ran where; `contribution_note`
   drift; 16 "table missing" fallbacks hide a missed one; a fresh project
   can't be rebuilt from the folder (no grants since 056 was removed).
+  **Built Nov 20, the code side** (`claude/health-migrations`):
+  - Migration 105 makes `migration_ran`, and every migration from it on
+    writes its own name there (`migrationsRecordThemselves.test.ts` fails
+    on one that doesn't, red 1/2 without 105). `npm run migrations:report`
+    (`-- --prod` for live; it only selects) lists what's recorded, and for
+    each older migration looks for the tables and columns it made
+    (`scripts/migrationFootprint.mjs`), less what a later one dropped or
+    renamed. One that makes neither (a policy, an index, a data fix) is
+    "can't tell": 25 of 104.
+  - Read Nov 20: dev, everything seen except 105. **Live: 067
+    (`today_home`) not run**, its three `site_settings` columns missing.
+    Harmless while Today is parked (the read is `select *`, and only a
+    save of Today's settings needs them, which says so), but it is the
+    one older migration live doesn't have.
+  - The "table missing" fallbacks (13 reading Postgres' wording, 4 more
+    dropping a later column) now go through
+    `src/lib/supabase/schemaMissing.ts`, which tells the log and Sentry
+    once per name per server ("[schema] watch isn't in the database…").
+    The page still carries on without it. `schemaMissingReported.test.ts`
+    fails on a store checking the wording itself. Red 8/8 against the old
+    stores.
+  - **For the user:** run 105, dev then live. Then decide on 067 for
+    live (run it, or leave it until Today comes back).
+  - Not done: `site_settings.contribution_note` is still there on dev
+    and live (read Nov 20). Migration 033 was deleted with the feature
+    (Aug 27), but nothing dropped the column. Dropping it is a migration,
+    so it's the user's call. Rebuilding a fresh project from the folder (grants, and the
+    restore drill) is untouched.
 - Hidden communities' data through the public API routes. **Built Nov
   20**: the proxy now sees the public API routes too, and answers 404 to
   `?community=<hidden>` without that community's preview cookie; the

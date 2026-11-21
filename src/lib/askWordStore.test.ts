@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 
 const result = vi.hoisted(() => ({ value: { data: null as unknown, error: null as { message: string } | null } }))
+const report = vi.hoisted(() => vi.fn())
+vi.mock('./serverError', () => ({ reportServerError: report }))
 vi.mock('./supabase/admin', () => {
   const chain = { select: () => chain, eq: () => chain, order: () => Promise.resolve(result.value) }
   return { getAdminClient: () => ({ from: () => chain }) }
@@ -26,10 +28,11 @@ describe('the taught words, with the categories', () => {
     expect(g.askWords).toBeUndefined()
   })
 
-  it('without migration 063, no words, and nothing breaks', async () => {
+  it('without migration 063, no words, nothing breaks, and Sentry hears of it', async () => {
     result.value = { data: null, error: { message: 'relation "public.question_word" does not exist' } }
     expect(await withAskWords('philly', [food])).toEqual([food])
     expect(await listTaughtWords('philly')).toEqual({ words: [], available: false })
+    expect(report).toHaveBeenCalledWith(expect.stringMatching(/^\[schema\] question_word isn’t in the database/))
   })
 
   it('a failed read leaves the categories as they are', async () => {

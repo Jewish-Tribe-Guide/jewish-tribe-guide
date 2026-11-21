@@ -1,4 +1,5 @@
 import { getAdminClient } from './supabase/admin'
+import { schemaMissing } from './supabase/schemaMissing'
 import type { StatusChange } from './email'
 
 // The night_note table (migration 096): what the night's jobs saw that
@@ -10,7 +11,7 @@ import type { StatusChange } from './email'
 const KEEP_DAYS = 14
 
 function noteTableMissing(message: string | undefined): boolean {
-  return !!message && /\bnight_note\b/.test(message) && /(does not exist|schema cache)/.test(message)
+  return schemaMissing('night_note', message)
 }
 
 /** Keeps Google's status changes for tonight's email. False when there's

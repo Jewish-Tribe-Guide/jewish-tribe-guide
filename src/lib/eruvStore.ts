@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { saySchemaMissing, schemaMissing } from './supabase/schemaMissing'
 import { getAdminClient } from './supabase/admin'
 import type { Eruv, EruvStatus } from './eruv'
 import type { EruvLineFile } from './eruvLine'
@@ -29,7 +30,11 @@ const LATER_COLUMNS = ['line_hide_points', 'line_missing', ...EMAIL_COLUMNS]
 // Read only where an eruv is shown or edited, so a map's fingerprint
 // (eruvMapsVersion) doesn't change with them.
 const DETAILS_COLUMN = 'details'
-const laterNamed = (message: string | undefined) => [...LATER_COLUMNS, DETAILS_COLUMN].filter((c) => !!message && message.includes(c))
+function laterNamed(message: string | undefined): string[] {
+  const named = [...LATER_COLUMNS, DETAILS_COLUMN].filter((c) => !!message && message.includes(c))
+  for (const c of named) saySchemaMissing(`eruv.${c}`)
+  return named
+}
 
 /** A select of `columns` plus the later ones, less any not there yet. */
 async function selectWithLater<T>(
@@ -176,7 +181,7 @@ function fromAdminRow(r: AdminRow): AdminEruv {
 }
 
 export function eruvTableMissing(message: string | undefined): boolean {
-  return !!message && /\beruv\b/.test(message) && /(does not exist|schema cache)/.test(message)
+  return schemaMissing('eruv', message)
 }
 
 /** A community's active eruvim, by name. `available` is false

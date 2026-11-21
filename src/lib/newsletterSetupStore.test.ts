@@ -5,9 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const db = vi.hoisted(() => ({
   rows: new Map<string, { key: string; checked_at: string | null; account: string | null }>(),
   missing: false,
+  noWebApp: false,
 }))
 const MISSING = { message: 'relation "public.newsletter_setup" does not exist' }
 
+const report = vi.hoisted(() => vi.fn())
+vi.mock('./serverError', () => ({ reportServerError: report }))
 vi.mock('./supabase/admin', () => ({
   getAdminClient: () => ({
     from: () => ({
@@ -16,11 +19,14 @@ vi.mock('./supabase/admin', () => ({
         if (!db.rows.has(row.community_id) || !opts.ignoreDuplicates) db.rows.set(row.community_id, { key: row.key, checked_at: null, account: null })
         return { error: null }
       },
-      select: () => {
+      select: (columns: string) => {
         let where: [string, string] = ['', '']
         const q = {
           eq: (col: string, v: string) => ((where = [col, v]), q),
-          single: async () => ({ data: db.rows.get(where[1]) ?? null, error: null }),
+          single: async () =>
+            db.noWebApp && columns.includes('web_app_url')
+              ? { data: null, error: { message: 'column newsletter_setup.web_app_url does not exist' } }
+              : { data: db.rows.get(where[1]) ?? null, error: null },
           maybeSingle: async () => {
             if (db.missing) return { data: null, error: MISSING }
             const found = [...db.rows].find(([, r]) => r.key === where[1])
@@ -45,6 +51,7 @@ const { communityOfNewsletterKey, getNewsletterSetup, recordNewsletterCheck } = 
 beforeEach(() => {
   db.rows.clear()
   db.missing = false
+  db.noWebApp = false
 })
 
 describe('newsletterSetupStore', () => {
@@ -75,5 +82,12 @@ describe('newsletterSetupStore', () => {
     expect(await getNewsletterSetup('riverton')).toBeNull()
     expect(await communityOfNewsletterKey('nl_x')).toBeNull()
     await expect(recordNewsletterCheck('riverton', null)).resolves.toBeUndefined()
+    expect(report).toHaveBeenCalledWith(expect.stringMatching(/^\[schema\] newsletter_setup isn’t in the database/))
+  })
+
+  it('before migration 091: the setup, with Read now off, and Sentry hears of it', async () => {
+    db.noWebApp = true
+    expect(await getNewsletterSetup('riverton')).toMatchObject({ webAppUrl: null })
+    expect(report).toHaveBeenCalledWith(expect.stringMatching(/^\[schema\] newsletter_setup\.web_app_url isn’t in the database/))
   })
 })

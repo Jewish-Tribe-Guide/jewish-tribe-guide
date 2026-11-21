@@ -1,4 +1,5 @@
 import { revalidateTag } from 'next/cache'
+import { schemaMissing } from './supabase/schemaMissing'
 import { getAdminClient } from './supabase/admin'
 import { TAGS } from './cacheTags'
 import type { MenuDish } from './menuReader'
@@ -29,7 +30,7 @@ export type StoredMenuReading = {
 }
 
 function tableMissing(message: string | undefined): boolean {
-  return !!message && /menu_reading/.test(message) && /(does not exist|schema cache)/.test(message)
+  return schemaMissing('menu_reading', message)
 }
 
 const COLUMNS = 'resource_id, status, source_url, dishes, note, model, read_at, decided_at, decided_by'

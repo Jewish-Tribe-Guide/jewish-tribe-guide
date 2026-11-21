@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { saySchemaMissing, schemaMissing } from './supabase/schemaMissing'
 import { getAdminClient } from './supabase/admin'
 
 // The newsletter_setup table (migration 090): each community's own key for
@@ -18,7 +19,7 @@ export type NewsletterSetup = {
 }
 
 export function setupTableMissing(message: string | undefined): boolean {
-  return !!message && /\bnewsletter_setup\b/.test(message) && /(does not exist|schema cache)/.test(message)
+  return schemaMissing('newsletter_setup', message)
 }
 
 /** Long and random, with a prefix that says what it is. */
@@ -28,7 +29,11 @@ export function newKey(): string {
 
 type Row = { key: string; checked_at: string | null; account: string | null; web_app_url?: string | null }
 
-const webAppColumnMissing = (message: string | undefined) => !!message && /\bweb_app_url\b/.test(message)
+function webAppColumnMissing(message: string | undefined): boolean {
+  const missing = !!message && /\bweb_app_url\b/.test(message)
+  if (missing) saySchemaMissing('newsletter_setup.web_app_url')
+  return missing
+}
 
 /** This community's setup, its key made the first time it's asked for;
  *  null without the table. */

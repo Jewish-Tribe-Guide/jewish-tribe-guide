@@ -1,4 +1,5 @@
 import { getAdminClient } from './supabase/admin'
+import { schemaMissing } from './supabase/schemaMissing'
 import type { CategoryConfig } from './categories'
 import type { TaughtWord } from './askWords'
 
@@ -8,14 +9,8 @@ import type { TaughtWord } from './askWords'
 // questions tab. Missing table (the migration not run yet) is not an
 // error: the search just knows no taught words, as before.
 
-let warned = false
 function tableMissing(message: string | undefined): boolean {
-  const missing = !!message && /question_word/.test(message) && /(does not exist|schema cache)/.test(message)
-  if (missing && !warned) {
-    warned = true
-    console.warn('[ask-words] no question_word table (migration 063): no taught words')
-  }
-  return missing
+  return schemaMissing('question_word', message)
 }
 
 export type StoredWord = TaughtWord & { fromQuestion: string | null; taughtBy: string; taughtAt: string }

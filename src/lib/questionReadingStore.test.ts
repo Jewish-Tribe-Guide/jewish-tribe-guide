@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // Without migration 062's table the reader still works: a lookup finds
 // nothing and a save does nothing, and neither throws.
 const m = vi.hoisted(() => ({ maybeSingle: vi.fn(), upsert: vi.fn(), update: vi.fn() }))
+const report = vi.hoisted(() => vi.fn())
+vi.mock('./serverError', () => ({ reportServerError: report }))
 vi.mock('@/lib/supabase/admin', () => {
   const chain = { select: () => chain, eq: () => chain, maybeSingle: m.maybeSingle, upsert: m.upsert, update: m.update }
   return { getAdminClient: () => ({ from: () => chain }) }
@@ -16,11 +18,12 @@ beforeEach(() => {
 })
 
 describe('questionReadingStore', () => {
-  it('finds nothing, and warns once, when the table isn’t there yet', async () => {
+  it('finds nothing, and tells Sentry once, when the table isn’t there yet', async () => {
     m.maybeSingle.mockResolvedValue({ data: null, error: { message: "Could not find the table 'public.question_reading' in the schema cache" } })
     expect(await findReading('philly', 'meat')).toBeNull()
     expect(await findReading('philly', 'dairy')).toBeNull()
-    expect(console.warn).toHaveBeenCalledTimes(1)
+    expect(report).toHaveBeenCalledTimes(1)
+    expect(report).toHaveBeenCalledWith(expect.stringMatching(/^\[schema\] question_reading isn’t in the database/))
     expect(console.error).not.toHaveBeenCalled()
   })
 
