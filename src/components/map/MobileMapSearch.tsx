@@ -9,6 +9,11 @@ import type { LatLng } from '@/lib/googleMapsLinks'
 import type { MobileNearbySheetHandle } from './MobileNearbySheet'
 import type { ResourceMapViewProps } from './mapViewShared'
 
+/* ── Floating search + filters (mobile) — laid directly over the
+        map, Google-Maps-style, instead of pushing it down. Category
+        chips sit right under the search bar as their own
+        always-visible scroll row, same as Google Maps — no
+        separate "Filters" button/sheet. ───────────────────────── */
 export default function MobileMapSearch({
   overlayRef,
   backTo,

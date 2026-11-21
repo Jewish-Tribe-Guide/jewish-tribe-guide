@@ -4,6 +4,18 @@
 // shows: the results list, a place, or an eruv.
 import type { ReactNode, UIEvent } from 'react'
 
+// desktop:absolute (not a flex sibling that consumes row width
+// anymore): this used to sit inline in the flex row, so opening
+// it shrank the map div next to it — which resizes the map's
+// real container, and ResourceMap's own ResizeObserver reacts to
+// any container resize by re-centering the map on its (now
+// off-center) geo center to refresh the tile layer (see that
+// comment). The net effect was the whole map visibly shifting
+// whenever the sidebar opened or closed, not just around a
+// selection — Google Maps' own results panel floats over the
+// map instead for exactly this reason. Overlaying it here (with
+// its own elevation) means the map's box never changes size, so
+// that ResizeObserver never fires and nothing under it moves.
 export function DesktopSidebar({
   sidebarVisible,
   sidebarWidth,

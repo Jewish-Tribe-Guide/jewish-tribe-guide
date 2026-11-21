@@ -38,6 +38,22 @@ export function CampaignChip({
   )
 }
 
+// A standalone toggle, not one of CategoryFilter's own chips — it narrows
+// ACROSS categories rather than toggling one, so it doesn't belong to
+// that component's select/all/none model. Rendered by CategoryFilter
+// itself, right after the "All" chip and before the real category
+// chips — it's the most important shortlist, not just another category.
+// Hidden until there's at least one pin: an always-visible "Pinned 0"
+// that narrows the map to nothing isn't a useful default state for a
+// feature nobody's touched yet.
+// Display only, same reasoning as CategoryFilter's own chips — while
+// "All" is on, Pinned is technically part of the selection too, but
+// coloring it in adds nothing the map (showing everything already) hasn't
+// already said. The real toggle state (aria-pressed, the click handler)
+// stays keyed on `pinnedSelected` itself.
+// "Saved" (Pin until Oct 14, canvas page "you", board YouMap): right after
+// All, which includes it (the user, Oct 23) — the visitor's own places,
+// not one more category.
 export function PinnedChip({
   pinnedHighlighted,
   pinnedSelected,
@@ -89,6 +105,10 @@ export function FiltersButton({ filtersOn, setFiltersOpen }: { filtersOn: number
   )
 }
 
+// The Eruv button: bottom-right on the map, above the live-location
+// button on a phone and above zoom on a computer, so every chip in the row
+// is a place filter (the user, Oct 15). There once there's a line to draw.
+// Off, white with the eruv's icon in its colour; on, filled.
 export function EruvButton({
   tapEruvButton,
   eruvimOn,

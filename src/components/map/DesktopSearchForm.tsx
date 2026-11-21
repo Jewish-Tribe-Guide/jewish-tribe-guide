@@ -7,6 +7,14 @@ import { ArrowLeftIcon } from '@/components/icons'
 import { SearchSuggestions } from './mapViewParts'
 import type { MapViewPoint } from './mapViewShared'
 
+// ── Desktop search box + its autocomplete dropdown — shared between the
+// two places it can render: floating directly on the map (the default
+// browsing state, Google-Maps-style) or embedded at the top of the
+// sidebar (once something's actually been searched/picked). Only one of
+// these ever actually mounts at a time (the two call sites are mutually
+// exclusive on desktopNarrowed/desktopSelected), so this still respects
+// "only one desktop <input> in the DOM at once" — see the mobile input's
+// own comment about why that matters. ─────────────────────────────────
 export default function DesktopSearchForm({
   inputRef,
   placeOpen,

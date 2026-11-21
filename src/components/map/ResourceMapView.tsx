@@ -1,23 +1,17 @@
 'use client'
 
 import { track } from '@vercel/analytics'
-import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import type { MapPoint } from './ResourceMap'
 import { createHighlight } from './highlight'
 import CategoryFilter from './CategoryFilter'
-import MapFiltersSheet, { type MapFilterSection } from './MapFiltersSheet'
+import MapFiltersSheet from './MapFiltersSheet'
 import NearbyList from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
-import type { HostedEditor } from '@/components/resources/ListingEditor'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
-import { selectValues } from '@/lib/categories'
 import {
-  filterCount,
-  filterFields,
-  keepsHours,
-  openNowAll,
   passesFields,
   setOpenNowFor,
   toggleBool,
@@ -32,10 +26,7 @@ import { useNow } from '@/lib/useNow'
 import { ui } from '@/lib/uiConfig'
 import { usePinned } from '@/lib/pinnedContext'
 import { CURRENT_LOCATION_LABEL } from '@/lib/useLiveLocation'
-import { useDroppedPins } from '@/lib/droppedPinsContext'
 import { useMapSidebar } from './useMapSidebar'
-import { useCampaignBanners } from '@/lib/contentContext'
-import { activeCampaignBanner } from '@/lib/campaignBanner'
 import { mapQueryString } from '@/lib/routes'
 import { countEvent } from '@/lib/countEvent'
 import { useOptionalCommunitySlug, useCommunityTimezone } from '@/lib/communityContext'
@@ -46,7 +37,6 @@ import { moveBackTo } from '@/components/admin/useScreenHistory'
 import { stepCount, stepsIn, withoutSteps } from '@/lib/stepAddress'
 import {
   DROPPED_FILTER_ID,
-  DROPPED_PIN_COLOR,
   DROPPED_PREFIX,
   ERUV_FILTER_ID,
   ERUV_PREFIX,
@@ -62,6 +52,8 @@ import {
 } from './mapViewShared'
 import { MapWithHover, SearchSuggestions } from './mapViewParts'
 import { useMapPoints } from './useMapPoints'
+import { useDesktopSelection } from './useDesktopSelection'
+import { useCampaignOption, useDroppedMapPins, useFilterSections } from './useMapViewParts'
 import { useMapSearch } from './useMapSearch'
 import { useMapFilters } from './useMapFilters'
 import { useViewFromLink } from './useViewFromLink'
@@ -100,27 +92,17 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // category of its own. Lives in PinnedContext, not local state — see
   // filterActive's own doc comment for why.
 
-  // Dropped pins — arbitrary points the visitor marks themselves, not tied
-  // to a listing. `pendingDropAt` is the coordinate of a long-press waiting
-  // to be named; `editingDroppedId` is an already-saved pin the visitor
-  // tapped to rename/remove. At most one editor is ever open, so these don't
-  // need to be one combined state.
-  const { droppedPins, add: addDroppedPin, remove: removeDroppedPin, rename: renameDroppedPin } = useDroppedPins()
-  const [pendingDropAt, setPendingDropAt] = useState<{ lat: number; lng: number } | null>(null)
-  const [editingDroppedId, setEditingDroppedId] = useState<string | null>(null)
-  const droppedMapPoints = useMemo<SelectablePoint[]>(
-    () =>
-      droppedPins.map((p) => ({
-        id: `${DROPPED_PREFIX}${p.id}`,
-        lat: p.lat,
-        lng: p.lng,
-        name: p.label,
-        color: DROPPED_PIN_COLOR,
-        categoryLabel: 'Your pin',
-        filterId: DROPPED_FILTER_ID,
-      })),
-    [droppedPins],
-  )
+  const {
+    droppedPins,
+    addDroppedPin,
+    removeDroppedPin,
+    renameDroppedPin,
+    pendingDropAt,
+    setPendingDropAt,
+    editingDroppedId,
+    setEditingDroppedId,
+    droppedMapPoints,
+  } = useDroppedMapPins()
   const { tracking, start, stop } = liveTracking ?? NOOP_LIVE_TRACKING
 
   // `userLocation` (page.tsx's global coords) already updates continuously
@@ -210,59 +192,12 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // marker without moving a view the visitor already positioned themselves.
   // See ResourceMap's own frameToken prop doc for how it's consumed.
   const [frameToken, setFrameToken] = useState(0)
-  // Desktop's equivalent of MobileNearbySheet's own `selected` state — the
-  // place currently shown in the sidebar's detail panel (MapPlaceDetail)
-  // instead of its results list. Mobile keeps its own copy of this inside
-  // MobileNearbySheet; desktop has no such child component (the sidebar is
-  // built directly in this file) so it's tracked here instead.
-  const [desktopSelected, setDesktopSelectedRaw] = useState<SelectablePoint | null>(null)
-  // Also keeps selectedPointId (the marker-highlight id ResourceMap reads,
-  // shared with mobile's own selection) in sync — set together, right where
-  // the selection itself changes, rather than via a separate effect.
-  // The sidebar's place (or eruv) open in its editor: how to step back, what
-  // that step is called, and whether anything typed would be lost. Its ‹ is
-  // the ← in the search box (Oct 15). Keyed on the place's id so it can't
-  // outlive the place it was set for. Mirrored in a ref so leaveEditThen,
-  // reached through several handlers in one click, asks only once.
-  const [editor, setEditor] = useState<(HostedEditor & { id: string }) | null>(null)
-  const editorRef = useRef(editor)
-  useLayoutEffect(() => {
-    editorRef.current = editor
+  const { desktopSelected, setDesktopSelected, editor, setEditor, editorRef, onPlaceEditor } = useDesktopSelection({
+    isMobile,
+    standalone,
+    setSelectedPointId,
   })
   const desktopEditing = !isMobile && !!editor && editor.id === desktopSelected?.id
-  const desktopSelectedId = desktopSelected?.id ?? null
-  const onPlaceEditor = useCallback(
-    (next: HostedEditor | null) => setEditor(next && desktopSelectedId ? { ...next, id: desktopSelectedId } : null),
-    [desktopSelectedId],
-  )
-  // A place opened on the computer's map is an entry in the history, as on
-  // a phone (MobileNearbySheet): Back closes it rather than leaving the map
-  // and its search (Nov 18). Not when the address names it already (a
-  // link, a reload). Closed on the screen, it takes that entry back, and
-  // the popstate listener below clears it.
-  const setDesktopSelected = (p: SelectablePoint | null) => {
-    const stepped = (window.history.state as { mapPlaceOpen?: boolean } | null)?.mapPlaceOpen
-    if (!p && stepped && standalone) {
-      window.history.back()
-      return
-    }
-    if (p && !desktopSelected && !stepped && standalone && new URLSearchParams(window.location.search).get('place') !== p.id) {
-      window.history.pushState({ ...(window.history.state ?? {}), mapPlaceOpen: true }, '')
-    }
-    setDesktopSelectedRaw(p)
-    setSelectedPointId(p?.id)
-  }
-  const onPlacePop = useEffectEvent((e: PopStateEvent) => {
-    if (isMobile || !desktopSelected || (e.state as { mapPlaceOpen?: boolean } | null)?.mapPlaceOpen) return
-    setDesktopSelectedRaw(null)
-    setSelectedPointId(undefined)
-  })
-  useEffect(() => {
-    if (!standalone) return
-    const listener = (e: PopStateEvent) => onPlacePop(e)
-    window.addEventListener('popstate', listener)
-    return () => window.removeEventListener('popstate', listener)
-  }, [standalone])
   // Desktop-only — the embedded home-screen map starts as a contained card
   // (like a widget, not the whole page); this expands it to cover the
   // viewport, and collapses it back in place. The standalone page-level map
@@ -763,7 +698,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       // different handlers (submitSearch, toggleBoolField, toggleSelectValue, ...).
       // Not mid-edit: a chip toggled beside the editor leaves it open (a
       // search asks first, and has closed it by the time it commits).
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (!desktopEditing) setDesktopSelected(visiblePoints.length === 1 ? visiblePoints[0] : null)
       setSidebarCollapsed(false)
     }
@@ -879,14 +813,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     if (visiblePoints.length === 0) setSidebarCollapsed(true)
   }, [visiblePoints.length, desktopSelected, desktopNarrowed, isMobile, setSidebarCollapsed, eruvimOn])
 
-  // ── Desktop search box + its autocomplete dropdown — shared between the
-  // two places it can render: floating directly on the map (the default
-  // browsing state, Google-Maps-style) or embedded at the top of the
-  // sidebar (once something's actually been searched/picked). Only one of
-  // these ever actually mounts at a time (the two call sites are mutually
-  // exclusive on desktopNarrowed/desktopSelected), so this still respects
-  // "only one desktop <input> in the DOM at once" — see the mobile input's
-  // own comment about why that matters. ─────────────────────────────────
   const desktopSearchForm = ui.search.map && !isMobile && (
     <DesktopSearchForm
       inputRef={desktopSearchInputRef}
@@ -907,39 +833,13 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     />
   )
 
-  // A live seasonal campaign's category (see CampaignBannerManager), given
-  // its own distinctly-styled chip rather than just sorting into `options`
-  // by count like every other category — the whole point is that a visitor
-  // notices it's not an ordinary category. Absent entirely outside the
-  // campaign's date range (activeCampaignBanner), and also when its
-  // category currently has no points to show (nothing to filter to).
-  // Which campaign is on waits for today's date, as the home card's does.
-  const campaignBanners = useCampaignBanners()
-  const campaignClock = useNow()
-  const activeCampaign = campaignClock === null ? null : activeCampaignBanner(campaignBanners, campaignClock, timezone)
-  const campaignOption = activeCampaign ? options.find((o) => o.id === activeCampaign.categoryId) : undefined
+  const campaignOption = useCampaignOption(options, timezone)
   const campaignHighlighted = !!campaignOption && effectiveSelected.has(campaignOption.id) && !allChipsOn
   const campaignChip = campaignOption && (
     <CampaignChip campaignOption={campaignOption} campaignHighlighted={campaignHighlighted} effectiveSelected={effectiveSelected} toggle={toggle} />
   )
 
-  // A standalone toggle, not one of CategoryFilter's own chips — it narrows
-  // ACROSS categories rather than toggling one, so it doesn't belong to
-  // that component's select/all/none model. Rendered by CategoryFilter
-  // itself, right after the "All" chip and before the real category
-  // chips — it's the most important shortlist, not just another category.
-  // Hidden until there's at least one pin: an always-visible "Pinned 0"
-  // that narrows the map to nothing isn't a useful default state for a
-  // feature nobody's touched yet.
-  // Display only, same reasoning as CategoryFilter's own chips — while
-  // "All" is on, Pinned is technically part of the selection too, but
-  // coloring it in adds nothing the map (showing everything already) hasn't
-  // already said. The real toggle state (aria-pressed, the click handler)
-  // stays keyed on `pinnedSelected` itself.
   const pinnedHighlighted = pinnedSelected && !allChipsOn
-  // "Saved" (Pin until Oct 14, canvas page "you", board YouMap): right after
-  // All, which includes it (the user, Oct 23) — the visitor's own places,
-  // not one more category.
   const pinnedChip = ui.map.pins && mappablePinnedCount > 0 && (
     <PinnedChip pinnedHighlighted={pinnedHighlighted} pinnedSelected={pinnedSelected} togglePinnedSelected={togglePinnedSelected} mappablePinnedCount={mappablePinnedCount} />
   )
@@ -967,60 +867,18 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     setSelected,
     showAllPlaces,
   })
-  // ── Filters: one button, one sheet, the chips of what's on ───────────────
-  // The categories showing, in the chip row's order: the sheet's sections.
-  const showingCategories = useMemo(() => {
-    const byId = new Map((categories ?? []).map((c) => [c.id, c]))
-    return options.flatMap((o) => (effectiveSelected.has(o.id) && byId.has(o.id) ? [byId.get(o.id)!] : []))
-  }, [options, effectiveSelected, categories])
-  const topOpenNow = openNowAll(filters, showingCategories)
-  const categorySections = useMemo<MapFilterSection[]>(() => {
-    return showingCategories.flatMap((c) => {
-      const f = filters[c.id] ?? {}
-      const fields = filterFields(c)
-      const catPoints = allPoints.filter((p) => p.filterId === c.id)
-      const booleans = fields.filter((x) => x.type === 'boolean').map((x) => ({ key: x.key, label: x.filterLabel ?? x.label, on: !!f.bool?.includes(x.key) }))
-      const selects = fields
-        .filter((x) => x.type === 'select')
-        .map((x) => {
-          const chosen = f.select?.[x.key] ?? []
-          // The values its places actually have, and whatever's chosen.
-          const values = [...new Set([...catPoints.flatMap((p) => (p.raw ? selectValues(p.raw[x.key]) : [])), ...chosen])].filter(Boolean)
-          return { key: x.key, label: x.filterLabel ?? x.label, values, chosen }
-        })
-        .filter((sel) => sel.values.length > 0)
-      const openNow = keepsHours(c) ? !!f.openNow : null
-      if (openNow === null && booleans.length === 0 && selects.length === 0) return []
-      const shown = optionsWithFilters.find((o) => o.id === c.id)?.count ?? catPoints.length
-      return [
-        {
-          id: c.id,
-          label: c.pluralLabel,
-          icon: c.icon,
-          color: colorById.get(c.id) ?? '#64748b',
-          note: shown === catPoints.length ? `all ${catPoints.length}` : `${shown} of ${catPoints.length}`,
-          openNow,
-          booleans,
-          selects,
-        },
-      ]
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showingCategories, filtersKey, allPoints, optionsWithFilters, colorById])
-  const filterSections = categorySections
-  const andNames = (names: string[]) => (names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`)
-  const topOpenNowNote = topOpenNow.on
-    ? `For ${andNames(topOpenNow.withHours.map((c) => c.pluralLabel))}.`
-    : topOpenNow.onFor.length > 0
-      ? `On for ${andNames(topOpenNow.onFor)} only.`
-      : null
-  const filtersOn = filterCount(filters, showingCategories)
+  const { topOpenNow, filterSections, topOpenNowNote, filtersOn } = useFilterSections({
+    categories,
+    options,
+    effectiveSelected,
+    filters,
+    filtersKey,
+    allPoints,
+    optionsWithFilters,
+    colorById,
+  })
   const filtersButton = <FiltersButton filtersOn={filtersOn} setFiltersOpen={setFiltersOpen} />
   const leadingChips = filtersButton
-  // The Eruv button: bottom-right on the map, above the live-location
-  // button on a phone and above zoom on a computer, so every chip in the row
-  // is a place filter (the user, Oct 15). There once there's a line to draw.
-  // Off, white with the eruv's icon in its colour; on, filled.
   const eruvColor = colorById.get(eruvCategory?.id ?? '') ?? '#64748b'
   const eruvButton = eruvimWithLines.length > 0 && <EruvButton tapEruvButton={tapEruvButton} eruvimOn={eruvimOn} eruvColor={eruvColor} eruvIcon={eruvCategory?.icon ?? ''} />
 
@@ -1084,18 +942,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   something to animate FROM/TO — unmounting it outright
                   wouldn't animate, it'd just vanish. ────────────────────── */}
           {!isMobile && (desktopNarrowed || !!desktopSelected || sidebarOpenedManually) && (
-            // desktop:absolute (not a flex sibling that consumes row width
-            // anymore): this used to sit inline in the flex row, so opening
-            // it shrank the map div next to it — which resizes the map's
-            // real container, and ResourceMap's own ResizeObserver reacts to
-            // any container resize by re-centering the map on its (now
-            // off-center) geo center to refresh the tile layer (see that
-            // comment). The net effect was the whole map visibly shifting
-            // whenever the sidebar opened or closed, not just around a
-            // selection — Google Maps' own results panel floats over the
-            // map instead for exactly this reason. Overlaying it here (with
-            // its own elevation) means the map's box never changes size, so
-            // that ResizeObserver never fires and nothing under it moves.
             <DesktopSidebar sidebarVisible={sidebarVisible} sidebarWidth={sidebarWidth} isDraggingSidebar={isDraggingSidebar}>
               {ui.map.nearbyList &&
                 // No "Back to list" in here: the ← in the search box above
@@ -1212,11 +1058,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               />
 
               {ui.map.liveTracking && <DesktopTrackingButton tracking={tracking} onClick={() => (tracking ? stop() : handleStart())} />}
-              {/* ── Floating search + filters (mobile) — laid directly over the
-                      map, Google-Maps-style, instead of pushing it down. Category
-                      chips sit right under the search bar as their own
-                      always-visible scroll row, same as Google Maps — no
-                      separate "Filters" button/sheet. ───────────────────────── */}
               {ui.search.map && isMobile && (
                 <MobileMapSearch
                   overlayRef={setTopOverlayEl}
