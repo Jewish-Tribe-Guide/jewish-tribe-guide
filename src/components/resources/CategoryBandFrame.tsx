@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import type { ReactNode } from 'react'
 import { photoProps } from '@/lib/imageHosts'
-import { categoryTint, categoryRing } from '@/lib/categoryColor'
+import { categoryTint } from '@/lib/categoryColor'
 import { useIsMobile } from '@/lib/useIsMobile'
 
 type FrameProps = {
@@ -153,28 +153,6 @@ export function CategoryBandFrame({ color, imageUrl, hero, heroOverlap = false, 
       <div className="border-x border-slate-200">
         <div className="mx-auto max-w-6xl px-4">{children}</div>
       </div>
-    </div>
-  )
-}
-
-type BadgeProps = {
-  color: string
-  children: ReactNode
-}
-
-/** The circular badge that overlaps a CategoryBandFrame's bottom edge —
- *  white fill so it stays legible against any photo, with the category's
- *  own color as just the ring around it (a colored fill would read as
- *  another patch of the photo rather than a badge). Pass the icon/glyph as
- *  `children`; sizing (h-16 w-16 text-3xl) is fixed since every caller today
- *  wants the same badge size here. */
-export function CategoryBandBadge({ color, children }: BadgeProps) {
-  return (
-    <div
-      className="relative -mt-8 ml-1 flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white text-3xl"
-      style={{ boxShadow: `0 0 0 3px white, ${categoryRing(color)}`, color }}
-    >
-      {children}
     </div>
   )
 }

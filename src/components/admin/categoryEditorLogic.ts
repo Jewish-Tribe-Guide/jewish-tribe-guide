@@ -79,14 +79,6 @@ export type Draft = {
   listingParts: string
 }
 
-export const CAPABILITY_LABELS: Record<keyof CategoryCapabilities, string> = {
-  add: 'Add button',
-  edit: 'Edit button',
-  report: 'Report button',
-  directorySearch: 'Search bar',
-  map: 'Map button',
-}
-
 // Where a newly-added Photo field belongs: right after Website (or right
 // after Hours if there's no Website; or at the very front if neither) — same
 // slot it holds in the editor's own "Every listing also has" checkboxes, so

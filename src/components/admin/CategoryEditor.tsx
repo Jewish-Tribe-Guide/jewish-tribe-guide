@@ -921,8 +921,6 @@ function CategoryEditorScreen({
   )
 }
 
-export { sampleName } from '@/lib/fieldLooks'
-
 /** "Address, Phone, Hours and 3 more" under the folded Fields row. */
 export function fieldsSummary(labels: string[]): string {
   const named = labels.filter(Boolean)

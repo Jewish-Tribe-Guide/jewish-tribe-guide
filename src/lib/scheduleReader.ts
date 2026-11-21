@@ -339,10 +339,6 @@ Answer in JSON only: {"kind": "...", "complete": true, "season": null, "title": 
 }
 
 const NOT_EVERY_WEEK = /\b(?:once (?:a|per|each|every) month|twice (?:a|per) month|monthly|every other (?:week|shabbat|shabbos|friday|saturday)|(?:first|second|third|fourth|last|1st|2nd|3rd|4th) (?:shabbat|shabbos|friday|saturday|sunday)s? of (?:the|each|every)(?: english| hebrew)? month)\b/i
-/** Whether a message says the shul doesn't meet every week ("Services are
- *  held the 1st Saturday of each month"): then the dates it lists are all
- *  there are (listedServices, listingPageRun.ts). */
-export const saysNotEveryWeek = (text: string) => NOT_EVERY_WEEK.test(text.replace(/\s+/g, ' '))
 const NOT_DAVENING = /\b(?:dial|call|tehillim|class|classes|shiur|shiurim|study|lecture|program|event)\b/i
 const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 const isWeekday = (d: unknown): d is (typeof WEEKDAYS)[number] => (WEEKDAYS as readonly unknown[]).includes(d)

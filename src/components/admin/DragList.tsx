@@ -669,9 +669,6 @@ export function AddMenu({ label, options, onPick, wide, row }: { label: string; 
 }
 
 const plainButton = 'inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3.5 text-sm font-semibold hover:bg-slate-50 cursor-pointer'
-/** The plain white button of an opened row ("Take it off"). */
-export const rowButton = `${plainButton} text-slate-900`
-/** The same in blue, for adding ("+ Add a group"). */
 export const addButton = `${plainButton} text-primary`
 
 /** Adding one more to a whole list ("+ Add a box", "+ Add a tab", "+ Add a

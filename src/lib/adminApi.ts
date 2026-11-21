@@ -14,7 +14,6 @@ import { withCommunity } from './useCommunityData'
 // `community: null` is for the site-wide routes the superadmin console
 // calls (communities, pages), which belong to no one community.
 
-export type Json = Record<string, unknown> | unknown[]
 export type Method = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
 
 export type AdminApi = {

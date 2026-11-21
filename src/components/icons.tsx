@@ -282,29 +282,6 @@ export function CheckIcon({ className }: IconProps) {
   )
 }
 
-/** A circle struck through: closed for good, Request removal. */
-export function ClosedIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="m5.6 5.6 12.8 12.8" />
-    </svg>
-  )
-}
-
-// Three filled dots, not stroked paths like every icon above — a kebab menu
-// trigger reads as three small solid marks, not an outlined shape, so this
-// sets its own fill instead of using `base`'s stroke-only style.
-export function DotsIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
-      <circle cx="5" cy="12" r="2" />
-      <circle cx="12" cy="12" r="2" />
-      <circle cx="19" cy="12" r="2" />
-    </svg>
-  )
-}
-
 // A simple city-skyline silhouette — filled shapes, not stroked lines like
 // every icon above, since a skyline reads as solid rooftops against sky
 // rather than an outlined pictogram. A row of plain rectangle "rooftops"

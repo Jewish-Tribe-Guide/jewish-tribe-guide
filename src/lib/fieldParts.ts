@@ -29,9 +29,6 @@ export function ownerOfPart(key: string, fields: readonly CategoryField[]): Cate
   return fields.find((f) => partsOf(f, fields).some((p) => p.key === key))
 }
 
-/** Whether a field has parts. */
-export const hasParts = (f: CategoryField, fields: readonly CategoryField[]) => partsOf(f, fields).length > 0
-
 /** A link to a hechsher's certificate, by its name: not a website. */
 export function isCertificateLink(field: CategoryField): boolean {
   const words = `${field.key} ${field.linkLabel ?? field.label}`.toLowerCase()

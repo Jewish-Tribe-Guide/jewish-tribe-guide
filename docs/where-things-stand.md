@@ -993,7 +993,17 @@ Soon:
 - Two time parsers disagree ("8am" is Infinity in `parseTimeToMinutes`,
   checked); date helpers copied 8–9 times; `partDates` twice.
 - knip: a 4-line config takes it from 42 files / 243 exports to 0 / 31
-  real ones; put it in CI. Stale comments (11 names that no longer exist).
+  real ones; put it in CI. **Built Nov 20**: `knip.json` names the entry
+  points knip can't see (scripts, Playwright setup files, the service
+  worker), and counts an export used in its own file as used. All 23
+  candidates left were dead (nothing used them anywhere) and are gone,
+  259 lines. `npm run knip` runs in CI's lint job and fails on a new
+  unused file, export or dependency (checked with a planted export).
+  knip's Playwright plugin is off: it ran the write suites' configs,
+  which refuse to load without the test project's keys (CI's lint job
+  has none), so it listed every spec as unused. The specs and configs
+  are listed as entry points instead.
+  Still open: stale comments (11 names that no longer exist).
 - Preview emails go out without [DEV] (checked); `.env.example` has
   never been committed, `.gitignore` drops it (checked).
 
@@ -3428,6 +3438,10 @@ after the deploy, dry run first, and needs its own go-ahead.
 7. The "+" button covers part of the third tile in a row on the phone home.
 8. ~~Counts on the admin's To do tabs~~ Done with the admin redesign
    (Oct 29): To do is one list, and the nav shows its count.
+9. To look at some time (flagged Nov 20): the drawing session "Draw:
+   asking for location when it helps" (branch `claude/eager-nash-317067`,
+   started from the public site review) is waiting on the user's look at
+   its boards. Nothing built until a board is approved.
 
 ## Planned: the admin redesign (started Oct 28, brief agreed Oct 28)
 

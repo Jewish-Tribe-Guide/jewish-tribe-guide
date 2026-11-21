@@ -1,10 +1,8 @@
 'use client'
 
-import { noteChanged, type HoursRow } from '@/lib/hoursSections'
 import type { Watch } from '@/lib/watches'
 import { samePage } from '@/lib/hoursJob'
 import type { Finding } from '@/lib/watchFindings'
-import { BoxRow, BoxRows } from './JobBoxes'
 import type { HoursPlace } from './watchJobTypes'
 
 // ── Mikvah hours: a mikvah's listing sections (Oct 22) ──────────────────────
@@ -40,35 +38,4 @@ export function sectionPages(pages: readonly Watch[], sections: readonly ListedS
     if (page) out.set(s.section, page)
   }
   return out
-}
-
-export function Rows({ rows }: { rows: readonly HoursRow[] }) {
-  return (
-    <div>
-      <h4 className="pb-0.5 text-xs font-semibold uppercase tracking-wider text-slate-500">Hours</h4>
-      <BoxRows>
-        {rows.map((r, i) => (
-          <BoxRow key={i} name={r.days} right={r.text} mark={r.mark} was={r.was} />
-        ))}
-      </BoxRows>
-    </div>
-  )
-}
-
-/** The section's note: changed, the new one highlighted whole, the old one
- *  struck under it. */
-export function Notes({ now, next }: { now: string; next: string }) {
-  if (!now && !next) return null
-  const changed = noteChanged(now, next)
-  return (
-    <div>
-      <h4 className="pb-0.5 text-xs font-semibold uppercase tracking-wider text-slate-500">Notes</h4>
-      <BoxRows>
-        <li className={`border-t border-slate-100 py-1.5 text-sm whitespace-pre-line ${changed ? '-mx-2 bg-amber-50 px-2' : ''}`} data-testid="box-note" data-mark={changed ? 'changed' : 'same'}>
-          <span className="text-slate-900">{next || 'None'}</span>
-          {changed && now && <s className="mt-1 block text-xs text-slate-500">{now}</s>}
-        </li>
-      </BoxRows>
-    </div>
-  )
 }

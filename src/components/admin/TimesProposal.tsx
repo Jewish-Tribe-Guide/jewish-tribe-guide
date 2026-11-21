@@ -1,14 +1,12 @@
 'use client'
 
-import type { ReactNode } from 'react'
 import type { SpecialSchedule } from '@/lib/schedules'
-import { usualProposal, type ProposalRow, type RowGroup } from '@/lib/timesProposal'
+import { usualProposal, type ProposalRow } from '@/lib/timesProposal'
 import { TIMES_PARTS, partsFromRead, type PartGiven, type TimesPart } from '@/lib/timesParts'
 import type { Watch } from '@/lib/watches'
 import { samePage } from '@/lib/hoursJob'
 import type { Finding } from '@/lib/watchFindings'
 import type { Minyan } from '@/lib/davening'
-import { BoxRow, BoxRows } from './JobBoxes'
 import type { HoursPlace } from './watchJobTypes'
 
 // ── Shul times: a shul's listing boxes (Oct 21) ─────────────────────────────
@@ -47,47 +45,6 @@ export function partPages(pages: readonly Watch[], findings: readonly Finding[])
     if (page) out.set(part, page)
   }
   return out
-}
-
-export function Groups<R>({ groups, row }: { groups: RowGroup<R>[]; row: (r: R, i: number) => ReactNode }) {
-  return (
-    <>
-      {groups.map((g) => (
-        <div key={g.label}>
-          <h4 className="pb-0.5 text-xs font-semibold uppercase tracking-wider text-slate-500">{g.label}</h4>
-          <BoxRows>{g.rows.map(row)}</BoxRows>
-        </div>
-      ))}
-    </>
-  )
-}
-
-/** One usual minyan: its name, its season and note under it, its time on
- *  the right, and what changed beside what it was. */
-export function UsualRow({ r }: { r: ProposalRow }) {
-  const sub = [r.season, r.note].filter(Boolean).join(' · ')
-  const was = [r.was?.days, r.was?.season, r.was?.note].filter((w): w is string => !!w)
-  return (
-    <BoxRow
-      name={r.tefillah}
-      sub={
-        (sub || was.length > 0) && (
-          <>
-            {sub}
-            {was.map((w) => (
-              <s key={w} className="ml-1.5">
-                {w}
-              </s>
-            ))}
-          </>
-        )
-      }
-      right={r.when}
-      mark={r.status}
-      why="Not on their website"
-      was={r.was?.when}
-    />
-  )
 }
 
 /** A usual part's rows, the website's against the listing's. */
