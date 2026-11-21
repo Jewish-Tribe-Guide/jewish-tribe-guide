@@ -74,6 +74,8 @@ export const stripApostrophes = (s: string) => s.replace(/['’‘ʼʻ]/g, '')
 // of the richer point type this screen's own points carry (which also has
 // searchText, used only for filtering).
 export type SelectablePoint = MapPoint & { filterId: string; raw?: DirectoryResource }
+// A point as the view builds it: one it can search, by its words.
+export type MapViewPoint = SelectablePoint & { searchText: string }
 
 export type ResourceMapViewProps = {
   /** Initial location from the header's "Set location" control, if already set. */
