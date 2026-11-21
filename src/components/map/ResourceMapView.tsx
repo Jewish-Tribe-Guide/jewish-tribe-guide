@@ -1,10 +1,9 @@
 'use client'
 
 import { track } from '@vercel/analytics'
-import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from 'react'
-import ResourceMap, { type MapPoint } from './ResourceMap'
-import MapBoundary from './MapBoundary'
-import { createHighlight, type Highlight } from './highlight'
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import type { MapPoint } from './ResourceMap'
+import { createHighlight } from './highlight'
 import CategoryFilter, { CHIP_GLYPH, CHIP_SIZE, type FilterOption } from './CategoryFilter'
 import CategoryPickerList from './CategoryPickerList'
 import MapFiltersSheet, { type MapFilterSection } from './MapFiltersSheet'
@@ -40,13 +39,12 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
 import { foundFor, searchAsk, type SearchFound } from '@/lib/askSearch'
-import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { ui } from '@/lib/uiConfig'
 import { ArrowLeftIcon, ChevronLeftIcon, CloseIcon, ExpandIcon, CollapseIcon, BookmarkIcon, PinIcon, SlidersIcon } from '@/components/icons'
-import { categoryTint, getCategoryColor, HOSPITAL_COLOR, HOSPITAL_ICON } from '@/lib/categoryColor'
+import { getCategoryColor, HOSPITAL_COLOR, HOSPITAL_ICON } from '@/lib/categoryColor'
 import { CategoryGlyph } from '@/lib/categoryIcons'
-import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
+import LocationControl from '@/components/home/LocationControl'
 import { usePinned } from '@/lib/pinnedContext'
 import { CURRENT_LOCATION_LABEL } from '@/lib/useLiveLocation'
 import { useDroppedPins } from '@/lib/droppedPinsContext'
@@ -61,166 +59,31 @@ import { neighborhoodsFor } from '@/lib/places'
 import { learnFrom } from '@/lib/askReader'
 import { useLearnAfterPause } from '@/lib/useLearnAfterPause'
 import AskTheGroup from '@/components/home/AskTheGroup'
-import type { DirectoryResource, MapFilters } from '@/types'
+import type { DirectoryResource } from '@/types'
 import { useKeptListScroll } from './useKeptListScroll'
 import { useRouter } from 'next/navigation'
 import { moveBackTo } from '@/components/admin/useScreenHistory'
 import { stepCount, stepsIn, withoutSteps } from '@/lib/stepAddress'
+import {
+  DROPPED_FILTER_ID,
+  DROPPED_PIN_COLOR,
+  DROPPED_PREFIX,
+  ERUV_FILTER_ID,
+  ERUV_PREFIX,
+  HOSPITALS_ID,
+  NOOP_LIVE_TRACKING,
+  isOpenNowWord,
+  normalizeSearch,
+  openNowIdsFor,
+  resolveInitialSelected,
+  stripApostrophes,
+  type ResourceMapViewProps,
+  type SelectablePoint,
+} from './mapViewShared'
+import { MapWithHover, SearchSuggestions } from './mapViewParts'
 
-// Shared by the initial useState below and the resync effect further down
-// (see its own comment) — one place for the initialSelectedCategories-vs-
-// initialCategory precedence so the two can't drift apart.
-function resolveInitialSelected(categories: string[] | undefined, category: string | undefined, pinned = false, eruvim: boolean | 'only' = false): Set<string> | null {
-  // Arriving on the Pinned chip alone ("See them on the map" on the Pinned
-  // page): no category chip on, only the pins. Likewise the eruv lines
-  // alone (the Eruv page's Full map); lines that are merely on (`eruv=1`)
-  // don't narrow the places.
-  if ((pinned || eruvim === 'only') && categories === undefined && !category) return new Set()
-  return categories !== undefined ? new Set(categories) : category ? new Set([category]) : null
-}
+type Props = ResourceMapViewProps
 
-const HOSPITALS_ID = '__hospitals__'
-
-/** The places open right now among the categories whose Open now is on.
- *  Before the page has hydrated there's no time (see useNow): only closed
- *  businesses are left out until there is. */
-function openNowIdsFor(
-  points: readonly { id: string; raw?: DirectoryResource | null }[],
-  filters: MapFilterState,
-  clock: number | null,
-  hoursKeysByCat: Map<string, string[]>,
-): string[] {
-  if (!Object.values(filters).some((f) => f.openNow)) return []
-  const now = clock === null ? null : new Date(clock)
-  return points
-    .filter((p) => {
-      if (!p.raw || !filters[p.raw.category]?.openNow) return false
-      // See GenericDirectory's copy of this: a closed business is never open,
-      // whatever hours it still has saved.
-      if (businessClosure(p.raw as unknown as Record<string, unknown>)) return false
-      const keys = hoursKeysByCat.get(p.raw.category)
-      return !keys?.length || now === null || keys.some((k) => hoursOpenNow(p.raw![k], now) === true)
-    })
-    .map((p) => p.id)
-}
-// A dropped pin's marker id is prefixed with this so a click handler can
-// tell it apart from a real listing/hospital point without a separate prop
-// threaded through every consumer — see droppedMapPoints below.
-const DROPPED_PREFIX = 'dropped:'
-const DROPPED_FILTER_ID = '__dropped__'
-// An eruv opened from the Eruvim layer: not a pin, but it opens in the same
-// sheet or sidebar a place does, with the same way back (id `eruv:<id>`).
-const ERUV_FILTER_ID = '__eruv__'
-const ERUV_PREFIX = 'eruv:'
-const DROPPED_PIN_COLOR = '#D85A30'
-
-// Typing one of these in the search box searches "open now" instead of
-// matching literal text.
-const OPEN_NOW_WORDS = new Set(['open', 'open now', 'opennow', 'open-now'])
-const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
-
-// Apostrophes shouldn't matter for matching at all — searching "trader joes"
-// (no apostrophe, as most people type it) should still find "Trader Joe's",
-// same as a mobile keyboard's smart-punctuation autocorrect turning a typed
-// straight apostrophe into a curly one shouldn't break the match either.
-// Stripping every apostrophe variant from both sides makes all of that a
-// non-issue.
-const stripApostrophes = (s: string) => s.replace(/['’‘ʼʻ]/g, '')
-
-// The shape both selection surfaces (mobile's MobileNearbySheet, desktop's
-// own sidebar detail panel) need for a "show this place" action — a subset
-// of the richer point type this screen's own points carry (which also has
-// searchText, used only for filtering).
-type SelectablePoint = MapPoint & { filterId: string; raw?: DirectoryResource }
-
-type Props = {
-  /** Initial location from the header's "Set location" control, if already set. */
-  userLocation?: LatLng | null
-  /** Pre-select a single category filter on arrival (from a category's "Map" button). */
-  initialCategory?: string
-  /** Pre-fill the map's own search box on arrival — set when the directory the
-   *  visitor came from had an active search (e.g. "insomnia cookies" within
-   *  Food Establishments). */
-  initialQuery?: string
-  /** The exact category selection restored from history (browser back after
-   *  the visitor toggled chips on the map itself). Takes precedence over
-   *  initialCategory, which only covers the single-category arrival case. */
-  initialSelectedCategories?: string[]
-  /** The Pinned chip on, from the URL's `pinned` (see mapQueryString). */
-  initialPinned?: boolean
-  /** Eruv lines on, from the URL's `eruv` (see mapQueryString); 'only',
-   *  the lines with no places. */
-  initialEruvim?: boolean | 'only'
-  /** Field filters (open-now / kosher / type / …) carried from the directory the
-   *  visitor came from, applied to pins and shown as removable chips. */
-  initialFilters?: MapFilters
-  /** The pin id to open the detail panel/sheet for on arrival — the `place`
-   *  query param (see mapQueryString/parseMapQuery), read once on mount.
-   *  Standalone only: this is what makes a map link shareable down to the
-   *  specific pin someone had open, not just the pins and filters. */
-  initialPlaceId?: string
-  /** The address bar's query string these initial* props were read from
-   *  (MapScreen's useSearchParams). Lets the map tell its own address-bar
-   *  writes, echoed back by Next, from a real navigation; see
-   *  ownWritesRef below. */
-  viewSearch?: string
-  /** A round ‹ before the phone's search bar, back to the category the
-   *  visitor came from (its list's Map button or a listing's map tile;
-   *  board G1, Nov 16). The tab bar's Map has none: it is a tab. */
-  backTo?: { label: string; onBack: () => void }
-  /** Open a specific listing's detail card in its category directory. */
-  onViewListing?: (categoryId: string, listingId: string) => void
-  /** True for the one page-level map screen (mode 'map' in page.tsx) — the
-   *  admin's category-preview map is the only other caller, and never sets
-   *  this (it stays boxed). Desktop only in effect: a standalone map always
-   *  opens (and stays) fullscreen — there's no boxed state for it — and its
-   *  exit control always navigates away via onExitFullscreenToListing rather
-   *  than collapsing in place, however the visitor got here (a listing's own
-   *  "Map" button, the mobile tab bar, browser back/forward). */
-  standalone?: boolean
-  /** Whether the standalone map screen is the one currently on screen (mode
-   *  === 'map') — since it stays mounted across tab switches (see page.tsx),
-   *  this is how it knows to re-force fullscreen on every return visit, not
-   *  just its first mount (e.g. after exiting once already reset it false).
-   *  Ignored (and unnecessary) when `standalone` isn't set. */
-  visible?: boolean
-  /** Called whenever the standalone map's fullscreen exits — always
-   *  provided when `standalone` is set, since a standalone map never just
-   *  collapses to a boxed view in place; it navigates away instead (see
-   *  MapScreen's own exitToPreviousScreen). */
-  onExitFullscreenToListing?: () => void
-  /** The site-wide live GPS watch (see useLiveLocation), lifted to page.tsx so
-   *  starting it here also updates `userLocation` everywhere else the same
-   *  live coords are read (search sorting, directory distances) — not just
-   *  this screen. Optional (defaults to an inert no-op) for callers that don't
-   *  wire up real tracking, e.g. the admin category-preview map. */
-  liveTracking?: {
-    tracking: boolean
-    error: string | null
-    start: () => void
-    stop: () => void
-  }
-  /** Full address-entry + tracking controls, same object the header pill
-   *  reads (see LocationProvider) — so an address set from the map's own copy
-   *  of the control is set for the whole site, not just this screen. Desktop,
-   *  fullscreen only: fullscreen is `desktop:fixed desktop:inset-0 desktop:z-50`
-   *  below and paints over the header entirely, taking the header's pill with
-   *  it, so this is the only place left to set an address. The boxed state
-   *  doesn't need its own copy — the header is `sticky top-0` (SiteHeader.tsx)
-   *  and stays visible above a boxed map. Mobile has no such copy either — its
-   *  header is merely collapsed rather than covered, and its pin FAB already
-   *  reopens the same popover. Omitted by callers with nowhere to set an
-   *  address anyway (the admin category-preview map), which just means no
-   *  control renders. */
-  controls?: LocationControls
-}
-
-const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
-
-/** A query string in one canonical form, "?" or not. */
-function normalizeSearch(search: string): string {
-  return new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).toString()
-}
 
 export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialPinned = false, initialEruvim, initialFilters, initialPlaceId, viewSearch, backTo, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking, controls }: Props) {
   const timezone = useCommunityTimezone()
@@ -2715,83 +2578,5 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
         )
       })()}
     </div>
-  )
-}
-
-/** The map, with the sidebar's hovered row's pin lifted: the place open in
- *  the sidebar first, else the row under the pointer. Reads the hover store
- *  itself, so only the map redraws as the pointer moves down the list. A
- *  hover never moves the map: ResourceMap frames only on frameToken. */
-/** The search box's dropdown, on the computer and the phone alike (it was
- *  written out twice, Nov 18 review item 42): "Open now" when the words
- *  could mean it, then the matching places, each a tap straight to its
- *  card, then what to do when nothing matched. A press doesn't take the
- *  focus off the box, which would close the list before the tap landed. */
-function SearchSuggestions<P extends SelectablePoint>({ className, rowPadding, openNow, onOpenNow, places, onPick, nothing }: {
-  className: string
-  rowPadding: string
-  openNow: boolean
-  onOpenNow: () => void
-  places: P[]
-  onPick: (p: P) => void
-  nothing: ReactNode
-}) {
-  const row = `flex w-full items-center gap-3 ${rowPadding} py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer`
-  return (
-    <div className={className}>
-      {openNow && (
-        <button onMouseDown={(e) => e.preventDefault()} onClick={onOpenNow} className={row}>
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500" aria-hidden="true">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="9" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
-            </svg>
-          </span>
-          <span className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-slate-900">Open now</p>
-            <p className="truncate text-xs text-slate-400">Show only listings open right now</p>
-          </span>
-        </button>
-      )}
-      {places.map((p) => (
-        <button key={p.id} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(p)} className={row}>
-          <SuggestionIcon point={p} />
-          <span className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-slate-900">{p.name}</p>
-            <p className="truncate text-xs text-slate-400">
-              {p.categoryLabel}
-              {p.address ? ` · ${p.address}` : ''}
-            </p>
-          </span>
-        </button>
-      ))}
-      {nothing}
-    </div>
-  )
-}
-
-/** A search line's icon: the place's category's line icon on its tint, a
- *  pin for a pin of your own. Category emoji used to show here, and 📍 for
- *  the rest (Nov 18: no emoji as icons). */
-function SuggestionIcon({ point }: { point: SelectablePoint }) {
-  return (
-    <span
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-      style={{ backgroundColor: categoryTint(point.color), color: point.color }}
-      aria-hidden="true"
-    >
-      {point.filterId === DROPPED_FILTER_ID ? <PinIcon className="h-4 w-4" /> : <CategoryGlyph categoryId={point.filterId} className="h-4 w-4" />}
-    </span>
-  )
-}
-
-function MapWithHover({ highlight, selectedId, ...props }: ComponentProps<typeof ResourceMap> & { highlight: Highlight }) {
-  const hovered = useSyncExternalStore(highlight.subscribe, highlight.get, () => null)
-  // A map Google broke stays in its own box: the page's search, chips and
-  // list go on working (MapBoundary).
-  return (
-    <MapBoundary>
-      <ResourceMap {...props} selectedId={selectedId ?? hovered ?? undefined} />
-    </MapBoundary>
   )
 }
