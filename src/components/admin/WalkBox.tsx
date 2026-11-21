@@ -51,9 +51,9 @@ export default function WalkBox({
               className="flex min-h-[52px] w-full cursor-pointer items-center gap-2.5 px-4 py-2 text-left"
             >
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="text-[15px] font-semibold text-slate-900">{name}</span>
+                <span className="text-[0.9375rem] font-semibold text-slate-900">{name}</span>
                 {!isOpen && (
-                  <span className="text-[13px] text-slate-600">
+                  <span className="text-[0.8125rem] text-slate-600">
                     Up to {walk.maxMinutes} min{by ? ` · by ${by}` : ''}
                   </span>
                 )}

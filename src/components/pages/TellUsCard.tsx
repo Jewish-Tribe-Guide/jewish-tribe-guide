@@ -18,8 +18,8 @@ export function HelpCardBody({ icon, title, text }: { icon: PageGlyphName; title
     <>
       <GlyphDot name={icon} large />
       <span className="min-w-0 flex-1">
-        <span className="block text-[16.5px] font-bold text-slate-900 desktop:text-[19px] desktop:font-extrabold">{title}</span>
-        {text && <span className="mt-0.5 block text-[15px] leading-snug text-slate-600 desktop:text-[15.5px]">{text}</span>}
+        <span className="block text-[1.03125rem] font-bold text-slate-900 desktop:text-[1.1875rem] desktop:font-extrabold">{title}</span>
+        {text && <span className="mt-0.5 block text-[0.9375rem] leading-snug text-slate-600 desktop:text-[0.96875rem]">{text}</span>}
       </span>
       <PageGlyph name="chevron" className="h-5 w-5 flex-none text-slate-400" />
     </>

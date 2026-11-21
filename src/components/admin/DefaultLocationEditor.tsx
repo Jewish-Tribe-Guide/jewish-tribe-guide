@@ -105,7 +105,7 @@ export default function DefaultLocationEditor({ token }: { token: string }) {
     <div className="flex flex-col gap-4">
       <AdminBox>
         <div className="p-4">
-          <label htmlFor="default-location" className="block text-[13px] font-semibold text-slate-700 mb-1.5">
+          <label htmlFor="default-location" className="block text-[0.8125rem] font-semibold text-slate-700 mb-1.5">
             Until a visitor sets their own location, we use
           </label>
           <AddressInput
@@ -121,7 +121,7 @@ export default function DefaultLocationEditor({ token }: { token: string }) {
             preferPlaceName
           />
           <SpotMap key={`${at.lat},${at.lng}`} at={at} />
-          <p className="m-0 mt-3 text-[14px] text-slate-600">{timeZoneName(stored.timezone)}</p>
+          <p className="m-0 mt-3 text-[0.875rem] text-slate-600">{timeZoneName(stored.timezone)}</p>
           <div className="mt-4 flex items-center gap-3">
             <button
               type="button"
@@ -131,9 +131,9 @@ export default function DefaultLocationEditor({ token }: { token: string }) {
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
-            {saved && <span className="text-[14px] font-semibold text-emerald-700">Saved</span>}
+            {saved && <span className="text-[0.875rem] font-semibold text-emerald-700">Saved</span>}
           </div>
-          {error && <p className="m-0 mt-3 text-[13px] text-red-700">{error}</p>}
+          {error && <p className="m-0 mt-3 text-[0.8125rem] text-red-700">{error}</p>}
         </div>
       </AdminBox>
     </div>

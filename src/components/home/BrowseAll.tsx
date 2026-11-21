@@ -64,7 +64,7 @@ export default function BrowseAll(props: Props) {
     <div data-testid="browse-page">
       {/* A phone's title is the header's (useSetTabHeader in BrowseScreen,
           the user, Nov 16); there this h1 is for a screen reader. */}
-      <h1 className="sr-only desktop:not-sr-only desktop:text-[36px] desktop:font-extrabold desktop:tracking-tight desktop:text-ink">Browse</h1>
+      <h1 className="sr-only desktop:not-sr-only desktop:text-[2.25rem] desktop:font-extrabold desktop:tracking-tight desktop:text-ink">Browse</h1>
       <div className="desktop:mt-3">
         <SearchBox query={query} onQueryChange={setQuery} onSubmit={ask} placeholder={settings.searchPlaceholder} />
       </div>
@@ -121,7 +121,7 @@ export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone
         <div data-spot="groups" className="desktop:mt-2 desktop:grid desktop:grid-cols-2 desktop:gap-x-8">
           {sections.map((section) => (
             <section key={section.title} data-testid={`browse-group-${section.title}`} className="mt-6">
-              <h2 className="text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500">{section.title}</h2>
+              <h2 className="text-[0.78125rem] font-extrabold uppercase tracking-[0.06em] text-slate-500">{section.title}</h2>
               <ul className="mt-1">
                 {section.cards.map((card) => {
                   const line = lineFor(card.id)
@@ -132,10 +132,10 @@ export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone
                       <Link href={card.href} prefetch={false} className="flex items-center gap-3 border-t border-slate-100 py-2.5 hover:bg-slate-50">
                         <CategoryIcon icon={card.icon ?? ''} categoryId={card.id} color={getCategoryColor((categories ?? []) as CategoryConfig[], card.id ?? '')} className="h-9 w-9 text-base" sizePx={36} />
                         <span className="min-w-0 flex-1">
-                          <span className="block text-[16px] font-bold text-ink">{card.title}</span>
-                          {line && <span className="block truncate text-[13.5px] text-slate-600">{line}</span>}
+                          <span className="block text-[1rem] font-bold text-ink">{card.title}</span>
+                          {line && <span className="block truncate text-[0.84375rem] text-slate-600">{line}</span>}
                         </span>
-                        {n !== undefined && <span className="shrink-0 text-[13.5px] text-slate-500">{n}</span>}
+                        {n !== undefined && <span className="shrink-0 text-[0.84375rem] text-slate-500">{n}</span>}
                         <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
                       </Link>
                     </li>
@@ -163,7 +163,7 @@ export function BrowseList({ communitySlug, listings, schedule, zmanim, timezone
 export function BrowseFoot({ communitySlug }: { communitySlug: string }) {
   const settings = useSiteSettings()
   return (
-    <nav aria-label="About the guide" className="mt-8 border-t border-slate-200 pt-1 pb-2 text-[15px] font-bold text-primary">
+    <nav aria-label="About the guide" className="mt-8 border-t border-slate-200 pt-1 pb-2 text-[0.9375rem] font-bold text-primary">
       <div className="-mx-3 flex flex-wrap">
         {/* Always here, so a quiet week (no "This week" on Today) still has a
             way to the page — unless it's held back (see features.ts). */}

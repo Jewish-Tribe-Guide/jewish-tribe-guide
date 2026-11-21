@@ -14,7 +14,7 @@ import { DEFAULT_MOBILE_TABS } from '@/lib/siteSettings'
 import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 import { useContributions } from '@/lib/communityContext'
 
-const EYEBROW = 'mx-0.5 text-[13px] font-bold uppercase tracking-[0.06em] text-slate-500'
+const EYEBROW = 'mx-0.5 text-[0.8125rem] font-bold uppercase tracking-[0.06em] text-slate-500'
 
 // Feedback as a page (board Feedback, Nov 15): About and Privacy's look. On a
 // phone, "Know something we don't?" first, so a fix to a place goes into the
@@ -56,7 +56,7 @@ export default function FeedbackScreen({ email = null }: { email?: string | null
           data-testid="page-document"
           className="mb-4 flex flex-col gap-3 desktop:mb-0 desktop:grid desktop:grid-cols-[minmax(0,1fr)_420px] desktop:items-start desktop:gap-8 desktop:pt-3"
         >
-          <h1 className={isMobile ? 'sr-only' : 'mx-1 text-[24px] font-extrabold tracking-tight text-slate-900 desktop:hidden'}>{heading}</h1>
+          <h1 className={isMobile ? 'sr-only' : 'mx-1 text-[1.5rem] font-extrabold tracking-tight text-slate-900 desktop:hidden'}>{heading}</h1>
           {/* The side column: on a phone only its Tell us card shows, above
               the form; on a computer it sits to the right. */}
           <div className={`${sent ? 'hidden desktop:flex' : 'contents desktop:flex'} desktop:col-start-2 desktop:row-start-1 desktop:flex-col desktop:gap-4`}>
@@ -71,7 +71,7 @@ export default function FeedbackScreen({ email = null }: { email?: string | null
                 <p className={`${EYEBROW} hidden desktop:block ${tellUs ? 'desktop:mt-3.5' : 'desktop:mt-1.5'}`}>Rather email?</p>
                 <a className={`${HELP_CARD} hidden desktop:flex`} href={`mailto:${email}?subject=${encodeURIComponent('Feedback')}`}>
                   <GlyphDot name="mail" large />
-                  <span className="min-w-0 flex-1 break-words text-[16px] font-bold text-blue-700">{email}</span>
+                  <span className="min-w-0 flex-1 break-words text-[1rem] font-bold text-blue-700">{email}</span>
                 </a>
               </>
             )}

@@ -37,7 +37,7 @@ export default function CategoryPickerList({ options, selected, onToggle }: Prop
           <span className="flex flex-1 items-center gap-2.5 py-1.5">
             <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/5" style={{ backgroundColor: o.color }} aria-hidden="true" />
             {o.icon && <CategoryGlyph categoryId={o.id} icon={o.icon} className="h-5 w-5 shrink-0" />}
-            <span className="flex-1 text-[15px] font-medium text-slate-900">{o.label}</span>
+            <span className="flex-1 text-[0.9375rem] font-medium text-slate-900">{o.label}</span>
             <span className="text-sm text-slate-400">{o.count}</span>
           </span>
         </label>

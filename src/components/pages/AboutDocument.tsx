@@ -17,7 +17,7 @@ type Props = {
 }
 
 const BOX = PAGE_BOX
-const H2 = 'text-[20px] font-extrabold tracking-tight text-slate-900 desktop:text-[24px]'
+const H2 = 'text-[1.25rem] font-extrabold tracking-tight text-slate-900 desktop:text-[1.5rem]'
 // Fixed strings, so Tailwind sees every one.
 const CARD_COLUMNS: Record<number, string> = {
   1: 'desktop:grid-cols-1',
@@ -34,13 +34,13 @@ function ProseBox({ section, label }: { section: PageSection; label: boolean }) 
       <h2
         id={section.id}
         className={label
-          ? 'mb-2.5 text-[13px] font-bold uppercase tracking-[0.06em] text-slate-500'
-          : 'mb-3 text-[19px] font-bold text-slate-900'}
+          ? 'mb-2.5 text-[0.8125rem] font-bold uppercase tracking-[0.06em] text-slate-500'
+          : 'mb-3 text-[1.1875rem] font-bold text-slate-900'}
       >
         {section.heading}
       </h2>
       {/* Safe only because the body went through pageBodyToHtml. */}
-      <div className="rich-text text-[16px] leading-[1.7] text-slate-700 desktop:text-[17px]" dangerouslySetInnerHTML={{ __html: section.html }} />
+      <div className="rich-text text-[1rem] leading-[1.7] text-slate-700 desktop:text-[1.0625rem]" dangerouslySetInnerHTML={{ __html: section.html }} />
     </section>
   )
 }
@@ -59,8 +59,8 @@ function Cards({ section }: { section: PageSection }) {
             className="flex gap-3.5 desktop:flex-col desktop:gap-2.5 desktop:rounded-2xl desktop:border desktop:border-slate-200 desktop:bg-white desktop:p-[22px] desktop:pb-6 desktop:shadow-[0_1px_2px_rgb(15_23_42/0.05)]"
           >
             <GlyphDot name={pointGlyph(item.title)} large />
-            <div className="min-w-0 text-[15.5px] leading-[1.5] text-slate-700 desktop:leading-[1.6]">
-              <h3 className="font-bold text-slate-900 desktop:mb-2.5 desktop:text-[17px]">{item.title}</h3>
+            <div className="min-w-0 text-[0.96875rem] leading-[1.5] text-slate-700 desktop:leading-[1.6]">
+              <h3 className="font-bold text-slate-900 desktop:mb-2.5 desktop:text-[1.0625rem]">{item.title}</h3>
               <div className="rich-text" dangerouslySetInnerHTML={{ __html: item.html }} />
             </div>
           </li>
@@ -95,14 +95,14 @@ export default function AboutDocument({ title, eyebrow, body }: Props) {
           {lead && sections.length === 0 && (
             <div
               data-testid="page-plain"
-              className={`${BOX} rich-text px-4 py-[18px] text-[16px] leading-[1.7] text-slate-700 desktop:px-9 desktop:py-[30px] desktop:text-[17px]`}
+              className={`${BOX} rich-text px-4 py-[18px] text-[1rem] leading-[1.7] text-slate-700 desktop:px-9 desktop:py-[30px] desktop:text-[1.0625rem]`}
               dangerouslySetInnerHTML={{ __html: lead }}
             />
           )}
           {lead && sections.length > 0 && (
             <div
               data-testid="page-lead"
-              className="rich-text mb-1.5 max-w-[860px] text-[24px] font-bold leading-[1.35] tracking-tight text-slate-900 desktop:mb-0 desktop:text-[32px]"
+              className="rich-text mb-1.5 max-w-[860px] text-[1.5rem] font-bold leading-[1.35] tracking-tight text-slate-900 desktop:mb-0 desktop:text-[2rem]"
               dangerouslySetInnerHTML={{ __html: lead }}
             />
           )}

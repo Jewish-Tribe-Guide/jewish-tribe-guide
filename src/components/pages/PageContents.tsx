@@ -34,14 +34,14 @@ export default function PageContents({ items }: { items: { id: string; heading: 
 
   return (
     <nav aria-label="On this page" className="sticky top-24 hidden desktop:block">
-      <p className="px-3 pb-2 text-[13px] font-bold uppercase tracking-[0.06em] text-slate-500">On this page</p>
+      <p className="px-3 pb-2 text-[0.8125rem] font-bold uppercase tracking-[0.06em] text-slate-500">On this page</p>
       <ul>
         {items.map((i) => (
           <li key={i.id}>
             <a
               href={`#${i.id}`}
               aria-current={current === i.id ? 'location' : undefined}
-              className={`block rounded-lg px-3 py-[7px] text-[15px] ${current === i.id ? 'bg-indigo-100 font-bold text-indigo-900' : 'font-medium text-slate-600 hover:bg-slate-100'}`}
+              className={`block rounded-lg px-3 py-[7px] text-[0.9375rem] ${current === i.id ? 'bg-indigo-100 font-bold text-indigo-900' : 'font-medium text-slate-600 hover:bg-slate-100'}`}
             >
               {i.heading}
             </a>

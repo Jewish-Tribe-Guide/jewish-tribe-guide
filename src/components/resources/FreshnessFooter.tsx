@@ -162,7 +162,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
 
   if (onEdit && !justConfirmedNow) {
     const asking = !confirmedAt || isStale(confirmedAt, now)
-    const pill = 'flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 text-[14.5px] font-bold transition-colors hover:bg-slate-50 disabled:opacity-50'
+    const pill = 'flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 text-[0.90625rem] font-bold transition-colors hover:bg-slate-50 disabled:opacity-50'
     const edit = asking ? (
       <button type="button" onClick={onEdit} className={`${pill} text-primary`}>
         <PencilIcon className="h-3.5 w-3.5" />
@@ -173,7 +173,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
     )
     return (
       <div className="flex items-center gap-2" data-testid="freshness">
-        <p className={`min-w-0 flex-1 text-[13.5px] leading-snug ${asking ? 'text-caution' : 'text-slate-600'}`}>
+        <p className={`min-w-0 flex-1 text-[0.84375rem] leading-snug ${asking ? 'text-caution' : 'text-slate-600'}`}>
           {leadText}
           {confirmedAt ? `${giver ? `${giver},` : 'Confirmed'} ${shortDate(confirmedAt, timezone, now)}` : 'Not confirmed yet'}
           {asking && (confirmedAt ? ' · Still right?' : ' · Right?')}
@@ -195,7 +195,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
     // by Mekor Habracha, Nov 6", the box's name saying what.
     const said = subject ? `${what} ${lower ? `${lower},` : 'last checked'}` : giver ? `${giver},` : 'Confirmed'
     return (
-      <p className="text-[13.5px] leading-snug text-slate-600" data-testid="freshness">
+      <p className="text-[0.84375rem] leading-snug text-slate-600" data-testid="freshness">
         {leadText}
         {confirmedAt ? `${said} ${shortDate(confirmedAt, timezone, now)}.` : subject ? `${what} not checked by anyone yet.` : 'Not confirmed by anyone yet.'}
       </p>
@@ -204,7 +204,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
 
   if (justConfirmedNow) {
     return (
-      <p className="text-[13.5px] leading-snug text-emerald-700" data-testid="freshness">
+      <p className="text-[0.84375rem] leading-snug text-emerald-700" data-testid="freshness">
         <span className="font-semibold">✓ Confirmed. Thanks!</span>{' '}
         {mine?.undoable !== false && (
           <button onClick={undo} disabled={loading} className="cursor-pointer text-slate-500 hover:text-slate-700 hover:underline disabled:opacity-50">
@@ -219,7 +219,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
   if (confirmedAt) {
     const stale = isStale(confirmedAt, now)
     return (
-      <p className="text-[13.5px] leading-snug text-slate-600" data-testid="freshness">
+      <p className="text-[0.84375rem] leading-snug text-slate-600" data-testid="freshness">
         {leadText}
         {subject ? `${subject} ${lower ? `${lower},` : 'confirmed'}` : giver ? `${giver},` : 'Confirmed'} {shortDate(confirmedAt, timezone, now)}.
         {stale && <> Still right? {button('Yes')}</>}
@@ -229,7 +229,7 @@ function FreshnessStatus({ resourceId, confirmedAt: initialConfirmedAt, lead, su
   }
 
   return (
-    <p className="text-[13.5px] leading-snug text-slate-600" data-testid="freshness">
+    <p className="text-[0.84375rem] leading-snug text-slate-600" data-testid="freshness">
       {leadText}
       {subject ? `${subject} not confirmed by anyone yet.` : 'Not confirmed by anyone yet.'} Right? {button('Yes')}
       {failed}

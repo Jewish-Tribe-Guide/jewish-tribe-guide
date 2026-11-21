@@ -106,7 +106,7 @@ export default function FieldBoxes({
     if ('box' in item)
       return {
         className: `${i === 0 ? '' : 'mt-3'} overflow-hidden border ${folded.has(item.box.id) ? 'rounded-xl' : 'rounded-t-xl border-b-slate-100'} ${turnedDown || over ? edge : 'border-slate-200 bg-slate-50'}`,
-        note: turnedDown ? <p className="m-0 px-4 pb-2.5 text-[13px] font-semibold text-red-700">{no!.why}</p> : undefined,
+        note: turnedDown ? <p className="m-0 px-4 pb-2.5 text-[0.8125rem] font-semibold text-red-700">{no!.why}</p> : undefined,
       }
     const afterHead = i > 0 && 'box' in shown[i - 1]
     if ('end' in item) return { className: `rounded-b-xl border-x border-b ${edge} ${afterHead ? '' : 'border-t border-t-slate-100'} ${turnedDown || over ? '' : 'bg-white'}` }
@@ -198,7 +198,7 @@ export default function FieldBoxes({
             const box = boxes.find((b) => b.id === item.end)!
             const name = box.title || 'New box'
             const add = (
-              <button type="button" onClick={() => onAddField(box.id)} aria-label={`Add a field to ${name}`} className="flex min-h-[46px] flex-1 cursor-pointer items-center gap-2 pl-10 pr-4 text-left text-[15px] font-semibold text-primary hover:bg-blue-50/60">
+              <button type="button" onClick={() => onAddField(box.id)} aria-label={`Add a field to ${name}`} className="flex min-h-[46px] flex-1 cursor-pointer items-center gap-2 pl-10 pr-4 text-left text-[0.9375rem] font-semibold text-primary hover:bg-blue-50/60">
                 {PLUS}
                 Add a field
               </button>
@@ -242,7 +242,7 @@ function tagsOf(f: CategoryField): string[] {
 function Inner({ row, name, tags = [], onOpen, onRemove }: { row: DragRow; name: string; tags?: string[]; onOpen?: () => void; onRemove?: () => void }) {
   const label = (
     <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-      <span data-row-name className="text-[15px] text-slate-900">{name}</span>
+      <span data-row-name className="text-[0.9375rem] text-slate-900">{name}</span>
       {tags.map((t) => (
         <span key={t} className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
           {t}

@@ -50,7 +50,7 @@ export function UndoToastProvider({ children }: { children: React.ReactNode }) {
             // Above the tab bar and the floating "+" on a phone (3.75rem is
             // MobileTabBar's height, as GenericDirectory's "+" clears it);
             // bottom centre on desktop, which has neither.
-            className="fixed inset-x-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+5rem)] z-[70] mx-auto flex max-w-sm items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 text-[15px] font-semibold text-white shadow-lg desktop:bottom-6"
+            className="fixed inset-x-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+5rem)] z-[70] mx-auto flex max-w-sm items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 text-[0.9375rem] font-semibold text-white shadow-lg desktop:bottom-6"
           >
             <BookmarkIcon filled={toast.saved} className="h-[17px] w-[17px] shrink-0" />
             <span className="min-w-0 flex-1">{toast.text}</span>

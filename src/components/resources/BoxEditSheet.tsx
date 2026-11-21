@@ -183,13 +183,13 @@ export function BoxEditor({
         <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
           <CheckIcon className="h-8 w-8 text-emerald-700" />
         </span>
-        <p className="text-[22px] font-extrabold text-ink">Sent</p>
-        <p className="text-[15.5px] text-slate-700">An admin checks it, usually within a day.</p>
+        <p className="text-[1.375rem] font-extrabold text-ink">Sent</p>
+        <p className="text-[0.96875rem] text-slate-700">An admin checks it, usually within a day.</p>
         <button type="button" onClick={onClose} className={`${SUBMIT_PILL} mt-6`}>
           Done
         </button>
         {onEditElse && (
-          <button type="button" onClick={onEditElse} className="min-h-11 cursor-pointer text-[15px] font-bold text-primary hover:underline">
+          <button type="button" onClick={onEditElse} className="min-h-11 cursor-pointer text-[0.9375rem] font-bold text-primary hover:underline">
             Edit something else here
           </button>
         )}
@@ -220,11 +220,11 @@ export function BoxEditor({
     <div className="space-y-4" data-testid="box-edit">
       <Honeypot value={sender.honeypot} onChange={sender.setHoneypot} />
       {/* The shul's list says it itself, with the box's name once a minyan is open. */}
-      {!minyanimField && <p className="-mt-1 text-[14px] text-muted">{item.name}</p>}
+      {!minyanimField && <p className="-mt-1 text-[0.875rem] text-muted">{item.name}</p>}
       {edit.fields.map((f) =>
         f === minyanimField && weekPosts.length > 1 ? (
           <div key={f.key} className="space-y-6">
-            {openWeek === null && <p className="-mt-1 text-[14px] text-muted">{item.name}</p>}
+            {openWeek === null && <p className="-mt-1 text-[0.875rem] text-muted">{item.name}</p>}
             {weekPosts.map((w, i) => (
               <div key={w.id} hidden={openWeek !== null && openWeek !== w.id}>
                 <MinyanBoxEditor

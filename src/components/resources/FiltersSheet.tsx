@@ -136,7 +136,7 @@ function FiltersBody({
       ))}
       {selects.map((s) => (
         <fieldset key={s.key} className="space-y-2">
-          <legend className="mb-2 text-[13px] font-bold text-slate-500">{s.label}</legend>
+          <legend className="mb-2 text-[0.8125rem] font-bold text-slate-500">{s.label}</legend>
           <div className="flex flex-wrap gap-2">
             {(s.ordered ? s.values : orderForPicking(s.values)).map((v) => (
               <FilterChip key={v} label={v} on={s.chosen.includes(v)} onToggle={() => onSelect(s.key, v)} />
@@ -151,7 +151,7 @@ function FiltersBody({
         const shown = [...top, ...it.counts.filter((c) => it.chosen.includes(c.tag) && !top.includes(c))]
         return (
           <fieldset key={it.key} className="space-y-2">
-            <legend className="mb-2 text-[13px] font-bold text-slate-500">{it.label}</legend>
+            <legend className="mb-2 text-[0.8125rem] font-bold text-slate-500">{it.label}</legend>
             <div className="flex flex-wrap gap-2">
               {shown.map((c) => (
                 <FilterChip key={c.tag} label={c.tag} count={c.count} on={it.chosen.includes(c.tag)} onToggle={() => onItem?.(it.key, c.tag)} />
@@ -182,7 +182,7 @@ function ShowButton({ count, onClose, units = ['listing', 'listings'] }: { count
     <button
       type="button"
       onClick={onClose}
-      className="h-12 w-full cursor-pointer rounded-xl bg-primary text-[15.5px] font-bold text-white transition-transform active:scale-[0.99]"
+      className="h-12 w-full cursor-pointer rounded-xl bg-primary text-[0.96875rem] font-bold text-white transition-transform active:scale-[0.99]"
     >
       Show {count} {count === 1 ? units[0] : units[1]}
     </button>
@@ -214,7 +214,7 @@ function AllItems({ items, onItem, onClose, count, units }: { items: FilterItems
           onChange={(e) => setFind(e.target.value)}
           placeholder="Find an item"
           aria-label="Find an item"
-          className="min-w-0 flex-1 bg-transparent text-[15px] text-ink placeholder:text-slate-400 focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent text-[0.9375rem] text-ink placeholder:text-slate-400 focus:outline-none"
         />
       </label>
       <ul className="divide-y divide-slate-100 border-y border-slate-100">
@@ -224,13 +224,13 @@ function AllItems({ items, onItem, onClose, count, units }: { items: FilterItems
             <li key={c.tag}>
               <label className="flex h-11 cursor-pointer items-center gap-3">
                 <input type="checkbox" checked={on} onChange={() => onItem(c.tag)} className="h-5 w-5 shrink-0 cursor-pointer accent-primary" />
-                <span className={`flex-1 text-[15px] text-ink ${on ? 'font-bold' : ''}`}>{c.tag}</span>
-                <span className="text-[13.5px] text-slate-500 tabular-nums">{c.count}</span>
+                <span className={`flex-1 text-[0.9375rem] text-ink ${on ? 'font-bold' : ''}`}>{c.tag}</span>
+                <span className="text-[0.84375rem] text-slate-500 tabular-nums">{c.count}</span>
               </label>
             </li>
           )
         })}
-        {rows.length === 0 && <li className="py-3 text-[14px] text-slate-500">No item called “{find.trim()}”.</li>}
+        {rows.length === 0 && <li className="py-3 text-[0.875rem] text-slate-500">No item called “{find.trim()}”.</li>}
       </ul>
       <ShowButton count={count} onClose={onClose} units={units} />
     </div>
@@ -240,7 +240,7 @@ function AllItems({ items, onItem, onClose, count, units }: { items: FilterItems
 export function SwitchRow({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1">
-      <span className="text-[15px] font-semibold text-ink">{label}</span>
+      <span className="text-[0.9375rem] font-semibold text-ink">{label}</span>
       <button
         type="button"
         role="switch"
@@ -282,7 +282,7 @@ export function FilterChip({
       aria-pressed={on}
       onClick={onToggle}
       className={[
-        'flex h-[34px] shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border text-[13.5px] transition-colors',
+        'flex h-[34px] shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border text-[0.84375rem] transition-colors',
         on
           ? 'border-primary bg-primary pl-2.5 pr-3 font-bold text-white'
           : 'border-slate-300 bg-white px-3 font-semibold text-ink hover:bg-slate-50',

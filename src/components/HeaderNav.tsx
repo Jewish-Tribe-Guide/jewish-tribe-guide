@@ -202,7 +202,7 @@ export default function HeaderNav() {
                 }`}
               >
                 {item.label}
-                <span aria-hidden="true" className="text-[10px]">
+                <span aria-hidden="true" className="text-[0.625rem]">
                   {open === item.id ? '▴' : '▾'}
                 </span>
               </button>
@@ -218,7 +218,7 @@ export default function HeaderNav() {
                   <div className="grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4">
                     {sections.map((section) => (
                       <div key={section.title}>
-                        <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">
+                        <p className="mb-2 text-[0.65625rem] font-bold uppercase tracking-wide text-slate-400">
                           {section.title}
                         </p>
                         <ul className="flex flex-col gap-0.5">
@@ -299,7 +299,7 @@ export default function HeaderNav() {
               }`}
             >
               {item.label}
-              <span aria-hidden="true" className="text-[10px]">
+              <span aria-hidden="true" className="text-[0.625rem]">
                 {open === item.id ? '▴' : '▾'}
               </span>
             </button>
@@ -319,7 +319,7 @@ export default function HeaderNav() {
                 {heads.length
                   ? heads.map((h) => (
                       <div key={h.id} className="w-48">
-                        <p className="mb-1 px-3 pt-2 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">{h.label}</p>
+                        <p className="mb-1 px-3 pt-2 text-[0.65625rem] font-bold uppercase tracking-wide text-slate-400">{h.label}</p>
                         {h.actions}
                       </div>
                     ))

@@ -25,7 +25,7 @@ import { SignUpFields, signUpLinkOk } from './SignUp'
 // seven controls each, a tiny ✕ and tiny day chips ("a bit scary", the
 // user, Oct 10).
 
-const input = 'h-11 rounded-xl border border-slate-300 bg-white px-3 text-[15px] text-slate-900 focus:border-primary focus:outline-none'
+const input = 'h-11 rounded-xl border border-slate-300 bg-white px-3 text-[0.9375rem] text-slate-900 focus:border-primary focus:outline-none'
 
 const DAY_LABELS: Record<Minyan['days'][number], string> = {
   sun: 'Sun',
@@ -49,7 +49,7 @@ const kindOf = (m: Minyan, box: MinyanBox): 'weekday' | 'shabbos' =>
 const dayLabel = (d: Minyan['days'][number], box: MinyanBox) => (box === 'shabbos' && d === 'fri' ? 'Friday night' : DAY_LABELS[d])
 
 const chip = (on: boolean) =>
-  `h-10 cursor-pointer rounded-full border-[1.5px] px-4 text-[14.5px] font-bold ${on ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-600'}`
+  `h-10 cursor-pointer rounded-full border-[1.5px] px-4 text-[0.90625rem] font-bold ${on ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-600'}`
 
 export default function MinyanBoxEditor({
   original,
@@ -156,13 +156,13 @@ export default function MinyanBoxEditor({
 
   return (
     <div className="space-y-4" data-testid="minyan-box-list">
-      {heading ? <p className="text-[15.5px] font-extrabold text-slate-900">{heading}</p> : !nameShown && <p className="-mt-1 text-[14px] text-muted">{place}</p>}
+      {heading ? <p className="text-[0.96875rem] font-extrabold text-slate-900">{heading}</p> : !nameShown && <p className="-mt-1 text-[0.875rem] text-muted">{place}</p>}
       <MinyanBoxRows rows={rows} box={box} writing={writing} mark={(m) => (isChanged(m) ? (was.has(m.id) ? 'Changed' : 'New') : null)} was={was} onOpen={setOpen} />
-      {rows.length === 0 && (empty ? <p className="text-[15.5px] font-bold text-slate-900">{empty}</p> : <p className="text-[15px] text-slate-600">No times listed yet.</p>)}
+      {rows.length === 0 && (empty ? <p className="text-[0.96875rem] font-bold text-slate-900">{empty}</p> : <p className="text-[0.9375rem] text-slate-600">No times listed yet.</p>)}
       <button
         type="button"
         onClick={() => setOpen('new')}
-        className="flex h-11.5 w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-300 bg-white text-[15px] font-bold text-primary hover:bg-slate-50"
+        className="flex h-11.5 w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-300 bg-white text-[0.9375rem] font-bold text-primary hover:bg-slate-50"
       >
         <PlusIcon className="h-4 w-4" />
         Add a minyan
@@ -198,7 +198,7 @@ export function MinyanBoxRows({
     <>
       {boxGroups(rows, box).map((g) => (
         <div key={g.label}>
-          <p className="text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-muted">{g.label}</p>
+          <p className="text-[0.78125rem] font-extrabold uppercase tracking-[0.04em] text-muted">{g.label}</p>
           <ul className="divide-y divide-slate-200/70">
             {g.rows.map((m) => {
               // The week's rows are under their tefillah already: the time
@@ -213,7 +213,7 @@ export function MinyanBoxRows({
               const inside = (
                 <>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[15.5px] text-slate-900">
+                    <span className="block text-[0.96875rem] text-slate-900">
                       {kind === 'shabbos' && (
                         <>
                           <b>{TEFILLAH_LABELS[m.tefillah]}</b>{' '}
@@ -221,10 +221,10 @@ export function MinyanBoxRows({
                       )}
                       <span className={kind === 'weekday' ? 'font-bold' : 'text-slate-700'}>{timeText(m)}</span>
                     </span>
-                    {sub && <span className="mt-0.5 block text-[13.5px] text-muted">{sub}</span>}
-                    {oldNote && <del className="mt-0.5 block text-[13.5px] text-slate-500">{oldNote}</del>}
+                    {sub && <span className="mt-0.5 block text-[0.84375rem] text-muted">{sub}</span>}
+                    {oldNote && <del className="mt-0.5 block text-[0.84375rem] text-slate-500">{oldNote}</del>}
                   </span>
-                  {marked && <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-amber-800">{marked}</span>}
+                  {marked && <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[0.78125rem] font-extrabold text-amber-800">{marked}</span>}
                   {onOpen && <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />}
                 </>
               )
@@ -279,9 +279,9 @@ function OneMinyan({
 
   return (
     <div className="space-y-4" data-testid="minyan-box-one">
-      <p className="-mt-1 text-[14px] text-muted">{under}</p>
+      <p className="-mt-1 text-[0.875rem] text-muted">{under}</p>
       <label className="block space-y-1.5">
-        <span className="block text-[14px] font-bold text-slate-700">Tefillah</span>
+        <span className="block text-[0.875rem] font-bold text-slate-700">Tefillah</span>
         <select
           value={row.tefillah}
           onChange={(e) => {
@@ -299,7 +299,7 @@ function OneMinyan({
       </label>
 
       <div className="space-y-2">
-        <p className="text-[14px] font-bold text-slate-700">Time</p>
+        <p className="text-[0.875rem] font-bold text-slate-700">Time</p>
         {canBeRelative && (
           <div className="flex gap-1 rounded-xl bg-slate-100 p-[3px]" role="group" aria-label="Clock time or from a zman">
             {([[false, 'Clock time'], [true, 'From a zman']] as const).map(([rel, label]) => (
@@ -308,7 +308,7 @@ function OneMinyan({
                 type="button"
                 aria-pressed={relative === rel}
                 onClick={() => set(rel ? modes.switchToRelative(row) : modes.switchToClock(row))}
-                className={`h-10 flex-1 cursor-pointer rounded-[10px] text-[14.5px] ${relative === rel ? 'bg-white font-bold text-slate-900 shadow-sm' : 'font-semibold text-muted'}`}
+                className={`h-10 flex-1 cursor-pointer rounded-[10px] text-[0.90625rem] ${relative === rel ? 'bg-white font-bold text-slate-900 shadow-sm' : 'font-semibold text-muted'}`}
               >
                 {label}
               </button>
@@ -330,11 +330,11 @@ function OneMinyan({
         ) : (
           <input type="text" value={row.time} onChange={(e) => set(modes.setClockTime(row, e.target.value))} placeholder="7:00am" aria-label="Time" className={`${input} w-36`} />
         )}
-        {!readable && row.time.trim() && <p className="text-[13px] text-caution">The guide can’t read “{row.time}” as a time. Type it like 6:30pm{canBeRelative ? ', or choose From a zman' : ''}.</p>}
+        {!readable && row.time.trim() && <p className="text-[0.8125rem] text-caution">The guide can’t read “{row.time}” as a time. Type it like 6:30pm{canBeRelative ? ', or choose From a zman' : ''}.</p>}
       </div>
 
       <div className="space-y-2">
-        <p className="text-[14px] font-bold text-slate-700">Which days?</p>
+        <p className="text-[0.875rem] font-bold text-slate-700">Which days?</p>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Days">
           {choices.map((d) => (
             <button key={d} type="button" aria-pressed={row.days.includes(d)} onClick={() => set({ days: row.days.includes(d) ? row.days.filter((x) => x !== d) : [...row.days, d] })} className={chip(row.days.includes(d))}>
@@ -350,7 +350,7 @@ function OneMinyan({
         <div className="space-y-4 border-t border-slate-200/70 pt-4">
           {asks('season') && (
             <div className="space-y-2">
-              <p className="text-[14px] font-bold text-slate-700">Time of year</p>
+              <p className="text-[0.875rem] font-bold text-slate-700">Time of year</p>
               <div className="flex gap-1 rounded-xl bg-slate-100 p-[3px]" role="group" aria-label="Time of year">
                 {([undefined, ...(Object.keys(SEASON_LABELS) as Season[])] as const).map((s) => (
                   <button
@@ -358,7 +358,7 @@ function OneMinyan({
                     type="button"
                     aria-pressed={row.season === s}
                     onClick={() => set({ season: s })}
-                    className={`h-10 flex-1 cursor-pointer rounded-[10px] text-[14.5px] ${row.season === s ? 'bg-white font-bold text-slate-900 shadow-sm' : 'font-semibold text-muted'}`}
+                    className={`h-10 flex-1 cursor-pointer rounded-[10px] text-[0.90625rem] ${row.season === s ? 'bg-white font-bold text-slate-900 shadow-sm' : 'font-semibold text-muted'}`}
                   >
                     {s ? `${s.charAt(0).toUpperCase()}${s.slice(1)}` : 'All year'}
                   </button>
@@ -370,10 +370,10 @@ function OneMinyan({
               nothing to clamp. */}
           {relative && (
             <div className="space-y-2">
-              <p className="text-[14px] font-bold text-slate-700">But never before</p>
+              <p className="text-[0.875rem] font-bold text-slate-700">But never before</p>
               <div className="flex items-center gap-2">
                 <input type="time" value={row.notBefore ?? ''} onChange={(e) => set(modes.setBound(row, { notBefore: e.target.value }) ?? {})} aria-label="Earliest time" className={`${input} w-32`} />
-                <span className="text-[14.5px] text-muted">or after</span>
+                <span className="text-[0.90625rem] text-muted">or after</span>
                 <input type="time" value={row.notAfter ?? ''} onChange={(e) => set(modes.setBound(row, { notAfter: e.target.value }) ?? {})} aria-label="Latest time" className={`${input} w-32`} />
               </div>
             </div>
@@ -381,7 +381,7 @@ function OneMinyan({
           {asks('signUp') && <SignUpFields signUp={row.signUp} onChange={(signUp) => set({ signUp })} />}
           {asks('joinLink') && (
             <label className="block space-y-1.5">
-              <span className="block text-[14px] font-bold text-slate-700">Zoom or livestream link</span>
+              <span className="block text-[0.875rem] font-bold text-slate-700">Zoom or livestream link</span>
               <input
                 type="url"
                 inputMode="url"
@@ -392,17 +392,17 @@ function OneMinyan({
                 aria-label="Zoom or livestream link"
                 className={`${input} w-full`}
               />
-              {!signUpLinkOk(row.joinLink) && <span className="block text-[13px] text-caution">Paste the whole link, starting https://</span>}
+              {!signUpLinkOk(row.joinLink) && <span className="block text-[0.8125rem] text-caution">Paste the whole link, starting https://</span>}
             </label>
           )}
           {/* Folds it away again; what's set stays set. */}
-          <button type="button" onClick={() => setMore(false)} className="inline-flex cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary">
+          <button type="button" onClick={() => setMore(false)} className="inline-flex cursor-pointer items-center gap-1 text-[0.90625rem] font-bold text-primary">
             Less
             <ChevronRightIcon className="h-4 w-4 -rotate-90" />
           </button>
         </div>
       ) : (
-        <button type="button" onClick={() => setMore(true)} className="inline-flex cursor-pointer items-center gap-1 text-[14.5px] font-bold text-primary">
+        <button type="button" onClick={() => setMore(true)} className="inline-flex cursor-pointer items-center gap-1 text-[0.90625rem] font-bold text-primary">
           More
           <ChevronRightIcon className="h-4 w-4 rotate-90" />
         </button>
@@ -410,7 +410,7 @@ function OneMinyan({
 
       <div className="space-y-1 pt-2">
         {onRemove && (
-          <button type="button" onClick={onRemove} className="min-h-11 w-full cursor-pointer text-center text-[15px] font-bold text-red-700 hover:underline">
+          <button type="button" onClick={onRemove} className="min-h-11 w-full cursor-pointer text-center text-[0.9375rem] font-bold text-red-700 hover:underline">
             Remove this minyan
           </button>
         )}

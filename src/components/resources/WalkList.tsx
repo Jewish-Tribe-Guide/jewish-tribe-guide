@@ -192,7 +192,7 @@ export default function WalkLists({ lists, from, fromItem }: Props) {
   // OpenRouteService and OpenStreetMap ask for wherever their walks show.
   const anyRouted = shown.some(({ target }) => (routedOf.get(target.id)?.size ?? 0) > 0)
   const footer = anyRouted ? (
-    <span className="text-[11.5px] text-slate-400" data-testid="walk-credit">
+    <span className="text-[0.71875rem] text-slate-400" data-testid="walk-credit">
       Walks: <a href="https://openrouteservice.org/" target="_blank" rel="noopener noreferrer" className="hover:underline">openrouteservice</a> ·{' '}
       <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="hover:underline">© OpenStreetMap</a>
     </span>
@@ -293,9 +293,9 @@ function WalkList({
     )
   }
   const title = (
-    <span className="block text-[15px] font-bold text-slate-900">{rows.length > 0 ? `${noun} · ${rows.length}` : noun}</span>
+    <span className="block text-[0.9375rem] font-bold text-slate-900">{rows.length > 0 ? `${noun} · ${rows.length}` : noun}</span>
   )
-  const sub = summary && <span className="mt-0.5 block text-[13.5px] leading-snug text-slate-600">{summary}</span>
+  const sub = summary && <span className="mt-0.5 block text-[0.84375rem] leading-snug text-slate-600">{summary}</span>
 
   return (
     <li data-testid="walk-list">
@@ -367,8 +367,8 @@ function WalkMinyanim({
   // Under the title only what there's no list to say, as the kind's line.
   const summary = ahead && slots.length === 0 ? 'No minyanim listed today or tomorrow.' : null
   const count = today.length > 0 ? ` · ${today.length} left today` : slots.length > 0 ? ` · ${slots.length} tomorrow` : ''
-  const title = <span className="block text-[15px] font-bold text-slate-900">Minyanim{count}</span>
-  const sub = summary && <span className="mt-0.5 block text-[13.5px] leading-snug text-slate-600">{summary}</span>
+  const title = <span className="block text-[0.9375rem] font-bold text-slate-900">Minyanim{count}</span>
+  const sub = summary && <span className="mt-0.5 block text-[0.84375rem] leading-snug text-slate-600">{summary}</span>
 
   return (
     <li data-testid="walk-minyanim">
@@ -383,7 +383,7 @@ function WalkMinyanim({
           </button>
           {open && (
             <div className="pb-2">
-              <h4 className="mt-1 mb-0.5 text-[12px] font-bold uppercase tracking-wide text-slate-500">
+              <h4 className="mt-1 mb-0.5 text-[0.75rem] font-bold uppercase tracking-wide text-slate-500">
                 {today.length > 0 ? 'Today' : 'Tomorrow'} · {slots.length}
               </h4>
               <ul>
@@ -465,7 +465,7 @@ function ListBody({
           list, nearest first, says it (the user, Oct 15). */}
       {groups.map((g) => (
         <div key={g.label}>
-          <h4 className="mt-3 mb-0.5 text-[12px] font-bold uppercase tracking-wide text-slate-500">
+          <h4 className="mt-3 mb-0.5 text-[0.75rem] font-bold uppercase tracking-wide text-slate-500">
             {g.label} · {g.rows.length}
           </h4>
           <ul>
@@ -480,7 +480,7 @@ function ListBody({
       {fromItem && !onMap && (
         <Link
           href={`${routes.map(community)}${mapQueryString({ categories: [fromItem.category, target.id], place: fromItem.id })}`}
-          className="mt-2 inline-block text-[14px] font-bold text-primary hover:underline"
+          className="mt-2 inline-block text-[0.875rem] font-bold text-primary hover:underline"
         >
           See them on the map
         </Link>
@@ -517,13 +517,13 @@ function Row({ row, target, field, place }: { row: WalkRow; target: CategoryConf
         {...(onMap ? pointerHover(() => onMap.highlight.set(item.id), () => onMap.highlight.set(null)) : {})}
         className="flex items-center gap-3 py-2.5 hover:bg-slate-50"
       >
-        <span className="w-[52px] shrink-0 text-[15px] font-extrabold text-slate-900">
+        <span className="w-[52px] shrink-0 text-[0.9375rem] font-extrabold text-slate-900">
           {minutes}
-          <span className="text-[12px] font-semibold text-slate-500"> min</span>
+          <span className="text-[0.75rem] font-semibold text-slate-500"> min</span>
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-bold text-slate-900">{item.name}</span>
-          {line && <span className="mt-0.5 block truncate text-[13px] text-slate-500">{line}</span>}
+          <span className="block truncate text-[0.9375rem] font-bold text-slate-900"><bdi>{item.name}</bdi></span>
+          {line && <span className="mt-0.5 block truncate text-[0.8125rem] text-slate-500">{line}</span>}
         </span>
       </Link>
     </li>

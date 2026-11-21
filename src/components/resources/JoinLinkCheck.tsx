@@ -81,16 +81,16 @@ export default function JoinLinkCheck({ item, joined }: { item: DirectoryResourc
     }
   }, [phase, token, community, item.id, fetchOrPreview, turnstileActive])
 
-  const button = 'h-9 cursor-pointer rounded-full border border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-slate-900 hover:bg-slate-50 disabled:cursor-default disabled:opacity-60'
+  const button = 'h-9 cursor-pointer rounded-full border border-slate-300 bg-white px-3.5 text-[0.875rem] font-semibold text-slate-900 hover:bg-slate-50 disabled:cursor-default disabled:opacity-60'
 
   if (phase === 'idle') return <FreshnessFooter resourceId={item.id} source={item.confirmedFrom} by={item.confirmedBy} confirmedAt={item.confirmedAt} subject="Join link" />
-  if (phase === 'thanks-yes') return <p className="text-[14px] text-emerald-700" role="status">Thanks! It’s marked as working.</p>
-  if (phase === 'thanks-no') return <p className="text-[14px] text-emerald-700" role="status">Thanks for saying. An admin will check the link.</p>
+  if (phase === 'thanks-yes') return <p className="text-[0.875rem] text-emerald-700" role="status">Thanks! It’s marked as working.</p>
+  if (phase === 'thanks-no') return <p className="text-[0.875rem] text-emerald-700" role="status">Thanks for saying. An admin will check the link.</p>
 
   const busy = phase === 'confirming' || phase === 'reporting'
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" data-testid="join-link-check">
-      <p className="text-[15.5px] font-semibold text-slate-900">Did the link work?</p>
+      <p className="text-[0.96875rem] font-semibold text-slate-900">Did the link work?</p>
       <div className="mt-2 flex flex-wrap gap-2">
         <button type="button" disabled={busy} onClick={yes} className={button}>
           Yes, it opened the group
@@ -108,11 +108,11 @@ export default function JoinLinkCheck({ item, joined }: { item: DirectoryResourc
         </button>
       </div>
       {phase === 'failed' && (
-        <p role="alert" className="mt-2 text-[13.5px] text-red-700">
+        <p role="alert" className="mt-2 text-[0.84375rem] text-red-700">
           That didn’t send. Please try again.
         </p>
       )}
-      {busy && <p className="mt-2 text-[13px] text-slate-500">Sending…</p>}
+      {busy && <p className="mt-2 text-[0.8125rem] text-slate-500">Sending…</p>}
       {phase === 'reporting' && turnstileActive && <TurnstileWidget onVerify={setToken} />}
     </div>
   )

@@ -67,7 +67,7 @@ export default function ChangesScreen({ failed, nights = [] }: { failed: boolean
           {/* Back to the Today home it was made for; opened from a tab while
               Today is held back, it's a tab screen like You, with no way back. */}
           {features.todayHome && (
-            <Link href={routes.home(community.slug)} className="mb-2 block text-[15px] font-bold text-primary hover:underline">
+            <Link href={routes.home(community.slug)} className="mb-2 block text-[0.9375rem] font-bold text-primary hover:underline">
               ‹ Today
             </Link>
           )}
@@ -75,11 +75,11 @@ export default function ChangesScreen({ failed, nights = [] }: { failed: boolean
             {/* A phone's title is the header's (useSetTabHeader, the user,
                 Nov 16); this h1 is for a screen reader. */}
             <h1 className="sr-only">What changed</h1>
-            <p data-testid="changes-count" className="mt-0.5 min-h-[1.375em] text-[15px] leading-snug text-slate-600">
+            <p data-testid="changes-count" className="mt-0.5 min-h-[1.375em] text-[0.9375rem] leading-snug text-slate-600">
               {count}
             </p>
           </div>
-          {message && <p className="text-[15px] leading-snug text-slate-600 desktop:text-base">{message}</p>}
+          {message && <p className="text-[0.9375rem] leading-snug text-slate-600 desktop:text-base">{message}</p>}
           {changes === null && !failed && (
             <div aria-hidden="true" className="mt-6 space-y-3 desktop:mt-0">
               {[0, 1, 2, 3].map((i) => (
@@ -95,7 +95,7 @@ export default function ChangesScreen({ failed, nights = [] }: { failed: boolean
               <div data-testid="changes-box" className="desktop:rounded-2xl desktop:border desktop:border-slate-200 desktop:bg-white desktop:px-6 desktop:pb-2 desktop:pt-1">
                 {days.map(({ day, items: onDay }, i) => (
                   <section key={day} data-testid="changes-day" className={`mt-5 desktop:mt-0 desktop:pt-4 ${i > 0 ? 'desktop:mt-2' : ''}`}>
-                    <h2 className="text-[13px] font-extrabold uppercase tracking-[0.05em] text-slate-500">{day}</h2>
+                    <h2 className="text-[0.8125rem] font-extrabold uppercase tracking-[0.05em] text-slate-500">{day}</h2>
                     <ul className="mt-2 rounded-2xl border border-slate-200 bg-white px-4 [&>li:first-child>div]:border-t-0 desktop:mt-1 desktop:rounded-none desktop:border-0 desktop:bg-transparent desktop:px-0 desktop:[&>li:first-child>div]:border-t">
                       {onDay.map((item) =>
                         'night' in item ? (

@@ -20,7 +20,7 @@ export default function SetupChecklist({ setup }: { setup: SetupState }) {
       <div className="px-4 pt-3.5 pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2.5">
           <h2 className="flex-1 m-0 text-base font-bold text-slate-900">Set up your guide</h2>
-          <span className="text-[13px] text-slate-600">
+          <span className="text-[0.8125rem] text-slate-600">
             {done} of {steps.length} done
           </span>
         </div>
@@ -42,8 +42,8 @@ export default function SetupChecklist({ setup }: { setup: SetupState }) {
                 <span className="shrink-0 w-6 h-6 rounded-full border-2 border-slate-400" aria-hidden="true" />
               )}
               <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-                <span className={`text-[15px] font-semibold ${s.done ? 'text-slate-500' : 'text-slate-900'}`}>{s.name}</span>
-                <span className="text-[13px] text-slate-600">{s.done ? 'Done' : s.line}</span>
+                <span className={`text-[0.9375rem] font-semibold ${s.done ? 'text-slate-500' : 'text-slate-900'}`}>{s.name}</span>
+                <span className="text-[0.8125rem] text-slate-600">{s.done ? 'Done' : s.line}</span>
               </span>
               <GoChevron />
             </Link>

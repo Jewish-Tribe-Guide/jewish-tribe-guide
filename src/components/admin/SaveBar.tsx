@@ -44,7 +44,7 @@ export default function SaveBar({
       aria-label="Save"
       className="sticky bottom-[var(--admin-tabs,0px)] z-20 -mx-4 md:-mx-10 mt-2 flex flex-wrap items-center gap-3 bg-white border-t border-slate-200 px-4 md:px-10 py-3"
     >
-      <p role="status" className="flex-1 m-0 text-[15px] font-semibold text-slate-900">
+      <p role="status" className="flex-1 m-0 text-[0.9375rem] font-semibold text-slate-900">
         {error ? <span className="text-red-700">{error}</span> : changes > 0 ? (status ?? changesLabel(changes)) : 'Saved.'}
       </p>
       {changes > 0 && (
@@ -53,7 +53,7 @@ export default function SaveBar({
             type="button"
             onClick={onUndo}
             disabled={saving}
-            className="min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[15px] font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-60 cursor-pointer"
+            className="min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[0.9375rem] font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-60 cursor-pointer"
           >
             {undoLabel}
           </button>
@@ -61,7 +61,7 @@ export default function SaveBar({
             type="button"
             onClick={onSave}
             disabled={saving}
-            className="min-h-11 px-5 rounded-lg bg-primary text-white text-[15px] font-semibold hover:bg-primary/90 disabled:opacity-60 cursor-pointer"
+            className="min-h-11 px-5 rounded-lg bg-primary text-white text-[0.9375rem] font-semibold hover:bg-primary/90 disabled:opacity-60 cursor-pointer"
           >
             {saving ? 'Saving…' : saveLabel}
           </button>

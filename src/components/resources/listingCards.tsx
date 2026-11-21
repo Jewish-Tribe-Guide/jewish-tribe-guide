@@ -60,7 +60,7 @@ export function SectionCard({
     const label = gate.filterLabel ?? gate.label
     return (
       <Card title={title} testId="listing-section" onEdit={onEdit}>
-        <p className="text-[15px] text-slate-700">Not known yet. Is it {label}?</p>
+        <p className="text-[0.9375rem] text-slate-700">Not known yet. Is it {label}?</p>
         {onAnswer && (
           <div className="mt-2.5 flex gap-2 pb-1">
             {[true, false].map((v) => (
@@ -68,7 +68,7 @@ export function SectionCard({
                 key={String(v)}
                 type="button"
                 onClick={() => onAnswer({ [gate.key]: v })}
-                className="h-11 flex-1 cursor-pointer rounded-full border border-slate-300 bg-white text-[15px] font-bold text-slate-900 transition-colors hover:bg-slate-50"
+                className="h-11 flex-1 cursor-pointer rounded-full border border-slate-300 bg-white text-[0.9375rem] font-bold text-slate-900 transition-colors hover:bg-slate-50"
               >
                 {v ? 'Yes' : 'No'}
               </button>
@@ -86,7 +86,7 @@ export function SectionCard({
     const text = fieldText(f, item[f.key])
     if (f === lead) {
       parts.push(
-        <p key={f.key} className="text-[16px] font-bold text-slate-900">
+        <p key={f.key} className="text-[1rem] font-bold text-slate-900">
           {text}
         </p>,
       )
@@ -95,7 +95,7 @@ export function SectionCard({
         <a
           key={f.key}
           href={`tel:${String(item[f.key]).replace(/\D/g, '')}`}
-          className="mt-2.5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-[15.5px] font-bold text-white hover:bg-primary-dark"
+          className="mt-2.5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-[0.96875rem] font-bold text-white hover:bg-primary-dark"
         >
           <PhoneIcon className="h-5 w-5" />
           Call {leadText || text}
@@ -103,14 +103,14 @@ export function SectionCard({
       )
     } else if (f.type === 'url') {
       parts.push(
-        <a key={f.key} href={text} target="_blank" rel="noopener noreferrer" className="mt-1.5 block text-[15px] font-semibold text-primary hover:underline">
+        <a key={f.key} href={text} target="_blank" rel="noopener noreferrer" className="mt-1.5 block text-[0.9375rem] font-semibold text-primary hover:underline">
           {f.linkLabel ?? f.label}
         </a>,
       )
     } else if (f.type === 'boolean' && item[f.key] === false) {
       // A no, said as one: "Not Shabbat friendly".
       parts.push(
-        <p key={f.key} className="mt-1 text-[15px] font-semibold text-slate-700">
+        <p key={f.key} className="mt-1 text-[0.9375rem] font-semibold text-slate-700">
           Not {f.filterLabel ?? f.label}
         </p>,
       )
@@ -118,20 +118,20 @@ export function SectionCard({
       // Said once, ticked ("✓ Shabbat friendly"), not "Shabbat friendly:
       // Shabbat friendly".
       parts.push(
-        <p key={f.key} className="mt-1 flex items-center gap-2 text-[15px] font-semibold text-slate-900">
+        <p key={f.key} className="mt-1 flex items-center gap-2 text-[0.9375rem] font-semibold text-slate-900">
           <CheckIcon className="h-4 w-4 shrink-0 text-emerald-700" />
           {text}
         </p>,
       )
     } else if (f.type === 'textarea') {
       parts.push(
-        <p key={f.key} className="mt-1 whitespace-pre-line text-[15px] leading-snug text-slate-700">
+        <p key={f.key} dir="auto" className="mt-1 whitespace-pre-line text-[0.9375rem] leading-snug text-slate-700">
           {text}
         </p>,
       )
     } else {
       parts.push(
-        <p key={f.key} className="mt-1 text-[15px] leading-snug text-slate-700">
+        <p key={f.key} className="mt-1 text-[0.9375rem] leading-snug text-slate-700">
           {!f.hideLabel && <span className="text-muted">{f.label}: </span>}
           {text}
         </p>,
@@ -142,7 +142,7 @@ export function SectionCard({
   const dated = parts.length > 0 && !!footer
   return (
     <Card title={title} testId="listing-section" footer={dated ? footer : undefined} onEdit={dated ? undefined : onEdit}>
-      {parts.length > 0 ? parts : <p className="text-[15px] text-slate-600">{NOT_YET}</p>}
+      {parts.length > 0 ? parts : <p className="text-[0.9375rem] text-slate-600">{NOT_YET}</p>}
     </Card>
   )
 }
@@ -173,7 +173,7 @@ function ShabbosField({ field, item }: { field: CategoryField; item: DirectoryRe
     <Line label={field.label}>
       {text ? (
         <>
-          <span className={field.type === 'select' || field.type === 'boolean' ? 'font-semibold text-slate-900' : 'whitespace-pre-line'}>{text}</span>
+          <span dir="auto" className={field.type === 'select' || field.type === 'boolean' ? 'font-semibold text-slate-900' : 'whitespace-pre-line'}>{text}</span>
           {view && live && (
             <>
               {' · '}
@@ -185,7 +185,7 @@ function ShabbosField({ field, item }: { field: CategoryField; item: DirectoryRe
               >
                 {view.label}
               </Link>
-              {view.checked && <span className="block text-[13px] text-muted">{view.checked}</span>}
+              {view.checked && <span className="block text-[0.8125rem] text-muted">{view.checked}</span>}
             </>
           )}
         </>
@@ -199,8 +199,8 @@ function ShabbosField({ field, item }: { field: CategoryField; item: DirectoryRe
 function Line({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="border-t border-slate-200 py-2 first:border-t-0">
-      <p className="text-[12px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-0.5 text-[15px] leading-snug text-slate-700">{children}</p>
+      <p className="text-[0.75rem] font-bold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-0.5 text-[0.9375rem] leading-snug text-slate-700">{children}</p>
     </div>
   )
 }

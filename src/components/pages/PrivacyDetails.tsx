@@ -36,7 +36,7 @@ export default function PrivacyDetails({ sections }: { sections: PageSection[] }
   const [openId, setOpenId] = useState<string | null>(null)
   return (
     <>
-      <p className="mx-1 mt-2 text-[13px] font-bold uppercase tracking-[0.06em] text-slate-500 desktop:hidden">The details</p>
+      <p className="mx-1 mt-2 text-[0.8125rem] font-bold uppercase tracking-[0.06em] text-slate-500 desktop:hidden">The details</p>
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.05)] desktop:flex desktop:flex-col desktop:gap-4 desktop:overflow-visible desktop:rounded-none desktop:border-0 desktop:bg-transparent desktop:shadow-none">
         {sections.map((s) => {
           const open = openId === s.id
@@ -47,7 +47,7 @@ export default function PrivacyDetails({ sections }: { sections: PageSection[] }
               aria-labelledby={`${s.id}-h`}
               className="border-t border-slate-200 first:border-t-0 desktop:scroll-mt-24 desktop:rounded-2xl desktop:border desktop:bg-white desktop:px-9 desktop:py-[30px] desktop:shadow-[0_1px_2px_rgb(15_23_42/0.05)] desktop:first:border-t"
             >
-              <h2 id={`${s.id}-h`} className="text-[16.5px] text-slate-900 desktop:mb-3.5 desktop:text-[19px] desktop:font-bold">
+              <h2 id={`${s.id}-h`} className="text-[1.03125rem] text-slate-900 desktop:mb-3.5 desktop:text-[1.1875rem] desktop:font-bold">
                 <button
                   type="button"
                   aria-expanded={open}
@@ -61,7 +61,7 @@ export default function PrivacyDetails({ sections }: { sections: PageSection[] }
                 <span className="hidden desktop:inline">{s.heading}</span>
               </h2>
               <div id={`${s.id}-body`} className={open ? 'px-4 pb-[18px] desktop:p-0' : 'page-row-closed'}>
-                <SectionBody section={s} className="text-[15.5px] leading-[1.65] text-slate-700 desktop:text-[16px] desktop:leading-[1.7]" />
+                <SectionBody section={s} className="text-[0.96875rem] leading-[1.65] text-slate-700 desktop:text-[1rem] desktop:leading-[1.7]" />
               </div>
             </section>
           )

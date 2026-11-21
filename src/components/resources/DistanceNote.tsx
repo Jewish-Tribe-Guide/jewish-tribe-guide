@@ -17,7 +17,7 @@ export default function DistanceNote({ className = '', onPhoto = false }: { clas
   // onPhoto: white on the category page's photo (board H4), its link
   // underlined, as the home's own hero has it.
   return (
-    <p className={`flex flex-wrap items-center gap-x-1.5 ${onPhoto ? 'text-[15px] text-white/90' : 'text-[13px] text-muted'} ${className}`}>
+    <p className={`flex flex-wrap items-center gap-x-1.5 ${onPhoto ? 'text-[0.9375rem] text-white/90' : 'text-[0.8125rem] text-muted'} ${className}`}>
       <PinIcon className="h-3.5 w-3.5 shrink-0" />
       <span>Distances from central {community.region}</span>
       <span aria-hidden="true">·</span>

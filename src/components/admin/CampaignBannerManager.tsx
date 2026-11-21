@@ -120,9 +120,9 @@ export default function CampaignBannerManager({
   const live = now === null ? null : activeCampaignBanner(banners, now, timezone)
   return (
     <AdminBox title="Campaigns">
-      <p className="m-0 px-4 pt-3 text-[13px] text-slate-600">A banner on the home page between two dates, leading to one category, like a Sukkah map.</p>
+      <p className="m-0 px-4 pt-3 text-[0.8125rem] text-slate-600">A banner on the home page between two dates, leading to one category, like a Sukkah map.</p>
       {banners.length === 0 ? (
-        <p className="m-0 px-4 py-4 text-[15px] text-slate-600">{listingCategories.length === 0 ? 'Make a category first.' : 'No campaigns yet.'}</p>
+        <p className="m-0 px-4 py-4 text-[0.9375rem] text-slate-600">{listingCategories.length === 0 ? 'Make a category first.' : 'No campaigns yet.'}</p>
       ) : (
         [...banners]
           .sort((a, b) => b.startDate.localeCompare(a.startDate))
@@ -262,16 +262,16 @@ function CampaignScreen({
           {!isNew &&
             (askingDelete ? (
               <div className="flex flex-wrap items-center gap-3">
-                <span className="text-[15px] text-slate-900">Delete {banner.title}?</span>
-                <button type="button" onClick={remove} disabled={saving} className="min-h-11 px-4 rounded-lg bg-red-600 text-white text-[15px] font-semibold cursor-pointer disabled:opacity-60">
+                <span className="text-[0.9375rem] text-slate-900">Delete {banner.title}?</span>
+                <button type="button" onClick={remove} disabled={saving} className="min-h-11 px-4 rounded-lg bg-red-600 text-white text-[0.9375rem] font-semibold cursor-pointer disabled:opacity-60">
                   Delete it
                 </button>
-                <button type="button" onClick={() => setAskingDelete(false)} className="min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[15px] font-semibold text-slate-900 cursor-pointer">
+                <button type="button" onClick={() => setAskingDelete(false)} className="min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[0.9375rem] font-semibold text-slate-900 cursor-pointer">
                   Leave it
                 </button>
               </div>
             ) : (
-              <button type="button" onClick={() => setAskingDelete(true)} className="self-start min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[15px] font-semibold text-red-700 cursor-pointer">
+              <button type="button" onClick={() => setAskingDelete(true)} className="self-start min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[0.9375rem] font-semibold text-red-700 cursor-pointer">
                 Delete this campaign
               </button>
             ))}
@@ -315,11 +315,11 @@ function BannerPreview({ title, subtitle }: { title: string; subtitle: string })
         <img src={BANNER_PHOTO} alt="" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-white/40 to-transparent" />
         <div className="absolute inset-x-3 bottom-2.5">
-          <p className="m-0 text-[15px] font-bold text-slate-900">{title || 'Sukkah Map'}</p>
-          <p className="m-0 text-[12px] text-slate-700">{subtitle || 'Find open sukkahs to visit this Sukkot'}</p>
+          <p className="m-0 text-[0.9375rem] font-bold text-slate-900">{title || 'Sukkah Map'}</p>
+          <p className="m-0 text-[0.75rem] text-slate-700">{subtitle || 'Find open sukkahs to visit this Sukkot'}</p>
         </div>
       </div>
-      <p className="m-0 border-t border-slate-200 px-3 py-2.5 text-[12.5px] text-slate-600">Shows at the top of the home page between the two dates</p>
+      <p className="m-0 border-t border-slate-200 px-3 py-2.5 text-[0.78125rem] text-slate-600">Shows at the top of the home page between the two dates</p>
     </div>
   )
 }

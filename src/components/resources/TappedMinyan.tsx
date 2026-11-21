@@ -86,12 +86,12 @@ export function TappedMinyanBox({ item, category }: { item: DirectoryResource; c
   const note = noteText(minyan.notes)
   return (
     <div className="space-y-1 rounded-lg bg-primary/[0.07] px-3 py-2.5" data-testid="tapped-minyan">
-      <p className="text-[16px] font-extrabold text-slate-900">
+      <p className="text-[1rem] font-extrabold text-slate-900">
         {TEFILLAH_LABELS[minyan.tefillah]} · {day ? `${day} ` : ''}
         {clockTime(tapped.minutes)}
       </p>
       {note && <p className="text-sm text-slate-700">{note}</p>}
-      <JoinLink link={minyan.joinLink} className="block text-[15px]" />
+      <JoinLink link={minyan.joinLink} className="block text-[0.9375rem]" />
       {/* One box, in the same blue: where to sign up goes in it, not in a
           second box under the times (the user, Oct 16). */}
       {minyan.signUp && (

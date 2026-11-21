@@ -131,28 +131,28 @@ function PickShul({ shuls, dayLine, shulText, onPick }: { shuls: readonly Direct
   const shown = typed || all ? found : found.slice(0, 5)
   return (
     <div className="space-y-2" data-testid="add-minyan-shul">
-      <p className="text-[14px] text-muted">{dayLine}</p>
-      <p className="pt-1 text-[14px] font-bold text-slate-900">Which shul?</p>
-      <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the shuls" aria-label="Search the shuls" className={`${inputClass} h-11 w-full text-[15px]`} />
+      <p className="text-[0.875rem] text-muted">{dayLine}</p>
+      <p className="pt-1 text-[0.875rem] font-bold text-slate-900">Which shul?</p>
+      <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the shuls" aria-label="Search the shuls" className={`${inputClass} h-11 w-full text-[0.9375rem]`} />
       <ul className="divide-y divide-slate-100">
         {shown.map((s) => (
           <li key={s.id}>
             <button type="button" onClick={() => onPick(s.id)} className="flex w-full cursor-pointer items-center justify-between gap-3 py-2.5 text-left hover:bg-slate-50">
               <span className="min-w-0">
-                <span className="block truncate text-[15px] font-bold text-slate-900">{s.name}</span>
-                {shulText(s) && <span className="block truncate text-[13px] text-muted">{shulText(s)}</span>}
+                <span className="block truncate text-[0.9375rem] font-bold text-slate-900">{s.name}</span>
+                {shulText(s) && <span className="block truncate text-[0.8125rem] text-muted">{shulText(s)}</span>}
               </span>
-              {far(s) && <span className="shrink-0 text-[13.5px] text-muted">{far(s)}</span>}
+              {far(s) && <span className="shrink-0 text-[0.84375rem] text-muted">{far(s)}</span>}
             </button>
           </li>
         ))}
       </ul>
       {!typed && !all && found.length > shown.length && (
-        <button type="button" onClick={() => setAll(true)} className="cursor-pointer text-[14px] font-bold text-primary hover:underline">
+        <button type="button" onClick={() => setAll(true)} className="cursor-pointer text-[0.875rem] font-bold text-primary hover:underline">
           Nearest first, all {found.length} ›
         </button>
       )}
-      {typed && found.length === 0 && <p className="text-[13.5px] text-muted">No shul called that in the guide.</p>}
+      {typed && found.length === 0 && <p className="text-[0.84375rem] text-muted">No shul called that in the guide.</p>}
     </div>
   )
 }
@@ -195,10 +195,10 @@ function MinyanTime({
   if (sent) {
     return (
       <div className="space-y-3">
-        <p role="status" className="text-[15px] font-semibold text-emerald-700">
+        <p role="status" className="text-[0.9375rem] font-semibold text-emerald-700">
           Thanks! An admin checks it before everyone sees it.
         </p>
-        <button type="button" onClick={onClose} className="h-11 w-full cursor-pointer rounded-xl bg-primary text-[15px] font-bold text-white hover:bg-primary-dark">
+        <button type="button" onClick={onClose} className="h-11 w-full cursor-pointer rounded-xl bg-primary text-[0.9375rem] font-bold text-white hover:bg-primary-dark">
           Done
         </button>
       </div>
@@ -233,7 +233,7 @@ function MinyanTime({
     if (!turnstileActive) void send('')
   }
   const chip = (on: boolean) =>
-    `cursor-pointer rounded-full border-[1.5px] px-3 py-1.5 text-[13px] font-semibold ${on ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-600'}`
+    `cursor-pointer rounded-full border-[1.5px] px-3 py-1.5 text-[0.8125rem] font-semibold ${on ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-600'}`
 
   return (
     <div className="space-y-4" data-testid="add-minyan-time">
@@ -247,7 +247,7 @@ function MinyanTime({
               set(relative && !RELATIVE_ELIGIBLE.includes(tefillah) ? { ...modes.switchToClock(row), tefillah } : { tefillah })
             }}
             aria-label="Tefillah"
-            className={`${inputClass} h-11 min-w-0 flex-1 text-[15px] font-semibold`}
+            className={`${inputClass} h-11 min-w-0 flex-1 text-[0.9375rem] font-semibold`}
           >
             {TEFILLAH_ORDER.map((t) => (
               <option key={t} value={t}>
@@ -256,7 +256,7 @@ function MinyanTime({
             ))}
           </select>
           {!relative && (
-            <input type="text" value={row.time} onChange={(e) => set(modes.setClockTime(row, e.target.value))} placeholder="7:00am" aria-label="Time" className={`${inputClass} h-11 w-28 shrink-0 text-[15px]`} />
+            <input type="text" value={row.time} onChange={(e) => set(modes.setClockTime(row, e.target.value))} placeholder="7:00am" aria-label="Time" className={`${inputClass} h-11 w-28 shrink-0 text-[0.9375rem]`} />
           )}
         </div>
         {relative && (
@@ -273,13 +273,13 @@ function MinyanTime({
           </div>
         )}
         {RELATIVE_ELIGIBLE.includes(row.tefillah) && <TimeModeToggle relative={relative} label="From a zman" onClock={() => set(modes.switchToClock(row))} onRelative={() => set(modes.switchToRelative(row))} />}
-        {!readable && row.time.trim() && <p className="text-[12.5px] text-caution">The guide can’t read “{row.time}” as a time. Type it like 6:30pm, or choose From a zman.</p>}
+        {!readable && row.time.trim() && <p className="text-[0.78125rem] text-caution">The guide can’t read “{row.time}” as a time. Type it like 6:30pm, or choose From a zman.</p>}
       </div>
 
       <div>
-        <p className="text-[14px] font-bold text-slate-900">Which days?</p>
+        <p className="text-[0.875rem] font-bold text-slate-900">Which days?</p>
         {oneOff && oneOffName ? (
-          <p className="mt-1.5 text-[14px] text-slate-700">
+          <p className="mt-1.5 text-[0.875rem] text-slate-700">
             Only {oneOffName}, {dateText(day.date, { weekday: true })}.{' '}
             <button type="button" onClick={() => setOneOff(false)} className="cursor-pointer font-bold text-primary hover:underline">
               Every week instead
@@ -300,22 +300,22 @@ function MinyanTime({
           </div>
         )}
       </div>
-      <input type="text" value={notes} maxLength={120} onChange={(e) => setNotes(e.target.value)} placeholder="Note (optional)" aria-label="Note" className={`${inputClass} h-11 w-full text-[15px]`} />
+      <input type="text" value={notes} maxLength={120} onChange={(e) => setNotes(e.target.value)} placeholder="Note (optional)" aria-label="Note" className={`${inputClass} h-11 w-full text-[0.9375rem]`} />
       <div className="space-y-2">
         <button
           type="button"
           disabled={busy || !row.time.trim() || !readable || (!oneOff && days.length === 0)}
           onClick={start}
-          className="h-12 w-full cursor-pointer rounded-xl bg-primary text-[16px] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
+          className="h-12 w-full cursor-pointer rounded-xl bg-primary text-[1rem] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
         >
           {busy ? 'Sending…' : 'Send for a check'}
         </button>
         {error && (
-          <p role="alert" className="text-[13.5px] text-red-700">
+          <p role="alert" className="text-[0.84375rem] text-red-700">
             {error}
           </p>
         )}
-        <p className="text-center text-[12.5px] leading-snug text-muted">An admin checks it before anyone sees it.</p>
+        <p className="text-center text-[0.78125rem] leading-snug text-muted">An admin checks it before anyone sees it.</p>
       </div>
       {busy && turnstileActive && <TurnstileWidget key={attempt} onVerify={(token) => pending.current(token)} />}
     </div>

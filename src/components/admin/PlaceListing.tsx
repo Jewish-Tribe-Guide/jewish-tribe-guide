@@ -35,7 +35,7 @@ const primary = `${button} border border-primary bg-primary text-white`
 const secondary = `${button} border border-slate-300 bg-white text-slate-900 hover:bg-slate-50`
 const danger = `${button} border border-red-600 bg-red-600 text-white`
 const LINE_LINK = 'cursor-pointer font-semibold text-primary hover:underline disabled:opacity-60'
-const INPUT = 'min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-[15px] text-slate-900'
+const INPUT = 'min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-[0.9375rem] text-slate-900'
 
 /** `send`: an eruv's own way back, which isn't a listing's route. */
 export function ArchivedPlace({ place, category, token, onDone, send: own }: { place: AdminPlace; category: CategoryConfig | undefined; token: string; onDone: () => void; send?: { restore: () => Promise<void>; remove: () => Promise<void> } }) {
@@ -62,7 +62,7 @@ export function ArchivedPlace({ place, category, token, onDone, send: own }: { p
       <div className="flex flex-col gap-3 p-4">
         <div className="flex flex-col gap-0.5">
           <h2 className="m-0 text-lg font-bold text-slate-900">{place.name}</h2>
-          <span className="text-[13px] text-slate-600">
+          <span className="text-[0.8125rem] text-slate-600">
             {[category?.label, `Archived ${shortDay(place.changedAt)}`].filter(Boolean).join(' · ')}
           </span>
           {place.listing.address && <span className="text-sm text-slate-700">{place.listing.address}</span>}
@@ -98,7 +98,7 @@ export function ArchivedPlace({ place, category, token, onDone, send: own }: { p
 /** On the right of a row: the job that keeps it. */
 export function RowJob({ source }: { source: Pick<RowSource, 'job' | 'amber'> }) {
   return (
-    <span className={`max-w-[40%] shrink-0 text-right text-[13px] leading-snug ${source.amber ? 'text-amber-800' : 'text-slate-600'}`} data-testid="row-job">
+    <span className={`max-w-[40%] shrink-0 text-right text-[0.8125rem] leading-snug ${source.amber ? 'text-amber-800' : 'text-slate-600'}`} data-testid="row-job">
       {source.job}
     </span>
   )
@@ -121,7 +121,7 @@ export function ArchiveBin({ onClick }: { onClick: () => void }) {
 /** "Its menu · Oct 20 · Change": a row's one line, its controls drawn in by the caller. */
 export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' | 'url' | 'when'> & { red?: boolean }; controls?: ReactNode[] }) {
   return (
-    <p className={`m-0 text-[13px] [overflow-wrap:anywhere] ${line.red ? 'font-semibold text-red-700' : 'text-slate-500'}`} data-testid="row-source">
+    <p className={`m-0 text-[0.8125rem] [overflow-wrap:anywhere] ${line.red ? 'font-semibold text-red-700' : 'text-slate-500'}`} data-testid="row-source">
       {line.url ? (
         <a href={line.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
           {line.text}
@@ -197,7 +197,7 @@ export function SourceScreen({ label, value: first, button: words, attempt: firs
       }}
     >
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-        <label className="flex flex-col gap-1.5 text-[13px] text-slate-600">
+        <label className="flex flex-col gap-1.5 text-[0.8125rem] text-slate-600">
           {label}
           <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} className={INPUT} autoFocus />
         </label>
@@ -209,7 +209,7 @@ export function SourceScreen({ label, value: first, button: words, attempt: firs
         {busy ? 'Reading…' : words}
       </button>
       {stop && (
-        <button type="button" disabled={busy} onClick={() => void go(async () => { await stop(); await onDone() })} className="min-h-11 cursor-pointer text-center text-[15px] font-bold text-red-700 disabled:opacity-60">
+        <button type="button" disabled={busy} onClick={() => void go(async () => { await stop(); await onDone() })} className="min-h-11 cursor-pointer text-center text-[0.9375rem] font-bold text-red-700 disabled:opacity-60">
           Stop reading it
         </button>
       )}

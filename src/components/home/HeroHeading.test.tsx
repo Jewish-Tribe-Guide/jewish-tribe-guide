@@ -103,7 +103,7 @@ describe('HeroHeading — Phase 3 desktop details', () => {
     expect(hero.querySelector('h1')!.className).toMatch(/\btext-white\b/)
     // 48px, so the line spans about the search box's 720px under it rather
     // than sitting narrower than the box (Nov 11).
-    expect(hero.querySelector('h1')!.className).toMatch(/\btext-\[48px\]/)
+    expect(hero.querySelector('h1')!.className).toMatch(/\btext-\[3rem\]/)
     expect(column.className).toMatch(/\bmax-w-\[880px\]/)
     expect(hero.querySelector('h1')!.nextElementSibling!.className).toMatch(/\bmax-w-\[688px\]/)
     expect(hero.querySelector('[class*="rgba(15,23,42,0.55)"]')).not.toBeNull()

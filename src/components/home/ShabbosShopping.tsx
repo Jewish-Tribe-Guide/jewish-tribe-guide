@@ -40,18 +40,18 @@ export default function ShabbosShopping({ listings, categories, items, now, from
         </span>
       )}
       <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-900/70 to-slate-900/35" />
-      <h3 className="relative text-[13px] font-semibold text-slate-200">Shabbos shopping</h3>
-      <p className="relative mt-0.5 text-[28px] font-extrabold tracking-tight">
+      <h3 className="relative text-[0.8125rem] font-semibold text-slate-200">Shabbos shopping</h3>
+      <p className="relative mt-0.5 text-[1.75rem] font-extrabold tracking-tight">
         {stores} {stores === 1 ? 'store' : 'stores'} open
       </p>
-      {closest != null && <p className="relative text-[13.5px] text-slate-200">{stores === 1 ? `${milesText(closest)} away` : `Closest ${milesText(closest)}`}</p>}
+      {closest != null && <p className="relative text-[0.84375rem] text-slate-200">{stores === 1 ? `${milesText(closest)} away` : `Closest ${milesText(closest)}`}</p>}
       <div className="relative mt-auto flex gap-2 pt-3">
         {rows.map((row) => (
           <Link
             key={row.item}
             href={candleItemHref(communitySlug, row)}
             prefetch={false}
-            className="min-w-0 flex-1 truncate rounded-lg bg-white/15 px-2 py-2 text-center text-[13.5px] font-bold text-white hover:bg-white/25 desktop:max-w-40"
+            className="min-w-0 flex-1 truncate rounded-lg bg-white/15 px-2 py-2 text-center text-[0.84375rem] font-bold text-white hover:bg-white/25 desktop:max-w-40"
           >
             {row.item}
           </Link>

@@ -135,8 +135,8 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
           <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${TONE_DOT[e.tone]}`} />
           <span className="min-w-0 flex-1">
             <span className="block truncate font-semibold text-slate-900">{e.name}</span>
-            <span className={`block text-[13.5px] font-semibold ${TONE_WORDS[e.tone]}`}>{e.label}</span>
-            {e.checked && <span className="block truncate text-[13px] text-muted">{e.checked}</span>}
+            <span className={`block text-[0.84375rem] font-semibold ${TONE_WORDS[e.tone]}`}>{e.label}</span>
+            {e.checked && <span className="block truncate text-[0.8125rem] text-muted">{e.checked}</span>}
           </span>
         </button>
       ))}
@@ -269,10 +269,10 @@ function NearbyRow({ point: p, category, place, now, showCategory, canViewListin
         <span className="min-w-0 flex-1">
           <span className={`block truncate font-semibold ${canViewListing ? 'text-slate-900 group-hover:text-blue-600 transition-colors' : 'text-slate-900'}`} data-testid="nearby-name">
             {p.name}
-            {place && <span className="text-[13.5px] font-normal text-slate-500"> · {place}</span>}
+            {place && <span className="text-[0.84375rem] font-normal text-slate-500"> · {place}</span>}
           </span>
           {facts.length > 0 ? (
-            <span className="block truncate text-[13.5px] text-slate-600" data-testid="nearby-facts">
+            <span className="block truncate text-[0.84375rem] text-slate-600" data-testid="nearby-facts">
               {showCategory && p.categoryLabel && (
                 <>
                   <span className="font-semibold" style={{ color: p.color }} data-testid="nearby-category">
@@ -294,7 +294,7 @@ function NearbyRow({ point: p, category, place, now, showCategory, canViewListin
             // in its pins' colour too in a mixed list, as on a row with
             // facts: grey here, a hotel with no hours read differently
             // from one with them (the user, Oct 16).
-            <span className="block truncate text-[13.5px] text-slate-500" data-testid="nearby-facts">
+            <span className="block truncate text-[0.84375rem] text-slate-500" data-testid="nearby-facts">
               {showCategory && p.categoryLabel ? (
                 <span className="font-semibold" style={{ color: p.color }} data-testid="nearby-category">
                   {p.categoryLabel}

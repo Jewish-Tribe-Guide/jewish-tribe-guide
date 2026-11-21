@@ -213,7 +213,7 @@ export function CompactCardGrid({
           className="mt-2 flex w-full cursor-pointer items-center justify-center gap-1 rounded-xl py-2.5 text-sm font-medium text-primary transition-colors hover:bg-slate-50"
         >
           {expanded ? 'Show less' : 'Show more'}
-          <span aria-hidden="true" className="text-[10px]">
+          <span aria-hidden="true" className="text-[0.625rem]">
             {expanded ? '▴' : '▾'}
           </span>
         </button>

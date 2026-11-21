@@ -152,7 +152,7 @@ export default function YouScreen() {
           />
           {showResults && lines.length > 0 && <SearchLines lines={lines} categories={home.categories} typed={q} onPick={goTo} roundSave className="mt-2" />}
           {showResults && lines.length === 0 && (
-            <p data-testid="you-search-nothing" className="mt-2 px-1 text-[14px] text-slate-500 desktop:text-white">
+            <p data-testid="you-search-nothing" className="mt-2 px-1 text-[0.875rem] text-slate-500 desktop:text-white">
               Nothing in the guide for “{q}”
             </p>
           )}
@@ -165,8 +165,8 @@ export default function YouScreen() {
               <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <BookmarkIcon className="h-6 w-6" />
               </span>
-              <p className="mt-4 text-[19px] font-extrabold text-ink">Nothing saved yet</p>
-              <p className="mt-1 text-[15px] text-slate-500">{SAVE_HOW}</p>
+              <p className="mt-4 text-[1.1875rem] font-extrabold text-ink">Nothing saved yet</p>
+              <p className="mt-1 text-[0.9375rem] text-slate-500">{SAVE_HOW}</p>
             </div>
             {/* A computer: where the cards will go, drawn as dashed outlines,
                 the first saying how. */}
@@ -176,8 +176,8 @@ export default function YouScreen() {
                   <BookmarkIcon className="h-5 w-5" />
                 </span>
                 <span>
-                  <span className="block text-[17px] font-extrabold text-ink">Nothing saved yet</span>
-                  <span className="block text-[14px] text-slate-500">{SAVE_HOW.replace(/\.$/, '')}</span>
+                  <span className="block text-[1.0625rem] font-extrabold text-ink">Nothing saved yet</span>
+                  <span className="block text-[0.875rem] text-slate-500">{SAVE_HOW.replace(/\.$/, '')}</span>
                 </span>
               </div>
               <div className={EMPTY_CARD} />
@@ -215,7 +215,7 @@ export default function YouScreen() {
                   )}
                 </div>
               </SwipeRowGroup>
-              <p className="mt-3 text-[13px] text-slate-500 desktop:mt-9">
+              <p className="mt-3 text-[0.8125rem] text-slate-500 desktop:mt-9">
                 <span className="desktop:hidden">Saved on this phone</span>
                 <span className="hidden desktop:inline">Saved in this browser</span>
               </p>
@@ -239,7 +239,7 @@ const ROW_LINK = 'flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3 desktop:px-
 function Section({ title, testId, className = '', children }: { title: string; testId: string; className?: string; children: React.ReactNode }) {
   return (
     <section data-testid={testId} className={className}>
-      <h2 className="mb-2 text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500 desktop:mb-3">{title}</h2>
+      <h2 className="mb-2 text-[0.78125rem] font-extrabold uppercase tracking-[0.06em] text-slate-500 desktop:mb-3">{title}</h2>
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white desktop:grid desktop:grid-cols-3 desktop:gap-4 desktop:overflow-visible desktop:rounded-none desktop:border-0 desktop:bg-transparent">{children}</div>
     </section>
   )
@@ -311,10 +311,10 @@ function PlaceRow({
           <PlaceIcon place={place} color={getCategoryColor(categories, category.id)} className="h-11 w-11 text-lg desktop:h-14 desktop:w-14" sizePx={56} />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
-              <span className="truncate text-[15.5px] font-bold text-ink">{name}</span>
+              <span className="truncate text-[0.96875rem] font-bold text-ink">{name}</span>
               {changed && <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-primary" data-testid="you-changed-dot" />}
             </span>
-            <span className="mt-0.5 block truncate text-[13.5px] text-slate-600">
+            <span className="mt-0.5 block truncate text-[0.84375rem] text-slate-600">
               {[
                 ...(changed ? [<span key="changed" className="font-semibold text-primary">{changed}</span>] : []),
                 ...status.map((f, i) => (
@@ -353,8 +353,8 @@ function SearchRow({ search, sub, href, onRemove }: { search: SavedSearch; sub: 
             </svg>
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[15.5px] font-bold text-ink">{name}</span>
-            {sub && <span className="mt-0.5 block truncate text-[13.5px] text-slate-500">{sub}</span>}
+            <span className="block truncate text-[0.96875rem] font-bold text-ink">{name}</span>
+            {sub && <span className="mt-0.5 block truncate text-[0.84375rem] text-slate-500">{sub}</span>}
           </span>
         </Link>
         <RowBookmark name={name} onRemove={onRemove} />

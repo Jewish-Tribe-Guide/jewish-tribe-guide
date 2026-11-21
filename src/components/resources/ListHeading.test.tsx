@@ -105,8 +105,8 @@ describe('ListHeading — Map in the row', () => {
   it('sets the row’s words at 13px below 390 wide, 14px from there', () => {
     render(<ListHeading count={71} total={71} filters={filters} sort={sort} mapHref="/m" />)
     for (const el of [screen.getByRole('button', { name: 'Filters' }), screen.getByRole('link', { name: 'Map' }), screen.getByRole('button', { name: 'Sort Distance' })]) {
-      expect(el.className).toMatch(/(^|\s)text-\[13px\](\s|$)/)
-      expect(el.className).toMatch(/(^|\s)min-\[390px\]:text-\[14px\](\s|$)/)
+      expect(el.className).toMatch(/(^|\s)text-\[0.8125rem\](\s|$)/)
+      expect(el.className).toMatch(/(^|\s)min-\[390px\]:text-\[0.875rem\](\s|$)/)
     }
   })
 })

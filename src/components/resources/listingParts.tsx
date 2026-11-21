@@ -54,7 +54,7 @@ export function Card({
       <div className="py-1" data-testid={testId} data-muted={muted || undefined}>
         {(named || action) && (
           <div className="flex items-baseline justify-between gap-3 pt-1.5">
-            {named ? <p className="text-[12px] font-extrabold uppercase tracking-wide text-muted">{named}</p> : <span />}
+            {named ? <p className="text-[0.75rem] font-extrabold uppercase tracking-wide text-muted">{named}</p> : <span />}
             {action}
           </div>
         )}
@@ -67,7 +67,7 @@ export function Card({
           children
         )}
         {(footer || onEdit) && (
-          <div className="mt-1.5 flex items-center gap-2 pt-1 text-[13px] leading-snug text-muted">
+          <div className="mt-1.5 flex items-center gap-2 pt-1 text-[0.8125rem] leading-snug text-muted">
             <div className="min-w-0 flex-1">{footer}</div>
             {onEdit && <EditButton onClick={onEdit} />}
           </div>
@@ -99,7 +99,7 @@ export function Card({
         children
       )}
       {(footer || onEdit) && (
-        <div className={`mt-2.5 flex items-center gap-2 border-t pt-2 text-[13px] leading-snug text-muted ${muted ? 'border-slate-300' : 'border-slate-100'}`}>
+        <div className={`mt-2.5 flex items-center gap-2 border-t pt-2 text-[0.8125rem] leading-snug text-muted ${muted ? 'border-slate-300' : 'border-slate-100'}`}>
           <div className="min-w-0 flex-1">{footer}</div>
           {onEdit && <EditButton onClick={onEdit} />}
         </div>
@@ -115,7 +115,7 @@ export function EditButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 text-[14.5px] font-bold text-primary hover:underline"
+      className="flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 text-[0.90625rem] font-bold text-primary hover:underline"
       data-testid="box-edit-button"
     >
       <PencilIcon className="h-3.5 w-3.5" />

@@ -13,11 +13,11 @@ import { SUBMIT_PILL } from './submitPill'
 // and the eruv's editor (EruvEditor) both draw it from here, so they can't
 // drift apart.
 
-export const editorInputClass = 'h-11.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-[15.5px] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none'
-export const editorFieldLabel = 'mb-1.5 block text-[14px] font-bold text-slate-700'
+export const editorInputClass = 'h-11.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-[0.96875rem] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none'
+export const editorFieldLabel = 'mb-1.5 block text-[0.875rem] font-bold text-slate-700'
 
 export function ChangedTag() {
-  return <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-amber-800">Changed</span>
+  return <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[0.78125rem] font-extrabold text-amber-800">Changed</span>
 }
 
 /** A row, closed: its heading, what it says now, and a ›. */
@@ -56,8 +56,8 @@ export function EditorRowCard({
     >
       {leading}
       <span className="min-w-0 flex-1">
-        <span className="block text-[16px] font-extrabold text-slate-900">{title}</span>
-        {summary && <span className="mt-0.5 line-clamp-2 block text-[14px] leading-snug text-muted">{summary}</span>}
+        <span className="block text-[1rem] font-extrabold text-slate-900">{title}</span>
+        {summary && <span className="mt-0.5 line-clamp-2 block text-[0.875rem] leading-snug text-muted">{summary}</span>}
       </span>
       {tags}
       {aside}
@@ -75,7 +75,7 @@ export function EditorOpenCard({ title, tags, onClose, children, cardRef, testId
   const inside = (
     <>
       <button type="button" onClick={onClose} aria-expanded="true" className="flex min-h-11 w-full cursor-pointer items-center gap-3 text-left">
-        <span className="min-w-0 flex-1 text-[16px] font-extrabold text-slate-900">{title}</span>
+        <span className="min-w-0 flex-1 text-[1rem] font-extrabold text-slate-900">{title}</span>
         {tags}
         <ChevronRightIcon className="h-4 w-4 shrink-0 -rotate-90 text-slate-500" />
       </button>
@@ -96,7 +96,7 @@ export function EditorOpenCard({ title, tags, onClose, children, cardRef, testId
   return (
     <div ref={cardRef} data-testid={testId} className={`scroll-my-4 ${card}`}>
       {inside}
-      <button type="button" onClick={onClose} className="h-11 w-full cursor-pointer rounded-full border border-slate-300 bg-white text-[15px] font-bold text-primary">
+      <button type="button" onClick={onClose} className="h-11 w-full cursor-pointer rounded-full border border-slate-300 bg-white text-[0.9375rem] font-bold text-primary">
         Done
       </button>
     </div>
@@ -108,7 +108,7 @@ export function EditorOpenCard({ title, tags, onClose, children, cardRef, testId
 export function EditorEmptyRows({ children }: { children: ReactNode }) {
   return (
     <div data-testid="editor-empty">
-      <p className="pb-1 text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-muted">Not on the listing yet</p>
+      <p className="pb-1 text-[0.78125rem] font-extrabold uppercase tracking-[0.04em] text-muted">Not on the listing yet</p>
       <ul className="space-y-1">{children}</ul>
     </div>
   )
@@ -117,7 +117,7 @@ export function EditorEmptyRows({ children }: { children: ReactNode }) {
 /** A box the listing doesn't have yet, to add. */
 export function EditorAddLine({ title, onOpen, testId, opens }: { title: ReactNode; onOpen: () => void; testId: string; opens: 'here' | 'screen' }) {
   return (
-    <button type="button" onClick={onOpen} data-testid={testId} data-opens={opens} className="flex min-h-11 w-full cursor-pointer items-center gap-2 text-left text-[15px] font-bold text-primary">
+    <button type="button" onClick={onOpen} data-testid={testId} data-opens={opens} className="flex min-h-11 w-full cursor-pointer items-center gap-2 text-left text-[0.9375rem] font-bold text-primary">
       <PlusIcon className="h-4 w-4 shrink-0" />
       {title}
     </button>
@@ -131,8 +131,8 @@ export function EditorSent({ message, onDone }: { message: string; onDone: () =>
       <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
         <CheckIcon className="h-8 w-8 text-emerald-700" />
       </span>
-      <p className="text-[22px] font-extrabold text-ink">Sent</p>
-      <p className="text-[15.5px] text-slate-700">{message}</p>
+      <p className="text-[1.375rem] font-extrabold text-ink">Sent</p>
+      <p className="text-[0.96875rem] text-slate-700">{message}</p>
       <button type="button" onClick={onDone} className={`${SUBMIT_PILL} mt-6`}>
         Done
       </button>

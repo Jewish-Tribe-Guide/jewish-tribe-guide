@@ -491,7 +491,7 @@ export function RowName({ rename, name }: { rename: RowRename; name: string }) {
     if (rename.fresh) setEditing(true)
   }
   // The box's padding hangs to the left, so the name sits where it did closed.
-  const pad = '-ml-2.5 rounded-md border px-2.5 py-1.5 text-[15px] font-semibold'
+  const pad = '-ml-2.5 rounded-md border px-2.5 py-1.5 text-[0.9375rem] font-semibold'
   if (!editing)
     return (
       <button
@@ -597,13 +597,13 @@ export function OrderRow({
         >
           {iconBox}
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-[15px] font-semibold text-slate-900">{name}</span>
+            <span className="text-[0.9375rem] font-semibold text-slate-900">{name}</span>
             {line && !open && (
-              <span id={lineId} aria-hidden className="text-[13px] text-slate-600">
+              <span id={lineId} aria-hidden className="text-[0.8125rem] text-slate-600">
                 {line}
               </span>
             )}
-            {open && openLine && <span className="text-[13px] text-slate-600">{openLine}</span>}
+            {open && openLine && <span className="text-[0.8125rem] text-slate-600">{openLine}</span>}
           </span>
           <span className={open ? 'rotate-90' : ''}>
             <Chevron />
@@ -628,8 +628,8 @@ export function InnerRow({ row, name, line, onRemove, className }: { row: DragRo
       <div className="flex min-h-11 items-center gap-1 pl-1 pr-1">
         {row.handle}
         <span {...row.rowProps} className="flex min-w-0 flex-1 select-none flex-col gap-0.5 py-2 text-left">
-          <span className="text-[15px] font-medium text-slate-900">{name}</span>
-          {line && <span className="text-[13px] text-slate-600">{line}</span>}
+          <span className="text-[0.9375rem] font-medium text-slate-900">{name}</span>
+          {line && <span className="text-[0.8125rem] text-slate-600">{line}</span>}
         </span>
         <button type="button" onClick={onRemove} aria-label={`Take ${name} off`} className={iconButton}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
@@ -677,7 +677,7 @@ export const addButton = `${plainButton} text-primary`
  *  the site homepage part of admin?"). Adding inside one row stays that
  *  row's own button. */
 export const addListButton =
-  'flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 text-[15px] font-semibold text-primary hover:border-primary hover:bg-blue-50'
+  'flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 text-[0.9375rem] font-semibold text-primary hover:border-primary hover:bg-blue-50'
 
 /** A box's or a tab's X (FieldBoxes, OrderRow). */
 export const X = (
@@ -707,7 +707,7 @@ export function AddListButton({ onClick, disabled, children }: { onClick: () => 
  *  above it (the user, Nov 10: "can add a link be the same as add a field
  *  in design?"). */
 export const addRowButton =
-  'flex min-h-[46px] w-full cursor-pointer items-center gap-2 pl-10 pr-4 text-left text-[15px] font-semibold text-primary hover:bg-blue-50/60'
+  'flex min-h-[46px] w-full cursor-pointer items-center gap-2 pl-10 pr-4 text-left text-[0.9375rem] font-semibold text-primary hover:bg-blue-50/60'
 
 /** `addRowButton` as a button. */
 export function AddRowButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {

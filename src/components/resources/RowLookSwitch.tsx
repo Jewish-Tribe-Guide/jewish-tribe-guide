@@ -31,7 +31,7 @@ export default function RowLookSwitch({ look, onChange }: { look: RowLook; onCha
       type="button"
       aria-pressed={look === value}
       onClick={() => onChange(value)}
-      className={`h-8 cursor-pointer rounded-full px-3 text-[13px] font-semibold transition-colors ${
+      className={`h-8 cursor-pointer rounded-full px-3 text-[0.8125rem] font-semibold transition-colors ${
         look === value ? 'bg-white text-slate-900 shadow-sm' : 'text-white/80 hover:text-white'
       }`}
     >

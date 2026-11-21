@@ -74,8 +74,8 @@ function SearchRow({
         className="w-full flex items-center gap-3 px-4 py-2.5 min-h-[52px] text-left text-slate-900 hover:bg-slate-50 cursor-pointer"
       >
         <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-          <span className="text-[15px] font-semibold">“{search.term}”</span>
-          <span className="text-[13px] text-slate-600">
+          <span className="text-[0.9375rem] font-semibold">“{search.term}”</span>
+          <span className="text-[0.8125rem] text-slate-600">
             {search.count} {search.count === 1 ? 'search' : 'searches'} · {shortDay(`${search.lastDay}T12:00:00`)}
           </span>
         </span>
@@ -103,7 +103,7 @@ function SearchRow({
           </div>
           {data.addable.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              <label htmlFor={`${id}-category`} className="text-[13px] text-slate-600">
+              <label htmlFor={`${id}-category`} className="text-[0.8125rem] text-slate-600">
                 {data.canTeach && teachable(search.term) ? 'Or show a category for it' : 'Category'}
               </label>
               <span className="flex gap-2">

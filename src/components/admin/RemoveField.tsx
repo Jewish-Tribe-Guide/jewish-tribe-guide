@@ -27,7 +27,7 @@ export default function RemoveField({
   onKeep: () => void
 }) {
   const { label, count } = removing
-  const row = 'm-0 border-b border-slate-100 px-4 py-3.5 text-[15px] text-slate-900 last:border-b-0'
+  const row = 'm-0 border-b border-slate-100 px-4 py-3.5 text-[0.9375rem] text-slate-900 last:border-b-0'
   return (
     <>
       <AdminBack back={{ label, onClick: onKeep }} title={`Remove ${label} from ${page}?`} />
@@ -45,14 +45,14 @@ export default function RemoveField({
         <button
           type="button"
           onClick={onRemove}
-          className="min-h-11 px-4 rounded-lg bg-red-700 text-white text-[15px] font-bold hover:bg-red-800 cursor-pointer"
+          className="min-h-11 px-4 rounded-lg bg-red-700 text-white text-[0.9375rem] font-bold hover:bg-red-800 cursor-pointer"
         >
           Remove it
         </button>
         <button
           type="button"
           onClick={onKeep}
-          className="min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[15px] font-bold text-slate-900 hover:bg-slate-50 cursor-pointer"
+          className="min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[0.9375rem] font-bold text-slate-900 hover:bg-slate-50 cursor-pointer"
         >
           Keep it
         </button>

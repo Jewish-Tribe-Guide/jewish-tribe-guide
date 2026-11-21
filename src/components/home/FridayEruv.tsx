@@ -53,7 +53,7 @@ export default function FridayEruv({ communitySlug, href, now, look = 'dark' }: 
   if (!loaded || loaded.eruvim.length === 0) {
     return (
       <Link href={href} prefetch={false} data-testid="today-eruv" className={rowClass}>
-        <span className={`min-w-0 flex-1 text-[14.5px] font-bold ${L.name}`}>Eruvim</span>
+        <span className={`min-w-0 flex-1 text-[0.90625rem] font-bold ${L.name}`}>Eruvim</span>
         <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
       </Link>
     )
@@ -68,15 +68,15 @@ export default function FridayEruv({ communitySlug, href, now, look = 'dark' }: 
     return (
       <Link href={`${href}?item=${encodeURIComponent(one.id)}`} prefetch={false} data-testid="today-eruv" className={rowClass}>
         <span className="min-w-0 flex-1">
-          <span className={`flex flex-wrap items-baseline gap-x-1.5 text-[14.5px] font-bold ${L.name}`}>
+          <span className={`flex flex-wrap items-baseline gap-x-1.5 text-[0.90625rem] font-bold ${L.name}`}>
             {dot(view.tone)}
             {one.name}
             <span className={`font-bold ${L.words[view.tone]}`}>{view.label}</span>
           </span>
           {view.tone === 'grey' && one.hotline ? (
-            <span className={`block text-[12.5px] ${L.quiet}`}>Hotline {one.hotline}</span>
+            <span className={`block text-[0.78125rem] ${L.quiet}`}>Hotline {one.hotline}</span>
           ) : (
-            checked && <span className={`block text-[12.5px] tabular-nums ${L.quiet}`}>{checked}</span>
+            checked && <span className={`block text-[0.78125rem] tabular-nums ${L.quiet}`}>{checked}</span>
           )}
         </span>
         <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
@@ -95,13 +95,13 @@ export default function FridayEruv({ communitySlug, href, now, look = 'dark' }: 
     <Link href={href} prefetch={false} data-testid="today-eruv" className={rowClass}>
       <span className="min-w-0 flex-1">
         {summary.down && (
-          <span className={`flex items-baseline gap-1.5 text-[14.5px] font-extrabold ${L.down}`}>
+          <span className={`flex items-baseline gap-1.5 text-[0.90625rem] font-extrabold ${L.down}`}>
             {dot('red')}
             {summary.down}
           </span>
         )}
-        <span className={`flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[13.5px] font-semibold ${L.parts}`}>
-          {!summary.down && <span className={`text-[14.5px] font-bold ${L.name}`}>Eruvim</span>}
+        <span className={`flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[0.84375rem] font-semibold ${L.parts}`}>
+          {!summary.down && <span className={`text-[0.90625rem] font-bold ${L.name}`}>Eruvim</span>}
           {parts}
         </span>
       </span>

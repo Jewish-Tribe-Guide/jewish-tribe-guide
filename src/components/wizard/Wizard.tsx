@@ -244,7 +244,7 @@ export default function Wizard({
           <p className="text-slate-500 max-w-sm mx-auto">{successMessage}</p>
           <button
             onClick={onClose}
-            className="mt-8 rounded-full bg-primary px-7 py-3 text-[15px] font-semibold text-white hover:bg-primary-dark transition-colors cursor-pointer"
+            className="mt-8 rounded-full bg-primary px-7 py-3 text-[0.9375rem] font-semibold text-white hover:bg-primary-dark transition-colors cursor-pointer"
           >
             Done
           </button>
@@ -269,14 +269,14 @@ export default function Wizard({
       />
       <div key={step.id} className="animate-[fadeIn_180ms_ease-out]">
         {step.section && (
-          <p className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-primary">
+          <p className="mb-2 text-[0.8125rem] font-semibold uppercase tracking-wide text-primary">
             {step.section}
           </p>
         )}
-        <h2 className="text-[26px] sm:text-[30px] font-bold tracking-tight text-slate-900 leading-tight">
+        <h2 className="text-[1.625rem] sm:text-[1.875rem] font-bold tracking-tight text-slate-900 leading-tight">
           {step.question}
         </h2>
-        {step.hint && <p className="mt-2 text-[15px] text-slate-500">{step.hint}</p>}
+        {step.hint && <p className="mt-2 text-[0.9375rem] text-slate-500">{step.hint}</p>}
 
         <div className="mt-7">
           {step.kind === 'single' && (
@@ -311,7 +311,7 @@ export default function Wizard({
               value={(answers[step.id] as string) ?? ''}
               onChange={(e) => setAnswer(step.id, e.target.value)}
               placeholder={step.placeholder}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-[16px] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-[1rem] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
             />
           )}
 
@@ -324,7 +324,7 @@ export default function Wizard({
               onChange={(e) => setAnswer(step.id, step.kind === 'tel' ? formatPhone(e.target.value) : e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); goNext() } }}
               placeholder={step.placeholder}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-[18px] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-[1.125rem] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           )}
 
@@ -340,7 +340,7 @@ export default function Wizard({
                   value={(answers.phone as string) ?? ''}
                   onChange={(e) => setAnswer('phone', formatPhone(e.target.value))}
                   placeholder="(555) 555-0100"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-[18px] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-[1.125rem] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
               <div>
@@ -353,7 +353,7 @@ export default function Wizard({
                   onChange={(e) => setAnswer('email', e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); goNext() } }}
                   placeholder="you@example.com"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-[18px] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-[1.125rem] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
               <p className="text-sm text-slate-400">Enter at least one — whichever you prefer.</p>
@@ -378,7 +378,7 @@ export default function Wizard({
             <button
               onClick={goNext}
               disabled={submitting}
-              className="rounded-full bg-primary px-7 py-3 text-[15px] font-semibold text-white hover:bg-primary-dark transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              className="rounded-full bg-primary px-7 py-3 text-[0.9375rem] font-semibold text-white hover:bg-primary-dark transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {submitting ? 'Submitting…' : isLast ? submitLabel : 'Continue'}
             </button>
@@ -386,7 +386,7 @@ export default function Wizard({
               <button
                 onClick={goNext}
                 disabled={submitting}
-                className="text-[15px] font-medium text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="text-[0.9375rem] font-medium text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 Skip
               </button>
@@ -402,7 +402,7 @@ export default function Wizard({
         {step.kind === 'single' && step.optional && (
           <button
             onClick={() => goToStep(Math.min(clampedIdx + 1, visible.length - 1))}
-            className="mt-7 text-[15px] font-medium text-slate-400 hover:text-slate-600 cursor-pointer"
+            className="mt-7 text-[0.9375rem] font-medium text-slate-400 hover:text-slate-600 cursor-pointer"
           >
             Skip
           </button>
@@ -464,14 +464,14 @@ function OptionButton({
       ].join(' ')}
     >
       {option.icon && <span className="text-2xl shrink-0" aria-hidden="true">{option.icon}</span>}
-      <span className="text-[15px] font-medium text-slate-900">{option.label}</span>
+      <span className="text-[0.9375rem] font-medium text-slate-900">{option.label}</span>
       {showCheck && (
         // Square (not circular) so it reads as a checkbox — these steps are
         // multi-select ("tap all that apply"), and a round indicator looks like
         // a single-choice radio.
         <span
           className={[
-            'ml-auto grid h-5 w-5 shrink-0 place-items-center rounded-md border text-[11px] text-white',
+            'ml-auto grid h-5 w-5 shrink-0 place-items-center rounded-md border text-[0.6875rem] text-white',
             active ? 'border-primary bg-primary' : 'border-slate-300',
           ].join(' ')}
           aria-hidden="true"

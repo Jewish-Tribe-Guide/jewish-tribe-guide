@@ -163,7 +163,7 @@ function LegacyDaveningTimes({ text }: { text: string }) {
     .filter(Boolean) as { label: string; time: string }[]
 
   if (entries.length === 0) {
-    return <p className="text-sm text-slate-800 whitespace-pre-line">{text}</p>
+    return <p dir="auto" className="text-sm text-slate-800 whitespace-pre-line">{text}</p>
   }
 
   return (

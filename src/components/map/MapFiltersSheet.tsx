@@ -78,20 +78,20 @@ function Body({ top, onTopOpenNow, sections, onOpenNow, onBoolean, onSelect, onC
           filter (the user, Oct 15). */}
       {top.shown && (
         <section aria-label="All categories" className="space-y-3" data-testid="map-filters-open-all">
-          <h3 className="text-[17px] font-extrabold text-ink">All categories</h3>
+          <h3 className="text-[1.0625rem] font-extrabold text-ink">All categories</h3>
           <SwitchRow label="Open now" on={top.on} onToggle={onTopOpenNow} />
-          {top.note && <p className="-mt-2 text-[13px] text-muted">{top.note}</p>}
+          {top.note && <p className="-mt-2 text-[0.8125rem] text-muted">{top.note}</p>}
         </section>
       )}
-      {sections.length === 0 && <p className="text-[15px] text-muted">Nothing showing has filters. Turn on a category above.</p>}
+      {sections.length === 0 && <p className="text-[0.9375rem] text-muted">Nothing showing has filters. Turn on a category above.</p>}
       {sections.map((s) => (
         <section key={s.id} aria-label={s.label} className="space-y-3 border-t border-slate-200 pt-4" data-testid={`map-filters-${s.id}`}>
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white" style={{ backgroundColor: s.color }} aria-hidden="true">
               {s.icon && <CategoryGlyph categoryId={s.id} icon={s.icon} className="h-4 w-4" />}
             </span>
-            <h3 className="text-[17px] font-extrabold text-ink">{s.label}</h3>
-            <span className="ml-auto text-[13px] text-muted">{s.note}</span>
+            <h3 className="text-[1.0625rem] font-extrabold text-ink">{s.label}</h3>
+            <span className="ml-auto text-[0.8125rem] text-muted">{s.note}</span>
           </div>
           {s.openNow !== null && <SwitchRow label="Open now" on={s.openNow} onToggle={() => onOpenNow(s.id)} />}
           {s.booleans.map((b) => (
@@ -99,7 +99,7 @@ function Body({ top, onTopOpenNow, sections, onOpenNow, onBoolean, onSelect, onC
           ))}
           {s.selects.map((sel) => (
             <fieldset key={sel.key} className="space-y-2">
-              <legend className="mb-2 text-[13px] font-bold text-slate-500">{sel.label}</legend>
+              <legend className="mb-2 text-[0.8125rem] font-bold text-slate-500">{sel.label}</legend>
               <div className="flex flex-wrap gap-2">
                 {orderForPicking(sel.values).map((v) => (
                   <FilterChip key={v} label={v} on={sel.chosen.includes(v)} onToggle={() => onSelect(s.id, sel.key, v)} />
@@ -112,7 +112,7 @@ function Body({ top, onTopOpenNow, sections, onOpenNow, onBoolean, onSelect, onC
       <button
         type="button"
         onClick={onClose}
-        className="h-12 w-full cursor-pointer rounded-xl bg-primary text-[15.5px] font-bold text-white transition-transform active:scale-[0.99]"
+        className="h-12 w-full cursor-pointer rounded-xl bg-primary text-[0.96875rem] font-bold text-white transition-transform active:scale-[0.99]"
       >
         {doneLabel ?? `Show ${count} place${count === 1 ? '' : 's'}`}
       </button>

@@ -314,7 +314,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', color = '#64748b', band
                           {isPinned(eruv.id) && <SavedBadge />}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block text-[15.5px] font-bold text-slate-900">{eruv.name}</span>
+                          <span className="block text-[0.96875rem] font-bold text-slate-900">{eruv.name}</span>
                           <EruvStatusLine eruv={eruv} now={now} timezone={ready.timezone} candles={ready.candles} />
                         </span>
                         <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400" />
@@ -339,7 +339,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', color = '#64748b', band
             <div className="relative hidden lg:sticky lg:top-[4.5rem] lg:block lg:h-[min(calc(100vh-6rem),720px)]">
               <div className="h-full transition-opacity group-data-[snap=map]/split:opacity-30">{eruvMap('h-full', () => setMapHidden(true))}</div>
               <div aria-hidden="true" className="pointer-events-none absolute inset-0 hidden items-center justify-center group-data-[snap=map]/split:flex">
-                <span className="rounded-full bg-slate-900/85 px-4 py-2 text-[14px] font-semibold text-white shadow-lg">Let go to hide the map</span>
+                <span className="rounded-full bg-slate-900/85 px-4 py-2 text-[0.875rem] font-semibold text-white shadow-lg">Let go to hide the map</span>
               </div>
             </div>
           )}

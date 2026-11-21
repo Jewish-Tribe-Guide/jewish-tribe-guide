@@ -36,11 +36,11 @@ export default function AskTheGroup({ query, nothingClose, sharePath, scope, cla
   const { share, copied } = useShareLink(sharePath, query, () => askMessage(query))
   return (
     <div className={`rounded-xl border border-slate-200 bg-white px-3.5 py-3 ${className}`} data-testid="ask-the-group">
-      <p className="text-[14px] font-semibold leading-snug text-ink">
+      <p className="text-[0.875rem] font-semibold leading-snug text-ink">
         {nothingClose ? `Nothing in ${scope ? scope.label : 'the guide'} for “${query}”.` : 'Not what you’re looking for?'}
       </p>
       {scope && (
-        <Link href={scope.searchAll} className="mt-1.5 inline-block text-[14.5px] font-bold text-primary hover:underline">
+        <Link href={scope.searchAll} className="mt-1.5 inline-block text-[0.90625rem] font-bold text-primary hover:underline">
           Search the whole guide
         </Link>
       )}
@@ -50,7 +50,7 @@ export default function AskTheGroup({ query, nothingClose, sharePath, scope, cla
           track('asked_group')
           void share()
         }}
-        className="mt-2.5 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-[10px] bg-primary text-[15px] font-bold text-white transition-colors hover:bg-primary-dark"
+        className="mt-2.5 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-[10px] bg-primary text-[0.9375rem] font-bold text-white transition-colors hover:bg-primary-dark"
       >
         <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
           <path d="M10 3v10M6 7l4-4 4 4M4 12v3a2 2 0 002 2h8a2 2 0 002-2v-3" strokeLinecap="round" strokeLinejoin="round" />

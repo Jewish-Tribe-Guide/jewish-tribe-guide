@@ -322,7 +322,7 @@ describe('NearbyList — what a row says', () => {
     expect(name.className).not.toMatch(/\btext-sm\b/)
     const facts = screen.getByTestId('nearby-facts')
     expect(facts).toHaveTextContent(/^Open( until [^·]+)?·Keystone-K$/)
-    expect(facts.className).toMatch(/text-\[13\.5px\]/)
+    expect(facts.className).toMatch(/text-\[0\.84375rem\]/)
     expect(screen.queryByText(/1 Main St/)).not.toBeInTheDocument()
   })
 

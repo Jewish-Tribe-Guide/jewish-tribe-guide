@@ -78,21 +78,21 @@ export default function ItemsEditor({
               add()
             }
           }}
-          className="h-11.5 min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3.5 text-[15.5px] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none"
+          className="h-11.5 min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3.5 text-[0.96875rem] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none"
         />
-        <button type="button" onClick={add} className="h-11.5 shrink-0 cursor-pointer rounded-xl border border-slate-300 bg-white px-4.5 text-[15px] font-bold text-primary hover:bg-slate-50">
+        <button type="button" onClick={add} className="h-11.5 shrink-0 cursor-pointer rounded-xl border border-slate-300 bg-white px-4.5 text-[0.9375rem] font-bold text-primary hover:bg-slate-50">
           Add
         </button>
       </div>
       {/* An empty list with no heading is nothing, not a gap under Add. */}
       {groups.filter((g) => g.label || g.names.length).map((g) => (
         <div key={g.mark}>
-          {g.label && <p className="pb-0.5 text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-muted">{g.label}</p>}
+          {g.label && <p className="pb-0.5 text-[0.78125rem] font-extrabold uppercase tracking-[0.04em] text-muted">{g.label}</p>}
           <ul className="divide-y divide-slate-200/70">
             {g.names.map((name) =>
               open === name ? (
                 <li key={name} className="-mx-2.5 my-1 rounded-xl border border-slate-300 bg-white px-2.5 pb-2.5">
-                  <button type="button" onClick={() => setOpen(null)} aria-expanded className="flex min-h-11 w-full cursor-pointer items-center text-left text-[15.5px] font-bold text-slate-900">
+                  <button type="button" onClick={() => setOpen(null)} aria-expanded className="flex min-h-11 w-full cursor-pointer items-center text-left text-[0.96875rem] font-bold text-slate-900">
                     <span className="flex-1">{name}</span>
                     <ChevronRightIcon className="h-4 w-4 -rotate-90 text-muted" />
                   </button>
@@ -111,7 +111,7 @@ export default function ItemsEditor({
                           type="button"
                           aria-pressed={on}
                           onClick={() => mark(name, to)}
-                          className={`h-10 flex-1 cursor-pointer rounded-[10px] text-[14.5px] font-bold ${on ? 'bg-white text-slate-900 shadow-sm' : to === 'remove' ? 'text-red-700' : 'text-muted'}`}
+                          className={`h-10 flex-1 cursor-pointer rounded-[10px] text-[0.90625rem] font-bold ${on ? 'bg-white text-slate-900 shadow-sm' : to === 'remove' ? 'text-red-700' : 'text-muted'}`}
                         >
                           {label}
                         </button>
@@ -125,10 +125,10 @@ export default function ItemsEditor({
                     type="button"
                     onClick={() => setOpen(name)}
                     aria-expanded={false}
-                    className={`flex min-h-11.5 w-full cursor-pointer items-center gap-2.5 text-left text-[15.5px] text-slate-900 ${isNew(name) ? '-mx-2.5 my-1 w-[calc(100%+20px)] rounded-xl bg-yellow-50 px-2.5' : ''}`}
+                    className={`flex min-h-11.5 w-full cursor-pointer items-center gap-2.5 text-left text-[0.96875rem] text-slate-900 ${isNew(name) ? '-mx-2.5 my-1 w-[calc(100%+20px)] rounded-xl bg-yellow-50 px-2.5' : ''}`}
                   >
                     <span className="flex-1">{name}</span>
-                    {isNew(name) && <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[12.5px] font-extrabold text-amber-800">New</span>}
+                    {isNew(name) && <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[0.78125rem] font-extrabold text-amber-800">New</span>}
                     <ChevronRightIcon className="h-4 w-4 rotate-90 text-slate-400" />
                   </button>
                 </li>
@@ -141,8 +141,8 @@ export default function ItemsEditor({
         <ul className="divide-y divide-slate-200/70">
           {removed.map((name) => (
             <li key={name} className="flex min-h-11.5 items-center">
-              <span className="flex-1 text-[15.5px] text-slate-400 line-through">{name}</span>
-              <button type="button" onClick={() => keep(name)} className="cursor-pointer text-[14.5px] font-bold text-primary">
+              <span className="flex-1 text-[0.96875rem] text-slate-400 line-through">{name}</span>
+              <button type="button" onClick={() => keep(name)} className="cursor-pointer text-[0.90625rem] font-bold text-primary">
                 Keep
               </button>
             </li>

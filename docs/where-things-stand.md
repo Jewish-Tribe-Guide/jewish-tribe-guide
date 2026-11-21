@@ -913,8 +913,15 @@ Found and not fixed:
   once (404 on a new community, `claude/shul-listing`). Still open:
   `category-open:41` ("opens without asking the server" saw an RSC
   request), twice (`claude/next-round`, and the Sentry 11.14 Dependabot
-  PR, where `category-editor:46` also found two Hours buttons). Not a
-  wait; not looked into.
+  PR, where `category-editor:46` also found two Hours buttons).
+  **Closed Nov 21 (a test bug):** both traces show the click while a
+  prefetch was still arriving. Next fetches each row's outline
+  (`/_tree`), but the page's content segment once, under whichever row
+  asks first, shared by all; the test waited only for the clicked row's
+  outline. It now waits until nothing under the list is arriving, for
+  half a second. Couldn't be shown red locally: the local build fetched
+  no shared segment at all (only outlines), so there was nothing to
+  hold back. Passed 4 of 4.
 - e2e `listing-detail.spec.ts:537` (above): once, not looked into.
 - 25 of 104 older migrations can't be told run or not from what they
   made (a policy, an index, a data fix).
@@ -1319,15 +1326,84 @@ Soon:
     …). `envExample.test.ts` fails on a setting the code reads that it
     doesn't name, or a value that isn't a placeholder. Red 3/3.
 
-Later or bigger: the two 2,000-line screens (map, category page);
-foreign keys and transactions for deletes and approvals; `details`
-holding app state; log retention; redundant indexes; an old-iOS floor
-decision; rem font sizes; `dir="auto"` for Hebrew; the parked Today
+Later or bigger:
+foreign keys; `details`
+holding app state (planned, below); an old-iOS floor
+decision; the parked Today
 features (keep or delete); `/inbox` per community; this file's size;
 Partial Prefetching before Next 17.
 
+Done Nov 21 (`claude/later-list`): font sizes are rem (999 classes;
+`remFontSizes.test.ts` fails on a px one), so text follows the browser's
+text size. Hebrew keeps its own direction: listing names sit in `<bdi>`,
+written notes and descriptions carry `dir="auto"`, and so do the text
+boxes people type into (never a phone or number box).
+
+The two big screens are split (Nov 21, no behaviour change):
+`ResourceMapView.tsx` 2,797 → 1,177 lines (18 new files in
+`src/components/map/`: search, categories, eruvim, points, filters,
+the address read, the desktop sidebar and chrome as hooks and
+components) and `GenericDirectory.tsx` 2,271 → 1,093 (22 new files in
+`src/components/resources/`). Checked by tsc, lint, the unit suite and
+e2e (419 passed), not by eye.
+
+Redundant indexes: migration 108 drops ten one-column indexes a key or
+102's indexes already cover (nine `<table>_community_idx` from 027, plus
+`resource_tag_resource_idx` and `vote_resource_idx`), each only if the
+covering index is really there. Checked on a fresh Postgres 17 after
+001–107: drops all ten, runs twice clean, keeps one whose cover is
+missing. Run on dev and live Nov 21 (recorded in `migration_ran`).
+
+Log retention, measured on live Nov 21 (read only): activity 447 rows,
+daily_count 709, job_run 142, question_reading 53, submission 1,385,
+night_note 0. job_run and night_note already prune themselves
+(`KEEP_DAYS`). Nothing else needs a limit yet: at this size every read
+is milliseconds. Revisit when daily_count passes ~50,000 rows (the
+Missed searches tab reads all of a community's search misses, every day
+ever) — then read the last year only, rather than deleting anything.
+
 Checked and not so: the nightly email does record a failed send, as a
 warning, not a failure.
+
+## `details` holding the site's own state: a plan, not started (Nov 21)
+
+A listing's `details` jsonb holds what people wrote (hours, notes, the
+fields an admin set up) and, beside it, about 26 keys the site keeps for
+itself: Google sync state (`googleSyncedAt`, `googleKept`, `notOnGoogle`,
+`businessStatus*`, `lastSyncError`, …), confirmations
+(`confirmedAt/From/By`, `sectionConfirmed`, `sectionFrom`), item marks
+(`itemSeen`, `itemGone`, `itemMenu`), `googleFields`, `verifiedPlaceId`,
+`legacyId` (`SYNC_INTERNAL_FIELDS` and `DIFF_ONLY_HIDDEN_FIELDS`,
+`syncFields.ts`). Measured: 53 source files name them, and 10 SQL
+functions write them in place (057, item marks, 065, the five
+section-confirm migrations, 091's visitor confirm).
+
+Why it matters: every write of a whole `details` has to carry those keys
+through, or it wipes them. That is how save-survey item 2 could erase a
+listing's Google state and confirmations, and why `prepareSubmission`,
+the moderation diff and the editor each keep their own list of keys to
+strip, hide or keep.
+
+The move, in steps that each ship alone and leave the site working:
+
+1. Migration: `resource.state jsonb not null default '{}'`, and a
+   backfill copying the 26 keys into it (`details` untouched).
+2. Reads: one `listingFromRow` merges `{...details, ...state}`, so every
+   screen and test reading `item.confirmedAt` keeps working unchanged.
+3. Writes, one writer at a time: the Google sync, the confirm and
+   item-mark SQL functions (new versions writing `state`), the menu
+   reader. Each writes `state` and still mirrors to `details` until 5.
+4. Submissions and approvals stop carrying site keys at all: a payload's
+   `details` is people's words only, and the strip/hide lists shrink to
+   nothing. Approval writes `details` whole without reading it first.
+5. A second migration removes the 26 keys from `details`.
+
+Decision for the user before starting: whether it's worth it now. It
+removes a class of bug (a whole-`details` write wiping the site's
+state) that today is guarded case by case, and it touches most of the
+listing code; roughly a week of steps, each needing a migration run on
+dev then live at the right moment (step 1 before 3's deploy, 5 only
+after 4 is live).
 
 ## The save survey (Nov 21; 1–5 fixed the same day, the rest open)
 
@@ -1350,6 +1426,16 @@ each with tests that failed against the old code):
   finishes it.
 - 5: a failed take-down goes to Sentry, a tap on a warning with nothing
   waiting files the removal, and Undo takes the warning down first.
+
+From 6, **deleting a category, a form or a community is one step** (Nov
+21, `claude/later-list`): migration 109 adds `delete_category`,
+`delete_form` and `delete_community`, each one transaction, and the
+stores call them (`src/lib/supabase/inOneStep.ts`), keeping the old
+step-by-step delete where 109 hasn't run. Checked on a fresh Postgres 17:
+a failure at the last delete leaves every earlier one undone. Run on dev and
+live Nov 21 (recorded in `migration_ran`). The rest of 6 and 7 stay open;
+approvals as a whole stay outside a transaction (Google lookups and
+geocoding can't run inside one), with 1–3 covering what that left.
 
 The list as found:
 

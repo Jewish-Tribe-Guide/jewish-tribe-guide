@@ -51,7 +51,7 @@ export function AdminBox({
           >
             <span className="flex-1 min-w-0 flex flex-col">
               <span className="text-base font-bold text-slate-900">{title}</span>
-              {summary && !open && <span className="text-[13px] text-slate-500 truncate">{summary}</span>}
+              {summary && !open && <span className="text-[0.8125rem] text-slate-500 truncate">{summary}</span>}
             </span>
             {count !== undefined && <AdminCount n={count} />}
             <span className={open ? 'rotate-90' : ''}>
@@ -148,7 +148,7 @@ export function AdminHead({
       {/* Under the way back on a computer, or beside what's `right` of it
           when the way back is the phone's alone (board 1). */}
       <h1
-        className={`flex-1 min-w-0 m-0 truncate text-lg font-bold text-slate-900 md:whitespace-normal md:text-[26px] ${phoneOnly ? '' : 'md:order-last md:basis-full'}`}
+        className={`flex-1 min-w-0 m-0 truncate text-lg font-bold text-slate-900 md:whitespace-normal md:text-[1.625rem] ${phoneOnly ? '' : 'md:order-last md:basis-full'}`}
       >
         {title}
       </h1>
@@ -171,7 +171,7 @@ export function AdminPreviewButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="w-full min-h-[46px] inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white text-[15px] font-bold text-primary cursor-pointer"
+      className="w-full min-h-[46px] inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white text-[0.9375rem] font-bold text-primary cursor-pointer"
     >
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
         <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" />
@@ -232,10 +232,10 @@ export function AdminRow({
     <>
       {icon && <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-slate-100 text-slate-700">{icon}</span>}
       <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-        <span className="text-[15px] font-semibold">{name}</span>
-        {line && <span className="text-[13px] text-slate-600">{line}</span>}
+        <span className="text-[0.9375rem] font-semibold">{name}</span>
+        {line && <span className="text-[0.8125rem] text-slate-600">{line}</span>}
       </span>
-      {aside && <span className="text-[13px] text-slate-600">{aside}</span>}
+      {aside && <span className="text-[0.8125rem] text-slate-600">{aside}</span>}
       <GoChevron />
     </>
   )
@@ -287,20 +287,20 @@ export function AdminRows<T>({ items, shown = 4, children }: { items: T[]; shown
  *  else. To do's lists say "Nothing to do." */
 export function AdminEmpty({ children = 'Nothing to do.' }: { children?: React.ReactNode }) {
   return (
-    <p className="bg-white border border-slate-200 rounded-[10px] px-4 py-6 text-center text-[15px] text-slate-600">
+    <p className="bg-white border border-slate-200 rounded-[10px] px-4 py-6 text-center text-[0.9375rem] text-slate-600">
       {children}
     </p>
   )
 }
 
 export const adminInputClass =
-  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-[15px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-[0.9375rem] text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
 /** A labelled input: the label above, the input under it. */
 export function AdminField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">{label}</span>
+      <span className="block text-[0.8125rem] font-semibold text-slate-700 mb-1.5">{label}</span>
       {children}
     </label>
   )
@@ -326,7 +326,7 @@ export function AdminSwitch({ checked, onChange, label }: { checked: boolean; on
 export function AdminYesNo({ question, value, onChange }: { question: string; value: boolean; onChange: (yes: boolean) => void }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 min-h-[60px] border-b border-slate-100 last:border-b-0">
-      <span aria-hidden="true" className="flex-1 min-w-0 text-[15px] font-semibold text-slate-900">
+      <span aria-hidden="true" className="flex-1 min-w-0 text-[0.9375rem] font-semibold text-slate-900">
         {question}
       </span>
       <span role="radiogroup" aria-label={question} className="inline-flex shrink-0 rounded-[10px] border border-slate-300 bg-white p-0.5">
@@ -337,7 +337,7 @@ export function AdminYesNo({ question, value, onChange }: { question: string; va
             role="radio"
             aria-checked={value === yes}
             onClick={() => onChange(yes)}
-            className={`min-h-9 w-16 rounded-lg text-[14px] font-semibold cursor-pointer ${value === yes ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
+            className={`min-h-9 w-16 rounded-lg text-[0.875rem] font-semibold cursor-pointer ${value === yes ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
           >
             {yes ? 'Yes' : 'No'}
           </button>
@@ -416,7 +416,7 @@ export function AdminMenu<V extends string>({
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((o) => !o)}
-        className={`flex h-11 w-full cursor-pointer items-center justify-between gap-0.5 rounded-[10px] border pl-3 pr-2 text-[13px] font-semibold disabled:opacity-60 ${
+        className={`flex h-11 w-full cursor-pointer items-center justify-between gap-0.5 rounded-[10px] border pl-3 pr-2 text-[0.8125rem] font-semibold disabled:opacity-60 ${
           narrowed ? 'border-primary bg-blue-50 text-primary' : 'border-slate-300 bg-white text-slate-900'
         }`}
       >
@@ -437,7 +437,7 @@ export function AdminMenu<V extends string>({
                 onChange(o.value)
                 if (!several) setOpen(false)
               }}
-              className={`flex min-h-11 w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-[15px] font-medium ${
+              className={`flex min-h-11 w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-[0.9375rem] font-medium ${
                 several ? 'text-slate-900 hover:bg-slate-50' : picked(o.value) ? 'bg-blue-50 text-primary' : 'text-slate-900 hover:bg-slate-50'
               }`}
             >
@@ -470,7 +470,7 @@ export function AdminMenu<V extends string>({
 /** A search box over a list (Category pages' ready-made lists). */
 export function SearchBox({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
   return (
-    <label className="flex items-center gap-2 min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-[15px] text-slate-900 max-w-[760px]">
+    <label className="flex items-center gap-2 min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-[0.9375rem] text-slate-900 max-w-[760px]">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#64748b" strokeWidth="1.8" aria-hidden="true">
         <circle cx="7" cy="7" r="4.5" />
         <path d="M10.5 10.5L14 14" />
@@ -483,7 +483,7 @@ export function SearchBox({ value, onChange, label }: { value: string; onChange:
 /** The "+ Make your own …" line under a ready-made list. */
 export function MakeOwnLink({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} className="self-start inline-flex items-center gap-2 min-h-11 text-[15px] font-semibold text-primary hover:underline cursor-pointer">
+    <button type="button" onClick={onClick} className="self-start inline-flex items-center gap-2 min-h-11 text-[0.9375rem] font-semibold text-primary hover:underline cursor-pointer">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
         <path d="M12 5v14M5 12h14" />
       </svg>

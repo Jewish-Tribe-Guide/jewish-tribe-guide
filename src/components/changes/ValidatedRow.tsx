@@ -26,7 +26,7 @@ export default function ValidatedRow({ night, communitySlug, when }: { night: Ni
         <Link
           href={routes.validatedNight(communitySlug, night.key)}
           prefetch={false}
-          className="min-w-0 flex-1 text-[14px] leading-snug text-slate-500 after:absolute after:inset-0 after:content-['']"
+          className="min-w-0 flex-1 text-[0.875rem] leading-snug text-slate-500 after:absolute after:inset-0 after:content-['']"
         >
           <span className="font-semibold text-slate-700">Validated</span>
           {[...nightLine(night), when].map((part) => (

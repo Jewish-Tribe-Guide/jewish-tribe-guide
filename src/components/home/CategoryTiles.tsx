@@ -55,7 +55,7 @@ export function mostListedFirst(cards: readonly CardDef[], counts: Record<string
 
 /** The phone home's label over a box (Right now, Explore by Category):
  *  small, grey, capitals. */
-export const HOME_LABEL = 'mb-2 text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-slate-500'
+export const HOME_LABEL = 'mb-2 text-[0.78125rem] font-extrabold uppercase tracking-[0.06em] text-slate-500'
 /** The phone home's tiles: three across, straight on the page (M1). */
 export const TILE_GRID = 'grid grid-cols-3 gap-x-2.5 gap-y-3.5'
 
@@ -106,7 +106,7 @@ export function CategoryTile({ card, photo, color }: { card: CardDef; photo: str
       </span>
       {/* In flow under the picture: a long name ("Candle Lighting &
           Zmanim") takes a second line rather than being cut off. */}
-      <span data-testid="tile-name" className="mt-1.5 block text-[13.5px] font-bold leading-tight text-ink">
+      <span data-testid="tile-name" className="mt-1.5 block text-[0.84375rem] font-bold leading-tight text-ink">
         {card.title}
       </span>
     </Link>

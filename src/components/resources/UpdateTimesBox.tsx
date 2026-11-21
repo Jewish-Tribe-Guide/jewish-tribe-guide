@@ -181,15 +181,15 @@ export default function UpdateTimesBox({
     <div className="mt-2 rounded-[10px] border border-slate-300 bg-white p-2.5" data-testid="update-times">
       {step === 'choose' && (
         <div className="space-y-2">
-          <p className="text-[15.5px] font-extrabold text-slate-900">{item.name}’s times</p>
-          <p className="text-[13.5px] leading-snug text-muted">A whole schedule or one Shabbos’s times, either works. The guide compares it with the times it has.</p>
+          <p className="text-[0.96875rem] font-extrabold text-slate-900">{item.name}’s times</p>
+          <p className="text-[0.84375rem] leading-snug text-muted">A whole schedule or one Shabbos’s times, either works. The guide compares it with the times it has.</p>
           <button type="button" onClick={() => setStep('paste')} className={`${big} border-primary bg-primary/5`}>
-            <span className="text-[15.5px] font-extrabold text-slate-900">Paste their message</span>
-            <span className="mt-0.5 text-[13px] leading-snug text-slate-600">The email, WhatsApp message or newsletter the shul sent.</span>
+            <span className="text-[0.96875rem] font-extrabold text-slate-900">Paste their message</span>
+            <span className="mt-0.5 text-[0.8125rem] leading-snug text-slate-600">The email, WhatsApp message or newsletter the shul sent.</span>
           </button>
           <button type="button" disabled={busy === 'read'} onClick={() => fileInput.current?.click()} className={`${big} border-slate-200`}>
-            <span className="text-[15.5px] font-extrabold text-slate-900">{busy === 'read' ? 'Reading…' : 'Add a photo or PDF'}</span>
-            <span className="mt-0.5 text-[13px] leading-snug text-slate-600">The schedule on the shul’s board, or the flyer they emailed.</span>
+            <span className="text-[0.96875rem] font-extrabold text-slate-900">{busy === 'read' ? 'Reading…' : 'Add a photo or PDF'}</span>
+            <span className="mt-0.5 text-[0.8125rem] leading-snug text-slate-600">The schedule on the shul’s board, or the flyer they emailed.</span>
           </button>
           <input
             ref={fileInput}
@@ -210,7 +210,7 @@ export default function UpdateTimesBox({
               setAddFirst(true)
               setStep('result')
             }}
-            className="cursor-pointer text-[14.5px] font-bold text-primary hover:underline"
+            className="cursor-pointer text-[0.90625rem] font-bold text-primary hover:underline"
           >
             Or add one time ›
           </button>
@@ -219,7 +219,7 @@ export default function UpdateTimesBox({
 
       {step === 'paste' && (
         <div>
-          <label htmlFor={textId} className="text-[14px] font-bold text-slate-900">
+          <label htmlFor={textId} className="text-[0.875rem] font-bold text-slate-900">
             Their message
           </label>
           <textarea
@@ -230,13 +230,13 @@ export default function UpdateTimesBox({
             maxLength={8000}
             onChange={(e) => setText(e.target.value)}
             placeholder="Paste the schedule or Shabbos times they sent"
-            className="mt-1.5 w-full rounded-[10px] border-2 border-slate-300 px-3 py-2 text-[15px] text-slate-900 outline-none focus:border-primary"
+            className="mt-1.5 w-full rounded-[10px] border-2 border-slate-300 px-3 py-2 text-[0.9375rem] text-slate-900 outline-none focus:border-primary"
           />
           <button
             type="button"
             disabled={text.trim().length < 10 || busy === 'read'}
             onClick={() => start('read', (token) => void read(token, { text }))}
-            className="mt-2 h-10 w-full cursor-pointer rounded-[10px] bg-primary text-[14.5px] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
+            className="mt-2 h-10 w-full cursor-pointer rounded-[10px] bg-primary text-[0.90625rem] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
           >
             {busy === 'read' ? 'Reading…' : 'Read the times'}
           </button>
@@ -261,12 +261,12 @@ export default function UpdateTimesBox({
       )}
 
       {onClose && (
-        <button type="button" onClick={onClose} className="mt-2 cursor-pointer text-[14px] font-bold text-slate-500 hover:text-slate-700">
+        <button type="button" onClick={onClose} className="mt-2 cursor-pointer text-[0.875rem] font-bold text-slate-500 hover:text-slate-700">
           Cancel
         </button>
       )}
       {error && (
-        <p role="alert" className="mt-2 text-[13.5px] text-red-700">
+        <p role="alert" className="mt-2 text-[0.84375rem] text-red-700">
           {error}
         </p>
       )}
@@ -324,42 +324,42 @@ function TimesResult({
   return (
     <div data-testid="times-result">
       {source && 'text' in source && (
-        <div className="rounded-[10px] bg-slate-100 px-3 py-2 text-[13.5px]">
+        <div className="rounded-[10px] bg-slate-100 px-3 py-2 text-[0.84375rem]">
           <button type="button" onClick={() => setShowSource((v) => !v)} aria-expanded={showSource} className="flex w-full cursor-pointer justify-between text-left">
             <span className="text-slate-700">From the message you pasted</span>
             <b className="text-primary">{showSource ? 'Hide' : 'Show'}</b>
           </button>
-          {showSource && <p className="mt-1.5 text-[12.5px] leading-relaxed whitespace-pre-line text-slate-700">{source.text}</p>}
+          {showSource && <p className="mt-1.5 text-[0.78125rem] leading-relaxed whitespace-pre-line text-slate-700">{source.text}</p>}
         </div>
       )}
       {source && 'file' in source && source.url && (
-        <a href={source.url} target="_blank" rel="noopener noreferrer" className="block text-[13px] font-semibold text-primary hover:underline">
+        <a href={source.url} target="_blank" rel="noopener noreferrer" className="block text-[0.8125rem] font-semibold text-primary hover:underline">
           From your {source.file?.type === 'application/pdf' ? 'PDF' : 'photo'} ↗
         </a>
       )}
 
-      <p className="mt-3 text-[17px] leading-tight font-extrabold text-slate-900">{title}</p>
-      {week && u.title && <p className="mt-0.5 text-[13.5px] font-semibold text-slate-700">{u.title}</p>}
+      <p className="mt-3 text-[1.0625rem] leading-tight font-extrabold text-slate-900">{title}</p>
+      {week && u.title && <p className="mt-0.5 text-[0.84375rem] font-semibold text-slate-700">{u.title}</p>}
       {nothingRead ? (
         <div className="mt-2 rounded-[10px] bg-caution/10 px-3 py-2.5" role="status" data-testid="times-nothing-read">
-          <p className="text-[14.5px] font-bold text-slate-900">No times could be read from it</p>
-          <p className="mt-0.5 text-[13.5px] leading-snug text-slate-700">
+          <p className="text-[0.90625rem] font-bold text-slate-900">No times could be read from it</p>
+          <p className="mt-0.5 text-[0.84375rem] leading-snug text-slate-700">
             {aLink ? 'A link isn’t opened here. Paste the times themselves, or add a photo of them.' : 'Paste the times themselves, or add a photo of them.'}
           </p>
-          <button type="button" onClick={onAgain} className="mt-1.5 cursor-pointer text-[14.5px] font-bold text-primary hover:underline">
+          <button type="button" onClick={onAgain} className="mt-1.5 cursor-pointer text-[0.90625rem] font-bold text-primary hover:underline">
             Try again
           </button>
         </div>
       ) : (
-        <p className="mt-1 text-[13.5px] leading-snug text-slate-600">
+        <p className="mt-1 text-[0.84375rem] leading-snug text-slate-600">
           How they’ll show in the guide.{week ? ' Other weeks stay as they are.' : ''}
         </p>
       )}
-      {nothingRead && byDay.length > 0 && <p className="mt-3 text-[13.5px] text-slate-600">What the guide has now:</p>}
+      {nothingRead && byDay.length > 0 && <p className="mt-3 text-[0.84375rem] text-slate-600">What the guide has now:</p>}
 
       {byDay.map(({ day, rows: dayRows }) => (
         <div key={day} className="mt-3" data-testid="result-day">
-          <p className="text-[12.5px] font-extrabold tracking-wide text-muted uppercase">{dayHeading(day, u.kind, dayRows.find((r) => r.occasion)?.occasion)}</p>
+          <p className="text-[0.78125rem] font-extrabold tracking-wide text-muted uppercase">{dayHeading(day, u.kind, dayRows.find((r) => r.occasion)?.occasion)}</p>
           {dayRows.map((r) =>
             editing === r.id ? (
               <RowEditor
@@ -396,37 +396,37 @@ function TimesResult({
           onCancel={() => setEditing(null)}
         />
       ) : (
-        <button type="button" onClick={() => setEditing('new')} className="mt-3 cursor-pointer text-[14.5px] font-bold text-primary hover:underline">
+        <button type="button" onClick={() => setEditing('new')} className="mt-3 cursor-pointer text-[0.90625rem] font-bold text-primary hover:underline">
           + Add a time
         </button>
       )}
 
-      {u.season && u.otherSeason > 0 && <p className="mt-3 text-[13px] text-muted">Their {u.season === 'winter' ? 'summer' : 'winter'} times stay as they are.</p>}
+      {u.season && u.otherSeason > 0 && <p className="mt-3 text-[0.8125rem] text-muted">Their {u.season === 'winter' ? 'summer' : 'winter'} times stay as they are.</p>}
 
       {anything ? (
         <>
-          {asUsualWeek && <p className="mt-4 text-[14px] font-semibold text-emerald-700">The same as their usual times.</p>}
+          {asUsualWeek && <p className="mt-4 text-[0.875rem] font-semibold text-emerald-700">The same as their usual times.</p>}
           <button
             type="button"
             disabled={busy || editing !== null}
             onClick={() => onSend(u)}
-            className="mt-4 h-11 w-full cursor-pointer rounded-xl bg-primary text-[15.5px] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
+            className="mt-4 h-11 w-full cursor-pointer rounded-xl bg-primary text-[0.96875rem] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
           >
             {busy ? 'Sending…' : asUsualWeek ? 'Add as this week’s schedule' : 'Send'}
           </button>
-          <p className="mt-2 text-[12.5px] leading-snug text-muted">An admin checks it against {source ? 'what you sent' : 'the shul’s times'} before anyone sees it.</p>
+          <p className="mt-2 text-[0.78125rem] leading-snug text-muted">An admin checks it against {source ? 'what you sent' : 'the shul’s times'} before anyone sees it.</p>
         </>
       ) : (
         rows.length > 0 &&
         !nothingRead &&
         editing === null && (
           <>
-            <p className="mt-4 text-[14px] font-semibold text-emerald-700">Everything matches what the guide has.</p>
+            <p className="mt-4 text-[0.875rem] font-semibold text-emerald-700">Everything matches what the guide has.</p>
             <button
               type="button"
               disabled={busy}
               onClick={onConfirm}
-              className="mt-2 h-11 w-full cursor-pointer rounded-xl border-[1.5px] border-primary bg-white text-[15px] font-bold text-primary hover:bg-primary/5 disabled:opacity-45"
+              className="mt-2 h-11 w-full cursor-pointer rounded-xl border-[1.5px] border-primary bg-white text-[0.9375rem] font-bold text-primary hover:bg-primary/5 disabled:opacity-45"
             >
               {busy ? 'Saving…' : 'Mark them confirmed'}
             </button>
@@ -456,10 +456,10 @@ function ResultRow({ row: r, week, onEdit, onPatch }: { row: UpdateRow; week: bo
   if (r.status === 'gone' && !r.keep) {
     return (
       <div className="flex items-center justify-between border-t border-slate-200 py-2" data-status="gone">
-        <span className="text-[15px] text-muted line-through">
+        <span className="text-[0.9375rem] text-muted line-through">
           {label} · {shownTime(r.time)}
         </span>
-        <button type="button" onClick={() => onPatch({ keep: true })} className="cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
+        <button type="button" onClick={() => onPatch({ keep: true })} className="cursor-pointer text-[0.84375rem] font-bold text-primary hover:underline">
           Keep
         </button>
       </div>
@@ -468,30 +468,30 @@ function ResultRow({ row: r, week, onEdit, onPatch }: { row: UpdateRow; week: bo
   return (
     <div className="border-t border-slate-200 py-2" data-status={r.status}>
       <button type="button" onClick={onEdit} className="flex w-full cursor-pointer items-baseline justify-between gap-2 text-left" aria-label={`${label}, ${shownTime(r.time)}. Fix it`}>
-        <span className="text-[15px] text-slate-900">
+        <span className="text-[0.9375rem] text-slate-900">
           {label}
-          {r.status === 'new' && <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-px text-[11.5px] font-extrabold text-primary">New</span>}
-          {note && <span className="text-[13px] text-muted"> · {note}</span>}
+          {r.status === 'new' && <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-px text-[0.71875rem] font-extrabold text-primary">New</span>}
+          {note && <span className="text-[0.8125rem] text-muted"> · {note}</span>}
         </span>
         <span className="shrink-0 whitespace-nowrap">
-          {r.status === 'changed' && r.was && <span className="mr-1.5 text-[14px] text-muted line-through">{shownTime(r.was)}</span>}
+          {r.status === 'changed' && r.was && <span className="mr-1.5 text-[0.875rem] text-muted line-through">{shownTime(r.was)}</span>}
           {/* Blue, with a pencil: the time is what to tap to fix it, said
               by how it looks rather than "Tap a time to fix it" (Oct 15). */}
-          <b className="text-[15px] text-primary">{shownTime(r.time)}</b>
+          <b className="text-[0.9375rem] text-primary">{shownTime(r.time)}</b>
           <PencilIcon className="ml-1 inline h-3.5 w-3.5 text-primary" />
         </span>
       </button>
       {r.status === 'gone' && r.keep && (
-        <button type="button" onClick={() => onPatch({ keep: false })} className="mt-0.5 cursor-pointer text-[13px] font-bold text-muted hover:underline">
+        <button type="button" onClick={() => onPatch({ keep: false })} className="mt-0.5 cursor-pointer text-[0.8125rem] font-bold text-muted hover:underline">
           Kept · take it off
         </button>
       )}
       {week && r.status === 'changed' && r.rowId && (
-        <button type="button" onClick={() => onPatch({ everyWeek: !r.everyWeek })} aria-pressed={!!r.everyWeek} className="mt-0.5 block cursor-pointer text-left text-[13px] font-bold text-primary hover:underline">
+        <button type="button" onClick={() => onPatch({ everyWeek: !r.everyWeek })} aria-pressed={!!r.everyWeek} className="mt-0.5 block cursor-pointer text-left text-[0.8125rem] font-bold text-primary hover:underline">
           {r.everyWeek ? '✓ Their usual time from now on · undo' : 'Their usual time now? Change it every week'}
         </button>
       )}
-      {r.unsure && <p className="mt-0.5 text-[12.5px] leading-snug text-caution">Check this one: {r.unsure}</p>}
+      {r.unsure && <p className="mt-0.5 text-[0.78125rem] leading-snug text-caution">Check this one: {r.unsure}</p>}
     </div>
   )
 }
@@ -568,21 +568,21 @@ function RowEditor({
         )}
       </div>
       <input type="text" value={draft.notes ?? ''} maxLength={120} onChange={(e) => set({ notes: e.target.value || undefined })} placeholder="Note (optional)" aria-label="Note" className={`${inputClass} w-full`} />
-      {!readable && draft.time.trim() && <p className="text-[12.5px] text-caution">The guide can’t read “{draft.time}” as a time. Type it like 6:30pm, or choose From a zman.</p>}
+      {!readable && draft.time.trim() && <p className="text-[0.78125rem] text-caution">The guide can’t read “{draft.time}” as a time. Type it like 6:30pm, or choose From a zman.</p>}
       <div className="flex items-center gap-3">
         <button
           type="button"
           disabled={!draft.time.trim() || !readable}
           onClick={() => onDone(draft)}
-          className="h-9 cursor-pointer rounded-lg bg-primary px-4 text-[14px] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
+          className="h-9 cursor-pointer rounded-lg bg-primary px-4 text-[0.875rem] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:opacity-45"
         >
           Done
         </button>
-        <button type="button" onClick={onCancel} className="cursor-pointer text-[14px] font-bold text-slate-500 hover:text-slate-700">
+        <button type="button" onClick={onCancel} className="cursor-pointer text-[0.875rem] font-bold text-slate-500 hover:text-slate-700">
           Cancel
         </button>
         {onRemove && (
-          <button type="button" onClick={onRemove} className="ml-auto cursor-pointer text-[14px] font-bold text-red-700 hover:underline">
+          <button type="button" onClick={onRemove} className="ml-auto cursor-pointer text-[0.875rem] font-bold text-red-700 hover:underline">
             Take it off
           </button>
         )}

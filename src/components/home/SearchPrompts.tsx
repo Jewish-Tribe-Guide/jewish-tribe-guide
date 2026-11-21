@@ -38,14 +38,14 @@ export default function SearchPrompts({
 export const PHONE_MOST = 6
 
 const chip =
-  'cursor-pointer whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[13.5px] font-medium text-ink shadow-sm transition-colors hover:border-primary/50 hover:text-primary-dark'
+  'cursor-pointer whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[0.84375rem] font-medium text-ink shadow-sm transition-colors hover:border-primary/50 hover:text-primary-dark'
 
 const darkChip =
-  'cursor-pointer whitespace-nowrap rounded-full border border-white/40 bg-white/15 px-3 py-1.5 text-[13.5px] font-medium text-white transition-colors hover:bg-white/25'
+  'cursor-pointer whitespace-nowrap rounded-full border border-white/40 bg-white/15 px-3 py-1.5 text-[0.84375rem] font-medium text-white transition-colors hover:bg-white/25'
 
 function Label({ onDark = false }: { onDark?: boolean }) {
   return (
-    <span data-prompt-label className={`text-[13px] font-medium ${onDark ? 'text-white/75' : 'text-slate-500'}`}>
+    <span data-prompt-label className={`text-[0.8125rem] font-medium ${onDark ? 'text-white/75' : 'text-slate-500'}`}>
       Try asking
     </span>
   )

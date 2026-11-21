@@ -46,7 +46,7 @@ export default function PlaceFrame({
 }) {
   useOwnHead()
   const counter = !position.alone && (
-    <span className="text-[13.5px] text-slate-500 whitespace-nowrap">
+    <span className="text-[0.84375rem] text-slate-500 whitespace-nowrap">
       {position.at + 1} of {position.total}
     </span>
   )
@@ -59,8 +59,8 @@ export default function PlaceFrame({
           </svg>
         </button>
         <div className="flex-1 min-w-0">
-          <h1 className="m-0 truncate text-lg md:text-[24px] font-bold text-slate-900">{name}</h1>
-          {subline !== null && <p className="max-md:hidden m-0 text-[13.5px] text-slate-500">{subline}</p>}
+          <h1 className="m-0 truncate text-lg md:text-[1.5rem] font-bold text-slate-900">{name}</h1>
+          {subline !== null && <p className="max-md:hidden m-0 text-[0.84375rem] text-slate-500">{subline}</p>}
         </div>
         <div className="max-md:hidden flex items-center gap-2">
           {counter}
@@ -74,7 +74,7 @@ export default function PlaceFrame({
         </div>
       </header>
       {subline !== null && (
-        <div className="md:hidden flex items-center justify-between gap-3 pt-3 pb-2 text-[13.5px] text-slate-500">
+        <div className="md:hidden flex items-center justify-between gap-3 pt-3 pb-2 text-[0.84375rem] text-slate-500">
           <span className="min-w-0">{subline}</span>
           {counter}
         </div>
@@ -139,7 +139,7 @@ export function placeSubline(category: string | null | undefined, listingHref: s
 export function PlaceCard({ title, children }: { title?: ReactNode; children: ReactNode }) {
   return (
     <section aria-label={typeof title === 'string' ? title : undefined} className="bg-white border border-slate-200 rounded-[14px] p-4 flex flex-col gap-3">
-      {title && <h2 className="m-0 text-[17px] font-bold text-slate-900">{title}</h2>}
+      {title && <h2 className="m-0 text-[1.0625rem] font-bold text-slate-900">{title}</h2>}
       {children}
     </section>
   )
@@ -157,7 +157,7 @@ export function SourceCard({ name, rest, failed, children }: { name: ReactNode; 
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         disabled={!children}
-        className="w-full flex items-start gap-2.5 px-4 py-3 min-h-11 text-left text-[14px] text-slate-600 cursor-pointer disabled:cursor-default"
+        className="w-full flex items-start gap-2.5 px-4 py-3 min-h-11 text-left text-[0.875rem] text-slate-600 cursor-pointer disabled:cursor-default"
       >
         {children && (
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className={`mt-1 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`}>
@@ -175,7 +175,7 @@ export function SourceCard({ name, rest, failed, children }: { name: ReactNode; 
           )}
         </span>
       </button>
-      {open && children && <div className="flex flex-col gap-1.5 px-4 pb-3.5 pl-[42px] text-[14px]">{children}</div>}
+      {open && children && <div className="flex flex-col gap-1.5 px-4 pb-3.5 pl-[42px] text-[0.875rem]">{children}</div>}
     </section>
   )
 }
@@ -183,7 +183,7 @@ export function SourceCard({ name, rest, failed, children }: { name: ReactNode; 
 /** `computerOnly`: Cancel, which a phone does with the header's chevron. */
 export type PlaceButton = { label: string; onClick?: () => void; href?: string; busy?: string | false; disabled?: boolean; computerOnly?: boolean }
 
-const PILL = 'inline-flex items-center justify-center min-h-[46px] px-6 rounded-full text-[15px] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-default'
+const PILL = 'inline-flex items-center justify-center min-h-[46px] px-6 rounded-full text-[0.9375rem] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-default'
 
 /** The answers: the first blue and full width on a phone, the rest white
  *  under it, two side by side; on a computer all in a row. */

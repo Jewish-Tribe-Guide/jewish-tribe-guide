@@ -1,6 +1,7 @@
 import { cacheLife, cacheTag } from 'next/cache'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
+import { inOneStep } from './supabase/inOneStep'
 import { DEFAULT_CONTACT_STEPS, type FormConfig, type FormContent, type FormStep } from './forms'
 
 // Turns a human label into a URL-safe slug, e.g. "Event RSVP" → "event-rsvp".
@@ -227,6 +228,9 @@ export async function deleteForm(community: string, id: string): Promise<{ respo
     .eq('community_id', community)
     .eq('form_id', id)
 
+  if (await inOneStep('delete_form', { p_community: community, p_id: id }, 'Failed to delete form')) return { responses: count ?? 0 }
+
+  // Without migration 109: the responses, then the form.
   const { error: responsesErr } = await supabase
     .from('form_response')
     .delete()

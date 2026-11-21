@@ -51,7 +51,7 @@ export function FindSheet({ place: p, post, onPicked, onClose }: { place: Google
   }
   const body = (
     <div className="grid gap-3 px-4 pb-4">
-      <p className="text-[13px] text-slate-500">{[p.name, p.address?.split(',')[0]].filter(Boolean).join(' · ')}</p>
+      <p className="text-[0.8125rem] text-slate-500">{[p.name, p.address?.split(',')[0]].filter(Boolean).join(' · ')}</p>
       <form onSubmit={submit} className="flex flex-wrap gap-2">
         <input value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search Google for" className="h-9 min-w-0 flex-[1_1_12rem] rounded-md border border-slate-300 px-2.5 text-sm" />
         <button type="submit" disabled={busy} className={BUTTON}>
@@ -67,7 +67,7 @@ export function FindSheet({ place: p, post, onPicked, onClose }: { place: Google
             <li key={f.placeId} className="flex items-center gap-3 px-3 py-2">
               <span className="min-w-0 flex-1 text-sm font-semibold text-slate-900">
                 {f.name}
-                <span className="block text-[12.5px] font-normal text-slate-500">{f.address}</span>
+                <span className="block text-[0.78125rem] font-normal text-slate-500">{f.address}</span>
               </span>
               <button type="button" disabled={busy} onClick={() => void pick(f.placeId)} className={LINK}>
                 This one

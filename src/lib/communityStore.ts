@@ -3,6 +3,7 @@ import { schemaMissing } from './supabase/schemaMissing'
 import { CONFIG_COMMUNITY_SLUG } from './configCommunity'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
+import { inOneStep } from './supabase/inOneStep'
 import { community as configCommunity } from '@/community.config'
 import tzLookup from 'tz-lookup'
 import { assertUsableSlug } from './routes'
@@ -700,6 +701,9 @@ export async function deleteCommunity(slug: string): Promise<void> {
   if (target.isDefault) throw new Error('The default community cannot be deleted.')
   if (all.length <= 1) throw new Error('Cannot delete the only remaining community.')
 
+  if (await inOneStep('delete_community', { p_slug: slug, p_tables: [...COMMUNITY_SCOPED_TABLES] }, 'Failed to delete community')) return
+
+  // Without migration 109: one table at a time.
   const supabase = getAdminClient()
   for (const table of COMMUNITY_SCOPED_TABLES) {
     const { error } = await supabase.from(table).delete().eq('community_id', slug)

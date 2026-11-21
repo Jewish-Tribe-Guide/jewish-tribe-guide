@@ -323,7 +323,7 @@ export default function FormEditor({
             {/* As a category's page (board 21b): on a phone, "On the site"
                 on the left, the switch on the right. */}
             <span className="flex-1 min-w-0 flex flex-col gap-px">
-              {!isNew && <span aria-hidden="true" className="md:hidden text-[15px] font-semibold text-slate-900">On the site</span>}
+              {!isNew && <span aria-hidden="true" className="md:hidden text-[0.9375rem] font-semibold text-slate-900">On the site</span>}
               {responsesHref && (
                 <Link href={responsesHref} className="self-start text-sm font-semibold text-primary">
                   Responses
@@ -331,7 +331,7 @@ export default function FormEditor({
               )}
             </span>
             {!isNew && (
-              <span className="flex items-center gap-2.5 text-[15px] font-semibold text-slate-900">
+              <span className="flex items-center gap-2.5 text-[0.9375rem] font-semibold text-slate-900">
                 <span aria-hidden="true" className="max-md:hidden md:order-last">On the site</span>
                 <AdminSwitch checked={active} onChange={toggleActive} label="On the site" />
               </span>
@@ -345,7 +345,7 @@ export default function FormEditor({
             const heading = section && section !== sectionName(draft.steps[i - 1]?.section) ? section : null
             return (
               <div key={i}>
-                {heading && <p className="m-0 px-4 pt-3 pb-1.5 border-b border-slate-100 text-[13px] font-semibold text-slate-600">{heading}</p>}
+                {heading && <p className="m-0 px-4 pt-3 pb-1.5 border-b border-slate-100 text-[0.8125rem] font-semibold text-slate-600">{heading}</p>}
                 <AdminRow onClick={() => showStep(i)} name={s.question.trim() || 'New question'} line={questionLine(s, draft.steps)} />
               </div>
             )
@@ -381,16 +381,16 @@ export default function FormEditor({
         {form && !PROTECTED_FORM_IDS.has(form.id) &&
           (askingDelete ? (
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-[15px] text-slate-900">Delete {live.title} and every response to it?</span>
-              <button type="button" onClick={remove} className="min-h-11 px-4 rounded-lg bg-red-600 text-white text-[15px] font-semibold cursor-pointer">
+              <span className="text-[0.9375rem] text-slate-900">Delete {live.title} and every response to it?</span>
+              <button type="button" onClick={remove} className="min-h-11 px-4 rounded-lg bg-red-600 text-white text-[0.9375rem] font-semibold cursor-pointer">
                 Delete it
               </button>
-              <button type="button" onClick={() => setAskingDelete(false)} className="min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[15px] font-semibold text-slate-900 cursor-pointer">
+              <button type="button" onClick={() => setAskingDelete(false)} className="min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[0.9375rem] font-semibold text-slate-900 cursor-pointer">
                 Leave it
               </button>
             </div>
           ) : (
-            <button type="button" onClick={() => setAskingDelete(true)} className="self-start min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[15px] font-semibold text-red-700 cursor-pointer">
+            <button type="button" onClick={() => setAskingDelete(true)} className="self-start min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-[0.9375rem] font-semibold text-red-700 cursor-pointer">
               Delete this form
             </button>
           ))}

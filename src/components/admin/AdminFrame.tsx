@@ -59,7 +59,7 @@ function Icon({ name, size = 16 }: { name: AdminArea | 'view'; size?: number }) 
 }
 
 const sideLink = (current: boolean) =>
-  `flex items-center gap-2.5 p-2.5 rounded-lg min-h-11 text-[14.5px] ${
+  `flex items-center gap-2.5 p-2.5 rounded-lg min-h-11 text-[0.90625rem] ${
     current ? 'bg-primary/10 text-primary font-bold' : 'text-slate-700 font-semibold hover:bg-slate-50'
   }`
 
@@ -134,7 +134,7 @@ export default function AdminFrame({
   )
 
   const account = (
-    <div className="flex flex-col gap-1 px-2.5 pt-3 text-[13px] text-slate-600">
+    <div className="flex flex-col gap-1 px-2.5 pt-3 text-[0.8125rem] text-slate-600">
       <p className="m-0 break-all">
         Signed in as <span className="font-medium text-slate-700">{email}</span>
       </p>
@@ -154,8 +154,8 @@ export default function AdminFrame({
         className="hidden md:flex w-60 shrink-0 flex-col gap-1 bg-white border-r border-slate-200 px-3 py-5 sticky top-0 h-dvh overflow-y-auto"
       >
         <div className="flex flex-col px-2.5 pt-1 pb-4">
-          <span className="text-[15px] font-bold text-slate-900">{siteName}</span>
-          <span className="text-[12.5px] text-slate-500">Admin</span>
+          <span className="text-[0.9375rem] font-bold text-slate-900">{siteName}</span>
+          <span className="text-[0.78125rem] text-slate-500">Admin</span>
         </div>
         {main.map((a) => (
           <Link key={a.area} href={a.href} onClick={tapped(a.area)} scroll={a.area !== open?.area} aria-current={a.area === open?.area ? 'page' : undefined} className={sideLink(a.area === open?.area)}>
@@ -192,8 +192,8 @@ export default function AdminFrame({
           ) : (
             <header className="-mx-4 flex items-center gap-2.5 bg-white border-b border-slate-200 px-4 py-3 md:mx-0 md:p-0 md:bg-transparent md:border-0">
               <span className="flex-1 min-w-0 flex flex-col">
-                <span className="md:hidden text-[12.5px] text-slate-500">{siteName}</span>
-                <h1 className="m-0 text-xl md:text-[26px] font-bold text-slate-900">{open?.label ?? 'Admin'}</h1>
+                <span className="md:hidden text-[0.78125rem] text-slate-500">{siteName}</span>
+                <h1 className="m-0 text-xl md:text-[1.625rem] font-bold text-slate-900">{open?.label ?? 'Admin'}</h1>
               </span>
               <Link href={settings.href} aria-label="Settings" className="md:hidden inline-flex items-center justify-center w-11 h-11 text-slate-700">
                 <Icon name="settings" size={22} />

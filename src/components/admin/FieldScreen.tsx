@@ -42,7 +42,7 @@ const KIND: Record<FieldType, string> = {
 /** The kind a field is, as the boards name it ("Choices"). */
 export const fieldKind = (type: FieldType) => KIND[type]
 
-const input = 'w-full min-h-12 rounded-[10px] border border-slate-300 bg-white px-3.5 text-[15px] text-slate-900 placeholder:text-slate-400'
+const input = 'w-full min-h-12 rounded-[10px] border border-slate-300 bg-white px-3.5 text-[0.9375rem] text-slate-900 placeholder:text-slate-400'
 
 export default function FieldScreen({
   field: f,
@@ -80,7 +80,7 @@ export function FieldTitle({ field: f }: { field: CategoryField }) {
   return (
     <span className="inline-flex max-w-full items-center gap-3">
       <span className="truncate">{f.label || 'New field'}</span>
-      <span className="shrink-0 rounded-full bg-slate-200 px-2.5 py-[3px] text-[13px] font-semibold text-slate-600">{fieldKind(f.type)}</span>
+      <span className="shrink-0 rounded-full bg-slate-200 px-2.5 py-[3px] text-[0.8125rem] font-semibold text-slate-600">{fieldKind(f.type)}</span>
     </span>
   )
 }
@@ -95,7 +95,7 @@ function ReadyFieldScreen({ field: f, pageName, canRequire, onChange, onBack, on
   )
 }
 
-const chip = 'rounded-full bg-slate-100 px-3 py-1 text-[14px] font-semibold text-slate-700'
+const chip = 'rounded-full bg-slate-100 px-3 py-1 text-[0.875rem] font-semibold text-slate-700'
 
 /** "In the filter": on, a choice shows as a chip, the filter's own look; off
  *  again, it shows as it did when its screen opened, so a switch put back
@@ -129,12 +129,12 @@ export function WhatThisIs({ field, partnerOn = false }: { field: CategoryField;
   return (
     <AdminBox title="What this is">
       <div className="flex flex-col gap-3.5 p-4">
-        <p className="m-0 text-[17px] leading-[1.55] text-slate-800">
+        <p className="m-0 text-[1.0625rem] leading-[1.55] text-slate-800">
           {about}
           {comesWith?.length ? ` It comes with ${andList(comesWith)}.` : null}
         </p>
         {watchedBy ? (
-          <p className="m-0 text-[17px] leading-[1.55] text-slate-800" data-testid="watched">
+          <p className="m-0 text-[1.0625rem] leading-[1.55] text-slate-800" data-testid="watched">
             <strong className="font-semibold text-slate-900">Watched:</strong> {watchedBy}
             {community ? (
               <>
@@ -148,7 +148,7 @@ export function WhatThisIs({ field, partnerOn = false }: { field: CategoryField;
         ) : null}
         {choices?.length ? (
           <div className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-slate-500">Choices</span>
+            <span className="text-[0.8125rem] font-semibold text-slate-500">Choices</span>
             <ul aria-label="Choices" className="m-0 p-0 list-none flex flex-wrap gap-1.5">
               {choices.map((n) => (
                 <li key={n} className={chip}>
@@ -171,8 +171,8 @@ function Change({ label, hint, children }: { label: string; hint: string; childr
   return (
     <div className={changeRow}>
       <span className="flex flex-1 min-w-0 flex-col">
-        <span className="text-[15px] font-semibold text-slate-900">{label}</span>
-        <span className="text-[13px] text-slate-600">{hint}</span>
+        <span className="text-[0.9375rem] font-semibold text-slate-900">{label}</span>
+        <span className="text-[0.8125rem] text-slate-600">{hint}</span>
       </span>
       {children}
     </div>
@@ -222,7 +222,7 @@ export function FieldChanges({
           user, Nov 10). */}
       {choices && <ChoiceList field={f} onChange={onChange} markOwn />}
       <AdminBox title="What you can change">
-        {!required && !filter && !under && !kosher && !partnerSays && !minyan && <p className="m-0 px-4 py-3 text-[15px] text-slate-600">Nothing. It works the same on every page.</p>}
+        {!required && !filter && !under && !kosher && !partnerSays && !minyan && <p className="m-0 px-4 py-3 text-[0.9375rem] text-slate-600">Nothing. It works the same on every page.</p>}
         {required && (
           <Change label="Required" hint="A place can’t be added without it">
             <AdminSwitch checked={!!f.required} onChange={(on) => onChange({ required: on })} label="Required" />

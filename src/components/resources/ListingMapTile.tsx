@@ -55,7 +55,7 @@ export default function ListingMapTile({ item, category, community }: { item: Di
       />}
       {/* Top left, not the board's bottom left: Google's logo and its map
           credit sit along the bottom, and its terms say they stay visible. */}
-      <span className="absolute left-2 top-2 flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[13.5px] font-bold text-primary shadow-sm">
+      <span className="absolute left-2 top-2 flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[0.84375rem] font-bold text-primary shadow-sm">
         <MapFoldIcon className="h-4 w-4" />
         {label}
       </span>

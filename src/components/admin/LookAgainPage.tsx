@@ -27,7 +27,7 @@ const secondary = `${button} border border-slate-300 bg-white text-slate-900 hov
 /** Rows the list shows on a phone before "N more" (board Phone). */
 const PHONE_ROWS = 5
 
-const field = 'min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-[15px] text-slate-900'
+const field = 'min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-[0.9375rem] text-slate-900'
 const SHORT = Object.fromEntries(LOOK_GROUPS.map((g) => [g.kind, g.short])) as Record<LookKind, string>
 
 const JOB = NIGHTLY_JOBS.find((j) => j.id === 'look-again')!
@@ -53,8 +53,8 @@ function Opened({ item, api, base, reload }: { item: LookShown; api: AdminApi; b
   const f = item.found
   const fact = (label: string, value: string) => (
     <span className="flex flex-col">
-      <span className="text-[12.5px] text-slate-500">{label}</span>
-      <span className="text-[13.5px] text-slate-900 [overflow-wrap:anywhere]">{value}</span>
+      <span className="text-[0.78125rem] text-slate-500">{label}</span>
+      <span className="text-[0.84375rem] text-slate-900 [overflow-wrap:anywhere]">{value}</span>
     </span>
   )
   return (
@@ -87,8 +87,8 @@ function Opened({ item, api, base, reload }: { item: LookShown; api: AdminApi; b
           )}
         </div>
       )}
-      {said && <p className="m-0 text-[13.5px] text-slate-700" role="status">{said}</p>}
-      {error && <p className="m-0 text-[13.5px] text-red-700">{error}</p>}
+      {said && <p className="m-0 text-[0.84375rem] text-slate-700" role="status">{said}</p>}
+      {error && <p className="m-0 text-[0.84375rem] text-red-700">{error}</p>}
       <div className="flex flex-wrap gap-x-5 gap-y-1">
         {f && (
           <Link href={base} className="text-sm font-semibold text-primary hover:underline">
@@ -112,14 +112,14 @@ function LeftOut({ names }: { names: string[] }) {
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full min-h-11 cursor-pointer items-center gap-1.5 px-4 py-3 text-left text-[13.5px] text-slate-500"
+        className="flex w-full min-h-11 cursor-pointer items-center gap-1.5 px-4 py-3 text-left text-[0.84375rem] text-slate-500"
       >
         <span className={open ? 'rotate-90' : ''}>
           <Chevron />
         </span>
         Left out: {names.length} {names.length === 1 ? 'group' : 'groups'}, not places
       </button>
-      {open && <p className="m-0 px-4 pb-3 pl-9 text-[13.5px] text-slate-600">{names.join(' · ')}</p>}
+      {open && <p className="m-0 px-4 pb-3 pl-9 text-[0.84375rem] text-slate-600">{names.join(' · ')}</p>}
     </div>
   )
 }
@@ -141,12 +141,12 @@ function Rows({ rows, showKind, ...rest }: { rows: LookShown[]; showKind: boolea
               className="flex w-full min-h-11 cursor-pointer items-center gap-2.5 px-4 py-2.5 text-left hover:bg-slate-50 sm:grid sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_auto_16px] sm:gap-3.5"
             >
               <span className="flex min-w-0 flex-1 flex-col gap-0.5 sm:contents">
-                <span className="text-[14.5px] font-semibold text-slate-900 [overflow-wrap:anywhere]">{r.name}</span>
-                <span className={`text-[13px] text-slate-600 sm:text-[13.5px] ${opened ? 'max-sm:hidden' : ''}`}>
+                <span className="text-[0.90625rem] font-semibold text-slate-900 [overflow-wrap:anywhere]">{r.name}</span>
+                <span className={`text-[0.8125rem] text-slate-600 sm:text-[0.84375rem] ${opened ? 'max-sm:hidden' : ''}`}>
                   {showKind ? `${SHORT[r.kind]} · ${r.why}` : r.why}
                   <span className="sm:hidden"> · {r.when}</span>
                 </span>
-                <span className="hidden whitespace-nowrap text-right text-[12.5px] text-slate-500 sm:block">{r.when}</span>
+                <span className="hidden whitespace-nowrap text-right text-[0.78125rem] text-slate-500 sm:block">{r.when}</span>
               </span>
               <span className={opened ? 'rotate-90' : ''}>
                 <Chevron />
@@ -191,7 +191,7 @@ export default function LookAgainPage({ token }: { token: string }) {
     <div className="flex flex-col gap-3.5">
       {head}
       <p className="m-0 -mt-1 text-sm text-slate-600 max-md:hidden">Tries each one again a month after the last try · a few a night</p>
-      <div className="flex flex-wrap gap-x-[18px] gap-y-1.5 text-[13.5px] text-slate-600" data-testid="look-tonight">
+      <div className="flex flex-wrap gap-x-[18px] gap-y-1.5 text-[0.84375rem] text-slate-600" data-testid="look-tonight">
         <span>
           <span className="font-semibold text-slate-900">{tonight}</span> · {due}
         </span>

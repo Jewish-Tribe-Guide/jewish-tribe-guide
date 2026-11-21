@@ -32,7 +32,7 @@ function Parts({ parts, fit }: { parts: ChangePart[]; fit: boolean }) {
   if (parts.length === 0) return null
   if (!fit || open) {
     return (
-      <span data-testid="change-parts" className="mt-0.5 block text-[14px] leading-snug">
+      <span data-testid="change-parts" className="mt-0.5 block text-[0.875rem] leading-snug">
         {parts.map((p, i) => (
           <span key={i} className="block">
             <Part part={p} />
@@ -43,7 +43,7 @@ function Parts({ parts, fit }: { parts: ChangePart[]; fit: boolean }) {
   }
   const { shown, more } = fitParts(parts)
   return (
-    <span data-testid="change-parts" className={`mt-0.5 block text-[14px] leading-snug ${more ? '' : 'line-clamp-2'}`}>
+    <span data-testid="change-parts" className={`mt-0.5 block text-[0.875rem] leading-snug ${more ? '' : 'line-clamp-2'}`}>
       {shown.map((p, i) => (
         <span key={i}>
           {i > 0 && <span className="text-slate-400"> · </span>}
@@ -111,7 +111,7 @@ export default function ChangeRow({
             wrap, and pushed the Activity page wider than a phone, so it
             slid sideways (the user, Nov 16). */}
         <span className={`min-w-0 flex-1 break-words ${change.hidden ? 'opacity-45' : ''}`}>
-          <span className="block text-[15px] leading-snug text-slate-700">
+          <span className="block text-[0.9375rem] leading-snug text-slate-700">
             {linked ? (
               // The whole row is the link (its ::after covers it), so "and 2
               // more" can be a button of its own above it.
@@ -125,9 +125,9 @@ export default function ChangeRow({
             ) : (
               sentence
             )}
-            {change.hidden && <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-px text-[11.5px] font-bold text-slate-500">Hidden</span>}
+            {change.hidden && <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-px text-[0.71875rem] font-bold text-slate-500">Hidden</span>}
           </span>
-          <span className="mt-0.5 block text-[13px] text-slate-500">
+          <span className="mt-0.5 block text-[0.8125rem] text-slate-500">
             {category?.label ?? change.listing.category} · {when}
           </span>
           <Parts parts={change.parts} fit={fit} />

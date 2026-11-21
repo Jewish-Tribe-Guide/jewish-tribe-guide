@@ -166,7 +166,7 @@ export default function EruvEditor({ eruv, page, onClose, onHasChanges, adminSav
       }}
     >
       {!adminSave && <Honeypot value={honeypot} onChange={setHoneypot} />}
-      {eruv && <p className="px-1 text-[16px] font-extrabold text-slate-900">{eruv.name}</p>}
+      {eruv && <p className="px-1 text-[1rem] font-extrabold text-slate-900">{eruv.name}</p>}
       <Card>
         <div className="space-y-3 py-2">
           {adding && addedInput('name', 'Name')}

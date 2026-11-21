@@ -40,16 +40,16 @@ export function EruvStatusLine({ eruv, now, timezone, candles }: { eruv: Eruv; n
     <div data-testid="eruv-status" data-tone={view.tone}>
       <p className="mt-1 flex items-baseline gap-2">
         <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${TONE_DOT[view.tone]}`} />
-        <span className={`text-[15px] font-extrabold ${TONE_WORDS[view.tone]}`}>{view.label}</span>
+        <span className={`text-[0.9375rem] font-extrabold ${TONE_WORDS[view.tone]}`}>{view.label}</span>
       </p>
-      {view.checked && <p className="mt-0.5 text-[13px] leading-snug text-muted">{view.checked}</p>}
+      {view.checked && <p className="mt-0.5 text-[0.8125rem] leading-snug text-muted">{view.checked}</p>}
     </div>
   )
 }
 
 function ListingRow({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-3 border-t border-slate-100 py-2.5 text-[15px] leading-snug text-slate-800 first:border-t-0">
+    <div className="flex items-start gap-3 border-t border-slate-100 py-2.5 text-[0.9375rem] leading-snug text-slate-800 first:border-t-0">
       <span className="mt-0.5 w-[17px] shrink-0 text-slate-400">{icon}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
@@ -169,10 +169,10 @@ function EruvDetails({ eruv, color, now, timezone, candles }: { eruv: Eruv; colo
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
-            <h2 className="min-w-0 flex-1 text-[22px] font-extrabold leading-tight tracking-tight text-slate-900">{eruv.name}</h2>
+            <h2 className="min-w-0 flex-1 text-[1.375rem] font-extrabold leading-tight tracking-tight text-slate-900">{eruv.name}</h2>
             {ui.map.pins && page && <SaveButton saved={saved} onToggle={() => toggle({ id: eruv.id, categoryId: page.id })} name={eruv.name} />}
           </div>
-          <p className="mt-1 text-[14.5px] leading-snug text-muted">{['Eruv', ...topWords].join(' · ')}</p>
+          <p className="mt-1 text-[0.90625rem] leading-snug text-muted">{['Eruv', ...topWords].join(' · ')}</p>
         </div>
       </div>
       <Card>

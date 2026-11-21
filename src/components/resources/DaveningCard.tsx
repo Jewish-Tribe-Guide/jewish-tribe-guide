@@ -179,7 +179,7 @@ export default function DaveningCard({
     if (!canAdd) return null
     if (updated?.in === key)
       return (
-        <p role="status" className="mt-2 text-[13.5px] font-semibold text-emerald-700">
+        <p role="status" className="mt-2 text-[0.84375rem] font-semibold text-emerald-700">
           {updated.what === 'sent' ? 'Thanks! An admin checks them before everyone sees them.' : 'Thanks! Marked confirmed.'}
         </p>
       )
@@ -212,7 +212,7 @@ export default function DaveningCard({
       <div className="flex flex-wrap items-baseline gap-x-1.5">
         <FreshnessFooter resourceId={item.id} {...boxDate(item, section)} section={section} />
         {canAdd && updatingIn !== key && updated?.in !== key && (
-          <button type="button" onClick={() => open(key)} className="cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
+          <button type="button" onClick={() => open(key)} className="cursor-pointer text-[0.84375rem] font-bold text-primary hover:underline">
             Update their times
           </button>
         )}
@@ -236,7 +236,7 @@ export default function DaveningCard({
           data-testid="davening-folded"
         >
           <span className="text-base font-extrabold text-slate-900">{title}</span>
-          <span className="flex items-center gap-2.5 text-[14.5px] font-semibold text-slate-600">
+          <span className="flex items-center gap-2.5 text-[0.90625rem] font-semibold text-slate-600">
             {seasonal && season ? season.charAt(0).toUpperCase() + season.slice(1) : null}
             <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
           </span>
@@ -263,7 +263,7 @@ export default function DaveningCard({
       >
         <span>
           <span className="block text-base font-extrabold text-slate-900">{title}</span>
-          <span className="mt-0.5 block text-[13.5px] text-muted" data-testid="davening-fold-reason">
+          <span className="mt-0.5 block text-[0.84375rem] text-muted" data-testid="davening-fold-reason">
             {reason}
           </span>
         </span>
@@ -292,7 +292,7 @@ export default function DaveningCard({
           {/* A cell holds times: the way to join one from home goes under
               the table, naming it. */}
           {week.joins.map((m) => (
-            <JoinLink key={m.id} link={m.joinLink} what={`${formatDays(m.days.filter((d) => d !== 'sat'))} ${TEFILLAH_LABELS[m.tefillah]}`.trim()} className="mt-2 block text-[14px]" />
+            <JoinLink key={m.id} link={m.joinLink} what={`${formatDays(m.days.filter((d) => d !== 'sat'))} ${TEFILLAH_LABELS[m.tefillah]}`.trim()} className="mt-2 block text-[0.875rem]" />
           ))}
           {!allSignUp && signUpBoxes(week.signUps, { section: week.everySignUp ? 'All weekday times' : undefined, tapped: tappedRow })}
           {updateIn('week')}
@@ -352,7 +352,7 @@ export default function DaveningCard({
       <div className="flex flex-wrap items-baseline gap-x-1.5">
         <FreshnessFooter resourceId={item.id} {...postDate} ask={false} />
         {canAdd && updatingIn !== key && updated?.in !== key && (
-          <button type="button" onClick={() => open(key)} className="cursor-pointer text-[13.5px] font-bold text-primary hover:underline">
+          <button type="button" onClick={() => open(key)} className="cursor-pointer text-[0.84375rem] font-bold text-primary hover:underline">
             Update their times
           </button>
         )}
@@ -384,7 +384,7 @@ export default function DaveningCard({
   const fullGrid = weekGrid(weekdayDays.length ? weekDaysFrom(weekdayDays, thisWeek.posts) : [])
   const grid = fullGrid && todayDate && fullGrid.rows.every((r) => r.date < todayDate) ? null : fullGrid
   const datesAside = (text: string, testId: string) => (
-    <span className="text-[14.5px] text-slate-600" data-testid={testId}>
+    <span className="text-[0.90625rem] text-slate-600" data-testid={testId}>
       {text}
     </span>
   )
@@ -399,7 +399,7 @@ export default function DaveningCard({
             key={link}
             link={link}
             what={`${formatDays(DAY_KEYS.filter((d) => ms.some((m) => m.days.includes(d))))} ${[...new Set(ms.map((m) => TEFILLAH_LABELS[m.tefillah]))].join(' & ')}`}
-            className="mt-2 block text-[14px]"
+            className="mt-2 block text-[0.875rem]"
           />
         ))}
         {!allSignUp &&
@@ -413,7 +413,7 @@ export default function DaveningCard({
       // Their calendar read, and nothing in it this week: said, never left
       // out, which reads as not knowing (the user, Oct 23).
       <Card key="week-dated" title="This week" action={datesAside(datesText(thisWeek.none.from, thisWeek.none.to), 'davening-this-week-dates')} testId="davening-no-minyan" footer={postFootFor(thisWeek.none, 'this-week')}>
-        <p className="mt-1 text-[15.5px] font-bold text-slate-900">No minyan this week</p>
+        <p className="mt-1 text-[0.96875rem] font-bold text-slate-900">No minyan this week</p>
         {updateIn('this-week')}
       </Card>
     ) : null
@@ -448,11 +448,11 @@ export default function DaveningCard({
       {allSignUp && !tappedRow && signUpBoxes(rows, { place: true })}
       {notPosted && !specialSchedule && (
         <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3" data-testid="davening-not-posted">
-          <p className="text-[14.5px] font-bold text-caution">{notPosted.festival} times not posted</p>
-          <p className="mt-0.5 text-[13.5px] leading-snug text-amber-900">These are their usual times. They may not apply during {notPosted.festival}.</p>
+          <p className="text-[0.90625rem] font-bold text-caution">{notPosted.festival} times not posted</p>
+          <p className="mt-0.5 text-[0.84375rem] leading-snug text-amber-900">These are their usual times. They may not apply during {notPosted.festival}.</p>
           {canAdd &&
             (sent ? (
-              <p role="status" className="mt-2 text-[13.5px] font-semibold text-emerald-700">
+              <p role="status" className="mt-2 text-[0.84375rem] font-semibold text-emerald-700">
                 Thanks! An admin checks them before everyone sees them.
               </p>
             ) : adding ? (
@@ -461,7 +461,7 @@ export default function DaveningCard({
               <button
                 type="button"
                 onClick={() => setAdding(true)}
-                className="mt-2 h-10 w-full cursor-pointer rounded-[10px] border-[1.5px] border-primary bg-white text-[14.5px] font-bold text-primary hover:bg-primary/5"
+                className="mt-2 h-10 w-full cursor-pointer rounded-[10px] border-[1.5px] border-primary bg-white text-[0.90625rem] font-bold text-primary hover:bg-primary/5"
               >
                 Know their {notPosted.festival} times? Add them
               </button>
@@ -470,7 +470,7 @@ export default function DaveningCard({
       )}
       {specialSchedule && (
         <Card title={specialSchedule.name} testId="davening-special-box">
-          <p className="text-[13.5px] font-semibold text-green-700" data-testid="davening-special">
+          <p className="text-[0.84375rem] font-semibold text-green-700" data-testid="davening-special">
             {specialSchedule.mode === 'replace' ? 'In place of their usual times' : 'As well as their usual times'} until {dateText(specialSchedule.to, { weekday: true })}
           </p>
           <SpecialTimes schedule={specialSchedule} />
@@ -481,9 +481,9 @@ export default function DaveningCard({
       {shabbosBox.fold}
       {!week && !shab && (
         <Card title="Davening times" testId="davening-none">
-          <p className="pt-0.5 text-[14.5px] text-slate-700">No davening times listed yet.</p>
+          <p className="pt-0.5 text-[0.90625rem] text-slate-700">No davening times listed yet.</p>
           {canAdd && updatingIn !== 'none' && updated?.in !== 'none' && (
-            <button type="button" onClick={() => open('none')} className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 py-1 text-[14.5px] font-bold text-primary">
+            <button type="button" onClick={() => open('none')} className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 py-1 text-[0.90625rem] font-bold text-primary">
               <PlusIcon className="h-4 w-4" />
               Add their times
             </button>
@@ -526,7 +526,7 @@ function Notes({ lines }: { lines: (string | null | undefined)[] }) {
   const shown = lines.filter((l): l is string => !!l)
   if (shown.length === 0) return null
   return (
-    <div className="mt-2 space-y-1 text-[13px] leading-snug text-muted">
+    <div className="mt-2 space-y-1 text-[0.8125rem] leading-snug text-muted">
       {shown.map((l) => (
         <p key={l}>{l}</p>
       ))}
@@ -571,12 +571,12 @@ function signUpBoxes(minyanim: Minyan[], { section, place = false, tapped }: { s
  *  the box under it says so once, for all of them. */
 function WeekTable({ table, today, marks = true }: { table: NonNullable<ReturnType<typeof weekdayTable>>; today: DayKey | null; marks?: boolean }) {
   return (
-    <table className="mt-1 w-full text-[14.5px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }} data-testid="davening-week-table">
+    <table className="mt-1 w-full text-[0.90625rem]" style={{ borderCollapse: 'separate', borderSpacing: 0 }} data-testid="davening-week-table">
       <thead>
         <tr>
           <th className="w-[5.5rem]" />
           {table.columns.map((t) => (
-            <th key={t} scope="col" className="px-1.5 pb-1 text-left text-[11.5px] font-extrabold uppercase tracking-wide text-muted">
+            <th key={t} scope="col" className="px-1.5 pb-1 text-left text-[0.71875rem] font-extrabold uppercase tracking-wide text-muted">
               {TEFILLAH_LABELS[t]}
             </th>
           ))}
@@ -589,7 +589,7 @@ function WeekTable({ table, today, marks = true }: { table: NonNullable<ReturnTy
             <tr key={r.label} className={isToday ? 'bg-emerald-50' : undefined} data-today={isToday || undefined}>
               <th scope="row" className="rounded-l-lg py-2 pr-1.5 pl-2 text-left align-top font-bold text-slate-900">
                 {r.label}
-                {isToday && <span className="block text-[11px] font-extrabold tracking-wide text-emerald-700 uppercase">Today</span>}
+                {isToday && <span className="block text-[0.6875rem] font-extrabold tracking-wide text-emerald-700 uppercase">Today</span>}
               </th>
               {r.cells.map((c, i) => (
                 <td key={table.columns[i]} className={`px-1.5 py-2 align-top last:rounded-r-lg ${c === '—' ? 'text-slate-400' : isToday ? 'font-bold text-slate-900' : 'text-slate-900'}`}>
@@ -677,14 +677,14 @@ function ShabbosRows({ items, marks = true }: { items: readonly ShabbosItem[]; m
     <div data-testid="davening-shabbos-lines">
       {groups.map((g) => (
         <div key={g.group}>
-          <p className="mx-2 mt-3 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">{g.label}</p>
+          <p className="mx-2 mt-3 text-[0.6875rem] font-extrabold uppercase tracking-wide text-slate-500">{g.label}</p>
           {g.items.map((i, n) => (
-            <div key={i.key} className={`flex items-baseline justify-between gap-3.5 px-2 py-2 text-[14.5px] ${n ? 'border-t border-slate-100' : ''}`}>
+            <div key={i.key} className={`flex items-baseline justify-between gap-3.5 px-2 py-2 text-[0.90625rem] ${n ? 'border-t border-slate-100' : ''}`}>
               <span className="min-w-0">
                 <span className="font-semibold text-slate-900">{i.name}</span>
                 {i.row?.signUp && marks && <SignUpMark className="ml-1.5 align-[1px]" />}
-                {i.sub && <span className="mt-px block text-[12.5px] font-medium text-slate-500">{i.sub}</span>}
-                {i.row && <JoinLink link={i.row.joinLink} className="mt-0.5 block text-[14px]" />}
+                {i.sub && <span className="mt-px block text-[0.78125rem] font-medium text-slate-500">{i.sub}</span>}
+                {i.row && <JoinLink link={i.row.joinLink} className="mt-0.5 block text-[0.875rem]" />}
               </span>
               <span className="text-right font-bold whitespace-nowrap text-slate-900 tabular-nums">{i.time}</span>
             </div>
@@ -701,12 +701,12 @@ function ShabbosRows({ items, marks = true }: { items: readonly ShabbosItem[]; m
 function WeekGridTable({ grid, todayDate, marks }: { grid: WeekGrid; todayDate: string | null; marks: boolean }) {
   return (
     <>
-      <table className="mt-2 w-full text-[14px]" style={{ borderCollapse: 'separate', borderSpacing: 0 }} data-testid="davening-this-week-days">
+      <table className="mt-2 w-full text-[0.875rem]" style={{ borderCollapse: 'separate', borderSpacing: 0 }} data-testid="davening-this-week-days">
         <thead>
           <tr>
             <th className="w-[3.25rem]" />
             {grid.columns.map((t) => (
-              <th key={t} scope="col" className="px-2 pb-1 text-left align-bottom text-[11px] font-extrabold uppercase tracking-wide text-slate-600">
+              <th key={t} scope="col" className="px-2 pb-1 text-left align-bottom text-[0.6875rem] font-extrabold uppercase tracking-wide text-slate-600">
                 {TEFILLAH_LABELS[t]}
               </th>
             ))}
@@ -721,9 +721,9 @@ function WeekGridTable({ grid, todayDate, marks }: { grid: WeekGrid; todayDate: 
               <tr key={r.date} className={isToday ? 'bg-emerald-50' : undefined} data-today={isToday || undefined} data-past={past || undefined}>
                 <th scope="row" className={`rounded-l-lg border-t px-2 py-2 text-left align-top font-bold ${isToday ? 'border-transparent' : 'border-slate-100'} ${tone}`}>
                   {DAY_LABELS[weekdayOf(r.date)]}
-                  <small className={`block text-[12px] font-semibold whitespace-nowrap ${past ? 'text-slate-400' : 'text-slate-600'}`}>{dateText(r.date)}</small>
-                  {r.occasion && <small className="block text-[12px] font-semibold text-slate-600">{r.occasion}</small>}
-                  {isToday && <span className="block text-[11px] font-extrabold tracking-wide text-emerald-700 uppercase">Today</span>}
+                  <small className={`block text-[0.75rem] font-semibold whitespace-nowrap ${past ? 'text-slate-400' : 'text-slate-600'}`}>{dateText(r.date)}</small>
+                  {r.occasion && <small className="block text-[0.75rem] font-semibold text-slate-600">{r.occasion}</small>}
+                  {isToday && <span className="block text-[0.6875rem] font-extrabold tracking-wide text-emerald-700 uppercase">Today</span>}
                 </th>
                 {r.cells.map((c, i) => (
                   <td key={grid.columns[i]} className={`border-t px-2 py-2 align-top last:rounded-r-lg ${isToday ? 'border-transparent' : 'border-slate-100'} ${c.length ? tone : 'text-slate-400'}`}>
@@ -751,7 +751,7 @@ function WeekGridTable({ grid, todayDate, marks }: { grid: WeekGrid; todayDate: 
         </tbody>
       </table>
       {grid.notes.map((n) => (
-        <p key={n.mark} className="mx-2 mt-1 text-[13px] text-slate-600">
+        <p key={n.mark} className="mx-2 mt-1 text-[0.8125rem] text-slate-600">
           {n.mark} {n.text}
         </p>
       ))}
@@ -781,18 +781,18 @@ function SpecialTimes({ schedule }: { schedule: SpecialSchedule }) {
 function SpecialDay({ label, rows }: { label: string; rows: SpecialSchedule['minyanim'] }) {
   return (
     <div className="border-t border-slate-100 py-1.5 first:border-t-0">
-      <p className="text-[12px] font-extrabold uppercase tracking-wide text-muted">{label}</p>
+      <p className="text-[0.75rem] font-extrabold uppercase tracking-wide text-muted">{label}</p>
       {[...rows]
         .sort((a, b) => TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) || (clockMinutes(a.time) ?? 1440) - (clockMinutes(b.time) ?? 1440))
         .map((m) => {
           const note = noteText(m.notes)
           return (
-            <div key={m.id} className="grid grid-cols-[9.5rem_1fr] gap-2.5 py-0.5 text-[15px]">
+            <div key={m.id} className="grid grid-cols-[9.5rem_1fr] gap-2.5 py-0.5 text-[0.9375rem]">
               <span className="font-semibold text-slate-900">{TEFILLAH_LABELS[m.tefillah]}</span>
               <span className="text-slate-900">
                 <b>{timeText(m)}</b>
                 {note ? <span className="text-muted"> · {note}</span> : null}
-                <JoinLink link={m.joinLink} className="block text-[14px]" />
+                <JoinLink link={m.joinLink} className="block text-[0.875rem]" />
               </span>
             </div>
           )
@@ -812,13 +812,13 @@ export function UsualTimes({ minyanim }: { minyanim: unknown }) {
     <div data-testid="usual-times">
       {week && (
         <>
-          <p className="mt-1 text-[12px] font-extrabold uppercase tracking-wide text-muted">Usual weekday times</p>
+          <p className="mt-1 text-[0.75rem] font-extrabold uppercase tracking-wide text-muted">Usual weekday times</p>
           <WeekTable table={week} today={null} marks={false} />
         </>
       )}
       {shab && (
         <>
-          <p className="mt-2 text-[12px] font-extrabold uppercase tracking-wide text-muted">Usual Shabbos times</p>
+          <p className="mt-2 text-[0.75rem] font-extrabold uppercase tracking-wide text-muted">Usual Shabbos times</p>
           <ShabbosRows items={usualShabbosItems(shab.lines, undefined, null)} marks={false} />
         </>
       )}

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_CONTACT_STEPS } from './forms'
 
 vi.mock('next/cache', () => ({
@@ -23,9 +23,14 @@ function chainable(result: unknown) {
   return builder
 }
 
+// Migration 109's functions, missing unless a test says otherwise, so the
+// tests above it cover the step-by-step delete a project without 109 runs.
+const mockRpc = vi.hoisted(() => vi.fn())
+const fnMissing = (fn: string) => ({ error: { message: `Could not find the function public.${fn}(…) in the schema cache` } })
+beforeEach(() => mockRpc.mockReset().mockImplementation(async (fn: string) => fnMissing(fn)))
 const mockFrom = vi.hoisted(() => vi.fn())
 vi.mock('./supabase/admin', () => ({
-  getAdminClient: () => ({ from: mockFrom }),
+  getAdminClient: () => ({ from: mockFrom, rpc: mockRpc }),
 }))
 
 const {
@@ -388,5 +393,38 @@ describe('deleteForm', () => {
         : chainable({ error: { message: 'form fk violation' } }),
     )
     await expect(deleteForm('philly', 'event-rsvp')).rejects.toThrow('Failed to delete form: form fk violation')
+  })
+})
+
+describe('deleteForm — in one step, once 109 has run (Nov 21)', () => {
+  it('hands the delete to delete_form and deletes nothing itself', async () => {
+    const deleted: string[] = []
+    mockFrom.mockImplementation((table: string) => {
+      const b = chainable({ count: 4, error: null, data: null })
+      b.delete = vi.fn(() => {
+        deleted.push(table)
+        return b
+      })
+      return b
+    })
+    mockRpc.mockResolvedValue({ error: null })
+    expect(await deleteForm('philly', 'event-rsvp')).toEqual({ responses: 4 })
+    expect(mockRpc).toHaveBeenCalledWith('delete_form', { p_community: 'philly', p_id: 'event-rsvp' })
+    expect(deleted).toEqual([])
+  })
+
+  it('a failure there throws, with no table touched', async () => {
+    const deleted: string[] = []
+    mockFrom.mockImplementation((table: string) => {
+      const b = chainable({ count: 1, error: null, data: null })
+      b.delete = vi.fn(() => {
+        deleted.push(table)
+        return b
+      })
+      return b
+    })
+    mockRpc.mockResolvedValue({ error: { message: 'boom' } })
+    await expect(deleteForm('philly', 'event-rsvp')).rejects.toThrow('Failed to delete form: boom')
+    expect(deleted).toEqual([])
   })
 })

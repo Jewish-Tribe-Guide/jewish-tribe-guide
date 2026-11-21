@@ -662,17 +662,17 @@ function CategoryEditorScreen({
               (board 21b). A computer: the count, then the switch and its
               words. */}
           <span className="flex-1 min-w-0 flex flex-col gap-px">
-            <span aria-hidden="true" className="md:hidden text-[15px] font-semibold text-slate-900">On the site</span>
+            <span aria-hidden="true" className="md:hidden text-[0.9375rem] font-semibold text-slate-900">On the site</span>
             {!isNew && placeCount !== null && (
               <Link
                 href={`${adminBase(community)}/places?category=${encodeURIComponent(initial!.id)}`}
-                className="self-start text-[13px] text-slate-600 md:text-sm md:font-semibold md:text-primary hover:underline"
+                className="self-start text-[0.8125rem] text-slate-600 md:text-sm md:font-semibold md:text-primary hover:underline"
               >
                 {placeCount} {placeCount === 1 ? 'place' : 'places'}
               </Link>
             )}
           </span>
-          <span className="flex items-center gap-2.5 text-[15px] font-semibold text-slate-900">
+          <span className="flex items-center gap-2.5 text-[0.9375rem] font-semibold text-slate-900">
             <span aria-hidden="true" className="max-md:hidden md:order-last">On the site</span>
             <AdminSwitch checked={draft.active} onChange={(on) => set('active', on)} label="On the site" />
           </span>
@@ -873,7 +873,7 @@ function CategoryEditorScreen({
         </AdminBox>}
 
         {isNew ? (
-          <button type="button" onClick={leave} className="self-start min-h-11 px-1 text-[15px] font-semibold text-red-700 hover:underline cursor-pointer">
+          <button type="button" onClick={leave} className="self-start min-h-11 px-1 text-[0.9375rem] font-semibold text-red-700 hover:underline cursor-pointer">
             Don&rsquo;t make this page
           </button>
         ) : (
@@ -952,7 +952,7 @@ function Basics({
       <div className="flex flex-col gap-3 p-4 border-b border-slate-100">
         <div className="flex items-end gap-3">
           <span className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-slate-700">Icon</span>
+            <span className="text-[0.8125rem] font-semibold text-slate-700">Icon</span>
             <span data-testid="category-icon-preview">{icon}</span>
           </span>
           <span className="flex-1 min-w-0">
@@ -968,7 +968,7 @@ function Basics({
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center gap-3 px-4 py-2.5 min-h-[60px] text-left cursor-pointer hover:bg-slate-50"
       >
-        <span className="flex-1 text-[15px] font-semibold text-slate-900">Banner photo</span>
+        <span className="flex-1 text-[0.9375rem] font-semibold text-slate-900">Banner photo</span>
         <BannerThumb url={banner} />
         <span className={open ? 'rotate-90' : ''}>
           <Chevron />
@@ -992,7 +992,7 @@ function BannerThumb({ url }: { url: string | null }) {
 
 function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (on: boolean) => void }) {
   return (
-    <label className="inline-flex items-center gap-2 min-h-8 text-[15px] text-slate-900 cursor-pointer">
+    <label className="inline-flex items-center gap-2 min-h-8 text-[0.9375rem] text-slate-900 cursor-pointer">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
       {label}
     </label>

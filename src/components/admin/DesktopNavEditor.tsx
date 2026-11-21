@@ -372,7 +372,7 @@ function OtherRow({ names }: { names: string[] }) {
       {names.length > 0 && (
         <ul className="m-0 flex list-none flex-col rounded-lg border border-slate-200 p-0">
           {names.map((n) => (
-            <li key={n} className="border-b border-slate-100 px-3 py-2.5 text-[15px] font-medium text-slate-900 last:border-b-0">
+            <li key={n} className="border-b border-slate-100 px-3 py-2.5 text-[0.9375rem] font-medium text-slate-900 last:border-b-0">
               {n}
             </li>
           ))}

@@ -336,12 +336,12 @@ export default function ModerationQueue({ session }: { session: Session }) {
               className={openPlace ? 'max-md:hidden md:overflow-y-auto md:bg-white md:px-4 md:pt-6' : undefined}
             >
               {openPlace && (
-                <h1 className="m-0 mb-4 flex items-baseline gap-2.5 text-[26px] font-bold text-slate-900">
-                  To do <span className="text-[14px] font-normal text-slate-500">{list.length} to decide</span>
+                <h1 className="m-0 mb-4 flex items-baseline gap-2.5 text-[1.625rem] font-bold text-slate-900">
+                  To do <span className="text-[0.875rem] font-normal text-slate-500">{list.length} to decide</span>
                 </h1>
               )}
               {done && (
-                <p role="status" className="m-0 mb-3 text-[15px] text-slate-600">
+                <p role="status" className="m-0 mb-3 text-[0.9375rem] text-slate-600">
                   {done}: nothing left to do
                 </p>
               )}

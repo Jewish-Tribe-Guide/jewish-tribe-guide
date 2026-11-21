@@ -236,7 +236,7 @@ export default function SubscribeSection({
               onFocus={() => setStarted(true)}
               placeholder="Your email"
               aria-label="Email address"
-              className="h-10 min-w-0 flex-1 rounded-full border border-slate-300 bg-white px-4 text-[14.5px] text-ink placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary @[540px]:w-[200px] @[540px]:flex-none"
+              className="h-10 min-w-0 flex-1 rounded-full border border-slate-300 bg-white px-4 text-[0.90625rem] text-ink placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary @[540px]:w-[200px] @[540px]:flex-none"
             />
             <button type="submit" disabled={submitting} className={SIGN_OFF_BUTTON}>
               {submitting ? 'Signing up…' : 'Sign up'}
@@ -349,10 +349,10 @@ export default function SubscribeSection({
                     <span aria-hidden="true">
                       {allCategories ? 'All categories' : `${selected.length} ${selected.length === 1 ? 'category' : 'categories'}`}
                     </span>
-                    {/* text-[10px]: this is just "opens a menu," not a
+                    {/* text-[0.625rem]: this is just "opens a menu," not a
                         heading — at the default text-sm size it read as
                         bigger than the affordance needed. */}
-                    <span aria-hidden="true" className="text-[10px] text-slate-400">
+                    <span aria-hidden="true" className="text-[0.625rem] text-slate-400">
                       {pickerOpen ? '▲' : '▼'}
                     </span>
                   </div>

@@ -322,7 +322,7 @@ export default function CategoryManager({
           <button
             type="button"
             onClick={() => onOpenEditor(`${CAT_PREFIX}new`)}
-            className="shrink-0 min-h-10 px-3.5 rounded-lg border border-slate-300 bg-white text-[13px] font-semibold text-primary hover:bg-slate-50 cursor-pointer"
+            className="shrink-0 min-h-10 px-3.5 rounded-lg border border-slate-300 bg-white text-[0.8125rem] font-semibold text-primary hover:bg-slate-50 cursor-pointer"
           >
             + New category page
           </button>
@@ -385,8 +385,8 @@ function NewPageEditor({
 function OnTheSite({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
   return (
     <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-[10px] px-4 py-2.5 min-h-[52px] md:-mt-3 md:bg-transparent md:border-0 md:p-0 md:min-h-0">
-      <span aria-hidden="true" className="flex-1 min-w-0 md:hidden text-[15px] font-semibold text-slate-900">On the site</span>
-      <span className="flex items-center gap-2.5 text-[15px] font-semibold text-slate-900">
+      <span aria-hidden="true" className="flex-1 min-w-0 md:hidden text-[0.9375rem] font-semibold text-slate-900">On the site</span>
+      <span className="flex items-center gap-2.5 text-[0.9375rem] font-semibold text-slate-900">
         <span aria-hidden="true" className="max-md:hidden md:order-last">On the site</span>
         <AdminSwitch checked={on} onChange={onChange} label="On the site" />
       </span>

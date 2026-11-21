@@ -170,7 +170,7 @@ export function PreviewBeside({
           ) : null}
         </div>
       </Frame>
-      {spot && missing === spot && <p className="m-0 text-[13px] text-slate-600" style={{ width: shown }}>Not on the {DEVICES[device].label.toLowerCase()} version.</p>}
+      {spot && missing === spot && <p className="m-0 text-[0.8125rem] text-slate-600" style={{ width: shown }}>Not on the {DEVICES[device].label.toLowerCase()} version.</p>}
     </div>
   )
 }

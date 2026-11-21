@@ -105,7 +105,7 @@ export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, cl
       ) : initials ? (
         // A darker shade of the category's colour: the plain colour on its
         // own light tint is too faint for small text.
-        <span className="text-[13px] font-extrabold tracking-tight" style={{ color: `color-mix(in oklab, ${color} 70%, #000)` }}>
+        <span className="text-[0.8125rem] font-extrabold tracking-tight" style={{ color: `color-mix(in oklab, ${color} 70%, #000)` }}>
           {initials}
         </span>
       ) : (

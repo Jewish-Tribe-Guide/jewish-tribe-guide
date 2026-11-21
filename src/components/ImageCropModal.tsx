@@ -251,7 +251,7 @@ export default function ImageCropModal({ source, shape, aspect = 1, onCancel, on
             className="w-full accent-primary cursor-pointer"
           />
         </label>
-        <p className="mt-1 text-[11px] text-muted">Drag the photo to reposition it.</p>
+        <p className="mt-1 text-[0.6875rem] text-muted">Drag the photo to reposition it.</p>
 
         <div className="mt-4 flex justify-end gap-2">
           <button

@@ -43,9 +43,9 @@ type ScreenSpec = { title: string; label: string; slot: AddSlot; placeholder?: s
 /** No email has come: the guide has to be on its list (EmailNone14). */
 export function SignUpLine({ account }: { account: string | null }) {
   const [copied, setCopied] = useState(false)
-  if (!account) return <p className="m-0 text-[13px] text-slate-500">Sign up for its emails with the guide’s Gmail</p>
+  if (!account) return <p className="m-0 text-[0.8125rem] text-slate-500">Sign up for its emails with the guide’s Gmail</p>
   return (
-    <p className="m-0 text-[13px] text-slate-500 [overflow-wrap:anywhere]">
+    <p className="m-0 text-[0.8125rem] text-slate-500 [overflow-wrap:anywhere]">
       Sign up for its emails with {account} ·{' '}
       <button
         type="button"
@@ -182,7 +182,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
               setPicked(null)
               setStep('finish')
             }}
-            className="cursor-pointer text-[15px] font-bold text-primary hover:underline"
+            className="cursor-pointer text-[0.9375rem] font-bold text-primary hover:underline"
           >
             Fill it in yourself
           </button>
@@ -305,7 +305,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
         {source.lines.map((line, i) => {
           const controls = lineControls(line)
           // A line that's only its Add a source.
-          if (!line.text) return <p key={i} className="m-0 text-[13px]">{controls}</p>
+          if (!line.text) return <p key={i} className="m-0 text-[0.8125rem]">{controls}</p>
           return (
             <Fragment key={i}>
               <SourceWords line={line} controls={controls} />
@@ -392,14 +392,14 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
 
   if (addedAs) {
     const { listing, stage } = addedAs
-    const banner = <p role="status" className="m-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-[15px] font-bold text-emerald-900">{listing.name} is added</p>
+    const banner = <p role="status" className="m-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-[0.9375rem] font-bold text-emerald-900">{listing.name} is added</p>
     const title = stage === 'failed' ? 'Change' : 'Add a place'
     return (
       <div className="flex flex-col gap-4">
         <AdminBack back={{ label: 'Back', onClick: onClose }} title={title} />
         {banner}
         {!!addedAs.notSaved?.length && (
-          <p role="alert" className="m-0 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[15px] font-bold text-amber-900">
+          <p role="alert" className="m-0 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[0.9375rem] font-bold text-amber-900">
             Not saved: {addedAs.notSaved.join(' · ')}
           </p>
         )}
@@ -408,11 +408,11 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
             Done
           </button>
         )}
-        {stage === 'reading' && <p className="m-0 text-[15px] text-slate-600">{website || given.page ? 'Reading its website…' : 'Looking in the guide’s Gmail…'}</p>}
+        {stage === 'reading' && <p className="m-0 text-[0.9375rem] text-slate-600">{website || given.page ? 'Reading its website…' : 'Looking in the guide’s Gmail…'}</p>}
         {stage === 'no-email' && (
           <>
             <div className="space-y-1">
-              <p className="m-0 text-[15px] font-bold text-slate-900">No emails from {given.email} yet</p>
+              <p className="m-0 text-[0.9375rem] font-bold text-slate-900">No emails from {given.email} yet</p>
               <SignUpLine account={guideGmail} />
             </div>
             <button type="button" onClick={onClose} className={SUBMIT_PILL}>
@@ -434,24 +434,24 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
         {stage === 'found' && (
           <>
             <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="m-0 text-[15px] font-extrabold text-slate-900">{addedAs.fromEmail ? 'Found in its email' : 'Found on its website'}</p>
+              <p className="m-0 text-[0.9375rem] font-extrabold text-slate-900">{addedAs.fromEmail ? 'Found in its email' : 'Found on its website'}</p>
               <ul className="m-0 mt-2 list-none space-y-1.5 p-0" data-testid="found-lines">
                 {addedAs.lines.map((l) => (
-                  <li key={l} className="text-[15px] text-slate-700">
+                  <li key={l} className="text-[0.9375rem] text-slate-700">
                     {l}
                   </li>
                 ))}
               </ul>
             </div>
             {takeFailed && (
-              <p role="alert" className="m-0 text-[15px] font-bold text-red-700">
+              <p role="alert" className="m-0 text-[0.9375rem] font-bold text-red-700">
                 Couldn’t add it. Try again.
               </p>
             )}
             <button type="button" disabled={taking} onClick={() => void takeFound(listing)} className={SUBMIT_PILL}>
               {taking ? 'Adding…' : 'Add to the listing'}
             </button>
-            <button type="button" disabled={taking} onClick={onClose} className="min-h-11 cursor-pointer text-center text-[15px] font-bold text-primary hover:underline">
+            <button type="button" disabled={taking} onClick={onClose} className="min-h-11 cursor-pointer text-center text-[0.9375rem] font-bold text-primary hover:underline">
               Decide later in To do
             </button>
           </>

@@ -235,7 +235,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
             <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={adminInputClass} />
           </AdminField>
           <div>
-            <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Logo</span>
+            <span className="block text-[0.8125rem] font-semibold text-slate-700 mb-1.5">Logo</span>
             <ImageUploadField
               value={draft.logoUrl ?? ''}
               onChange={(url) => set('logoUrl', url || null)}
@@ -291,7 +291,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
       <ScreenHeader title="Map" onBack={() => setCardScreen(null)} onRemove={cardOn('map') ? () => takeOff('map') : undefined} />
       <div className="p-5">
         {/* The map card's photo (board G3), on the card's own screen (V4). */}
-        <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Photo</span>
+        <span className="block text-[0.8125rem] font-semibold text-slate-700 mb-1.5">Photo</span>
         <ImageUploadField
           value={draft.desktopMapImage?.url ?? ''}
           onChange={(url) => set('desktopMapImage', url ? { url, alt: '' } : null)}
@@ -362,7 +362,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
                         user, Nov 11). */}
                     {/* No description: the photo is decoration (HeroHeading). */}
                     <div>
-                      <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">Photo</span>
+                      <span className="block text-[0.8125rem] font-semibold text-slate-700 mb-1.5">Photo</span>
                       <ImageUploadField
                         value={draft.desktopHeroImage?.url ?? ''}
                         onChange={(url) => set('desktopHeroImage', url ? { url, alt: '' } : null)}
@@ -407,8 +407,8 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
                       onClick={cardOpens.rightNow.onOpen}
                       className="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-[10px] border border-slate-200 bg-white px-4 py-2 text-left hover:border-primary"
                     >
-                      <span className="flex-1 text-[15px] font-medium text-slate-900">Right Now</span>
-                      {cardOpens.rightNow.summary && <span className="truncate text-[14px] text-muted">{cardOpens.rightNow.summary}</span>}
+                      <span className="flex-1 text-[0.9375rem] font-medium text-slate-900">Right Now</span>
+                      {cardOpens.rightNow.summary && <span className="truncate text-[0.875rem] text-muted">{cardOpens.rightNow.summary}</span>}
                       <svg width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-slate-400">
                         <path d="M1.5 1.5l6 6-6 6" />
                       </svg>
@@ -433,7 +433,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
                           <input type="radio" name="home-style" value={value} checked={draft.homeStyle === value} onChange={() => set('homeStyle', value)} className="mt-1" />
                           <span>
                             <span className="block text-sm font-medium text-slate-900">{label}</span>
-                            <span className="block text-[12px] text-muted">{help}</span>
+                            <span className="block text-[0.75rem] text-muted">{help}</span>
                           </span>
                         </label>
                       ))}
@@ -442,7 +442,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
                       <BeforeCandleItemsInput items={draft.beforeCandleItems} onChange={(items) => set('beforeCandleItems', items)} />
                     </AdminField>
                     <fieldset data-testid="today-blocks">
-                      <legend className="block text-[13px] font-semibold text-slate-700 mb-1">On the Today home</legend>
+                      <legend className="block text-[0.8125rem] font-semibold text-slate-700 mb-1">On the Today home</legend>
                       {TODAY_BLOCKS.map((block) => (
                         <label key={block.id} className="flex items-start gap-2.5 py-1">
                           <input
@@ -455,7 +455,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
                           />
                           <span>
                             <span className="block text-sm font-medium text-slate-900">{block.label}</span>
-                            <span className="block text-[12px] text-muted">{block.when}</span>
+                            <span className="block text-[0.75rem] text-muted">{block.when}</span>
                           </span>
                         </label>
                       ))}

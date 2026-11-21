@@ -13,7 +13,7 @@ export default function AboutHelpCards({ email }: { email: string | null }) {
 
   return (
     <section aria-labelledby="ways-to-help" className="flex flex-col gap-3 desktop:gap-4">
-      <h2 id="ways-to-help" className="mx-1 mt-3 text-[20px] font-extrabold tracking-tight text-slate-900 desktop:mx-0 desktop:mt-1 desktop:text-[24px]">
+      <h2 id="ways-to-help" className="mx-1 mt-3 text-[1.25rem] font-extrabold tracking-tight text-slate-900 desktop:mx-0 desktop:mt-1 desktop:text-[1.5rem]">
         Ways to help
       </h2>
       {contributions.add && <TellUsCard />}
