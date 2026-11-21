@@ -866,7 +866,104 @@ Nov 14, later, the user's yes to both:
   sits beside Feedback · About · Privacy at the bottom now, in Safari as
   it already did in the home-screen app.
 
-## The health sweep (Nov 20; fix-first 1-8 built on `claude/health-fixes`, Soon and Later not started)
+## The health sweep (Nov 20; fix-first 1-8 merged in PR 403, Soon built in PRs 404–411, Later not started)
+
+### Report: the Soon list (Nov 20, an unattended run)
+
+Every Soon item is built, some in part (each says what's left). PR 404
+(merged) took three; from 405 on, one PR per item, against main, each
+stacked on the one before, so merging the last brings in all of them.
+Every fix has a test that failed against the old code first; each
+commit says how many. Nothing was written to live, and no migration was
+run anywhere.
+
+Built:
+
+- [PR 404](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/404)
+  paged reads, hidden communities' API, reader spend: merged before
+  this run.
+- [PR 405](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/405)
+  knip in CI (before this run): green.
+- [PR 406](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/406)
+  the two admin-write failures: green.
+- [PR 407](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/407)
+  security: 2 red, neither from its own change. `home-preview-spot:33`
+  (a test race, fixed in 411) and e2e `listing-detail.spec.ts:537`
+  on the computer (Request removal, then Back to the listing: the name
+  wasn't there). Both passed on 408 and 409, which carry 407's code.
+- [PR 408](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/408)
+  migrations, the code side: green.
+- [PR 409](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/409)
+  dependencies: green.
+- [PR 410](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/410)
+  accessibility, the first two of four: 1 red, `home-preview-spot:33`
+  again.
+- [PR 411](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/411)
+  small cleanup, and the `home-preview-spot` fix: green.
+
+Found and not fixed:
+
+- Admin-write waits shorter than a busy test database, the shape 406
+  fixed twice: `todo-scroll:75`, `main-dishes`, `category-editor`,
+  `community-editor:61`. Not looked into.
+- e2e `listing-detail.spec.ts:537` (above): once, not looked into.
+- 25 of 104 older migrations can't be told run or not from what they
+  made (a policy, an index, a data fix).
+- 5 moderate `npm audit` findings, all `glob`/`minimatch` in Sentry's
+  build plugin, build time only; they wait on Sentry.
+- The sheets' "Drag to resize" handle and the Nearby sheet's still don't
+  work from a keyboard.
+- The readers that find a time inside running text (hours, calendar
+  titles, the shul page and schedule readers, ask) weren't merged with
+  the clock reader: they answer a different question.
+- Watches' days are on New York's clock in three files: right for Philly
+  and UES only.
+- Rebuilding a fresh project from the migrations folder (grants, a
+  restore drill) is untouched.
+
+For the user:
+
+1. **Turnstile and Upstash keys on Vercel's Production.** PR 404 (merged)
+   makes a missing key refuse on live: contributions and the AI readers
+   stop. Sentry shows nothing unresolved, and a refusal would be
+   reported there, so they're probably set. Worth a look.
+2. Run migrations 103, 104 and 105: dev, then live. Then say whether
+   live gets 067 (Today's settings) now or when Today comes back.
+3. Say whether to drop `site_settings.contribution_note` (a migration).
+4. Copy the Gmail script again from Newsletters into the guide's Gmail.
+   Then say whether an eruv email with no Authentication-Results header
+   should be refused outright.
+5. Check Database → Backups on live, and run the first live copy
+   (`npm run backup -- --prod`, read-only).
+6. Sentry cron monitors: set `SENTRY_CRON_MONITORS=on` in Vercel's
+   Production once Sentry's plan is checked (it bills past a free
+   allowance).
+7. The next production build's log should say Node 24.
+8. A design call: on a phone, You's saved places and searches can only
+   be removed by a swipe.
+9. Merging 411 brings in 405–410 too. 407's and 410's red runs predate
+   the preview test's fix; 411 carries it.
+
+Surprises:
+
+- Next keeps a screen you leave alive but asleep (`<Activity>`), so
+  Watches came back from Add a watch as it was before a switch (406).
+- The log's "Submission not found" was the test's own cleanup deleting a
+  row mid-approve, not the cause.
+- An eruv's status could be set by an email anyone could fake: the From
+  line wasn't checked against Gmail's verdict (407).
+- Since Nov 20 every suite hits the one test project at once, and waits
+  that were enough before aren't.
+- Live is missing migration 067; dev has everything but 105.
+- This Mac runs Node 26; CI and live run 24.
+- Taking focus into dialogs made the form editor's preview (a picture of
+  a form, under `inert`) steal the admin's typing. An existing unit test
+  caught it (2 runs in 5) and it was fixed before pushing.
+- A shul's "8am" was never its next minyan.
+- `.env.example` held two real email addresses. It had never been
+  committed, so they never reached the public repo.
+- `home-preview-spot:33`, seen three times, was the test pressing Forward
+  before the page's own step back had landed.
 
 The user (Nov 20): use the lull to check the site is "actually being
 built/run the right way". Six read-only reviewers (dead code and
@@ -874,7 +971,8 @@ structure, security, database, running the site, accessibility and
 robustness, dependencies), each finding checked before it went on the
 list. Marked **checked** where I confirmed it myself; the rest are read
 from code by a reviewer. The user's order (Nov 20): fix-first 1-8 as
-listed. All eight built; Soon and Later wait for the user to pick.
+listed. All eight built (PR 403), then the Soon list (the report above).
+Later waits for the user to pick.
 
 Fix first:
 
