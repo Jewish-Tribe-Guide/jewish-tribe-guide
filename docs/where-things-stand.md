@@ -956,6 +956,12 @@ For the user:
    `SENTRY_CRON_MONITORS=nightly-email` in Vercel's Production and
    redeploy. The nightly email already tells of the other jobs.
 7. The next production build's log should say Node 24.
+7b. An outside uptime check (Nov 21): nothing said if the whole site was
+   down. A free monitor (UptimeRobot, Better Stack) on
+   `https://phillyjewishguide.com/philly`, every 5 minutes, a keyword
+   check on `Explore by Category`, alerts to the user's email. Philly
+   only: Washington is hidden, so it answers 404 to a monitor. **When a
+   community is made visible, add one for `/<slug>` the same way.**
 8. A design call: on a phone, You's saved places and searches can only
    be removed by a swipe.
 9. Merging 411 brings in 405–410 too. 407's and 410's red runs predate
