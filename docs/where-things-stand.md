@@ -1329,7 +1329,7 @@ Partial Prefetching before Next 17.
 Checked and not so: the nightly email does record a failed send, as a
 warning, not a failure.
 
-## The save survey (Nov 21, read-only; nothing fixed yet)
+## The save survey (Nov 21; 1–5 fixed the same day, the rest open)
 
 Saves that make more than one write, through separate supabase-js calls
 with no transaction, and what a failure partway leaves. Only the
@@ -1337,7 +1337,21 @@ with no transaction, and what a failure partway leaves. Only the
 and `bump_daily_count` functions are atomic, and each covers one row.
 `approve_menu_dishes` (065) is defined and never called.
 
-Worst first (checked in the code: 1 and the unchecked read):
+Worst first. **1–5 are fixed** (Nov 21, on `claude/eruv-refuse-unproven`,
+each with tests that failed against the old code):
+
+- 1: a listing's reads and outside calls happen before the claim
+  (`prepareListing`), and a failed put-back goes to Sentry.
+- 2: the read stops the approval.
+- 3: once the change is on, a failed record write goes to Sentry and
+  the approval answers as done; a failed own Add/Edit/Archive is taken
+  back out of the queue (`approveOwn`).
+- 4: the listings change first, the category last, so saving again
+  finishes it.
+- 5: a failed take-down goes to Sentry, a tap on a warning with nothing
+  waiting files the removal, and Undo takes the warning down first.
+
+The list as found:
 
 1. **An approval can be left "approved" with nothing on the site.**
    `approveNow` (`submissionStore.ts`) claims the submission, then
