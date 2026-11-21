@@ -21,6 +21,20 @@ function walk(dir: string): string[] {
   })
 }
 
+/** The site's own keys, from migration 110's site_state_keys(). */
+function siteStateKeys(): string[] {
+  const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20240101000110_resource_state.sql'), 'utf8')
+  return [...sql.match(/site_state_keys\(\)[\s\S]*?array\[([\s\S]*?)\]/)![1].matchAll(/'(\w+)'/g)].map((k) => k[1])
+}
+
+function walkAll(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    if (name === 'node_modules' || name.startsWith('.')) return []
+    const path = join(dir, name)
+    return statSync(path).isDirectory() ? walkAll(path) : [path]
+  })
+}
+
 /** Each `from('resource')` chain's text, up to the end of its statement:
  *  while the next line is indented further than the line it starts on, or
  *  goes on with `.`, `)`, `}` or `]`. */
@@ -59,6 +73,60 @@ describe('a listing’s details are changed key by key', () => {
           .map((chain) => `${file}: ${chain.split('\n')[0].trim()}`),
       )
     expect(whole, 'write it with patchListing (src/lib/listingPatch.ts)').toEqual([])
+  })
+
+  // Scripts too (Nov 21, after 112 ran): a script's whole write keeps
+  // working for people's words, but whatever it changes among the site's
+  // keys is ignored, and the script still says it did it. A script that
+  // names one of those keys writes through scripts/patchListing.mjs. A write
+  // that sets `state` itself (a fixture reset, sync-dev-from-prod's copy of
+  // live's whole rows) keeps it, so it may write whole.
+  it('no script writes the site’s keys except through patchListing.mjs', () => {
+    const keys = siteStateKeys()
+    expect(keys).toContain('googleFields')
+    const SCRIPTS = join(process.cwd(), 'scripts')
+    const whole = readdirSync(SCRIPTS)
+      .filter((name) => /\.m?js$/.test(name) && name !== 'patchListing.mjs')
+      .flatMap((name) => {
+        const source = readFileSync(join(SCRIPTS, name), 'utf8')
+        const named = keys.filter((key) => new RegExp(`\\b${key}\\b`).test(source))
+        if (named.length === 0) return []
+        return resourceChains(source)
+          .filter(mayWriteDetails)
+          .filter((chain) => !/\bstate\b/.test(chain) && !(name === 'sync-dev-from-prod.mjs' && /upsert\(scrubbed/.test(chain)))
+          .map((chain) => `${name} (names ${named.join(', ')}): ${chain.split('\n')[0].trim()}`)
+      })
+    expect(whole, 'write it with scripts/patchListing.mjs').toEqual([])
+  })
+
+  // A test that sets a site key up with a plain write (Nov 21, PR 424's
+  // integration run): since 112 the write is ignored, so the test checks
+  // against a value that was never there, or passes without testing
+  // anything. Set `state` as well. An insert is fine: a new listing takes
+  // its keys from `details`.
+  it('no test sets a site key up with a plain update', () => {
+    const keys = siteStateKeys()
+    const root = process.cwd()
+    const dirs = ['src', ...readdirSync(root).filter((d) => /^e2e/.test(d))]
+    const files = dirs.flatMap((d) =>
+      walkAll(join(root, d)).filter((p) => /\.(test|spec|setup)\.ts$|e2e[^/]*\/[^/]+\.ts$/.test(p) && !p.endsWith('siteStateWriters.test.ts')),
+    )
+    const plain = files.flatMap((path) =>
+      resourceChains(readFileSync(path, 'utf8'))
+        .filter((chain) => /\.(update|upsert)\(/.test(chain) && keys.some((k) => new RegExp(`\\b${k}\\b`).test(chain)) && !/\bstate:/.test(chain))
+        .map((chain) => `${relative(root, path)}: ${chain.split('\n')[0].trim()}`),
+    )
+    expect(plain, 'set `state` too').toEqual([])
+  })
+
+  // A fixture upserted over an existing row is an update, so since 112 it
+  // keeps that row's confirmations and Google record unless it resets
+  // `state` too: the next run starts with whatever the last one confirmed.
+  it('a script’s listing upsert resets state', () => {
+    const source = readFileSync(join(process.cwd(), 'scripts/run-test-project-server.mjs'), 'utf8')
+    const upserts = resourceChains(source).filter((chain) => /\.upsert\(/.test(chain))
+    expect(upserts.length).toBeGreaterThan(0)
+    expect(upserts.filter((chain) => !/\bstate:\s*\{\}/.test(chain))).toEqual([])
   })
 
   it('catches one', () => {

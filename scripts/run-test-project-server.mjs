@@ -84,6 +84,7 @@ async function ensureMinimalListing(supabase) {
     address: '1 Test St, Philadelphia, PA',
     phone: null,
     details: {},
+    state: {},
     status: 'approved',
     reviewed_at: new Date().toISOString(),
   })
@@ -152,6 +153,7 @@ async function ensureCacheRoundtripFixtureCategory(supabase) {
     address: '1 Test St, Philadelphia, PA',
     phone: null,
     details: {},
+    state: {},
     status: 'approved',
     reviewed_at: new Date().toISOString(),
   })

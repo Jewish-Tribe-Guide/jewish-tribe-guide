@@ -16,6 +16,7 @@
 //   node --env-file=.env.local scripts/backfill-place-ids.mjs
 
 import { createClient } from '@supabase/supabase-js'
+import { patchListing } from './patchListing.mjs'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -102,7 +103,7 @@ async function findPlace(name, address) {
 
 const { data: rows, error } = await s
   .from('resource')
-  .select('id,name,address,category,details')
+  .select('id,community_id,name,address,category,details')
   .eq('status', 'approved')
 if (error) throw new Error(error.message)
 
@@ -124,7 +125,7 @@ for (const r of rows) {
   }
 
   const details = { ...(r.details ?? {}), placeId: match.placeId }
-  await s.from('resource').update({ details }).eq('id', r.id)
+  await patchListing(s, r, details)
   done++
   console.log(`✅ ${r.name}\n     → matched: ${match.name} — ${match.address}`)
   await sleep(200)

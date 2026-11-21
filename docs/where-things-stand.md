@@ -1327,8 +1327,8 @@ Soon:
     doesn't name, or a value that isn't a placeholder. Red 3/3.
 
 Later or bigger:
-foreign keys; `details`
-holding app state (planned, below); an old-iOS floor
+foreign keys; ~~`details`
+holding app state~~ (done Nov 21, below); an old-iOS floor
 decision; the parked Today
 features (keep or delete); `/inbox` per community; this file's size;
 Partial Prefetching before Next 17.
@@ -1395,20 +1395,22 @@ go stale. What changes is who may write those keys:
    `details` as before. `siteStateWriters.test.ts` fails on a new whole
    write. **111 (fixed) needs running on dev and live** (dev is also the
    test project; 109 and 110 ran on both Nov 21).
-3. **Written, held**: migration 112 turns the trigger round. A write not
+3. **Run on dev and live Nov 21**: migration 112 turns the trigger round. A write not
    marked as a site writer keeps the listing's `state`, and its `details`
    gets the site's keys from it, so an approved week-old edit, an admin's
    save or a script can no longer wipe or roll back a confirmation, an
    item date or Google's record. A write that sets `state` itself keeps it.
-   **Run it only after 111 and this branch's deploy are live.** Before
-   running it: the old one-off scripts in `scripts/` that write site keys
-   whole (`backfill-place-ids`, `backfill-verified-directions`,
+   Checked on a fresh Postgres 17: a stale whole write, the patch,
+   `confirm_resource`, an unrelated update, an explicit `state`.
+   After it ran, the scripts caught up the same day: the seven in
+   `scripts/` that write a listing's details and name a site key
+   (`backfill-place-ids`, `backfill-verified-directions`,
    `migrate-mismatched-placeids`, `sync-google-hours`,
-   `reconcile-google-provenance`, `merge-food-categories`) would have
-   those writes ignored, and `run-test-project-server.mjs`'s fixture
-   upserts should send `state: {}` to keep resetting them. Checked on a
-   fresh Postgres 17: a stale whole write, the patch, `confirm_resource`,
-   an unrelated update, an explicit `state`.
+   `reconcile-google-provenance`, `migrate-davening`, and
+   `merge-food-categories` while there) write through
+   `scripts/patchListing.mjs`, and `run-test-project-server.mjs`'s fixture
+   upserts send `state: {}` so they keep resetting a listing's
+   confirmations. `siteStateWriters.test.ts` covers `scripts/` too.
 
 The earlier order, kept for the record: reads merging `{...details,
 ...state}`, every writer writing `state`, then removing the keys from

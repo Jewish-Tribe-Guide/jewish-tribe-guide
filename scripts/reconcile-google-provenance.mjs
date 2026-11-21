@@ -37,6 +37,7 @@
 // match Google today; it never removes or replaces an entry.
 
 import { createClient } from '@supabase/supabase-js'
+import { patchListing } from './patchListing.mjs'
 
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 const APPLY = process.argv.includes('--apply')
@@ -129,7 +130,7 @@ for (const c of categoryRows) {
 
 const { data: rows, error } = await s
   .from('resource')
-  .select('id,name,phone,details,category')
+  .select('id,community_id,name,phone,details,category')
   .eq('status', 'approved')
   .not('details->>placeId', 'is', null)
 if (error) throw new Error(error.message)
@@ -213,7 +214,7 @@ for (const r of rows) {
       // Additive only — union with what's already there, never drop or
       // replace an entry (see the top-of-file note on why).
       const nextOwned = [...new Set([...priorOwned, ...confirmed])]
-      await s.from('resource').update({ details: { ...r.details, googleFields: nextOwned } }).eq('id', r.id)
+      await patchListing(s, r, { ...r.details, googleFields: nextOwned })
       updated++
     }
     await sleep(200)
@@ -223,10 +224,7 @@ for (const r of rows) {
   if (unclear.length) ambiguous.push({ id: r.id, name: r.name, unclear })
 
   if (APPLY) {
-    await s
-      .from('resource')
-      .update({ details: { ...r.details, googleFields: owned } })
-      .eq('id', r.id)
+    await patchListing(s, r, { ...r.details, googleFields: owned })
     updated++
   }
   await sleep(200)

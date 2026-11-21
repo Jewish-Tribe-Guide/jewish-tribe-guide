@@ -7,6 +7,7 @@
 // The existing `details.davening` text is left in place as a harmless fallback.
 
 import { createClient } from '@supabase/supabase-js'
+import { patchListing } from './patchListing.mjs'
 import { synagogues } from '../src/data/synagogues.js'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -141,7 +142,7 @@ function parseLegacyDavening(daveningArray) {
 
 const { data: rows, error } = await supabase
   .from('resource')
-  .select('id,details')
+  .select('id,community_id,details')
   .eq('category', 'synagogue')
 
 if (error) {
@@ -178,10 +179,7 @@ for (const row of rows) {
 
   const minyanim = parseLegacyDavening(source.davening)
 
-  const { error: upErr } = await supabase
-    .from('resource')
-    .update({ details: { ...row.details, minyanim } })
-    .eq('id', row.id)
+  const upErr = await patchListing(supabase, row, { ...row.details, minyanim }).then(() => null, (e) => e)
 
   if (upErr) {
     console.error(`  ❌ update failed for ${legacyId}:`, upErr.message)

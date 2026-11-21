@@ -18,6 +18,7 @@
 // categories lands on a completely different building.
 
 import { createClient } from '@supabase/supabase-js'
+import { patchListing } from './patchListing.mjs'
 
 const APPLY = process.argv.includes('--apply')
 const CATEGORIES = ['synagogue', 'mikvah', 'bikur-cholim']
@@ -66,7 +67,7 @@ function nameSimilarity(a, b) {
 
 const { data: rows, error } = await s
   .from('resource')
-  .select('id,name,address,category,details')
+  .select('id,community_id,name,address,category,details')
   .eq('status', 'approved')
   .in('category', CATEGORIES)
 if (error) throw new Error(error.message)
@@ -104,7 +105,7 @@ for (const r of rows) {
       verifiedPlaceName: match.name,
       verifiedAt: new Date().toISOString(),
     }
-    await s.from('resource').update({ details }).eq('id', r.id)
+    await patchListing(s, r, details)
   }
   verified++
   await sleep(200)
