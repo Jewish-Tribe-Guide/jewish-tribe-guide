@@ -103,20 +103,4 @@ describe('createVisibilityLoader', () => {
     advance(5_000)
     expect(await get()).toBe('A')
   })
-
-  // The proxy's address check asks again on an address it doesn't know, so a
-  // category made a moment ago isn't turned away for the whole TTL; at most
-  // once per maxAgeMs, so made-up addresses can't each cost a query.
-  it('loads again inside the TTL when asked for a fresher copy, at most once per maxAgeMs', async () => {
-    const load = vi.fn().mockResolvedValueOnce('A').mockResolvedValueOnce('B').mockResolvedValue('C')
-    const { get, advance } = setup(load)
-
-    await get()
-    advance(1_000)
-    expect(await get({ maxAgeMs: 5_000 })).toBe('A')
-    advance(4_000)
-    expect(await get({ maxAgeMs: 5_000 })).toBe('B')
-    expect(await get({ maxAgeMs: 5_000 })).toBe('B')
-    expect(load).toHaveBeenCalledTimes(2)
-  })
 })

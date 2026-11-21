@@ -9,7 +9,6 @@ import { listCommunityVisibility } from '@/lib/communityStore'
 import { createVisibilityLoader } from '@/lib/visibilityLoader'
 import { previewCookieName, previewCookieOptions } from '@/lib/previewCookie'
 import { friendlyListingPath, parseBareListingLink } from '@/lib/bareListingLink'
-import { NO_ADDRESSES, isKnownAddress, loadKnownAddresses } from '@/lib/knownAddresses'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Redirects "/" to a community.
@@ -188,49 +187,10 @@ async function redirectBareListingLink(request: NextRequest) {
   return NextResponse.redirect(url, 308)
 }
 
-// ── A made-up address answers 404, not the page's shell (Nov 21) ──
-// With Partial Prefetching, an address that wasn't prerendered is sent its
-// route's shell, and a 200, before the page can find it isn't real. So the
-// proxy turns away what it knows isn't there (knownAddresses.ts). Cached
-// like the visibility list; an address it doesn't know asks for a copy at
-// most ADDRESSES_RECHECK_MS old before answering 404, so a category or
-// listing made a moment ago gets through. Never loaded: everything passes.
-const ADDRESSES_CACHE_MS = 60_000
-const ADDRESSES_RECHECK_MS = 5_000
-const loadAddresses = createVisibilityLoader({
-  load: loadKnownAddresses,
-  empty: NO_ADDRESSES,
-  ttlMs: ADDRESSES_CACHE_MS,
-  retryMs: VISIBILITY_RETRY_MS,
-  onError: (err) => console.error('[proxy] address list refresh failed:', err),
-})
-
-// The site's own 404 page, not a line of text: it offers a way back into
-// the community the address named (not-found.tsx reads the address the
-// browser shows, which a rewrite leaves alone). Next serves /_not-found
-// with a 404.
-function notFoundResponse(request: NextRequest) {
-  return NextResponse.rewrite(new URL('/_not-found', request.url), { status: 404 })
-}
-
-async function refuseUnknownAddress(request: NextRequest) {
-  const { pathname } = request.nextUrl
-  let known = await loadAddresses()
-  if (known.communities.size === 0 || isKnownAddress(pathname, known)) return null
-  known = await loadAddresses({ maxAgeMs: ADDRESSES_RECHECK_MS })
-  if (known.communities.size === 0 || isKnownAddress(pathname, known)) return null
-  return notFoundResponse(request)
-}
-
 export async function proxy(request: NextRequest) {
   if (request.nextUrl.pathname === '/') return redirectRoot(request)
   if (request.nextUrl.pathname.startsWith('/api/')) return (await gateCommunityApi(request)) ?? NextResponse.next()
-  return (
-    (await gateCommunityPath(request)) ??
-    (await redirectBareListingLink(request)) ??
-    (await refuseUnknownAddress(request)) ??
-    NextResponse.next()
-  )
+  return (await gateCommunityPath(request)) ?? (await redirectBareListingLink(request)) ?? NextResponse.next()
 }
 
 export const config = {
@@ -243,8 +203,5 @@ export const config = {
   // assertUsableSlug's reserved-word list blocks that at creation.
   // The admin API stays out on purpose too: a proxy buffers every request
   // body it sees, and the admin's uploads have no need to be.
-  // favicon.ico isn't left out: there is none, and the proxy answers its 404
-  // (refuseUnknownAddress), as the [community] route did before Partial
-  // Prefetching.
-  matcher: '/((?!api/admin|api/cron|api/inbound|api/inbox|admin|inbox|_next/static|_next/image|sitemap.xml|robots.txt|manifest.webmanifest|icons).*)',
+  matcher: '/((?!api/admin|api/cron|api/inbound|api/inbox|admin|inbox|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|manifest.webmanifest|icons).*)',
 }

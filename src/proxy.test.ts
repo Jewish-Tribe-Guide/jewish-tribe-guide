@@ -17,15 +17,6 @@ vi.mock('@/lib/bareListingLink', async (importOriginal) => ({
   friendlyListingPath: mockFriendlyListingPath,
 }))
 
-// The address list (knownAddresses.ts) reads four tables. Rejected by
-// default: a list that never loaded lets everything through, which is what
-// every test before the address check's own expects.
-const mockLoadKnownAddresses = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/knownAddresses', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/knownAddresses')>()),
-  loadKnownAddresses: mockLoadKnownAddresses,
-}))
-
 function req(url: string, cookie?: string): NextRequest {
   return new NextRequest(new URL(url, 'https://example.com'), cookie ? { headers: { cookie } } : undefined)
 }
@@ -42,14 +33,9 @@ beforeEach(async () => {
   ;({ proxy } = await import('./proxy'))
 })
 
-beforeEach(() => {
-  mockLoadKnownAddresses.mockRejectedValue(new Error('not in this test'))
-})
-
 afterEach(() => {
   mockListCommunityVisibility.mockReset()
   mockFriendlyListingPath.mockReset()
-  mockLoadKnownAddresses.mockReset()
 })
 
 describe('proxy — "/" redirect', () => {
@@ -220,7 +206,7 @@ describe('proxy — a hidden community through the public API', () => {
     }
     const { config } = await import('./proxy')
     const re = pathToRegexp(config.matcher, [], { strict: true, sensitive: false, delimiter: '/' })
-    for (const path of ['/api/resources', '/api/zmanim/batch', '/philly', '/blatimore/food', '/favicon.ico']) expect(re.test(path), path).toBe(true)
+    for (const path of ['/api/resources', '/api/zmanim/batch', '/philly', '/blatimore/food']) expect(re.test(path), path).toBe(true)
     for (const path of ['/api/admin/listings', '/api/cron/watches', '/api/inbound/email', '/api/inbox', '/admin', '/inbox', '/_next/static/x.js']) {
       expect(re.test(path), path).toBe(false)
     }
@@ -267,60 +253,3 @@ describe('proxy — a listing’s bare-id link', () => {
     expect(mockFriendlyListingPath).not.toHaveBeenCalled()
   })
 })
-
-// With Partial Prefetching, a made-up address is sent its route's shell and
-// a 200 before the page can find it isn't real (7 e2e tests, Nov 21). The
-// proxy answers 404 first.
-describe('proxy — a made-up address', () => {
-  const known = {
-    communities: new Set(['philly']),
-    slugs: new Set(['philly/food', 'philly/volunteer']),
-    listings: new Set(['philly/food/goldi-a1b2c3']),
-  }
-
-  beforeEach(() => {
-    mockListCommunityVisibility.mockResolvedValue({ philly: { visible: true, previewToken: 't' } })
-    mockLoadKnownAddresses.mockReset()
-    mockLoadKnownAddresses.mockResolvedValue(known)
-  })
-
-  it('404s an unknown community, category or listing, and favicon.ico', async () => {
-    for (const path of ['/not-a-real-community', '/no-such-community/ask/kosher-wine', '/philly/not-a-real-category', '/philly/food/not-a-real-listing', '/favicon.ico', '/wp-login.php']) {
-      const res = await proxy(req(path))
-      expect(res.status, path).toBe(404)
-      // The site's 404 page, which offers a way back into the community.
-      expect(new URL(res.headers.get('x-middleware-rewrite')!).pathname, path).toBe('/_not-found')
-    }
-  })
-
-  it('lets the real ones through, and the screens that aren’t categories', async () => {
-    for (const path of ['/philly', '/philly/food', '/philly/volunteer', '/philly/food/goldi-a1b2c3', '/philly/about', '/philly/ask/kosher-wine', '/philly/changes/validated/2026-11-20', '/philly/eruv', '/philly/zmanim', '/offline', '/sw.js', '/images/hero.jpg', '/subscribers/manage']) {
-      const res = await proxy(req(path))
-      expect(res.status, path).toBe(200)
-      expect(res.headers.get('x-middleware-next'), path).toBe('1')
-    }
-  })
-
-  it('asks the database again before turning away an address it doesn’t know', async () => {
-    vi.useFakeTimers()
-    try {
-      mockLoadKnownAddresses.mockResolvedValueOnce(known).mockResolvedValueOnce({ ...known, slugs: new Set([...known.slugs, 'philly/new-category']) })
-      expect((await proxy(req('/philly'))).status).toBe(200)
-      vi.advanceTimersByTime(6_000)
-      expect((await proxy(req('/philly/new-category'))).status).toBe(200)
-      expect(mockLoadKnownAddresses).toHaveBeenCalledTimes(2)
-      // A made-up one straight after asks nothing more of the database.
-      expect((await proxy(req('/philly/made-up'))).status).toBe(404)
-      expect(mockLoadKnownAddresses).toHaveBeenCalledTimes(2)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('lets everything through when the list has never loaded', async () => {
-    mockLoadKnownAddresses.mockReset()
-    mockLoadKnownAddresses.mockRejectedValue(new Error('db down'))
-    expect((await proxy(req('/not-a-real-community'))).status).toBe(200)
-  })
-})
-

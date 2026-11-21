@@ -532,8 +532,8 @@ holding app state~~ (done Nov 21, below); ~~an old-iOS floor
 decision~~ (below); ~~the parked Today
 features~~ (stay parked, the user Nov 21); ~~`/inbox` per community~~
 (left as it is, below); ~~this file's size~~ (finished work moved to
-`docs/history.md` Nov 21, 8,039 lines to about 2,200); ~~Partial
-Prefetching before Next 17~~ (on, Nov 21, below).
+`docs/history.md` Nov 21, 8,039 lines to about 2,200); Partial
+Prefetching before Next 17 (tried Nov 21, below; not on).
 
 The user's calls on this list, Nov 21: Today stays parked, not deleted.
 `/inbox` stays as it is: it's for forms, there are none yet, and forms
@@ -554,34 +554,40 @@ on every visitor's download (the home's JS budget is 400 KB), and React
 and Next aren't tested there. Revisit only if analytics show real visits
 from iOS 15 or older.
 
-Partial Prefetching (**on**, Nov 21, `claude/foreign-keys`). Flipped on
-its own first, e2e went 419 passed to 412: **a made-up address answered
-200, not 404** (an unknown category, community, listing, shared
-question, `/favicon.ico`, the old travel-time endpoint). With the flag
-on, an address that wasn't prerendered is sent its route's shell at
-once, so the status is out before the page finds the address isn't
-real; Next's docs say to answer those from the proxy. So now:
+Partial Prefetching (tried Nov 21, not switched on): with
+`partialPrefetching: true`, e2e went 419 passed to 412 and **7 failed,
+all the same way: a made-up address answers 200, not 404** (an unknown
+category, community, listing, shared question, `/favicon.ico`, the old
+travel-time endpoint). The page still says "Page not found", but crawlers
+and link previews would take dead links as real pages. Cause, from Next's
+ISR docs: with the flag on, a path not prerendered is sent the route's
+App Shell at once, so the status is out before the page finds the
+address isn't real. `instant = false` doesn't help (it's validation
+only). What would work: `proxy.ts` answering 404 for an unknown community
+or category before rendering, against a cached list of slugs; a cost on
+every request, to measure. The gain is small today: measured with a
+production build, the home sends the same prefetches either way (3
+requests; most links already have `prefetch={false}`), and a category
+arrives on the click in about 0.4s. Next 17 turns it on for everyone, so
+it has to be done before that upgrade; the 7 e2e tests fail if it's
+flipped without the fix.
 
-- The proxy keeps a list of every real address
-  (`src/lib/knownAddresses.ts`: communities, categories, forms, each
-  category's approved listings by friendly slug and bare id), cached a
-  minute per server, and rewrites anything else to the site's own 404
-  page, with a 404. An address it doesn't know makes it reload the list
-  first (at most once per 5s), so a category or listing made a moment
-  ago gets through. If the list has never loaded, everything gets
-  through. A hidden category or an unpublished form still gets past it
-  and 404s from the page with a 200, as before.
-- Top-level folders, `public/` files and the screens under a community
-  are listed by hand; `knownAddresses.test.ts` fails when a folder
-  isn't on the list.
-- A made-up `/api/` path gets a 404 from `src/app/api/[...path]`.
-- `favicon.ico` now goes through the proxy (there is none; 404).
-
-Cost: one read of four tables per server per minute. The gain is small
-today: measured with a production build, the home sends the same
-prefetches either way (3 requests; most links already have
-`prefetch={false}`), and a category arrives on the click in about 0.4s.
-Next 17 turns it on for everyone, so this is that upgrade's part done.
+Built Nov 21 and reverted the same evening (commit 55ae2dc6, kept in
+history): the proxy kept a cached list of real addresses and sent the rest
+to the 404 page with a 404, and `api/[...path]` answered made-up API
+paths. e2e passed (419). **But the write suites found a second, bigger
+problem:** with the flag on, a page that wasn't prerendered at build time
+fails ("uncached or runtime data during prerendering",
+`NEXT_STATIC_GEN_BAILOUT`): `[community]`, `[slug]/[id]`, `map`, `about`,
+the admin's pages. Next renders those without their address first, and
+the community layout reads its address outside any `<Suspense>` (the
+same cause `[slug]/[id]/page.tsx`'s comment describes for the build). On
+live that would be every listing, category or community added since the
+last deploy, until the next one. e2e never sees it (philly is
+prerendered); admin-write and cache-roundtrip do (their community is made
+after the build). The real fix is the community layout (and the admin's)
+reading `params` inside a boundary, with the content loaded below it:
+a bigger change, worth its own plan before Next 17.
 
 Foreign keys (Nov 21, `claude/foreign-keys`): migration 113 **run on
 dev and live Nov 21** (the user). Every table's `community_id` points at
