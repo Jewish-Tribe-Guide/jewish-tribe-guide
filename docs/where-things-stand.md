@@ -1328,7 +1328,7 @@ Soon:
 
 Later or bigger: the two 2,000-line screens (map, category page);
 foreign keys and transactions for deletes and approvals; `details`
-holding app state; log retention; redundant indexes; an old-iOS floor
+holding app state; an old-iOS floor
 decision; the parked Today
 features (keep or delete); `/inbox` per community; this file's size;
 Partial Prefetching before Next 17.
@@ -1338,6 +1338,21 @@ Done Nov 21 (`claude/later-list`): font sizes are rem (999 classes;
 text size. Hebrew keeps its own direction: listing names sit in `<bdi>`,
 written notes and descriptions carry `dir="auto"`, and so do the text
 boxes people type into (never a phone or number box).
+
+Redundant indexes: migration 108 drops ten one-column indexes a key or
+102's indexes already cover (nine `<table>_community_idx` from 027, plus
+`resource_tag_resource_idx` and `vote_resource_idx`), each only if the
+covering index is really there. Checked on a fresh Postgres 17 after
+001–107: drops all ten, runs twice clean, keeps one whose cover is
+missing. **For the user:** run 108, dev then live, after 102.
+
+Log retention, measured on live Nov 21 (read only): activity 447 rows,
+daily_count 709, job_run 142, question_reading 53, submission 1,385,
+night_note 0. job_run and night_note already prune themselves
+(`KEEP_DAYS`). Nothing else needs a limit yet: at this size every read
+is milliseconds. Revisit when daily_count passes ~50,000 rows (the
+Missed searches tab reads all of a community's search misses, every day
+ever) — then read the last year only, rather than deleting anything.
 
 Checked and not so: the nightly email does record a failed send, as a
 warning, not a failure.
