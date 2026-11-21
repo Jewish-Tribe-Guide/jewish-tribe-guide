@@ -32,46 +32,13 @@ the next PR.
 
 Small open items from Nov 9:
 
-- ~~`e2e/saved.spec.ts` missing its Saved chip in CI~~ Found Nov 16 (third
-  time, PR #388): Google refused the key on localhost and threw inside the
-  Map page's pin redraw, which replaced the whole page with the error
-  screen. Fixed: `MapBoundary` keeps a broken map in its own box on the Map
-  page too, as on the category page. A real visitor whose map Google
-  refuses now keeps the search, chips and list.
-- ~~Dev's pretend Riverton community~~ Deleted Nov 20 (the user's yes),
-  with philly's old `Cache Round-trip Seed` category and section.
 - "How it looks" isn't built for the phone (nothing sits beside a field
   there).
 - The Denomination/Nusach script is still a dry run (see "Waiting for a yes
   to change the live site").
 
-**Nov 16, after #387 merged (on `redesign/speed-targets`):** speed
-targets agreed and written down in `docs/speed-targets.md` (≤0.1s to a
-visible response, ≤1s to the answer on a phone, Core Web Vitals at p75).
-The first tap on a place on a phone no longer slides up an empty sheet:
-its code loads once a category page is idle (`src/lib/preloadable.tsx`),
-checked by `e2e/first-tap.spec.ts`. PR builds made faster
-Nov 20 (PR 401): 10–13 min down to 5.6, see "The speed and scale sweep".
-
 **Nov 16, the user's notes after the release:**
 
-- Fixed: the Activity page slid sideways on a phone (a join link or long
-  minyan line had nowhere to wrap; 421px on a 375px phone, live). Rows wrap.
-- Fixed: the phone's "Kept up by the community" card was cut off with "…".
-  It says the count only now ("· 158 places"); "every listing dated" and
-  "checked with Google" are in the sheet it opens.
-- Fixed: Feedback's Send has no paper-plane icon ("No emoji for send").
-- The computer home's map photo: production lacked migration 095; the user
-  ran it and set the photo, then it was copied to production's own storage
-  (it pointed at dev's). The live home shows the copy once its cache
-  refreshes (any Site tab save does it).
-- Done: About and Privacy's new text copied from dev to live (the user's
-  yes, Nov 16), refreshed by a Pages tab save; the live home shows the map
-  photo from production's storage since the same save.
-- Fixed: Activity says "A visitor updated Mei Shalva" for a visitor's edit
-  (the user: "we can say visitor updated"). An admin's own edit and the
-  checks' ("… (automated)") still say "Mei Shalva updated" (activity.ts
-  `editedBy`, read from each edit's submission).
 - Fixed: coming back to the app re-rendered the whole page on nearly every
   return, and a tap made then waited for it. Live, the server's content
   fingerprint flipped between two values (instances with different cached
@@ -90,40 +57,7 @@ Nov 20 (PR 401): 10–13 min down to 5.6, see "The speed and scale sweep".
   live; copied to production's (the user's yes, Nov 16). Live has no eruv
   photo pointing at dev. Dev alone has photos for Eruv, Hospitals,
   Childcare and Schools (iStock links) and Hotels; not copied.
-- Fixed: a search for a name several places share ("Rita's", five of
-  them) listed three in alphabetical-tie order, the 1.2 mi one last and
-  the 0.8 mi one not at all. Equal matches now come nearest first
-  (`namedListings`, from the visitor or the community's centre).
 - Open question, not a decision: should a visitor order their You page?
-- You has its own search (the user's yes after canvas "Search on You",
-  boards 1-4 and 2b, Nov 16): a box under the title, "Find a place or a
-  search to save" ("Find more to save" once something is), with the
-  home's lines under it. Each line's bookmark is 2b's bigger round one
-  (SaveButton `round`): a tinted circle, solid blue once saved. The line
-  itself still opens what it names, and Enter goes to the first. On a
-  computer the box sits on the photo, as a category page's does.
-  Not drawn but built: "Nothing in the guide for "…"" when nothing matches.
-  Fixed the same day (the user, a computer at phone width): a click away
-  left You's results open. Now a tap or click away closes them as the
-  home's do, opening nothing, and Escape too (useCloseOnTapAway, shared
-  with the home's HeroHeading). And on a computer the Places heading
-  started inside the photo, half hidden (36px under the box where the
-  photo has 45); now what's saved starts 32px below the photo.
-- Fixed Nov 16 (the user, on a phone): search "what time is mincha
-  today", open Minyanim by time, tap the header's ‹, and Synagogues
-  showed for a moment before the view came back. A minyan question in
-  the box over the shuls opens the view after 0.7s, and the question was
-  still there. Now leaving the view keeps it left for those words; new
-  words or Enter ask again. The ‹ still goes to Synagogues, not home.
-- CI, Nov 16 (PR 389): admin-write's category-open test picked the
-  alphabetically first category, which was `cache-roundtrip-seed`, the
-  fixture the cache suite renames while both run against the test
-  project. It now skips other suites' fixtures (`e2e-…`,
-  `cache-roundtrip…`).
-- CI, Nov 16 (PR 389, next run): moderation's Reject test failed on
-  "Rejecting…" at expect's 5s default on a slow runner (4.1 min vs 2.7).
-  The approve test got 15s for the same thing on Nov 3; the reject,
-  edited-approve and History waits never did. All four have 15s now.
 - Fixed Nov 16 (PR 389's CI, then 4 of 10 locally, on main too): in the
   admin, a category page's editor started over whenever its list arrived
   with ANY page changed, so a screen just opened (Add a field) closed
@@ -155,56 +89,6 @@ Nov 20 (PR 401): 10–13 min down to 5.6, see "The speed and scale sweep".
 - Admin saves were slow, not the tests (Nov 16, the user: "if we just
   keep relaxing rules what are we even testing"). The 15s waits put in
   that morning are gone again; the tests are back on expect's 5s.
-  - Cause: every save on a place read all 13 watch jobs again and showed
-    "Saving…" until the last came back (4.4s for one menu Accept on a
-    laptop, over 5s in CI). Now a save waits only for the jobs its writes
-    reach (`jobsChangedBy`), and the rest are read behind it. Turning a
-    job off or on updates the remembered list at once (`noteJobSwitched`).
-  - Places opened with its own read queued behind those 13 (the browser
-    opens six connections to an HTTP/1.1 server, as in the tests). It now
-    reads the jobs after its list is in, as To do already did.
-  - A place's own screen showed nothing until all 13 were in, two or three
-    rounds of reads on those six connections, and main-dishes' `openPlace`
-    failed on it. Now every job comes in ONE request
-    (`/api/admin/watches/jobs`, the 13 routes run side by side on the
-    server; `?only=` for a save's). Unit tests answer it from each job's
-    own route (`src/test/fetchJobsByRoute.ts`, mocked in vitest.setup.ts).
-  - Turning a job back on could still show it off: a jobs read asked
-    before the switch landed after it with the old list (job-off, once in
-    two runs). A read from before a switch no longer sets which jobs are
-    off, and every open screen takes the switch too.
-  - CI's unit run failed on a timer left by `useScreenHistory` (a move's
-    wait for its address) firing after a test's page was gone; it stops
-    when there's no page now.
-  - Every admin route checked the sign-in with Supabase on its own, so one
-    jobs read made 14 checks; requests carrying the same token now share
-    the check under way (adminAuth's `checking`), dropped once answered.
-  - main-dishes' `openPlace` reloaded every 3s, so a load over 3s on a busy
-    runner was thrown away and restarted until the test gave up. Each try
-    now waits for the screen to finish loading (expect's 5s), then looks.
-  - Closed Nov 17: `category-open.spec.ts` failed 2 of 8 full admin-write
-    runs on Nov 16, then on main's CI and PR 392's (Cemetery each time).
-    A test bug, not the site's: it clicked once the prefetch's *headers*
-    arrived, but Next uses a prefetched route only once it has read and
-    stored the whole thing (`EntryStatus.Fulfilled`,
-    `segment-cache/navigation.js`); one still arriving counts as none. On a
-    cold CI server the route rendered in 132ms and the click landed 64ms
-    in. The test now marks in the page when the router has read the body
-    and clicks a task after. Holding the body back 1.5s after the headers:
-    old test 5 of 5 red, new 5 of 5 green. Also: the site's CSP refuses
-    `waitForFunction`'s string eval, so it can never see a page flag; poll
-    `page.evaluate` instead.
-  - Closed Nov 18: `community-editor.spec.ts:61` (a new community's page
-    404'd straight after Create), 1 run in 4 with two workers. Expiring the
-    community list wasn't enough: Next hands a `use cache` read the result
-    of a fill another request already started, without checking whether it
-    began before the invalidation (`use-cache-wrapper.js`, "joining pending
-    cross-request invocation"; 468 joins in one local run). A fill begun
-    before the insert answered after the expiry. The create route now reads
-    the list until it holds the new slug (two reads at most, five allowed)
-    before answering. A real bug for an admin too, not just the test. Unit
-    test red against the old code; the race itself didn't reproduce on
-    demand (25/25 before and after locally).
   - Nov 17, not reproduced: `places.spec.ts:77` and
     `read-questions.spec.ts:80` failed together in run 43994304148. The
     runner's own direct Supabase calls in the test hooks took 2–3.8s in
@@ -219,13 +103,6 @@ Nov 20 (PR 401): 10–13 min down to 5.6, see "The speed and scale sweep".
     the next failure (retained since cc591c7a) should name what remounted.
   - Moderation's 15s waits (from Nov 3) are the approve request itself,
     about ten database round trips in a row; left as they are.
-  - The combined jobs read made 105 database requests, about 65 of them
-    the same read again (the admin list 14 times, the watch list 14, the
-    categories 12, each job's runs 3). Inside it, an identical read is now
-    made once and shared (`src/lib/supabase/sharedReads.ts`, GETs only,
-    one request's lifetime): 42 requests, median 1.36s to 1.07s with two
-    at once, worst of 30 2.4s to 1.45s. Measured, not the cause of the
-    open item below: Places' own read was 0.41s either way.
   - Open: CI at 76ee5be9 (Nov 16 evening) failed two admin-write tests on
     a server stall over 5s: Places stuck on Loading… (its read is 0.4s
     locally) and a Dismiss still busy (one database delete). Nothing else
@@ -236,26 +113,6 @@ Nov 20 (PR 401): 10–13 min down to 5.6, see "The speed and scale sweep".
     next one names the request that hung. Read that before guessing.
   - Seen in that trace check: one Places load makes two combined jobs
     reads. Not looked into.
-  - CI's unit run failed once on To do's "1 of 3": the test's three places
-    were dated by the clock, which sometimes ticked between them and
-    reordered the newest-first list. Fixed in the test (fixed dates).
-- Phone header titles are bigger (the user's OK, Nov 16: "be aware of long
-  names"): 22px bold when it fits, stepping down to 19, 17, 15px, then two
-  lines, measured against the room beside it (`FitTitle`). The phone row's
-  gap is 12px now (it kept the computer's 40px). On a 320px phone "Philly
-  Jewish Guide" is 15px and "Candle Lighting & Zmanim" two lines; on 375px
-  19px and 15px. The computer header is unchanged.
-  `e2e/header-title.spec.ts`.
-- A tab's own page names itself in the phone header (the user's OK,
-  Nov 16): You, Activity, Browse (and Feedback, when it's a tab) show
-  the tab bar's word for them
-  beside the logo, with no Back (useSetTabHeader); the page starts with
-  its content, its own h1 kept for a screen reader. A chevron is what
-  says a page is a step down, so a category, a listing, About, and
-  Feedback when it isn't a tab keep "‹ title". Home keeps the site's name. A computer keeps
-  the site's name everywhere. With several communities the header's name
-  is the switcher, so it stays the community's name on a tab page too.
-  The Map tab hides the header on a phone, as before.
 - One e2e flake seen once (Nov 16), 0 of 10 on a repeat:
   `offline.spec.ts:109` desktop, `locator('main')` found two `<main>`s,
   one with React's `vt-update` (the server copy, mid view transition).
@@ -264,27 +121,6 @@ Nov 20 (PR 401): 10–13 min down to 5.6, see "The speed and scale sweep".
 **Nov 16, later: the map from a category on a phone (the user: "Yes,
 build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
 
-- Built: a Map button first in a category's list row on a phone, then
-  Filters and Sort, on one line down to 360 wide. It opens the real Map
-  tab on that category, its search and filters carried. Shown in both of
-  Synagogues' views. Where a category has no map (no addresses), no
-  button. A computer is unchanged (the map is beside the list).
-  **Changes two earlier decisions:** the list's count ("71 listings",
-  Sep 28) is off the row on a phone (a group's name, "Open now · 57",
-  moves under the buttons instead); and a category's own Map link is back
-  on phones (it was removed when the tab bar was thought enough). (Sort's
-  choice alone, the order and the 10px sides changed Nov 17, below.) The row
-  doesn't stick. `e2e/phone-map-row.spec.ts` measures the line at 360.
-- Built: arrived from a category, the Map tab's phone search bar has a
-  round ‹ before it, back to the category as it was (the browser's Back;
-  a link opened on its own goes to the category). `?from=` in the map's
-  address says where from, and survives the map's own address writes.
-  Opened as a tab, no ‹.
-- Fixed: a map link to one place (`?place=`) opened on the whole city
-  with the place lost among the pins. Fitting every pin started together
-  with the place's own framing and won; now a picked place frames itself.
-  Checked by eye only: the camera needs Google's map, which refuses the
-  key on CI's localhost (`shouldLeaveToSelection` is unit-tested).
 - Built Nov 17, for the user to try on the preview: the listing's map
   tile (B1). A phone's listing (its sheet on a category page, and its own
   page) has a small Google map, 120px tall, at the top of the address box,
@@ -296,134 +132,6 @@ build it"; canvas 6wPoB3zuQiwGfWu3QUKcpH, rows D, G and the built row H):**
   pill is top left, not bottom left, because Google's logo and credit sit
   along the bottom and must stay visible. Not on a computer (the map is
   beside the list there), nor in the map's own sheet.
-- Fixed with it: a map opened on one place framed it, then "nudged" the
-  pin to the strip's middle before the pin was drawn, read its box as the
-  screen's corner, and moved the map 251px the wrong way, the place behind
-  its sheet. The nudge now skips an undrawn pin; the place lands a little
-  low in the strip, but in view. And the Map tab's ‹ with a place's sheet
-  open closed only the sheet; it now goes back past the map's own entries
-  (`mapBackSteps`), checked in `e2e/phone-map-row.spec.ts`.
-- Fixed Nov 17 (the user, on the preview): the first listing's map tile
-  opened its place, every later one opened the map on the first place
-  again. The Map tab stays mounted behind other screens and restored the
-  address's place once a mount; now once each time it shows. Checked in
-  `e2e/phone-map-row.spec.ts` (Google's picture stood in for there).
-- Changed Nov 17 (user OK'd, from a tester): the footer's "Spot something
-  wrong or missing?" told every visitor the guide was likely wrong. Now
-  "Know something we don't?" and "Tap Suggest an edit on any listing, or
-  + Add for a new place. A person checks each one." (it used to name Edit
-  and Report links that are gone). The bottom line's "please confirm
-  details directly" stays, for now.
-- Built Nov 17 (user OK'd; a friend's idea): Activity shows the nightly
-  checks, canvas "Activity: the nightly checks" (6YK3gNdSPEZyhz3E1nYchS),
-  boards W1/W3 (the row) and X4/X5 (the night's page). Each night is one
-  quiet row in the timeline under its day, at the time it ran, not pinned:
-  the site's logo on a small tile, "Validated · 132 against Google · 119
-  against their own websites · 1 AM". It opens
-  `/[community]/changes/validated/<date>`: a group per kind of check,
-  every row a listing, the source only in the heading ("Hechsher, against
-  the kosher agencies' lists"), four shown then "Show all". Only what was
-  validated: what couldn't be read stays in the admin, a possible change
-  is never mentioned. Validated means a check read the source and found
-  it as we have it, whether or not the listing shows a date for it (the
-  user, Nov 17: not the same thing): a box dated by `confirmFromSource`, a
-  menu still naming the listing's dishes, an eruv website still showing
-  its hotline or alerts link, or Google answering and matching. Each is
-  noted per run by `validatedDuring.ts`; the ids go in `job_run.kinds`
-  (`validated`, `contact`), no migration. The read-menus job's first
-  reads count too when they agree (the Watches tab's Menus line already
-  counts that job); one that differs waits on the Main dishes tab and
-  never counts. Changes the Oct 2 rule that Activity shows
-  only changes to the guide. Departures from the boards: Google is one
-  group, "Open or closed, against Google" (most nights it checks status
-  only); Menus are "Dishes, against their menus" and eruvs "Eruv
-  hotlines and alerts, against their websites", both counted in "their
-  own websites"; two more groups, "Phone and email" and "Details"; every night's page lists names
-  (W2's counts-only older night is gone, since each run now keeps its
-  ids); yesterday's night is titled "Validated yesterday". Rows appear
-  only from the first runs after this deploys; no production write needed.
-- Built (user OK'd, Nov 16): a category page come back to, by ‹ on the
-  Map tab or the browser's Back, lights the tab it was first opened from
-  (Home), not the Map tab just left. Opened anew from another tab, it still
-  lights that tab (the Nov 4 rule). The Back flag lives in
-  `src/lib/cameBack.ts`, loaded from the root layout like `backGuard.ts`:
-  inside the tab bar's own module it heard the Back after the router had
-  drawn the page. `e2e/phone-map-row.spec.ts` checks both ways back.
-- Built Nov 17, the user's own call after the boards (rows I and J on the
-  canvas): on a phone the row is Filters (with its symbol) · Map (a word
-  only) · Sort Distance ▾ ("Sort" back on phones, and 8px between the
-  buttons as on a computer, the user later that day). Sort stays at the
-  end, where its menu opens. Map in
-  the middle is a change from Nov 16 (first) and from this morning's build
-  (alone at the right end, 99bc7b3a). The buttons and the Synagogue |
-  Minyan switch are 12px a side on a phone ("a little ovaly"; 14px
-  overflowed Synagogues at 360 by 10px), 14px on a computer. The computer
-  is as it was before Nov 17. The order is one place in `ListHeading.tsx`.
-  Map is wider than its word from 375 up, 20px a side ("more oval", the
-  user later still); at 360 it stays 12px, because Synagogues' switch
-  leaves it 4px. ~~The group isn't held to the right: Food's buttons start
-  at the left, Synagogues' follow the switch (agreed).~~ Replaced later
-  on Nov 17, below.
-- Built Nov 17, the user's call ("always know that filter and map are on
-  the left and then the right is either sort, toggle, or nothing"): on a
-  phone, Filters · Map always start at the left, and the right edge holds
-  what arranges the list: Sort, Synagogues' Synagogue | Minyan switch (in
-  both views), or nothing. **Changes** the switch's place on a phone: it
-  was first in the row, now last, at the right. The switch comes after
-  the buttons in the page itself, so Tab and a screen reader meet it where
-  it's seen. A computer is unchanged (count or switch at the left, buttons
-  at the right). `e2e/phone-map-row.spec.ts` measures both sides at 360
-  and 375.
-- Built Nov 17, the user's pick after CI ("Smaller text below 390"):
-  Synagogues' row ran 8px too wide at 360 and 375 in CI, whose Linux
-  browser draws the text about 4% wider than a Mac, as Android does. Below
-  390 wide the row's words (Filters, Map, Sort, the switch) are 13px
-  instead of 14, and Map's wider padding starts at 390 instead of 375.
-  **Changes** the row's text size on small phones; 390 and up and the
-  computer are unchanged.
-- Built Nov 17, boards A4/B4/D5 (canvas HDnTE69LPCKmyMHvUHjpGr): a listing
-  whose main thing is its one link (WhatsApp groups, Networking, a
-  cemetery with only a website; `mainThing` = `join`) opens with Join or
-  Visit and Share as two pills under the name, then the box with who it's
-  for and the link's date. On a phone the pills split the row two thirds
-  and one; from 640 wide each is as wide as its words. The box loses its
-  own Edit when it is the listing's only box and Edit listing is under it.
-  **Changes** Oct 6's one box (Join was inside it, after the description)
-  and Oct 10's Edit under every box, on these listings only.
-  Same day, board B6: the pills are light (pale blue, Join and Share
-  alike, a group's Join included), 40px tall and as wide as their words
-  on every width: the solid ones felt "aggressive" and a full row closed
-  the listing off. **Changes** a group's green Join (Oct 6) to blue.
-  Then Edit listing is the filled blue pill on these listings too, as on
-  every other (the user: "bring back the regular edit listing color"); it
-  was outlined from Oct 6, beside the big filled Join. **Changes** that.
-- Fixed Nov 17: Back from a listing's own page (`/philly/cemetery/<id>`
-  on a phone) wrote the category's address with `replaceState`, handing
-  it `window.history.state`. That state carries Next's `__NA` mark, and
-  Next's patched `replaceState` passes such a call through as its own, so
-  the router kept the listing's address and wrote it back on its next
-  commit: about 1 run in 13 in `e2e/listing-detail.spec.ts:375`, and
-  every time on coming back to the app (RefreshContentOnReturn's
-  refresh), after which a reload reopened the closed listing.
-  `closeOpenListing` now drops the mark, so Next moves its own address
-  with no navigation. New test "keeps the category's address after Back,
-  through a refresh": red 5 of 5 before, green 10 of 10 after; the old
-  test 40 of 40 after.
-- Fixed Nov 20 (CI on PR 400, Nov 19-20): `listing-detail.spec.ts:196`
-  desktop, "the search stays put when a listing opens", read the search
-  up to 6px low. The test's fault: a category screen arrives rising 6px
-  (fadeIn, 180ms) and its "before" read landed mid-rise. It now waits for
-  the arrival (`settled` in e2e/helpers.ts). Red 7 of 20 before, 0 of 20
-  after. Found on the way, a real bug: on Windows and Linux, where the
-  scrollbar takes room, the full-width bands (a category's photo, the
-  computer home's hero and map, the map page's band) were `100vw` wide,
-  so they ran under the scrollbar, lost half its width off the left, and
-  made the page 8px wider than the window. They take the scrollbar off
-  now (`bleed-x` / `w-page`, sized in `cqw` with <html> as the page's
-  container; first by a script measuring the scrollbar, which on CI read
-  0px on a category page and left it 8px too wide again).
-  New `e2e/full-bleed.spec.ts`: red 6 of 6 on the old bands, 20 of 20 on
-  the new.
 - Found Nov 17, not fixed: `FindResourcesConnected`'s `replace` sync (the
   search box, Open now, filters, `?item=`) writes the address the same
   way, so Next never learns those either: by the same mechanism a refresh
@@ -444,13 +152,6 @@ dark fade, and no chevron (the user, Nov 14). The phone's Try asking row
 shows only while the search box has focus; tapping a chip keeps the box
 focused. The computer keeps Try asking under its box as before. Still
 drawn only: N1, N3, O1–O3, P1/P1b.
-
-Board R3 (Nov 14, built): the phone's category tiles are the picture with
-the name under it in dark text (as J2), no longer white words on a
-darkened photo, so they don't read as more of Right now's photo rows. The
-Kept up card stays a card above the search, chevron and all (decided Nov
-14: it's how people find out they can trust the site, and opening it shows
-how everything is checked).
 
 **Drawn Nov 18, parked by the user the same day** ("maybe it's fine the
 way it is now idk" → "Park it for now"; today's home stays). If it comes
@@ -502,72 +203,9 @@ something about now: places with hours ("25 open now"), the minyan page
 (the next minyan, to that day's davening times), the eruv (up or down).
 With no choice made it's the first two categories with hours, as before
 (Food and Grocery on Philly's). Built on the site Nov 15:
-  - **Overnight (V3):** a row says "Opens Wed 6 AM · Nothing open now ·
-    first: HipCityVeg" and opens the category, instead of the card going.
   - **The choice** is `site_settings.right_now_categories` (migration
     **098, not run anywhere**). Before 098 a save that changes it says
     it isn't set up; every other save still works.
-  - The next-minyan row shows no distance (Right now measures from the
-    map's centre when the visitor hasn't said where they are).
-  - **Where the admin chooses: boards V4/V4b, approved and built Nov 15.**
-    Home page › Cards under the search is names only. Right Now and Map
-    end in what they're set to ("Food, Grocery", "Photo") and a chevron,
-    and open a screen of their own (`?card=rightNow`, `?card=map`) with
-    Back, and "Take off the page" in place of the ×. Right Now's screen:
-    the categories that can answer (two at most) and Shabbos shopping's
-    items (× and + Add; before this they could only be changed in the
-    held-back Today home's box). Map's screen: its photo, moved off the
-    list. On Phone, a box "Under the search" opens the same Right Now
-    screen (the phone home always has Right now), with nothing to take
-    off. **Changed from Nov 4:** "each card is a handle, its name and an
-    ×: nothing opens" now holds for every card but these two.
-  - Left off the board: the grips on the chosen categories (V4b) for
-    reordering them. The chosen are listed first, in the order they were
-    ticked; untick and tick again to swap.
-  - **W1 and W2, built Nov 15 (the user: "fix 1, you can fix 2").**
-    W1: Right Now's screen spells out each part of the week. "Saturday
-    night to Thursday" (was "On a weekday") with the picks; "Friday, until
-    candles" (Erev Yom Tov the same): candle lighting with the eruv, and
-    Shabbos shopping's items; "Candles to havdalah" (Yom Tov the same):
-    candle lighting with the eruv, nothing open, nothing to buy, nothing to
-    set. W2:
-    the computer's Explore by Category has no white box; its tiles stand
-    on the grey page under the heading, as the phone's do (M1). A tile
-    with no picture is white rather than grey, which read as a hole on
-    the grey. The other cards keep their boxes. W3a/W3b (the phone two
-    per row) were drawn only; the user: leave them.
-  - **Three follow-ups, built Nov 15.** Explore's "All categories" tile
-    appears only from 16 cards, so 15 all show (it used to hide one card
-    behind a button in its own spot). The computer's Right now cards lift
-    on hover like the home's other cards, no grey outline (they're
-    photos). And the preview shows another day: clicking (or tabbing to)
-    a part of the week on Right Now's screen shows that day in the
-    preview beside it, with a blue edge on the part and a "Showing
-    Friday ×" chip above the preview; the day stays while the admin is
-    on Home page, back on the card list included, until × ("Back to
-    now"). No switch on the preview (the user: clicking a section is
-    enough). It's viewing only, never saved or in the address. How:
-    the preview's clock moves (previewDay.ts: Friday 3 hours before
-    candles, Shabbos 3 hours before havdalah, a weekday 3 days before
-    candles), so the candles card and Shabbos shopping are right, but a
-    weekday's Next minyan row still reads today's schedule.
-  - **W2c, built Nov 15: a thin outline round each Explore picture.**
-    The home cards' grey line round each picture (All categories too),
-    the name outside it; the pointer anywhere on the tile turns it blue
-    and lifts the picture, as the other cards do (the user: "the same
-    light up blue and pop out"). W2b (one outline round the whole
-    section) was drawn only and not picked.
-  - **W4d, built Nov 15: the computer's Right now cards are white.** Under
-    the outlined photo tiles, two more photo cards read as more tiles
-    (the user: "too much pictures right next to each other"). Each card
-    is now white with the home cards' outline and hover, its category's
-    picture a band down the left quarter, the answer dark on the white
-    beside it; a category with no picture shows its line glyph in the
-    band, as its tile does. The phone keeps its photo rows (no hero photo
-    there, so they're the colour at the top). Drawn and not picked: W4
-    and W4b (the line icon in a blue square), W4c (a photo square). The
-    phone with the same card was drawn (W4e) beside today's; the user
-    chose to keep today's photo rows (decided Nov 15).
   - **Computer home: anchors, drawn only, paused Nov 15 (the user's
     call to come back to it).** The problem: "too many fragmented pieces
     and not enough anchors". Liked but not yet approved to build: Explore
@@ -632,12 +270,6 @@ With no choice made it's the first two categories with hours, as before
     after it still gets the old copy (here, the 404) while a new one is
     made; a reload showed it. The save now expires `/<community>/changes`
     at once, so the next load is the page (`route.test.ts`, red without).
-  - **W8 BUILT Nov 15**: Open now on the computer drawn like the cards at
-    the bottom (the user: "more of the same pictures when we just passed a
-    row or two of pictures"): white, no photo, the category as a small grey
-    label, the answer big, a blue button ("See what's open"; "See all
-    times" for a minyan, "See the eruv"). Replaces W4d's photo band. The
-    phone keeps its photo rows.
   - **What changed reads past deleted listings (Nov 15).** The log read
     took the newest 400 rows and the page then dropped any whose listing
     was gone; on dev the write suites' fixtures (4,307 rows in two weeks)
@@ -647,47 +279,12 @@ With no choice made it's the first two categories with hours, as before
     takes it off), so the preview's What changed shows something. Dev
     still has a leftover write-suite listing, "E2E Admin Write 6eabdb10-…",
     which shows there as new.
-  - **W9 BUILT Nov 15**: What changed shows each place's own picture,
-    whole on a small white tile (most are logos; filling a square cut wide
-    ones), and the category's icon where a place has none (118 of dev's
-    151 places have one). Board on the canvas, row "What changed".
-  - **Computer category pages (Nov 15)**: 44px of photo under the search
-    box, as above the count; it was 22 and the box sat on the photo's
-    edge. The photo is 262px (was 240); the list and map stay where they
-    were under it.
-  - **W10 A BUILT Nov 15**: a listing opened on a computer category page
-    keeps the photo, the title and the search where the list has them;
-    only the column under them changes, so nothing moves on the click (the
-    user: without the photo it "feels a bit weird"). Clicking into the
-    search goes back to the list. The way back reads "‹ All 71 places",
-    across from "2 of 71", since the title is right above it.
-  - **Eruv and Candle Lighting on the photo header (Nov 15)** (the user:
-    they "still have the old layout on desktop"): both had the coloured
-    banner with an icon; they now have the category pages' photo, with the
-    title on it ("5 eruvim" above Eruv Information; the location under
-    Candle Lighting & Zmanim). An opened eruv keeps it, as a listing does,
-    and its way back reads "‹ All 5 eruvim". Phones unchanged.
   - **W11 BUILT Nov 15** (the user: What changed and You should "look a
     little less boring"; canvas v90, row "What changed and You"; "leave
     out search and filter and if we need it we can add it"). On a
     computer, What changed, You, About and Privacy have the category
     pages' photo header (`PhotoHeader`, the community's home photo) with
     the title on it.
-    - **What changed:** the photo's count is the 30 days the page lists
-      ("68 changes in the last 30 days"), and the explaining paragraph is
-      gone. On a computer the days sit in one white box, with "Know a
-      place we're missing? / Suggest a listing" beside it. On a phone the
-      count is the line under the title, and each day's changes are in a
-      white box under its heading on the grey.
-    - **You:** the photo says "5 places · 1 search". Saved places and
-      searches are cards, three across, with 56px pictures. An empty You
-      on a computer shows three dashed outlines. On both phone and
-      computer the empty state says "Save a place or a search to keep it
-      here."
-    - **About and Privacy:** on a computer the text is in one white card
-      (at most 760px) under the photo, lined up with the title.
-      Privacy's "Last updated" is the card's first line. Phones are
-      unchanged, and Feedback stays plain.
     - **Not drawn, not built:** a "Recent changes" box on each listing
       (raised Nov 15, undecided).
   - **About and Privacy, rewritten and redrawn (Nov 15)**, from the
@@ -696,27 +293,10 @@ With no choice made it's the first two categories with hours, as before
     BUILT. This replaces the "white box per section" pass and its two
     pending content changes (`promote-page-headings.mjs` is no longer
     needed: the new text has real headings).
-    - The text stays admin-edited in the Pages tab. The layout comes from
-      its shape (`src/lib/pageSections.ts`): the text before the first
-      heading is the lead, each heading is a section, and a list whose
-      every item opens in bold becomes named points with an icon matched
-      from their words.
-    - About: the count and title on the photo, the mission large, The
-      problem beside What the guide does, Who it's for and What sets it
-      apart as cards (one box of rows on a phone), Who runs it beside Ways
-      to help (Tell us; Help run the guide and Start a guide for your
-      community email the address the text gives).
-    - Privacy: the short version as icon rows, then the details. On a
-      computer a contents list beside them marks the one being read; on a
-      phone they are rows that open one at a time.
     - **On the dev database for the preview.** Live still has the old
       text, which renders as a lead with no sections (readable, plain).
       **Writing the new text to live needs the user's go-ahead, after this
       deploys.**
-    - **Fixed Nov 15: the bottom of both pages ran under the phone's tab
-      bar** (the user: "getting cut off at the bottom"). They had a flat
-      48px under them, as the old pages did; now the bar's clearance plus
-      a small gap, like Feedback and the other tab screens.
     - **PostHog replays are mentioned** (the user, Nov 15, after asking
       whether sites usually say so): "and recordings of some visits, with
       anything typed hidden". The code records whenever Session Replay is
@@ -729,17 +309,6 @@ With no choice made it's the first two categories with hours, as before
       the email is Philly's)?
   - **Feedback, redrawn (Nov 15)**, from the same review page (v7, board
     Feedback; the user: "Yes, build it"). BUILT.
-    - "Know something we don't?" first, About's card word for word, which
-      opens the + Add box. On a phone it sits above the form; on a computer
-      to its right, under "About a place"
-      (`src/components/pages/TellUsCard.tsx`).
-    - The form: "Your note" and "Email, for a reply", no "(optional …)"
-      and no star; 16px fields; a tall Send with an icon, pale until
-      there's a note; "Read by the people who run the guide. Privacy".
-      After sending, a check, "Thanks, it's sent", the admin's thank-you
-      words and Send another.
-    - **A change to an earlier decision:** Feedback kept plain on a
-      computer (Nov 15). It now has the photo header, like About.
     - The computer page's "Rather email?" card gives the address About's
       text gives (one shared row, so Philly's for every community), and
       is left out when there is none. No per-community contact setting
@@ -751,39 +320,6 @@ With no choice made it's the first two categories with hours, as before
       updated (Nov 16); 099's column defaults not run on dev; nothing run
       on live — live still says "Send feedback" until 099 runs there,
       which needs the user's go-ahead.**
-    - **"Add it to the guide" (the user, Nov 16: open + Add, not
-      Feedback).** Checking found the board's question was out of date: no
-      search has linked to Feedback since Oct 10 (3fe02e6d left "Ask in a
-      WhatsApp group" as the nothing-found card's only action). Feedback's
-      leftover `?about=` prefill is removed. Bringing a + Add button back
-      to the nothing-found card would undo the Oct 10 decision; **decided
-      Nov 16: leave it** ("Ask in a WhatsApp group" stays the only action).
-    - **Feedback is a page on a computer too (the user, Nov 16: "let's do
-      full page").** A change to an earlier decision: the footer's "Send a
-      note" and the header's Feedback opened a dialog over the page being
-      read; both now link to `/[community]/feedback`, the same page a phone
-      has, so Back and a reload work and there's one form, not two. Before
-      this, no visible link on a computer reached the page at all. The
-      dialog and its drawn one-surface redesign (board, Nov 16) are gone.
-      A note still doesn't record which page it was written on; adding that
-      was offered, not asked for.
-  - **Fixed Nov 16: "Kept up by the community" said twice on the computer
-    home** (the user). The trust band near the top says it; the "Know a
-    place we're missing?" card at the bottom had it as its eyebrow too. The
-    card's eyebrow is now "Add or fix a place" (the user's yes, Nov 16),
-    matching Stay in the Loop's "Email updates" beside it, here and on
-    What changed's side card.
-  - **Feedback's fields are white** (the user, Nov 16: grey "makes me
-    think I can't click on it"). A change to the Nov 15 board, which drew
-    them grey until focused. Send stays pale until there's a note. The
-    admin preview matches.
-  - **Fixed Nov 16: Escape didn't close the Add a listing picker** (from
-    "Suggest a listing" on the computer home). Found while looking at it.
-  - **Photos in the Add a listing picker (the user, Nov 16: "Add photos
-    first").** A change to the Nov 14 decision (names only): each name has
-    its home tile's photo beside it, 40px, the same picture the tile uses
-    (so Food's banner picture too), or the tile's plain tint where a
-    category has none. Still no icons or emoji.
   - **Fixed Nov 16: a new community's site could 404 at first** (CI on
     PR 387). Creating one marked the community list stale, so the first
     load of its address could read the old list. It's now expired outright
@@ -794,29 +330,6 @@ With no choice made it's the first two categories with hours, as before
     Bad Request" (`submissionStore.ts`); the suite still passed, cause
     not looked into (the test project has no pending suggestion pointing
     at a place, so it isn't leftover data).
-  - **Fixed Nov 16: Delete this page could undo itself** (CI on PR 387).
-    Going back to a category page you had open before a save brought back
-    its old screen (Next keeps it, hidden), and when the list arrived it
-    started the page over, throwing away a Delete already asked (or
-    anything begun). It now takes the newest list before it draws.
-  - **Fixed Nov 15: a solid circle under the selected map pin** (a
-    visitor's phone, sent by the user). It was the pin's pulsing halo with
-    Reduce Motion on: the site cuts animations short there, and the halo's
-    resting look was a solid disc. Both looping rings (the halo, and the
-    pulse around your own dot) now rest invisible. Phones without Reduce
-    Motion look the same as before.
-  - **Fixed Nov 15: the "flaky" offline test was a test bug.**
-    `e2e/offline.spec.ts`'s wait for the service worker never waited
-    (an async `waitForFunction` predicate, which Playwright doesn't
-    await), so its reload raced the worker's install and the page never
-    became controlled. The worker itself was fine. Now 161/161 under
-    load; a unit check stops the same mistake in any suite.
-  - **Fixed Nov 15: a saved restaurant on You said "No davening times
-    listed"**. Food has a minyanim field (for restaurants that host one),
-    and You treated every place in such a category as a shul. It now asks
-    whether the place itself lists minyanim, as the category page does,
-    and otherwise says whether it's open. Same on the held-back Today's
-    Pinned block.
   - **Fixed Nov 15: the admin's campaign and banner photo on a phone**
     (the user: "don't seem to appear great on mobile"). The campaign's
     Ends date ran ~4px off its card, and the banner preview lived only
@@ -829,103 +342,13 @@ With no choice made it's the first two categories with hours, as before
     In the full admin-write run `category-open.spec.ts` failed once (it
     fetched `cat:cache-roundtrip-seed`, a category another test makes);
     it passed twice alone. Watch for it again.
-  - **Done Nov 15 (the user's yes): emails arrive in the community's
-    name**, "Philly Jewish Guide" <notifications@…> instead of the bare
-    address. `sendEmail` takes the community the email is about and puts
-    its name (`community.name`) on the sender; the two sign-in links have
-    none and get the default community's. Nothing to change on live:
-    `RESEND_FROM` stays the bare address (one set as `Name <address>`
-    is left as it is). `email.test.ts` also fails if a new send doesn't
-    name its community. Shows on live once the branch merges.
-  - **Done Nov 15 (the user's yes): a listing opened on a computer has
-    no category photo above it.** It was a 132px strip of the category's
-    picture with nothing on it, pushing the listing and the map down; now
-    they start under the header, as on any other page. The category page
-    itself keeps its 240px photo. `GenericDirectory.test.tsx`, red on the
-    old band.
-  - Three e2e tests were stale after U1 and the Nov 14 footer move (CI
-    hadn't run e2e on this branch since the last PR): budgets' computer
-    check waited for the Next minyan card (skips now where Right now took
-    its place), phone-home said a computer has no Right now (it has its
-    own, `data-wide`), mobile held the footer words 45-75px over the tab
-    bar (16-40 now; they sit ~25px over it).
-
-Nov 14, later, the user's yes to both:
-- Fixed Nov 17 (the user: WhatsApp Groups on a computer, narrowed to a
-  phone and widened again, "the search bar gets weird"): the category
-  page's search bar stayed in its docked look (white box, border, shadow)
-  on an unscrolled page. Crossing the phone/computer line remounts its
-  scroll marker and the docked check kept watching the old one.
-  `e2e/category-controls-resize.spec.ts`, red 3/3 before.
-- **The Kept up card is one line**, as tall as the search box (48px; it
-  was 59px on two lines, the bigger box on the page): "Kept up by the
-  community · 149 places", still a card with its chevron. A longer trust
-  line ("· every listing dated") is cut off with "…" on a narrow phone;
-  the sheet it opens says it all.
-- **Fixed: a gap under the footer in Safari** (none in the app added to
-  the home screen). Every phone screen over the tab bar left a flat 96px
-  for a 58px bar, which only the home-screen app's 34px safe area filled.
-  It is now the bar plus the safe area (`TAB_BAR_CLEARANCE`), on the home,
-  category pages, Browse, What changed, Feedback and You. The Add button
-  sits beside Feedback · About · Privacy at the bottom now, in Safari as
-  it already did in the home-screen app.
 
 ## The health sweep (Nov 20; fix-first 1-8 merged in PR 403, Soon built in PRs 404–411, Later not started)
 
 ### Report: the Soon list (Nov 20, an unattended run)
 
-Every Soon item is built, some in part (each says what's left). PR 404
-(merged) took three; from 405 on, one PR per item, against main, each
-stacked on the one before, so merging the last brings in all of them.
-Every fix has a test that failed against the old code first; each
-commit says how many. Nothing was written to live, and no migration was
-run anywhere.
-
-Built:
-
-- [PR 404](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/404)
-  paged reads, hidden communities' API, reader spend: merged before
-  this run.
-- [PR 405](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/405)
-  knip in CI (before this run): green.
-- [PR 406](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/406)
-  the two admin-write failures: green.
-- [PR 407](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/407)
-  security: 2 red, neither from its own change. `home-preview-spot:33`
-  (a test race, fixed in 411) and e2e `listing-detail.spec.ts:537`
-  on the computer (Request removal, then Back to the listing: the name
-  wasn't there). Both passed on 408 and 409, which carry 407's code.
-- [PR 408](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/408)
-  migrations, the code side: green.
-- [PR 409](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/409)
-  dependencies: green.
-- [PR 410](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/410)
-  accessibility, the first two of four: 1 red, `home-preview-spot:33`
-  again.
-- [PR 411](https://github.com/Jewish-Tribe-Guide/jewish-tribe-guide/pull/411)
-  small cleanup, and the `home-preview-spot` fix: green.
-
 Found and not fixed:
 
-- Admin-write waits shorter than a busy test database, the shape 406
-  fixed twice. `missed-searches:47` was one more (PR 417, Nov 21):
-  Dismiss's row waits on the save, now 20s. Read Nov 21, from every
-  admin-write failure in the last 60 CI runs: the rest were already
-  fixed. `todo-scroll:95` (4 runs, all `claude/bands-and-search` on
-  Nov 20) before 17d9b6a6 the same day; `main-dishes` and
-  `moderation:189` have 15s waits since PR 400; `community-editor:61`
-  once (404 on a new community, `claude/shul-listing`). Still open:
-  `category-open:41` ("opens without asking the server" saw an RSC
-  request), twice (`claude/next-round`, and the Sentry 11.14 Dependabot
-  PR, where `category-editor:46` also found two Hours buttons).
-  **Closed Nov 21 (a test bug):** both traces show the click while a
-  prefetch was still arriving. Next fetches each row's outline
-  (`/_tree`), but the page's content segment once, under whichever row
-  asks first, shared by all; the test waited only for the clicked row's
-  outline. It now waits until nothing under the list is arriving, for
-  half a second. Couldn't be shown red locally: the local build fetched
-  no shared segment at all (only outlines), so there was nothing to
-  hold back. Passed 4 of 4.
 - e2e `listing-detail.spec.ts:537` (above): once, not looked into.
 - 25 of 104 older migrations can't be told run or not from what they
   made (a policy, an index, a data fix).
@@ -956,11 +379,6 @@ For the user:
    settings) waits on live until Today comes back (decided Nov 21).
 3. Run migration 106 (drops the unused `site_settings.contribution_note`):
    dev, then live.
-4. Copy the Gmail script again from Newsletters into the guide's Gmail
-   (live admin, Update the script, since Nov 21: a running script had
-   no way to get the script again).
-   Done Nov 21. An eruv email with no Authentication-Results header is
-   now refused too (the user, Nov 21).
 5. Check Database → Backups on live, and run the first live copy
    (`npm run backup -- --prod`, read-only).
 6. Sentry cron monitors: the plan has one (checked Nov 21), so set
@@ -978,30 +396,7 @@ For the user:
 9. Merging 411 brings in 405–410 too. 407's and 410's red runs predate
    the preview test's fix; 411 carries it.
 
-Surprises:
-
-- Next keeps a screen you leave alive but asleep (`<Activity>`), so
-  Watches came back from Add a watch as it was before a switch (406).
-- The log's "Submission not found" was the test's own cleanup deleting a
-  row mid-approve, not the cause.
-- An eruv's status could be set by an email anyone could fake: the From
-  line wasn't checked against Gmail's verdict (407).
-- Since Nov 20 every suite hits the one test project at once, and waits
-  that were enough before aren't.
 - Live is missing migration 067; dev has everything but 105.
-- This Mac runs Node 26; CI and live run 24.
-- Taking focus into dialogs made the form editor's preview (a picture of
-  a form, under `inert`) steal the admin's typing. An existing unit test
-  caught it (2 runs in 5) and it was fixed before pushing.
-- A shul's "8am" was never its next minyan.
-- `.env.example` held two real email addresses. It had never been
-  committed, so they never reached the public repo.
-- `home-preview-spot:33`, seen three times, was the test pressing Forward
-  before the page's own step back had landed.
-- The unit suite's 5s findBy wait (PR 405) equalled Vitest's 5s test
-  budget, so a slow CI run failed at exactly 5000ms (main, Nov 21,
-  ModerationQueue's "1 of 2"). Tests get 15s now, and
-  `src/test/unitTimeouts.test.ts` holds the budget at twice the wait.
 
 The user (Nov 20): use the lull to check the site is "actually being
 built/run the right way". Six read-only reviewers (dead code and
@@ -1024,15 +419,6 @@ Fix first:
    "refused" test of that was wrong: it asked for the row back, which
    needs a read policy). `noPublicPolicies.test.ts`, red 1/1 without 103.
    **To run: dev, then live (the user).**
-2. **Anyone can backdate or erase a listing's "Still right?" date**: the
-   confirm route has no Turnstile and `unconfirm_*` takes the caller's
-   `p_previous`. Cuts against "confirmed means a person confirmed it".
-   **Built Nov 20**: the server reads the date before a Yes and hands the
-   browser a signed note of it (`src/lib/confirmUndo.ts`, keyed off the
-   service-role key, one listing and box, a day); the undo restores only
-   what the note says and ignores dates from the browser. No migration.
-   An undo from a tab opened before the deploy fails once ("couldn't
-   save"). Route tests: 10 red against the old route.
 3. **No backups or restore procedure** in the repo; the plan's backups
    and PITR need the user to check in Supabase. Photos in Storage too.
    **Built Nov 20**: `docs/backups.md` (the two copies, what to check,
@@ -1056,11 +442,6 @@ Fix first:
    (`on` is all of them): `nightly-email` is the one to watch, since
    that email already tells of any other job that failed or didn't run. Red
    3/3 against the old code (the route guard, the job report, the email).
-5. **The community list caches its one-community fallback for days**
-   after any Supabase error (checked, `listCommunities`). **Built
-   Nov 20**: a failed read throws, so nothing is cached and the next
-   request asks again; the config's community only for a missing or empty
-   table. Red 2/2 against the old code.
 6. **`community_id` still defaults to 'philly'** on 9 tables; 027 says
    to drop it once a second community exists (checked). **Built Nov 20**:
    migration 104 drops it. Every insert in the site already named its
@@ -1072,87 +453,18 @@ Fix first:
    round-trip's test form names Philly. `noDefaultCommunity.test.ts`, red
    3/3 against the old code. **To run: dev, then live (the user), after
    this deploys.**
-7. **`Map.groupBy` takes down a shul listing on iOS before 17.4**
-   (checked, `DaveningCard.tsx:396`), and the only error boundary is the
-   root one, so the header goes too. **Built Nov 20**: a plain `groupBy`
-   (`src/lib/groupBy.ts`); `browserSupport.test.ts` fails on any built-in
-   past Safari 16.4 (Next's build target), red 1/1 against the old card.
-   `[community]/error.tsx` shares the root's screen and keeps the header,
-   Go home going to the community. Checked in a real browser with a page
-   made to throw: header kept and Go home `/philly`; without it, no header
-   and Go home `/`. Not automated (it needs a page that always throws).
-8. **If Turnstile can't load, a contributor's Send never enables** and
-   nothing says why (hospital wifi, blockers). **Built Nov 20**: the
-   widget says "The spam check didn't load. Try again" after a failed
-   load, a script not there after 10s, or a challenge Cloudflare says
-   failed; a failed load is no longer kept, so Try again fetches it
-   again. Red 3/3 against the old widget. Seen in a real browser on
-   localhost, where Cloudflare refuses the check (600010), so local dev
-   shows the line on every form now.
 
 Soon:
 
-- Two admin-write tests failed on PR 405's first CI run and passed on
-  its rerun: `places.spec.ts:53` (the archive's status stayed
-  "approved", the server logging "Submission not found: Cannot coerce…")
-  and `job-off.spec.ts:12` (Links not shown after Turn on). **Built Nov
-  20** (`claude/vanishing-rows`). Neither was a flake.
-  - places: the archive took 10.4s in that run. It is six database calls
-    one after another, and the test project was carrying e2e's seven
-    servers and the other suites at once (locally, a burst of 120 reads
-    delays one read beside it by 1–2s). The test polled the database for
-    5s, gave up, and its cleanup then deleted the suggestion the server
-    was still approving: "Submission not found" was that, not the cause.
-    It now waits on the archive's own answer, and Bring it back's. With a
-    6s delay put into the archive route: old test red, new green (the
-    delay isn't committed).
-  - job-off: a real bug. Next keeps a route it leaves behind React's
-    `<Activity>`, its state kept and its effects off, so the Watches that
-    came back from Add a watch was the one from before. It had missed the
-    Turn on, showed Links off until its own read answered (over 5s on
-    CI), and remembered that for the next screen. `useWatchJobs` keeps a
-    log of switches now, and a screen catches up on the ones it missed
-    when it shows again. Unit test red 1/1 against the old hook; the e2e
-    test holds Watches' read back, red against the old hook in a real
-    browser. The same test failed Nov 14 and Nov 16.
-  - Since Nov 20 every suite runs at once against the one test project.
-    Other admin-write CI failures since Nov 12 with the same shape (a
-    wait shorter than a busy database) and not looked into here:
-    `todo-scroll.spec.ts:75` (4 times on Nov 20, `claude/bands-and-search`),
-    `main-dishes` (3), `category-editor` (3), `community-editor:61` (1),
-    and "Cannot coerce" once more in a moderation Reject (run 43954048161,
-    Nov 16), probably the same cleanup race.
-- Reads cut off at 1,000 rows with no error: vote counts first (checked).
-  **Built Nov 20**: every list read of a table that grows pages through
-  `readAll` (`src/lib/readAll.ts`), ordered to the key so pages don't
-  overlap; `readsArePaged.test.ts` scans the source and fails on a new
-  unpaged one (41 against the old code); a read that still comes back
-  at exactly 1,000 rows is reported to Sentry by table
-  (`src/lib/supabase/rowCap.ts`).
 - Migrations: nothing records which ran where; `contribution_note`
   drift; 16 "table missing" fallbacks hide a missed one; a fresh project
   can't be rebuilt from the folder (no grants since 056 was removed).
   **Built Nov 20, the code side** (`claude/health-migrations`):
-  - Migration 105 makes `migration_ran`, and every migration from it on
-    writes its own name there (`migrationsRecordThemselves.test.ts` fails
-    on one that doesn't, red 1/2 without 105). `npm run migrations:report`
-    (`-- --prod` for live; it only selects) lists what's recorded, and for
-    each older migration looks for the tables and columns it made
-    (`scripts/migrationFootprint.mjs`), less what a later one dropped or
-    renamed. One that makes neither (a policy, an index, a data fix) is
-    "can't tell": 25 of 104.
   - Read Nov 20: dev, everything seen except 105. **Live: 067
     (`today_home`) not run**, its three `site_settings` columns missing.
     Harmless while Today is parked (the read is `select *`, and only a
     save of Today's settings needs them, which says so), but it is the
     one older migration live doesn't have.
-  - The "table missing" fallbacks (13 reading Postgres' wording, 4 more
-    dropping a later column) now go through
-    `src/lib/supabase/schemaMissing.ts`, which tells the log and Sentry
-    once per name per server ("[schema] watch isn't in the database…").
-    The page still carries on without it. `schemaMissingReported.test.ts`
-    fails on a store checking the wording itself. Red 8/8 against the old
-    stores.
   - **For the user:** run 105, dev then live.
   - **Decided Nov 21:** 067 waits on live until Today comes back. Run
     it on live in the same change that turns Today on in
@@ -1162,37 +474,9 @@ Soon:
     but nothing dropped the column. Migration 106 drops it (written
     Nov 21; nothing reads it). **For the user:** run 106, dev then live. Rebuilding a fresh project from the folder (grants, and the
     restore drill) is untouched.
-- Hidden communities' data through the public API routes. **Built Nov
-  20**: the proxy now sees the public API routes too, and answers 404 to
-  `?community=<hidden>` without that community's preview cookie; the
-  cookie is set for the whole site (path `/`) so it reaches `/api`. Admin,
-  cron, inbound and inbox routes stay outside the proxy. Red 4/4 against
-  the old proxy. A preview cookie set before this only covers the pages:
-  reopen the preview link (an admin's console sets it again on load).
 - Focus in dialogs and sheets, drag handles keyboard can't use, search
   results silent to screen readers, swipe-only actions. **Built Nov 20,
   the first two of four** (`claude/health-a11y`):
-  - Dialogs: none moved the focus. Add's box opened and Tab walked the
-    page under the backdrop. Every modal one (9: the sheet every box uses,
-    Filters, the action dialog's two shapes, the form's two, the photo
-    crop, the add picker, a dropped pin) now takes it from
-    `useDialogFocus` (`src/lib/useDialogFocus.ts`): in on opening, round
-    inside on Tab, back to what opened it on closing, only the top one of
-    two. `dialogsTakeFocus.test.ts` fails on an `aria-modal` dialog
-    without it (9 against the old code). A dialog in an admin's preview
-    (drawn in its own frame, under `inert`) takes none: the form editor's
-    preview did, and pulled the focus out of the field being typed in
-    when it finished loading (caught by `FormsManager.test.tsx`, 2 runs
-    in 5).
-  - Search: the home's lines, You's, and a category page's list now tell a
-    screen reader what they found ("3 results", "2 listings", "Nothing
-    found for …") through `SearchAnnouncer`, a hidden status line.
-  - Proved in a real browser, phone and computer
-    (`e2e/focus-and-announcements.spec.ts`): red 8/8 against the old code.
-    The first try passed on a computer and failed on a phone: the sheet
-    has controls only a computer shows, and the trap counted one as its
-    first, so Shift+Tab walked out. It counts only what's shown now
-    (unit test red against that draft).
   - Not done: the sheet's "Drag to resize" handle and the Nearby sheet's
     handle are buttons a keyboard can't reach or work (no tabindex, no
     keys), so the Nearby list can't be opened up without a drag. The
@@ -1204,49 +488,6 @@ Soon:
     You's list without the swipe. Whether a phone gets a visible remove
     there is a design call. Every other swipe (category rows, the map
     list) is a shortcut to actions the opened listing also has.
-- Eruv status set from an unauthenticated email (inferred), admin sign-in
-  not checking the email is confirmed (depends on Supabase settings),
-  a cross-community Google sync route, eruv fetchers with no SSRF guard.
-  **Built Nov 20** (`claude/health-security`), all four:
-  - Sign-in: a token for an email never confirmed is refused by the admin
-    and inbox checks (`confirmedEmail.ts`). Live and dev both have
-    "Confirm email" on today (read from `/auth/v1/settings`: signups open,
-    `mailer_autoconfirm: false`), so nobody could do this yet; it no longer
-    rests on that setting. Every admin here signs in by magic link, which
-    confirms. Red 3/3 against the old checks.
-  - Google read on a place (`found` route, and approving a suggestion):
-    `loadSyncableListing` takes the admin's community and reads only its
-    listings. Before, an admin of one community could run a Google read on,
-    and write to, another's listing by its id. Red 3/3.
-  - The eruv readers (status page, map file, website watch) fetched their
-    saved addresses with plain fetch. They use `publicFetch`
-    (`menuReader.ts`) now: public internet only, every redirect checked,
-    as the menu reader already was. Red 3/3.
-  - Eruv emails: confirmed from code that nothing checked who sent one. The
-    route needs the script's key, but the script picks emails by their
-    From and List-Post headers, which anyone can write; a spoofed email
-    that reached the inbox would set the eruv's status at once. Gmail's
-    own verdict is in each email's Authentication-Results header. The
-    script now sends it (the first one, the header Gmail added, from the
-    raw message), and an eruv email is read only when DKIM, SPF or DMARC
-    passed for the eruv's address's domain (`emailAuth.ts`); otherwise
-    `unverified`, not read, reported to Sentry. Red 5/5. **For the user:**
-    copy the Gmail script again from Newsletters into the guide's Gmail
-    (done Nov 21). An email with no header is refused too since Nov 21
-    (the user's call): `unverified`, not read, and Sentry says to copy
-    the script again. Red 1/1 against the old read-it-anyway.
-  - Seen once in this branch's admin-write run, not reproduced (0 of 6
-    alone): `home-preview-spot.spec.ts:33`, browser Forward after "← Back
-    to editor" left the editor showing instead of the full-size preview.
-    Nothing here touches the admin screens; its trace was lost to the
-    rerun. Next time, read the trace before rerunning. **Fixed Nov 20**
-    (`claude/health-cleanup`), after it failed on PRs 407 and 410 too: a
-    test race. "← Back to editor" shows the editor at once, and its step
-    back in history (`useScreenHistory` queues it) lands a moment later;
-    the test's Forward came before it, did nothing, and the step back
-    then closed the preview. The test now waits for the address at each
-    step. With the step back delayed 400ms in a scratch copy: the old
-    test red at the CI's line, the new one green.
 - Spend: no site-wide cap on the AI photo readers; Turnstile and rate
   limits fail open when their keys are missing. **Built Nov 20**: the
   two photo readers share a day of 300 reads (`PHOTO_READS_A_DAY` in
@@ -1262,11 +503,6 @@ Soon:
   updates since September; Playwright held at 1.63 for production's
   Chromium (PR 402); `npm audit fix` is free; Node declared four ways.
   **Built Nov 20** (`claude/health-deps`):
-  - Dependabot leaves `@playwright/test`, `playwright-core` and
-    `@sparticuz/chromium` alone (moved by hand, together, checked on a
-    preview), and `@types/node`'s majors. Every group PR since September
-    carried the Playwright family, so CI's container-tag test failed it.
-    PR 402 already holds 1.63.
   - `npm audit fix`, no `--force`, lock file only: Sentry 10.75 → 10.78
     (the critical one, a tunnel-route bypass), undici, zod,
     typescript-eslint, dompurify. 15 findings down to 5 moderate. All 5 are
@@ -1283,52 +519,12 @@ Soon:
 - Two time parsers disagree ("8am" is Infinity in `parseTimeToMinutes`,
   checked); date helpers copied 8–9 times; `partDates` twice. **Built
   Nov 20** (`claude/health-cleanup`):
-  - One clock-time reader, `src/lib/clockMinutes.ts`;
-    `parseTimeToMinutes` is it with Infinity for words. A shul's "8am" or
-    "7 PM" used to sort last and was never its next minyan: the row skipped
-    it and said "Shacharis today: 8am" under the next one as if it were
-    words. The editors called it a time they couldn't read. Red 3/3: the
-    old test that pinned "7am" as unreadable, flipped; an agreement test;
-    and the row in `upcomingDavening.test.ts`.
-  - `src/lib/isoDay.ts` holds `addDays` (6 copies) and `dayInTimezone`
-    (17 copies in 16 files; `activity.ts` re-exports it for its 8
-    importers). `partDates` is shulTimes'. `oneDayHelper.test.ts` fails on
-    a new copy of any of the three (red 3/3).
   - Not merged, on purpose: the parsers that find a time *inside* running
     text (hours, calendar titles, the shul page and schedule readers,
     ask). They answer a different question. `nightKinds.ts`,
     `watchJobList.ts` and `openedPlaceBoxes.ts` still hard-code New
     York's clock for the Watches page's days: right for Philly and UES,
     wrong for a community in another time zone.
-- knip: a 4-line config takes it from 42 files / 243 exports to 0 / 31
-  real ones; put it in CI. **Built Nov 20**: `knip.json` names the entry
-  points knip can't see (scripts, Playwright setup files, the service
-  worker), and counts an export used in its own file as used. All 23
-  candidates left were dead (nothing used them anywhere) and are gone,
-  259 lines. `npm run knip` runs in CI's lint job and fails on a new
-  unused file, export or dependency (checked with a planted export).
-  knip's Playwright plugin is off: it ran the write suites' configs,
-  which refuse to load without the test project's keys (CI's lint job
-  has none), so it listed every spec as unused. The specs and configs
-  are listed as entry points instead.
-  Stale comments (11 names that no longer exist): **Built Nov 20**
-  (`claude/health-cleanup`), each pointed at what replaced it, or the
-  pointer dropped where nothing did. Not testable: a test can't tell a
-  comment's history ("this was X") from a pointer ("see X"), so the
-  historical mentions were left as they are.
-- Preview emails go out without [DEV] (checked); `.env.example` has
-  never been committed, `.gitignore` drops it (checked). **Built Nov 20**
-  (`claude/health-cleanup`):
-  - The [DEV] tag goes by `VERCEL_ENV === 'production'`, Sentry's gate.
-    It was `NODE_ENV`, which is 'production' on every build, a preview
-    (dev database) and the suites' `next start` included. Red 2/2.
-  - `.env.example` is in the repo: `!.env.example` after `.env*`. It
-    held two real email addresses (an admin's and the guide's inbox); the
-    repo is public, so they're `example.com` now. It named none of 15
-    settings the code reads (`OPENAI_API_KEY`, the server Places key,
-    `DEV_ADMIN_BYPASS_SECRET`, the `PROD_*` read keys with a warning,
-    …). `envExample.test.ts` fails on a setting the code reads that it
-    doesn't name, or a value that isn't a placeholder. Red 3/3.
 
 Later or bigger:
 ~~foreign keys~~ (written Nov 21, below); ~~`details`
@@ -1356,27 +552,6 @@ a category with listings are refused; `delete_category`, `delete_form`,
 `delete_community` and a direct community delete all leave nothing
 behind.
 
-Done Nov 21 (`claude/later-list`): font sizes are rem (999 classes;
-`remFontSizes.test.ts` fails on a px one), so text follows the browser's
-text size. Hebrew keeps its own direction: listing names sit in `<bdi>`,
-written notes and descriptions carry `dir="auto"`, and so do the text
-boxes people type into (never a phone or number box).
-
-The two big screens are split (Nov 21, no behaviour change):
-`ResourceMapView.tsx` 2,797 → 1,177 lines (18 new files in
-`src/components/map/`: search, categories, eruvim, points, filters,
-the address read, the desktop sidebar and chrome as hooks and
-components) and `GenericDirectory.tsx` 2,271 → 1,093 (22 new files in
-`src/components/resources/`). Checked by tsc, lint, the unit suite and
-e2e (419 passed), not by eye.
-
-Redundant indexes: migration 108 drops ten one-column indexes a key or
-102's indexes already cover (nine `<table>_community_idx` from 027, plus
-`resource_tag_resource_idx` and `vote_resource_idx`), each only if the
-covering index is really there. Checked on a fresh Postgres 17 after
-001–107: drops all ten, runs twice clean, keeps one whose cover is
-missing. Run on dev and live Nov 21 (recorded in `migration_ran`).
-
 Log retention, measured on live Nov 21 (read only): activity 447 rows,
 daily_count 709, job_run 142, question_reading 53, submission 1,385,
 night_note 0. job_run and night_note already prune themselves
@@ -1384,9 +559,6 @@ night_note 0. job_run and night_note already prune themselves
 is milliseconds. Revisit when daily_count passes ~50,000 rows (the
 Missed searches tab reads all of a community's search misses, every day
 ever) — then read the last year only, rather than deleting anything.
-
-Checked and not so: the nightly email does record a failed send, as a
-warning, not a failure.
 
 ## `details` holding the site's own state: started Nov 21 (the user's yes)
 
@@ -1480,149 +652,12 @@ listing code; roughly a week of steps, each needing a migration run on
 dev then live at the right moment (step 1 before 3's deploy, 5 only
 after 4 is live).
 
-## The save survey (Nov 21; all fixed the same day)
-
-Saves that make more than one write, through separate supabase-js calls
-with no transaction, and what a failure partway leaves. Only the
-`toggle_vote`, `confirm_*`, `mark_item`/`unmark_item`, `clear_item_gone`
-and `bump_daily_count` functions are atomic, and each covers one row.
-`approve_menu_dishes` (065) is defined and never called.
-
-Worst first. **1–5 are fixed** (Nov 21, on `claude/eruv-refuse-unproven`,
-each with tests that failed against the old code):
-
-- 1: a listing's reads and outside calls happen before the claim
-  (`prepareListing`), and a failed put-back goes to Sentry.
-- 2: the read stops the approval.
-- 3: once the change is on, a failed record write goes to Sentry and
-  the approval answers as done; a failed own Add/Edit/Archive is taken
-  back out of the queue (`approveOwn`).
-- 4: the listings change first, the category last, so saving again
-  finishes it.
-- 5: a failed take-down goes to Sentry, a tap on a warning with nothing
-  waiting files the removal, and Undo takes the warning down first.
-
-From 6, **deleting a category, a form or a community is one step** (Nov
-21, `claude/later-list`): migration 109 adds `delete_category`,
-`delete_form` and `delete_community`, each one transaction, and the
-stores call them (`src/lib/supabase/inOneStep.ts`), keeping the old
-step-by-step delete where 109 hasn't run. Checked on a fresh Postgres 17:
-a failure at the last delete leaves every earlier one undone. Run on dev and
-live Nov 21 (recorded in `migration_ran`).
-
-**The rest of 6 and 7 are fixed too** (Nov 21, `claude/save-survey-rest`,
-each with tests that failed against the old code): a new category whose
-first listing fails is taken back out (geocoded before the claim); a new
-eruv whose filling-in fails is too, and a failed removal is reported; a
-part approved at a time goes through `approveOwn`; kosher Bring it back
-and Archive answer ok once the change is on, and archiving again closes a
-finding left waiting; a community whose copying or screens fail is taken
-back out (`removeUnfinishedCommunity`); a Tell-us message checks every
-form before filing and emails the admins about whatever it filed; the
-hours and hospitals page swaps save the new state before taking off the
-old; activity and job-run write failures go to Sentry; the Google sync's
-update checks its error and counts a failed save as failed. Orphan
-uploads stay with the weekly sweep.
-
-Approvals as a whole stay outside a transaction (Google lookups and
-geocoding can't run inside one), with 1–3 covering what that left.
-
-The list as found:
-
-1. **An approval can be left "approved" with nothing on the site.**
-   `approveNow` (`submissionStore.ts`) claims the submission, then
-   applies it (Google lookups, geocoding), then marks it reviewed. If the
-   function is killed or times out while applying, the catch that puts it
-   back to waiting never runs; its own write ignores its error too. The
-   change leaves the queue and never appears, and no screen reopens it.
-   Every approval goes through here (queue, admin add/edit/remove, found,
-   kosher, Google, a part at a time).
-2. **An edit's read of the listing ignores its error** (`applyListing`'s
-   update path). If that read fails, the update rebuilds `details` from
-   nothing and wipes the listing's own keys (googleFields, item dates,
-   confirmations).
-3. The admin's own add: if the final mark fails after the listing is in,
-   the admin sees "Could not add listing" and a retry adds it twice. If
-   the approval fails cleanly, the admin's add sits in the queue as a
-   visitor's suggestion, once per retry.
-4. Renaming a field's options: listings are updated one by one after the
-   category; a failure partway, then a reload, strands the rest on the
-   old name (they stop matching filters), with no way to finish it.
-5. "Not anymore" and its undo: a failed follow-up write can leave the
-   warning on a listing with nothing in the queue to clear it.
-6. Smaller, each fixable from the admin: new-category approval leaves an
-   empty category (retry makes "label-2"); new eruv leaves a bare one;
-   part-at-a-time leaves a stray copy; kosher "Bring it back" / archive
-   leave the finding waiting; deleting a category, form or community can
-   stop halfway (a retry finishes it); creating a community can stop
-   halfway (delete and make it again); a Tell-us message filed partly
-   sends no admin email; the hours/hospitals page swaps can leave the
-   old page read or the marker gone.
-7. Low: activity rows, job-run finishes, Google sync's resource update
-   ignoring its error (the same closure reported again the next night),
-   orphan uploads (the weekly sweep clears them).
-
 ## The speed and scale sweep (Nov 20, on `claude/bands-and-search`)
-
-The user (Nov 20): "I want the site to be a good site… with the ability
-to scale." Measured first, on the live site and in the code, nothing
-changed until the user picked an order: quick visitor fixes, then saves
-and scale, then the nightly jobs, then CI.
-
-Measured on live (phillyjewishguide.com, Nov 20): every page from the CDN
-in 40–100ms; on a phone the main content showed in 0.65s (Food) to 0.94s
-(home) on a fast connection; no layout shift; no Sentry errors; all seven
-nightly jobs fine for two weeks. The morning watches take 134s (median)
-to 170s of the 220s they may start in, with one community.
-
-Done (batch 1, each red against the old code first):
-
-- Photos at the size drawn. Unsplash photos are asked of Unsplash at each
-  width the page needs (`photoProps` in `src/lib/imageHosts.ts`), and
-  Storage photos of Storage while Vercel's optimizer is off, as it is on
-  live. The live phone home fetched a 2070px Unsplash photo (159 KB) for a
-  108px tile; the logo is Storage's 88px copy, not the 1024px file.
-  `photoSizes.test.tsx`: 4 of 4 red before.
-- The page search (`hoursJobRun.ts`) and Look again take the communities
-  in turn each night, so the first can't spend the whole time and leave
-  the second unsearched (1 of 1 red each).
-- robots.txt keeps every community's admin and inbox out, not only
-  Philly's, and the admin says noindex itself (2 of 2 red).
-- A page's listings and their vote counts are read side by side.
 
 Measured and dropped: leaving admin-only data out of the listings sent
 with each page. The home is 90 KB compressed, and the admin-only keys are
 about 5% of it; the bulk is schedules and hours. A slim index for the
 home's search would be the real saving, later.
-
-Done (batch 2, saves, each red against the old code first):
-
-- A community admin's save makes only its own community stale: its
-  content tags, its own `content_stamp` row (`c:<slug>`, no migration;
-  a tab reads the later of it and `all`), and a second pass on
-  `community-pages:<slug>`, which the site settings read carries onto
-  every page of that community. Before, one save sent every community's
-  pages back to the database and told every open tab to re-render. The
-  site owner's routes, the nightly jobs and the manual revalidate still
-  reach every community. Default location invalidates the community list
-  itself (11 of 11 red).
-- An approval reads its category once (it read it 4 to 6 times), and its
-  independent last steps run side by side. Measured on the test project
-  from here: a new listing 1.0s → 0.6s (9 → 6 requests), an edit
-  1.35s → 0.8s (12 → 8). A category with tag fields saves more.
-- Approving a new listing answers before Google: the sync runs after the
-  response and refreshes the listings itself (2 of 2 red). Not timed:
-  the test project has no Google key.
-
-Done (batch 3, nightly jobs, each red against the old code first):
-
-- The morning watches take the communities in turn within each kind
-  (kosher lists, hospitals, overdue, then by priority), a different
-  community first each night, and each community has its own AI reads
-  (`orderForRun`, `budgetOf` in the watches route).
-- The Google hours sync refreshes only the communities it changed, and
-  says its 300s outright. Not made parallel: live it asks about 132
-  listings in 15s, so its 500 cap fits in a minute one at a time.
 
 - **A morning watches run per community** (Nov 20, the user: "if that's
   something we could do now"). `/api/cron/watches` starts a call per
@@ -1638,66 +673,6 @@ Done (batch 3, nightly jobs, each red against the old code first):
   protection page there would show as that). Two communities' runs can
   each read a site they share at the same moment; within one run, never.
 
-Done (batch 4, housekeeping, each red against the old code first):
-
-- **History fifty at a time** (`/api/admin/submissions`, Show older). It
-  read every decided change (live Philly: 1,253 approved), and on dev it
-  had stopped loading at all: every listing id went into one request,
-  refused as too long. Live, with more, likely the same (not checked:
-  needs the live admin).
-- **Migration 102, composite indexes** (listings by community, status
-  and category; To do; History; a browser's votes). Run on dev and live
-  by the user Nov 20.
-- **Option renames and field clears** write a category's listings ten
-  at a time (`atMostAtOnce`), each scoped to its community.
-
-Done (batch 5, CI, Nov 20): a PR's run is 8–9 min, from 11.4.
-`.github/actions/setup` restores `node_modules` (keyed on the lock file;
-`npm ci` only on a miss) and each build's `<dist>/cache/turbopack` (not
-the fetch cache beside it; production's smoke build caches none), and
-e2e runs in six shards, not four. `ciWorkflow.test.ts` checks each build
-job caches its own dist dir. A PR's first run builds cold (the suites
-don't run on main, so there's no main cache to start from); its later
-pushes start warm. Two failures it turned up along the way:
-
-- `todo-scroll.spec.ts` failed 4 runs in 5 on CI, never locally. The
-  open area's link now leaves the scroll alone (`scroll={false}`), and
-  the test prints the window's scrolls if it fails again; not proven to
-  be the cause.
-- `full-bleed.spec.ts`: the bands' scrollbar script measured 0px on CI's
-  category page. The bands are sized in `cqw` now, no script; green on CI.
-
-Then, the user's steer (Nov 20): "a healthy system that is built right
-and is fast and can scale", no patches to hit a number. Two structural
-reasons CI is ~9 min, fixed in that order:
-
-1. **Built once** (done, Nov 20). The six e2e shards each built the app;
-   now `e2e-build` builds once in the shards' container, hands `.next`
-   over as an artifact, and the shards start it (`E2E_PREBUILT=1`), with
-   the build's settings by YAML anchor. Measured: build job 1.8 min (38s
-   building, warm), shards 2.5–3 min each (1.8–2.7 min of tests). No
-   wall-time gain yet: the build still waits for the write suites.
-2. **The write suites on a community of their own** (done, Nov 20). cache-roundtrip and admin-write change
-   `e2e-writes`, a hidden community in the test project
-   (`scripts/writeSuiteCommunity.mjs`: made by the test server on
-   start, its shape copied once from philly, both suites' admins on its
-   own list). So e2e-build no longer waits for them, and each suite signs
-   in as its own admin, never philly's real one (the two used to cancel
-   each other's sign-in links). `suiteRows.test.ts` fails if a write
-   suite claims a row in philly or adds one with no community (7 did; it
-   went red on the old todo-scroll), and `ciWorkflow.test.ts` if
-   e2e-build waits again. Still shared: the About and Privacy rows, which
-   belong to no community; e2e checks only those pages' structure.
-   Local: cache-roundtrip 6/6, admin-write 58 passed, form-roundtrip 1/1.
-   First CI run (44797579727), all green: **5.6 min**, from 8–9. Everything
-   starts at once; the build takes 2.1 min, the shards 2.6–3.5 after it,
-   admin-write 4.4 and unit 4.0 beside them. The slowest path is now the
-   build plus the slowest shard (5.6), with admin-write and unit a minute
-   under it.
-   philly's old `Cache Round-trip Seed` category and `E2E Fixtures`
-   section were deleted Nov 20. A branch still on the old code (the
-   Dependabot PRs) puts them back when its CI runs.
-
 Flakes seen this batch, to watch: `category-open.spec.ts` (a click asked
 the server once, the re-run passed), the mobile prefetch budget (once).
 `todo-scroll.spec.ts` has passed every run since its fix.
@@ -1710,33 +685,6 @@ hits the one test project at once, so watch for it: if it repeats, size
 those waits to the database's slow spells, or separate the test project
 from dev's (the user's call, see Nov 17 above). Not retries.
 
-CI time, looked at again Nov 20 (the user: "the PR still took about 10
-minutes"). PR 402's checks took 7m20s, not 10. The rest was a second push
-restarting them and the merge after. They were slow because 402 changed the
-lock file: no package cache, so every job ran `npm ci`, and the build was
-cold. A PR that leaves the lock file alone runs in about 5.6 min. Three
-changes (`ciWorkflow.test.ts`, 3 red against the old files):
-
-- **Production's smoke run finishes again.** It ran all 582 tests on one
-  runner, took 13–15 min, and hit its 15-minute timeout on most pushes to
-  main since Nov 16, so it reported nothing. It now builds once
-  (`e2e-prod-build`) and runs six shards of that build, like e2e. Its
-  report upload was behind `if: failure()`, which a continue-on-error
-  step never sets; it now uses the step's own outcome.
-- **The build cache is saved once per PR**, keyed on the lock file, not
-  on every run (keyed on the commit, it cost 18–23s at the end of each
-  build job).
-- **e2e has seven shards**, from six; the slowest ran 168s of tests.
-
-Not changed: lint and typecheck still run before the unit tests in one
-job (4–6.5 min). On a warm run that is under the e2e path, so splitting
-them saves nothing yet.
-
-Still to do:
-
-1. Nothing left in batch 5. Leftovers in the test project are listed
-   under step 2.
-
 For the user: two home tiles link straight to a Google image thumbnail
 and an iStock photo (Mikvah's is the iStock one, on live). Either can vanish,
 and an iStock photo may need a licence. Left as they are.
@@ -1746,115 +694,10 @@ site's own address.
 
 ## The admin review (Nov 18, on `redesign/suite-rows`)
 
-The user asked for a look over the whole admin: what to fix, what to
-refactor, which watches don't work right. Fixed the same day, each with a
-test that failed against the old code:
-
-- Approve and reject act only on a change still waiting. Two approvals of
-  one new place at once (two tabs, a double tap) put it live twice, and
-  rejecting a change already approved marked it rejected while it stayed
-  live. The approval now claims the row first and hands it back if the
-  apply fails.
-- Category banner upload: that community's admins, not superadmins only.
-  Philly's 3 non-superadmin admins and Washington's 1 couldn't upload a
-  banner (as hero and logo before them).
-- Category page preview: its own community's places and zmanim, not
-  Philly's (it read `community.config`).
-- Watches: one watch's failed save no longer ends the night's run; it
-  counts as not working and the rest run.
-- Menu watch: a reading an admin skipped stays skipped on the nightly run,
-  not only on Read now.
 - Mekor watch: one place on Google is filed once. The Brodsky Center was
   filed twice on Nov 4 (two names on Mekor's list, one Google place).
   **Live queue still holds both** (the user's to reject one; 7 Mekor new
   places waiting, 14–30 days old).
-
-Then, the rest of the list (the user, Nov 18: "keep going through the
-whole list"), each with a test that failed against the old code unless
-it says otherwise:
-
-- Sign-in links (admin and inbox) go back to the guide, never to an
-  Origin header a request claims (d27471f5).
-- Home page and Feedback keep what was typed when the sign-in token
-  refreshes (431a5f89).
-- Add a place names a save that failed after the listing was made ("Not
-  saved: …"), and stays until Done (f4c61656).
-- A sign-in check that couldn't be made (no signal, a 5xx) says "Couldn't
-  check your access" with Try again, instead of "not an admin" and a
-  sign-out (7acbbd51).
-- Watches run and nightly email (0e9036b9): a failed step of the watches
-  run is named in its warning; a run cut off past its time limit is
-  emailed (live: read-menus Oct 27, watches Nov 6 were never told of); a
-  job that didn't run at all is emailed the first night it's late.
-- A page with part of a change waiting isn't AI-read again every night
-  (87411c2c), which was using up the night's reads.
-- Keystone-K and Mekor: a place Google said is closed isn't asked about
-  again for 30 days (c9717ddc); Keystone skips a new place already waiting
-  in the queue, by name or Google place (63896a05).
-- Google sync takes the longest-unasked listings first past its 500 cap,
-  and every Google request gives up after 10s (937e0802).
-- read-menus and look-again: a late answer always lands after its "took
-  too long" save (it raced it before); walk-routes' request times out
-  (f864d927). A late look-again try counted as failed has no test.
-- Back, Forward and reload (each checked in a real browser):
-  - `replaceState` calls in To do, Places and the sign-in gate drop Next's
-    mark (`replaceAddress`, 42da8b3e); a unit test fails on any new one.
-  - Home page's full-size preview (`?preview=open`), a form's question
-    (`?question=N`) and its preview (b220a7b4).
-  - Add a place's form after Find (`?step=finish`) and a source over it
-    (`?over=…`); a reload on the form is Find again, the address fixed in
-    place (58bed9f1).
-  - New community on the superadmin console (`?step=new`, 736d1797).
-- Gone: `People.tsx`, ChangeReview's unused `inPlace` (b0b75bd0), and the
-  unused `/api/admin/subscribers` routes (no test: nothing called them).
-- Settled with the user later on Nov 18 (they agreed to all three):
-  - A category's id can't be renamed: no screen offered it since Nov 5,
-    and a rename moved only the listings, so `renameCategoryId`, the
-    id-usage route and the editor's rename gate are gone (9181c66a).
-  - A form's tile has no emoji to pick: the site always drew its line
-    icon. The picker, the unused `PinColorField` and Support's and
-    Volunteer's emoji fallbacks are gone (1b4d2641).
-  - About and Privacy and Communities live only in the superadmin
-    console (`/admin/pages`, `/admin`); the community's menu links there
-    and its two copies are gone.
-- A listing that says KCL and that no name on KCL's list could be now
-  gets a card in To do, to take KCL off or keep it (the user chose it
-  over a line on the Kosher certification page, Nov 18). Before, it was
-  never dated and nothing said why. One that a name on the list might be
-  (two names, or a name too short to match on) is left alone. The card
-  isn't filed again once decided, until the listing's hechshers change,
-  and the Kosher certification page shows it as a difference too.
-- The three screen nits, fixed Nov 18: Places says the street of a place
-  another place has the name of (68d03fd5); Reports and History say
-  Approved and Rejected, as To do's buttons do, not Taken and Left
-  (8d549ac4, a change to the Oct 29 Reports board's wording; `e2e/admin.
-  spec.ts` still looked for "Taken" and failed, fixed on the public
-  review's branch); a shul's
-  usual times on its admin listing read by tefillah then time, Shabbos's
-  Friday first (d17d456c).
-
-- The watch fixes, later on Nov 18:
-  - A job turned off isn't searched for its pages (hours, menus, Refuah,
-    eruv websites), and a site's candidate pages are read three at a time
-    (84ccccd9).
-  - Each community's pages, calendars, newsletters and pasted times are
-    read on its own timezone and map centre, not community.config's
-    (cceefa9c). The fetch user-agent still says PhillyJewishGuide: the
-    site's name, and shul sites already let it through.
-  - Cron routes compare their secret in constant time (567c5ec8).
-  - Walk routes start somewhere else in the line each night, communities
-    too, so requests that fail every night can't hold the budget
-    (35440032).
-  - The morning run: the page search gets the first 60s and takes places
-    in turn; no watch starts after 220s, room for a calendar's two-week
-    read (40782d43).
-- The public site's `replaceState` calls (`FindResourcesConnected`,
-  `ResourceMapView`) carry Next's mark, and were checked in a real
-  browser on Nov 18: the address survives a focus refresh, a navigation
-  away and Back. Left as they are (still allowlisted in
-  `replaceStateMark.test.ts`).
-- The Brodsky Center's second copy in the live queue: the user rejected
-  it on Nov 18.
 
 Still open:
 
@@ -1909,45 +752,8 @@ Still open:
   Claude (Nov 19, "take it from here"): newsletter before calendar, and a
   short source matching the usual times files nothing. Switch being built;
   live data cleanup still needs the user's yes.
-- A listing list's scroll-to-a-row wait gives up after about 3 seconds
-  and stops when the list goes away (`whenSettled`, Nov 19). It used to
-  poll every 32ms forever for a row that never appeared, and one timer
-  firing after a test's page was gone failed PR 395's unit job ("window is
-  not defined") with every test passing.
-- The four refactors, done Nov 18 (branch `claude/admin-refactors-85cd73`):
-  - One admin api (`src/lib/adminApi.ts`, `useAdminApi`): every screen's
-    `/api/admin` request gets the token and the community from it, and
-    `adminApiCalls.test.ts` fails on one built by hand. It keeps one api
-    across the hourly new token, so no screen reloads a draft over what's
-    typed (the Home page and Feedback fix, now for every screen).
-  - One route wrapper (`src/lib/adminRoute.ts`: `adminRead`,
-    `adminWrite`, `siteAdminRead`, `siteAdminWrite`): sign-in, the
-    community, and the public site's cache thrown away after a write, now
-    even when the save failed partway. Every admin route is on it
-    (`adminRoutesWrapped.test.ts` fails on one that isn't) but dev-login,
-    request-link and whoami, which sign in themselves. So a 502 from an
-    approval, a listing save, a kosher restore, Google or Look again now
-    refreshes the site, where it didn't. Pages and a new community keep
-    their own invalidation (`siteAdminRead`), and a save that changes
-    nothing public is marked `unchanged()`.
-  - To do's open and close go through Next's router (`moveTo`), not a raw
-    `history.pushState`. It worked before too (Next's patched pushState
-    copied the same page's state), so `todo-history.spec.ts` passed
-    against the old code as well; it guards the move.
-  - One change screen: Read now's finding on a saved place opens To do's
-    (TodoChange), with its answers; ChangeReview is gone.
-  - One kosher-list runner (`src/lib/kosherListRun.ts`) for Keystone-K
-    and Mekor, with the closed-on-Google memory and queue checks in it.
 
 ## The public site review (Nov 18, on `claude/public-review-46a065`)
-
-The same exercise as the admin review, for everything a visitor sees. Six
-areas reviewed (getting around, a listing, the map, contributing, public
-API and caching, speed and phones); 47 findings, the user said yes to all
-of them in seven batches on Nov 18, with item 3 (Back closes a phone's
-listing sheet) and item 4 (Forward to a search shows the search again).
-Each fix has a test that failed against the old code. The full list is in
-the session's notes; what's done is below.
 
 Left out on purpose:
 
@@ -1960,226 +766,12 @@ Left out on purpose:
 
 Done:
 
-- "Next:" and the minyan lists count public holidays and Rosh Chodesh
-  (`dayKeysFor`). On Thanksgiving a shul said "Next: Shacharis 7 AM
-  tomorrow" right above "8:30 AM also on public holidays". The days
-  ahead carry Rosh Chodesh too since Nov 19 (the calendar is asked with
-  `nx=on`; `roshChodeshDays`, `withRoshChodesh`), so tomorrow's Rosh
-  Chodesh minyan is offered as Next. Not checked against Hebcal itself
-  from here (its site was blocked to the session): the item category
-  `roshchodesh` is the one `dateZmanim.ts` already reads. A cached answer
-  from before it says nothing ahead, as before. The unused
-  `calendarDaysFor` is gone.
-- What reaches the queue and the site from a visitor, tightened:
-  - A sender is their email only. A name they typed ("Keystone-K
-    (automated)") no longer makes the queue say it was read from a watch,
-    or approval say "Confirmed by" one.
-  - A new place from "+ Add" gets the same clean-up as the listing form
-    (`prepareSubmission`: the site's own keys off, contacts tidied, bare
-    websites given their scheme).
-  - Undoing a "checked" needs the stamp it was given, so a listing's date
-    can't be set to any day.
-  - Undoing "gone" puts "Reported gone" back only while a report of it is
-    waiting in the queue.
-  - A new place can't be sent into a hidden category.
-- Email the site sends: a request's type comes from the site (one of the
-  five built-in kinds, or a published form's own title found by its id),
-  never from the sender, since it is the email's subject. Its confirmation
-  goes to one address. The email signup has the Turnstile challenge,
-  mounted once someone types in it, so the home page still loads nothing
-  from Cloudflare (`budgets.spec.ts` now checks the home page too).
-- Photo uploads are stored with the type their bytes show, and refused
-  when the bytes are not a PNG, JPG, GIF or WebP, whatever the label says.
-  Since Nov 19 an upload also needs a passed Turnstile challenge: the
-  photo field runs its own (`challenge` on `ImageUploadField`), started
-  when a picture is picked, shown only if Cloudflare wants a click, a
-  fresh token per upload; after 20s without one it sends anyway and the
-  route decides. The admin's own editors use the same field and pass it
-  too. Unused photos on live, cleared Nov 19 (the user's yes): the 23
-  files no row mentioned (18 listing photos, mostly re-cropped on Aug
-  10–11, 3 old logos, 2 old category banners; 1.5 MB), backed up first to
-  `backups/prod-site-assets-unused-2026-11-19/` on the user's machine.
-  Every file a row mentions was checked to still load after. Kept on
-  purpose: the 36 only an edit in History mentions (old photos, two
-  rejected edits' photos, three screenshots the reader read), since
-  History shows them. Since Nov 19 it stays that way by itself
-  (`storedFiles.ts`): a save that replaces or takes off the logo, a hero,
-  the map card or a category's banner, or deletes a category, deletes the
-  old file once nothing else mentions it; and the Sunday link check first
-  clears every file over 30 days old that no row of any table mentions
-  (an upload never saved, a replaced listing photo, a reader's source
-  nobody kept), with the count in its line on the Watches tab. One table
-  that can't be read stops the pass. Uploads still land where they're
-  saved rather than in a holding folder (a move would mean rewriting the
-  address everywhere a save puts one). Its dry run on live found nothing
-  to clear; on the test project it cleared 30 old test uploads.
-  **Dev links to live's files** (130 of them, copied over by syncs), and
-  live's clean-up checks only live's rows. So the Nov 19 one took the old
-  logo dev's Philly still used, and the icon e2e tests failed on the test
-  project (CI's too). Fixed on dev the same day: the file, from the
-  backup, now in dev's own storage and dev's logo pointed at it. Then
-  (the user: "dev should not be linking to live photos") the other 129
-  were copied into dev's storage and dev's 211 rows pointed at them; dev
-  links to no live file now. `sync-dev-from-prod` copies a row's files
-  with it from now on (`scripts/storedFileCopy.mjs`).
-- Public reads: a form's unpublished draft no longer goes out with the
-  published form, and `/api/eruv` says a read failed and when, not the
-  error's text.
-- Counts: a vote needs an approved listing in a category with upvotes on,
-  real UUIDs, and one machine gets four taps a listing an hour. A
-  remembered question counts toward "most asked" once per visitor a day,
-  written after the answer.
-- A listing's hours read the place's clock (the community's timezone),
-  not the visitor's. A place open past midnight keeps its real close
-  ("Open until 2 AM", still open at 1 AM) instead of "11:59 PM" and
-  Closed, and a lunch or dinner break shows Closed (Google's split hours
-  are kept as `periods`; the old shape stays as it was for everything
-  else). Search's "open now" reads them the same way, and so do tonight's
-  candle lighting and the Shabbos card's place on a Friday, so "closes
-  before candles" compares like with like (Nov 18, after CI failed them).
-  The unit suite runs in UTC, as CI does (`vitest.config.mts`); a test
-  sets its times with `placeTime`, on the community's clock.
-- A shul's weekday box no longer says "10 min before sunset: 4:32 PM
-  today" on Friday or Shabbos (`ruleLinesToday` checks the rule's days).
-- The footer says "Tap Edit listing", the button's name.
-- Google's own description no longer asks "Still right?" on older
-  listings.
-- Zmanim are fetched with the date, in the community's time, so a CDN
-  can't hand back yesterday's just after midnight. A date more than a
-  day off is refused; today's is cached, any other isn't.
-- Back, Forward and reload (items 1–7):
-  - Coming back to the tab after an admin's change no longer drops the
-    search, Filters, an open listing or the Minyan view from the address
-    (the refresh wrote back the router's older address, and dropped the
-    page's own Back step with it). Both are put back once the refresh
-    lands, still behind the router. The first fix told the router the
-    address before refreshing, and Next then replayed the page's older
-    cached copy over the fresh one, so the admin's change never arrived
-    (CI's cache suite, "regains focus", 3 of 3 on Nov 18).
-  - Back and Forward onto a category show the search its address carries,
-    as a link does; before, they blanked it, and after a reload Back threw
-    a hydration error. `backForwardNavigation.ts` is gone.
-  - A phone's listing sheet opened from the list is a step: Back closes it
-    and stays on the list, Forward reopens it. A listing's own link no
-    longer gains `?item=`, so a reload is the same page.
-  - The computer's Map: a place opened is an entry, so Back closes it
-    instead of leaving the map. The phone's Map no longer adds a second
-    entry for a place after a reload (Back needed two presses).
-  - A bare-id listing link redirects (308) to the friendly one, from
-    the proxy (`bareListingLink.ts`); the approval email builds the
-    friendly one. Not from the page: Next 16.3 wrote a page redirect's
-    Location twice for a listing rendered on demand, and on the first
-    request the browser got `a, a` and a 404.
-- The map (items 15–20):
-  - No emoji on the map: the search lines draw the category's line icon
-    (a pin for your own pins), the computer's tracking button the phone's
-    arrow, the campaign chip its category's icon instead of a sparkle,
-    and "You are here" is words. The forms' emoji wait with the forms.
-  - The map's eruv rows say where and when their status was read
-    ("From centercityeruv.com, 2:55 PM"), as the Eruv page does.
-  - When the map can't load, it says everything on it is in the list,
-    not to check an API key (one message, `MapUnavailable`, for both
-    ways it fails).
-  - With no location set, the map's list starts from the community's
-    centre, and the phone's lowered sheet says "137 places", not "137
-    places nearby — drag up".
-  - The "Share your live location?" box no longer opens with the site
-    (the user, Nov 18: "I think we can fix the location ask"). Location is
-    asked for when the visitor reaches for it: "Use my location" above a
-    list, Set location in the header, or Distance with nothing to measure
-    from, each of which opens the header's location menu. A visitor who
-    shared before is picked up again silently, as before. The box, its
-    three-day re-ask and the e2e suites' `dismissLocationPrompt` are gone.
-  - With storage blocked (Safari's "Block all cookies"), the Map and the
-    home no longer show "Something went wrong": saved places, pins and
-    searches read as none, the sidebar opens at its usual width, a vote
-    keeps a token for the visit and a counted vote stays counted
-    (`safeStorage.ts`).
 - Speed and phones (items 35–41):
-  - A page is handed over as it arrives; the service worker stores its
-    copy afterwards. Before, every page on an installed or returning
-    phone waited for its last byte and the cache write.
-  - On one bar, a page that hasn't answered in 4 seconds shows its saved
-    copy; the request carries on and stores the fresh one.
-  - With no signal: "/" (where the installed app opens) shows the
-    community home visited last, not the offline page; a page saved
-    without its query string still opens with one; and a page reached by
-    a tap is there too: the page asks the worker to keep it, 3 seconds
-    after the tap, at most every 6 hours a page, never with Data Saver
-    (`storeTappedPage.ts`). The offline page links home.
-  - The script cache keeps 300 files, oldest out first, instead of every
-    deploy's.
   - `/` redirects with 307, not 308: it follows a remembered community,
     and a browser keeps a permanent redirect after the visitor switches.
     **Your call:** the installed app's name and icon are Philly's for
     every community (`manifest.ts`).
-  - The header's Set location, a listing's phone number, website, email
-    and links, and the map's chips each take a 44px tap without changing
-    how they look (`tap-44` in `globals.css`). A listing's details rows
-    are 4px taller to fit them. A contact's phones, email and website
-    (a hospital's Who to call, Rides…) each sit on a row of their own, 44px
-    tall, a faint line between them and a stronger one between contacts
-    (board A, picked Nov 19, canvas PMkcvVX1wzuqcbcryH2JqC; built the same
-    day). Side by side 4px apart, a tap could dial the next number. A
-    website row gets the globe icon, which the board didn't show. Cards/List left out.
-  - Sentry loads after the page instead of in its first download
-    (`deferredSentry.ts`). Errors thrown before it arrives are kept and
-    sent; the page-load trace now starts when it arrives.
-  - JS budgets for a category page, a listing's own page and the map
-    (`budgets.spec.ts`), counting the site's own scripts.
 - Tidying (items 33, 42–44, 47):
-  - Each community's own clock: zmanim, festivals, a shul's week read
-    from a photo and its times are worked out in the listing's community's
-    timezone, not Philly's (`apiUsesCommunityClock.test.ts` fails if a
-    route under `src/app/api` reads the deployment's config community).
-  - Contributions on or off per community: a community's `ui` row can
-    switch add, edit or report off for itself (`contributionsFor`); the
-    deployment switch still wins. Nothing sets it yet, so nothing changes
-    on the site.
-  - The four routes a visitor changes a shul or a listing's items through
-    share one start (`listingWrite.ts`). The photo check had drifted: a
-    week read from the "+ Add" box's photo was refused by one of them.
-  - The map's search suggestions are one list for the phone and the
-    computer.
-  - A listing's editor and its Request removal are addresses of their own
-    (Nov 19): `?editing=<id>~listing`, `<id>~listing/removal` and
-    `<id>~removal` (`useEditorInAddress`), written through Next's router.
-    A reload comes back to them, Back from one is the listing, and Back to
-    one from another page draws it. Everywhere a listing opens: the
-    computer's column, a phone's sheet and a listing's own page, the Map's
-    sidebar and phone sheet, and an eruv. Under the listing's id, so the
-    next listing a phone or the Map opens doesn't come up in the editor of
-    the one before. `?editing=` rather than `?form=edit`, which already
-    means the box over the list. A row opened inside the editor is still
-    a step of the screen alone (its ‹ closes it). A phone's sheet closed
-    with its editor open (the dimmed list tapped) now goes back to the
-    list; it used to stop on the listing's address with the sheet shut, so
-    the next Back did nothing and a reload reopened it (already so before
-    the editor had an address).
-  - The computer's Edit dialog (`ListingDetailModal`) is gone: a computer
-    has opened listings in the list's column since Sep 30, so nothing
-    reached it.
-  - Dead code out: the upvote button's two looks no screen used (both
-    drew a 👍), `formatWeekHours`, `syncedLabel`, the map's unused `onUp`
-    and its re-export of the hospital colour. Five public reads no screen
-    calls stay (`/api/site-settings`, `home-sections`, `forms`,
-    `hospitals`, `campaign-banners`): the e2e suites read them to know
-    what the site should show, and warm the cache through them. Their
-    comments said screens fetched them; they say who does now.
-  - The map's pins use Google's current pin (`glyphText`, `glyphSrc`,
-    the pin as its own element), so the console no longer warns about
-    the old one on every map load.
-  - Each community's own centre, area name and clock, everywhere on the
-    site and in the admin (Nov 19): a shul with no location of its own is
-    timed by its community's centre (`anchorKey`, `COMMUNITY_SPOT`), the
-    map opens there, distances and the home's zmanim are measured from it,
-    the footer and Volunteer wizard name its region, and "seen today" and
-    "last checked Oct 2" read its clock (`useCommunityPlace`,
-    `useCommunityTimezone`). `publicUsesCommunityPlace.test.ts` fails on
-    any new read of the config's. Left on the config on purpose: the
-    Privacy page's date (one policy for the site) and `HOURS_TIMEZONE`,
-    the last resort when a caller passes no clock (its callers weren't
-    audited).
   - A community's own admins set its default location (Nov 19), the
     place a visitor is taken to be until they set their own: Settings ›
     Default location, one place picker labelled "Until a visitor sets
@@ -2205,51 +797,10 @@ The user's answers on Nov 10, evening, and what was done with them:
   buttons, Delivery's own box and the Certification button are all back.
   Only the admin's grouping (a hechsher's caveat, note and certificate as
   parts of it; Delivery's WhatsApp link as a part of Delivery) stays.
-  - So **converting Food on the live site to Kosher and Delivery boxes is
-    no longer wanted**. Dev's Food `listing_parts` was put back to null.
-  - **Fields and "How it looks" match the restored listing** (the user
-    left it to Claude: "If they are one field then they should be one
-    field always"). Delivery Details is one row in a "Delivery" box, and
-    the hechsher one row in "What isn't kosher", the boxes the listing
-    draws them in; their parts are no rows. Either can be put in one of
-    the admin's boxes, where the listing then draws it (Delivery's text
-    and Join button there, not up top too; the hechsher's amber box and
-    Certification button stay where they always are).
   - **Every box takes every field** (the user: "Yes, anything takes
     anything"; then "I can not for the life of me understand why we're
     still having existing boxes not being editable and those add a fields
     not showing every field"). BUILT Nov 10:
-    - Contact and About take Delivery, a hechsher, davening times and
-      lists too, and the listing draws them there (f735af0e).
-    - Delivery, What isn't kosher, Main dishes, Davening times and a list
-      of contacts' own box take any field from their + Add a field and by
-      drag, and are renamed. Doing any of those makes the box one of the
-      admin's, in the same place with its name and fields (`ownBox`,
-      6a91cc56). Nov 7's "lock the name" was on fields only, so this
-      doesn't change it. Still taking only their own: a mikvah's section
-      and "Not on the listing".
-    - **Renaming a box never renames a field** (the user: "Boxes and
-      fields are separate. you can edit the name of a field you created,
-      yes. But not through renaming the box."). A field's name changes
-      only on its own screen. Before, a box named by a field made here
-      (Main dishes) renamed the field.
-    - **Address and phone move to any box** ("we should also be able to
-      move all fields. Including address and phone"; deab70a7). Saved as
-      `@address` / `@phone` in the box's list, Contact when nowhere. The
-      listing draws them in that box, first in it, address before phone,
-      as Fields lists them; the place editor edits them there too (see
-      "Editing follows the listing" below). A keyboard move that would
-      change nothing (the phone one step inside Contact) is skipped, so
-      the phone leaves Contact in one press (d72a1943). Hours and website
-      are still added from Contact (they drag after, as before).
-    - **No repeated headings** (c98028e6). A list drawn in a box of the
-      same name is named once (Main dishes made an admin box said "Main
-      dishes" three times); in a box of another name it's named small
-      under it.
-    - **How it looks is honest** (69bcc7d3): a field picked from a box's
-      + Add a field is shown in that box, as it really looks (the
-      davening table), on this page's own places, the one answering it
-      first; "On X, its answer made up" when none do.
     - **Editing follows the listing; admins arrange it** (the user: "an
       admin should have customization power to organize the website how
       it works for them", with simplicity for visitors first; 8bdf3495).
@@ -2266,119 +817,6 @@ The user's answers on Nov 10, evening, and what was done with them:
       "This Shabbos", as its box is. Not yet true in the code: hours are
       broken out only from Contact; in an admin's own box they're edited
       inside that box's section (proposed fix, waiting on the user).
-    - **A box's X is at the end of its name bar**, not a trash can on its
-      + Add a field line (405aacd9).
-    - **Three Fields bugs fixed** (the user's report, Nov 10):
-      - A field taken off and added again went back into the box it had
-        been in, not the one it was added from: taking a field off left
-        its name in that box. Now a field taken off leaves every box (the
-        box stays, empty), and a field added to a box is taken out of any
-        other.
-      - Dragging a field down didn't scroll the page, so a box below the
-        window couldn't be reached. A row held near the top or bottom of
-        the window now scrolls the page that way (faster nearer the edge,
-        the bottom's zone taller for the Save bar), and only the way the
-        row is being taken. Every drag list in admin has it (Home page
-        too).
-      - A box with nothing in it (or no name) seemed to save. Save
-        dropped it without a word, and left its place in the saved order
-        behind, which could shift the boxes after it. Save now stops and
-        says "“Box A” has nothing in it. Add a field or take the box off."
-    - **A box's X is only on an empty box** (the user's yes, Nov 10). A box
-      with fields in it, or the address or phone, has no X. Taking off or
-      dragging out its last field leaves it empty, with its X back; it
-      doesn't go on its own, so moving the only field elsewhere never
-      makes a box vanish mid-move. A field comes off on its own screen
-      ("Remove from <page>"); rows have no X. A box of the site's own
-      (Davening times, Main dishes, Delivery) still goes when emptied, as
-      it always has: it has no box to keep once nothing is in it.
-    - **Adding one more to a whole list looks like "+ Add a box"** (the
-      user's yes, Nov 10): a dashed button as wide as the list, a plus
-      icon before its words, under the list (`AddListButton` /
-      `AddMenu wide`, DragList.tsx). Done for: Within a walk's Add a page
-      (moved from the box's header to under its list; "None yet" dropped,
-      the button says it), Site → Home page's computer Header (Add a tab,
-      Add the Categories menu), phone Tabs (Add a tab) and Cards under the
-      search (Add <card>), on computer and phone. Adding inside one opened
-      row keeps that row's own small button, as a box's "+ Add a field" is
-      its own line: a tab's "+ Add a link" / "+ Add a heading", the
-      Categories dropdown's "+ Add a heading". Then (the user's "do those
-      too", Nov 10) the rest of the lists: Fields' Add audience group
-      (under Add a box), a field's Add a choice (under its choices, above
-      Other; moved from the box's header), Forms' Add a form (into the
-      list's box, from under it), a form's Add a question (under its
-      questions, from the header), and Campaigns' Add a campaign (under
-      the list, from the header; still greyed out until there's a
-      category, `AddListButton disabled`).
-    - **Boxes fold; tabs come off like boxes; adds inside one thing look
-      like "Add a field"** (the user, Nov 10). The rule as built, whole:
-      - Fields: every box starts open. A box with something in it folds
-        and opens by a press anywhere on its name bar, as a Home page tab
-        does (the user, Nov 10: "we want the top part"), the chevron at
-        its end included; a renameable box's name still renames it. An
-        empty box has its X there instead. A field dragged onto a folded box goes in at
-        its end. Folding isn't saved or in the address; it's how the list
-        is showing, and a field added to a folded box opens it.
-      - "Nothing in it yet" is gone everywhere it was: an empty field box
-        shows only its Add a field, and an empty Home page tab or heading
-        has no line under its name.
-      - Home page, computer Header and phone Tabs: a tab comes off by an X
-        on its name bar, last, shown only while it's empty; one with links
-        or headings is emptied first (each link's × as before). A heading
-        inside an ordinary tab works the same. Exceptions: the Categories
-        menu and its headings keep their trash can (its headings are the
-        home sections, taking one off still asks and moves its links to
-        Other, and the menu always holds Other).
-      - Add a link and Add a heading, in a tab, a heading and Categories'
-        headings, on computer and phone, are rows across the foot of a
-        white card holding the links, as a box's Add a field is
-        (`ListCard`, `AddRowButton`, `AddMenu row`).
-    - **A field comes off by the X on its row** (the user's yes, Nov 10).
-      Every field row in a category's Fields ends in an X ("Take … off").
-      A field no place has answered goes at once; one with answers opens
-      "Remove … from …?" (`?field=…&remove=1`), and Remove it or the
-      browser's Back return to the list. The field's own screen no longer
-      has "Remove from …". Address and Phone rows are only the X (they
-      have no screen). Exceptions: the hidden hechsher-part rows have no
-      X, and a category's "Delete this page" stays a small red link.
-      Adds stay full width; removes stay small, on the thing they remove.
-    - **A field's editable Choices come before "What you can change"**
-      (the user's yes, Nov 10): Kosher Certification, Eruv and Services
-      read What this is, Choices, then the switches. Ready-made fields'
-      fixed choices were already chips in What this is. A field made here
-      keeps Basics, Choices, Questions.
-    - **Hover on a computer, chevron on a phone, admin-wide** (the user,
-      Nov 10). A row that opens a screen of its own shows its chevron only
-      where there's no mouse to hover with (`GoChevron`,
-      `pointer-fine:hidden`); with a mouse, its row shades under the
-      pointer (`slate-100`). That is every `AdminRow` (To do, Places,
-      Watches, Reports, Category pages, Forms, Campaigns and the rest),
-      the setup checklist and a category's field rows. Exceptions: a
-      chevron that folds something open in place stays everywhere, since
-      it turns to say whether it's open (field boxes, Home page tabs,
-      phone boxes, Repeated searches, Banner photo, Within a walk, Look
-      again's rows); and the picture of a visitor's row in Add a field
-      keeps its chevron, since visitors' rows have one. A touch-screen
-      computer counts as a phone.
-    - **Save and Undo count only real changes** (the user, Nov 10: "even
-      just clicking something triggers a change. And undoing something
-      still says a change happened"). The rule as built, whole: the Save
-      bar counts a change only when what would be saved means something
-      different. A switch turned on and back off, a box's name pressed
-      and left as it was, and fields in a new key order are no change.
-      How: a category page compares by meaning (`draftMeaning`,
-      `FIELD_FLAG_MEANS` spells out every switch, so a new one is a
-      compile error until it's classified; `stableJson` ignores key order
-      and unset keys); a form compares its questions the same way
-      (`stepMeaning`). Where switching back was really lossy, it now puts
-      back what was saved: Kosher questions and the certificate link
-      turned back on come back as the page had them (their form section
-      and the link's name kept, the link in its saved place; a link the
-      page never had still goes right after its field); a filter turned
-      off puts back how the field showed. Campaigns, Feedback and Pages
-      already compared plain values. Swept by
-      `CategoryEditorNoChange.test.tsx` over a copy of six real pages,
-      every switch on every field's screen and every box name.
 - **Computer home: the hero centred** (BUILT Nov 11, the user's yes to
   board C on the desk canvas: "much calmer and more directs my attention").
   The headline, the big search and what to try are centred over the photo,
@@ -2391,8 +829,6 @@ The user's answers on Nov 10, evening, and what was done with them:
   phone home is untouched. Held off for a look with real people: the
   showcase sections, search in the header.
 - **Open from Nov 11's home review** (the user's notes on the built hero):
-  - The switch and day pills are blue (the site's colour for a picked
-    thing), BUILT.
   - Explore by Category showing every category instead of "More": held,
     to ask visitors.
   - Explore by Category as photo tiles (board H1 on the desk canvas, the
@@ -2456,14 +892,6 @@ The user's answers on Nov 10, evening, and what was done with them:
     the minyan card linked to (and drew the glyph of) the first category
     with a minyan field, Food on dev, instead of the shuls page the
     schedule reads. The map card's picture came after (below).
-  - **Computer home, more room** (board G5c, the user, Nov 11: "Yes, build
-    G5c"): BUILT Nov 11. 72px between the home's sections (was 32px), now 48px
-    (the user, Nov 11, once the cards were outlined: the gaps read too
-    big; "you can fix the gaps too"), the
-    first still 32px under the trust strip. "Know a place we're missing?"
-    is a 240px-tall section with a 38px heading, bigger line and a 56px
-    button; the navy Stay in the Loop box is 260px tall with a 38px
-    heading, a 320px email box and 56px controls. Phone unchanged.
   - **Map card picture: an OpenStreetMap street map** (the user, Nov 11:
     "OSM, farther out", picked over a close-in Center City view and over
     Google's Static Maps). BUILT Nov 11. `scripts/map-card-picture.mjs
@@ -2481,58 +909,6 @@ The user's answers on Nov 10, evening, and what was done with them:
     (since G3; unseen until a picture was set). **Dev has it. Live needs
     migration 095 first, then the script with `--prod --apply`: both need
     the user's go-ahead.**
-  - **Category pages open on the home tile's picture** (boards H4 computer,
-    H5 phone; the user, Nov 11: "let's do H4 and the phone"). BUILT Nov 11.
-    Computer: the band is a 240px photo under a dark gradient carrying "N
-    PLACES", the title at 44px (now the page's h1) and the distances line
-    in white; the search is a white pill on the photo's bottom, 688px wide.
-    Phone: the same picture, 120px, edge to edge under the header, no
-    second title; the rest as before. Changes to what was there: the round
-    category badge and the thin 132px strip are gone (the home tile's photo
-    now grows into the band instead of the badge morphing); listing rows
-    are a step bigger on a computer everywhere they're used (18px name, 48px
-    picture), phones unchanged; the count shows twice ("71 PLACES" on the
-    photo, "71 listings" over the list, which counts what's filtered).
-    Not drawn, decided while building: a category with no picture gets its
-    colour behind the words; a listing opened on a computer drops back to
-    the old 132px band with no words (it keeps the top of the page, as
-    decided Oct). Eruv's own page and Zmanim keep the old band.
-  - **A category has one picture, its banner, and its icon isn't set any
-    more** (the user, Nov 11: "the picture can just be the banner. So maybe
-    we don't need the option to change the icon"; "Yes, build it"). BUILT
-    Nov 11. The admin's Banner photo (else the older pasted card photo) is
-    the computer home's tile, the category page's photo and a phone's
-    picture under the header. The Icon section is gone from the category
-    editor (emoji box, Browse icons, "Or use a picture instead"); Basics
-    still shows the icon beside the name, not tappable. Every category
-    draws its kind's line icon; one with none of its own gets a plain
-    four-squares line icon where its emoji used to show (badges, map pins,
-    the nearby list). `icon_image_url` is no longer read or written (the
-    column stays, no migration) and its upload route is deleted, so the
-    soft 612px icon pictures on dev no longer show anywhere. Forms keep
-    their emoji Icon field. Changes to earlier decisions: home badges
-    (search rows) no longer show a category picture, and
-    Food's page now opens on its banner rather than the picture set as its
-    icon.
-  - **No more flying picture** (the user, Nov 11: "when I click on a
-    category card I see the background picture come flying in"). BUILT
-    Nov 11: the home tile and the category page's photo no longer share a
-    view-transition name, so the page just appears. Change to H4 as built
-    (the tile used to grow into the photo).
-  - **Outlined cards on the computer, photo tiles on the phone** (boards
-    J1b and J2b, the user's "J1b and J2b"). BUILT Nov 11:
-    - J1b: every white card on the computer home (Next minyan, Before
-      candles, the map card, the trust band, Suggest a listing, the Explore
-      box) carries a quiet grey outline all the time; under the pointer it
-      lifts and the outline goes blue. One constant, `HOME_CARD_OUTLINE`.
-      The photo tiles stay unoutlined. J1 (soft blue) not built.
-    - J2b: the phone home's tiles stay three across, each filled by the
-      category's one picture (banner, else card photo) with its name on it
-      over a dark fade. A category with no picture keeps its tint and line
-      icon. A long name grows its row rather than being cut. Change to the
-      Oct 17 decision ("not the old photo tiles"): every tile is now a
-      picture download (120px thumbnails from storage), inside the home's
-      600 KB image budget. J2 (name under the picture) not built.
   - **Phone home as board K1c, computer footer as K2** (the user, Nov 11:
     "I like it" to K1c; K2 "I like the footer for desktop"). BUILT Nov 11:
     - The tiles sit in one white box under a small "EXPLORE BY CATEGORY"
@@ -2544,64 +920,17 @@ The user's answers on Nov 10, evening, and what was done with them:
       their label, as wide as Right now's card, which keeps its box.
       Drawn, not built: M2 (white page) and M3 (white page, Right now as
       bare rows).
-    - Each name is in the middle of its tile, over an even darkening
-      ("I'm fighting my brain/eyes which wants to look center"). Changes
-      J2b's name at the bottom over a fade. The computer's tiles keep
-      theirs at the bottom.
     - No icons on the phone home ("It feels childish"): a Right now row
       shows its category's picture, the same as its tile, and none when it
       has no picture; a tile with no picture is its tint and its name.
       Changes this morning's "small badges stay icons" for these two spots.
       The search lines keep their icons; not asked yet.
-    - The 72px gap above Right now is gone: it was the computer's spacing
-      between card rows (G5c) collapsing through the phone's empty copies.
-      Now 20px.
-    - The phone footer is unchanged (the user: "I'm ok with how it is for
-      mobile"). The computer's footer is a white band (K2).
     - Drawn, not built: K1 (names at the bottom in the box) and K1b (K1c
       with icons and the heading inside the box).
-  - **The eruv line on the computer's Shabbos card** (board L1, the user,
-    Nov 11: "Yes, build L1"). BUILT Nov 11. From erev Shabbos or Yom Tov
-    to havdalah (the same window as the phone's candles card), the This
-    Shabbos card carries the phone's eruv line along its bottom, in a
-    light grey band: the nearest eruv by name with a location, the summary
-    without one, one that's down named first. The line is its own link to
-    the Eruv page; the rest of the card still opens Zmanim, so on those
-    days the card is a box holding two links. Weekdays: no line, one link.
-    No line without an Eruv page.
-  - **The computer home fits a narrower window** (the user, Nov 12: it
-    isn't "so great at shrinking", and Suggest a listing beside Stay in
-    the Loop came out badly). BUILT Nov 12. Each section now sizes itself
-    by its own box, not the window, so it also holds up when an admin
-    puts two in one row:
-    - Suggest a listing and Stay in the Loop: words, then the button or
-      email box under them, while the card is under 920px wide; side by
-      side from there, as drawn. Two in a row are the same height.
-    - The trust strip: under 900px, its heading on a row of its own and the
-      three points sharing the row under it.
-    - Next minyan and This Shabbos: under 448px, the round glyph goes and
-      the time drops from 34 to 30px, so it stays on one line.
-    - Looks unchanged at full width.
-  - **The computer's This Shabbos card names only the place** under its
-    times (the user, Nov 12: "Yes, just the place"). BUILT Nov 12. The
-    Hebrew date and "from Hebcal.com" are gone from the card; both stay on
-    the Zmanim page it opens, as Next minyan leaves its sources to its
-    page. Change to an earlier decision: the line had been kept for
-    visible trust.
-  - "Kept up by the community" on the computer: F1b BUILT Nov 11 (the
-    user's "Let's do F1b for now"). A full-width band below the hero photo,
-    not overlapping it: shield, the trust line, and the phone sheet's three
-    points, the whole band opening the same sheet as a centred dialog. The
-    phone is unchanged. The "Kept by the Community" card is gone with it:
-    a saved row of it draws nothing, the admin's card list no longer offers
-    it, and its eyebrow and heading settings are removed (no migration; the
-    two columns just stop being read).
   - The big map: G2 on the canvas, a card in words only (map glyph, "ONE
     MAP", "Everything on one map", one line, "Open the map"), the whole
     card tappable, under the categories. The user didn't want a drawn
     map. Not built: waiting on the user's go-ahead.
-  - The headline is 48px (was 40), in an 880px column so it stays on one
-    line about as wide as the 688px search box under it. BUILT.
   - A category's own picture ("Or use a picture instead") now shows on
     every home badge of it: computer tiles, search rows, phone tiles,
     Browse, Right now, the Add picker. It used to show only in the search
@@ -2628,23 +957,6 @@ The user's answers on Nov 10, evening, and what was done with them:
   Renamed later on Nov 11 to "Synagogue | Minyan", no "By" (the user:
   "take out 'by' and replace time with minyan"). Then as tall as Filters
   beside it, 40px (was 34px; the user: "Yes, match it").
-- **Minyanim by time opens on the page whose places have minyanim** (fixed
-  Nov 11, PR #381's e2e). Any page can be given Davening Times now, and the
-  test project's Food was, ahead of Synagogues. The search's "next maariv"
-  and the home's davening link took the first page holding the field, so
-  they landed on Food with nothing to show. They now take the page whose
-  places carry the most minyanim (`minyanimPage`), the first holding the
-  field only when none has any. The e2e tests pick the page the same way.
-- **Filter tag on Kosher items and Hours** (fixed Nov 11, the user on
-  Grocery's admin page). A field's row said Filter only for a Yes/No or
-  Choice shown as a badge, so Hours ("Open now") and a list of items
-  (Grocery's Kosher items, always the page's "Has" filter) showed none.
-  The row now says Filter the way the site filters (`inFilter`), and
-  removing a list of items warns that the filter loses it. A list of items
-  has the "In the filter" switch like any filter now (the user: "I don't
-  want any hidden rules"), saved as `itemFilter: false` when off, since
-  saving had forced `filterable` off on every list; off, it leaves Filters
-  and a search for an item no longer ticks it.
 - **To do's week box marks only what changed** (Nov 11, the user on the
   Shtiebel item). A week read again comes with every minyan under a new id,
   and the box matched the site's by id, so all of them said "New". It now
@@ -2699,28 +1011,6 @@ The user's answers on Nov 10, evening, and what was done with them:
   day something else still files, and so does the rest of the week. The
   items already waiting in the live queue predate this and are the
   user's to decide.
-- **A shul's week finding no longer shows other weeks changed back**
-  (fixed Nov 11, Mekor Habracha). Mekor's Nov 6 newsletter printed
-  "7:00pm" for Friday Nov 13's Mincha (candle lighting 4:28); that was
-  approved as read, and the listing's copy was later corrected to 4:30.
-  The Nov 10 website read was filed with a copy of the whole schedule
-  from before the correction, so To do showed Friday going back to 7pm.
-  Approving was always safe (`rebasePart` puts on the finding's own week
-  only); the queue list and job pages now show it the same way. The live
-  item's own week (Nov 20-21) is right. A candle-lighting check was
-  proposed and turned down (the user: "We are supposed to be an
-  aggregator. If someone posts a wrong time that's not on us").
-- **A website that changed after the newsletter corrects it** (the user,
-  Nov 11, changing Oct 20's "the newsletter wins": "if they correct it
-  then we should be correcting too"). On a day both give, a website page
-  that changed after the newsletter's week was posted corrects that
-  week's time for each tefillah it gives (`correctOlderWeeks` in
-  listingPageRun.ts): one minyan each side, same tefillah or both evening
-  ones; the week's other times that day stay. A page unchanged since, a
-  week with no posted time, or a page with no change on record leaves
-  the newsletter's week as it was. "Changed" is the whole page's
-  fingerprint, so a page edited for anything else counts as newer too;
-  the admin still approves each change.
 - **+ Add opening on Find the place, with AI a tap away: drawn, waiting
   on the user** (Nov 10, canvas
   https://claude.ai/artifact/5PNWucNyGPpCgnVRs6Rw9H, boards 1-4). The user
@@ -2740,31 +1030,6 @@ The user's answers on Nov 10, evening, and what was done with them:
 - **Later (the user, Nov 16): + Add might start by hand, with AI as the
   option**, the opposite of today. Not now ("that's for later"); nothing
   drawn or built.
-- **The Add box's steps are in the address, and its first link is "Find
-  the place"** (the user's yes, Nov 10). Each step of the + Add box is an
-  entry in the browser's history (`?box=find`, `?box=find/add`, then the
-  editor's row, `?box=find/add/hours`), so the browser's Back and Forward
-  walk the steps as the header's Back does; before, Back from "Add to …"
-  closed the whole box and lost what was typed. Closing the box takes its
-  steps back off the address. Going back to the search and forward again
-  starts the form fresh, as the header's Back always has. A reload closes
-  the box (the box itself has no address). The first screen's link is
-  "Find the place", what it opens, so "Fill it in yourself" only means the
-  empty form; the Eruv page's keeps "Fill it in yourself", since it goes
-  straight to the form. "Find the place" stays: it is the one search that
-  finds a place already in the guide and opens its edit (Oct 5).
-- **"More" is gone from a field's screen**, for a superadmin too (the
-  user: "yes remove it"). The old field form (CategoryFieldEditor) is
-  deleted, so its settings can't be reached by anyone now.
-- **The Eruv's Add button** is right as built (the user, Nov 10).
-- **Davening times, item lists and contacts in any of the admin's boxes**
-  (the user: "that is what I want"), drawn there as they are on their own
-  (the user: "Let's say same for now and if we need to change that we
-  can").
-- **A shul's website watch files only the upcoming week**, as a calendar
-  does: this week, and next week from Thursday (listingPageRun's
-  `upcoming`). Later dates on the page still tell which weeks have no
-  minyan. The newsletter path isn't limited.
 - **Mekor's Shabbos 9:15 PM couldn't be found to change.** This Shabbos's
   times came from two posts, a person's "Nov 8 – Nov 13" and the website's
   "Nov 14", and Edit opened only the first. Now Edit opens every post the
@@ -2776,13 +1041,6 @@ The user's answers on Nov 10, evening, and what was done with them:
     `mekor-prod-backup-nov10.json`. Mekor's own site says "9:15PM", so the
     website watch may file it again: reject it on To do.
   - Dev's Mekor holds the live times (copied to reproduce it).
-- **Rodeph Shalom's week** showed its 8:10 AM Shacharis crossed out and
-  new when only the note's words moved ("Online; until 8:40 AM" to
-  "until 8:40 AM; Online"). The user: still a change, but "Make it clear
-  that the suggestion is only on the note." The queue card now gives such
-  a minyan as one plain line marked "Note changed", the old note crossed
-  out above the new, and its heading says "a change to notes in the
-  schedule" (changeLines' `extras`; usual times the same).
 - Still held or open from before: boxes fold in Fields (held), a box's
   trash can on no board (held), big fields as rows inside any box, "Within
   a walk" and "Before it's opened" on no board, Mikvah sections not drawn,
@@ -2793,19 +1051,12 @@ The user's answers on Nov 10, evening, and what was done with them:
 The rule (AGENTS.md): nothing is written to the live database without a yes
 for that exact change, in the same conversation. Show the dry run first.
 
-0. ~~Migrations 095 and 096~~ Both on live (checked Nov 19: the map card's
-   photo column holds City Hall, and `night_note` exists).
 1. ~~Philly Synagogues' "Minyan" field and rename~~ Dropped (Nov 19, the
    user: "that just feels like an extra question"). No listing asks for
    missing weekday or Shabbos times any more, shul or not, so nothing has
    to say which places are shuls; the `minyanOnly` field setting is gone.
    Later, if a minyan that isn't a shul ever comes in: where it shows (the
    user could hear it not being on the Synagogues tab at all).
-1a. **Watches on shuls' and mikvahs' own pages** are on the live site
-   (checked Oct 23): Mekor, B'nai Abraham, Society Hill, Kol Tzedek,
-   Rodeph Shalom, Leyv Ha-Ir, the Little Shul, Mikveh Israel, Sons of
-   Israel, Lower Merion, Chabad of the Main Line, South Philadelphia
-   Shtiebel and the mikvahs, among others.
 
 1b. **Eruv status by email (6c):** migration 084 is run on both databases
    (the user, Oct 19). Northeast's address is set on live and its emails
@@ -2818,44 +1069,6 @@ for that exact change, in the same conversation. Show the dry run first.
    not now (the user): the site writes that line itself from what the page
    is, and stops storing a description. Until the three-line tiles are
    live, the phone home cuts the name to "Candle Lighting &…".
-
-1d. **Migration 085 (`watch.last_check`)** is run on both databases
-   (checked Oct 23). A watch's last check is kept across reloads.
-1e. **Migration 086 (`job_run`)** is run on both databases (the user,
-   Oct 24; checked). The live jobs start recording once this branch is
-   deployed.
-1f. **Migration 087 (`job_run.kinds`)** is run on both databases (the
-   user, Oct 25; checked). Each run saves its counts per kind from the
-   next run on, so Last night's earlier nights fill in one night at a
-   time (live, once this branch is deployed).
-1g. **Delivery listings lead with their box (board B, Oct 27):** built as
-   a setting on any link field (Admin → category → the link → "its own
-   box first, with no Directions", with a title and the field it says).
-   The box sits under the buttons: its words, then a wide Join the group.
-   The link isn't a round button too, and there's no Directions (Mike's
-   kitchen is 52 miles away). Set on dev's Food "Delivery WhatsApp Group"
-   (title Delivery, words Delivery Details). Live needs a yes for the same
-   setting, after this branch is deployed. **Written to live Oct 27 with
-   the user's yes** (backup in `backups/`, untracked); shows once PR 363
-   deploys.
-1h. **Two delivery group links: done by the user** (Oct 27). That Sushi
-   Spot - Lakewood's and Shlomo's Delivery WhatsApp Groups, added by the
-   user themselves.
-
-1i. **Dottie's Donuts /shop listing (f52e1951): done** (Oct 28, with the
-   user's yes). Menu link changed from /shop to https://www.dotties.com/
-   on live, nothing else (backup in that session's scratchpad). Its
-   flavours get dated from that menu once PR 365 deploys.
-
-1j. ~~FINE WINE & GOOD SPIRITS has no Google place~~ Done Oct 28, by an
-   edit that evening: it has the store's place id, Google keeps its name,
-   hours, phone and website, and the nightly sync reaches it (checked
-   Nov 19: last synced that morning).
-1k. **Migration 092 (`look_again`)** is run on dev and live (checked Nov 3,
-   after PR 373 deployed: live's table has every column, no rows yet).
-
-1l. ~~Migration 094 (`eruv.details`)~~ On dev and live (checked Nov 19:
-    live's eruv rows have the column).
 
 ## For the user or the community
 
@@ -2938,9 +1151,6 @@ for that exact change, in the same conversation. Show the dry run first.
 
 ## Getting the branch live
 
-3. **Merged Oct 17.** The live Keystone-K watch's first run (07:00 UTC
-   daily) will file about 34 suggestions at once and email the admins one
-   digest. The test project's daily watch run is on `main` now too.
 4. **Migration 083 (`confirmed_by_visitor`) is run on both databases**
    (the user, Oct 18): a visitor's Yes on a whole listing says "Confirmed
    by community".
@@ -2950,15 +1160,6 @@ for that exact change, in the same conversation. Show the dry run first.
    can't be seen through the API: without them a public eruv suggestion
    (a fix or, since Nov 9, a new eruv) fails to send and Yes under a contact box says "Didn't save". 067's
    columns (Today) are missing too, harmless while Today is held back.
-5. **Menu watches start on the live site Oct 18** (merged with #324, no
-   migration). The first daily run, 07:00 UTC Oct 18, gives every live food
-   place with a menu link a watch of its own (17 on Oct 18, created by "menu
-   links" on the Watches tab) and only records each menu as it is. From
-   then on a menu is read every morning for free; the AI (`OPENAI_API_KEY`)
-   reads it only when its words change, at most 3 a run, and dishes the
-   listing doesn't have wait on the Main dishes tab. Pausing one stops it;
-   removing one brings it back the next morning. The test project's daily
-   run makes the watches but never calls the AI.
 6. **Shul newsletters** (built Oct 18 on `redesign/shul-newsletters`, not
    merged; no migration). The guide's Gmail (phillyjewishguide@gmail.com)
    is subscribed to shul newsletters. A Google Apps Script in that account
@@ -3025,37 +1226,6 @@ for that exact change, in the same conversation. Show the dry run first.
    status on the Watches tab, no code: dev first, then live with a yes. Until then it
    shows "No status online".
 
-6b. **Mekor Habracha watch** (built Oct 18 on
-   `claude/unruffled-aryabhata-926203`, no migration; the comparison in 6a,
-   made daily). A website watch on mekorhabracha.org/center-city is read
-   by code, never the AI (`src/lib/mekorWatch.ts`, `mekorRun.ts`). It
-   matches each Mekor place to a guide listing by its certificate link
-   (Keystone-K's shared pages don't count), else by name and street number
-   or phone, and files nothing when unsure. It never changes a listing: each
-   difference goes to the queue as "Mekor Habracha list (automated)",
-   quoting Mekor's entry: a place the guide lacks (Google is asked first,
-   and a closed one is skipped; an archived one says so), a hechsher the
-   guide shows that Mekor doesn't, or Mekor's other than Keystone-K, and
-   an IKC place Mekor doesn't list (removing IKC, for a person to decide).
-   Keystone-K is never added or taken off from here; Keystone-K's watch
-   owns it. It never re-files what it filed before, approved or rejected,
-   and skips places already in the queue from anyone. It files nothing if
-   it reads fewer than 40 places.
-   **Production dry run, Oct 18 (read-only): 18 suggestions**, as 6a,
-   plus Primo Water Ice. Mekor's is in Cherry Hill, the guide's in Haddon
-   Township, a different branch, so it's filed as new.
-   On the test project the watch row exists and filed 15, and a second
-   run filed nothing. Until this merges, the test project's daily run
-   treats it as a plain website check.
-   **Live on Oct 19** (the user's yes): the watch is on production's
-   Watches tab as "Mekor Habracha kosher list". A dry run against
-   production that day read 78 places and found 18 differences, one of
-   them closed on Google (Z Candy Bar), so 17 to file. It was added
-   straight to the database, so it didn't run at once: it files at the
-   next daily run (07:00 UTC), or at once with Check now on the Watches
-   tab. Its agreement dates listings only once `redesign/oct18-fixes` is
-   deployed.
-
 6a. **Mekor Habracha's kosher list** (mekorhabracha.org/center-city,
    78 places, "Last Updated 2026-10-12"; the user, Oct 18: stay in sync,
    and flag a hechsher we show that they don't). Compared with the live
@@ -3105,63 +1275,6 @@ blue with a tick (ListingEditor's ChoiceButtons, the user's OK, Nov 9), on
 the site's own add form too. Hours, minyanim, contacts and a photo show their answer as
 a line when adding, not their full editor. Phone not built (nothing beside
 a field there).
-
-**Built Nov 9: How it looks as tabs** (the user, on boards 33d-34c: "I
-love ths. This is exactly it"). Copies of the boards are in
-`docs/mockups/how-it-looks-tabs/` (the canvas stays with the old Claude
-account). `FieldLooks.tsx`: the four stacked panels are tabs, List · Filters
-· A listing · Adding, in the same control as the page's Page / A listing /
-Adding. Each tab is a phone-width stretch of the screen, the field outlined
-and the rest faded:
-- List: three made-up rows, each answering the field differently (Meat,
-  Dairy, Parve), in the community's own neighbourhoods.
-- Filters: the sheet over the list, Open now first, the field's filter
-  working, the others faded.
-- A listing: header, facts line, buttons (no Directions: no address), the
-  boxes.
-- Adding: Add to Food, the row asked before the field's, then the field's
-  row open with its neighbours.
-
-Filters shows only while the field is in the filter, Adding only where
-visitors add. A sheet scrolls itself so the field is in sight. A field
-opens on the first tab it is on (Delivery Details on A listing; the user
-didn't object to that recommendation). A field asked only after an answer
-(Delivery Details, after Store Type is Scheduled Deliveries) gets that
-answer on the made-up place and is asked with Store Type. Anything else
-asked only after an answer is left off, as the site leaves it off. Places
-are named for their type only when the field is a type ("A bakery"), never
-for an answer about them ("An orthodox"). Differences from the boards, all
-from following the site: the row before Kosher in Adding is Store Type,
-not Address; Filters shows all of Food's ten hechshers, so the Show button
-is below the fold; Delivery's box names "Delivery Details" inside it, because
-it holds two fields; the delivery place is "A place", not "A caterer".
-
-Fixed Nov 9 (the user: "I don't see that for denomination"): "In the
-filter" turned off on a Choice, a Yes/No or Hours came back on with the
-save, and the panel kept In Filters. Saving now keeps it off. Off, a
-Choice also leaves the row (the row's default is "badge and in the
-filter"); Show it on a row puts it back. No stored
-field had a filter turned off, on dev or live, so nothing saved changes.
-"A link for places not listed here?": its "Words" box is now "What the
-link says" (it's the link under the list, "Not listed here? Find more
-kosher food"). Dev's pretend Riverton Food page (one pretend place) was
-deleted at the user's word, so it's no longer offered as a ready-made
-page; live never had it.
-
-Built Nov 9 (the user: "Yes, build it"): a page with no places yet shows
-a made-up one in its preview, on Page and A listing, with a strip above
-the site's header, "A made-up place, until this page has real ones". It's
-How it looks' made-up place (every field answered by type), plus a 555
-phone; no address, so no directions to a real street. Never saved; the
-first real place, or one added in the preview, replaces it
-(CategoryPreview.tsx). Fixed the same day (the user: "Yes, fix it"): in
-the admin's preview a page with one place drew its card as a tall white
-block running under the footer (Cemetery too; the real site was fine).
-The frame was an about:blank document, which has no doctype, so it laid
-out in quirks mode, where a card's h-full stretched to the page. The
-frame now starts with a doctype (DevicePreviewFrame.tsx), so the preview
-lays out in the same standards mode as the site: every portal preview
-(category pages, forms, site settings).
 
 The user, Nov 4, after Home page became one screen: Category pages is next,
 "organized better and just cleaned up in general". **Seventh draw Nov 5,
@@ -3366,13 +1479,6 @@ Networking, Cemetery); no page sets Groups. On the drawing:
   are ready-made (a second set, like the Mikvah's Women's Hours, comes
   with the kind); Davening times and Contacts come with the Shuls and
   Hospitals kinds.
-- No Map switch for the site either: the Map is on when the header or a
-  tab links to it. Code change only. BUILT Nov 5 (`linksToMap`, navTabs.ts):
-  the header and phone tabs link the Map with or without its row, the
-  home's View Map shows wherever it's linked, and Category pages has no
-  Map row (its old addresses open the list). Its row stays, holding the
-  zoom radius. Live: only Philly, Map on and linked, so nothing changes
-  there; dev's Riverton (no Map row, linked by default) gains one.
 - The question card is chosen by the site; the four listing options are
   set by the kind (superadmin can adjust).
 - Preview has Page · A listing · Adding. On a phone, Preview is the
@@ -3388,143 +1494,10 @@ opened (built without a DB change, on the fields themselves), 5
 removing a filled-in field. The Denomination/Nusach prod change comes
 after the deploy, dry run first, and needs its own go-ahead.
 
-- **Step 1 BUILT Nov 5** (redesign/oct18-fixes): the list is one box of
-  rows (glyph, name, "N places" or "Eruv page" / "Times page" / "Map
-  page", Hidden), "+ New category page" beside the heading. A page has
-  On the site, Basics (icon beside the name, Banner photo row),
-  Fields, Questions (two No / Yes) and "Delete this page" at its foot
-  (the Eruv's counts its eruvim and watches first). On a phone Basics,
-  Fields and Questions open folded, each with its line. Adding Address
-  puts the page on the map (a tick until step 3). `/categories/restaurant` (no
-  `cat:`) opens the page now.
-- Not on the drawing, in step 1: the Map was a row ("Map page") opening
-  its On the site switch until the header/tab links decided it; gone
-  Nov 5 (above). Pin colour is off
-  the page (not drawn); a saved colour keeps working. Group the list
-  and the question card are off the page too, waiting for Before it's
-  opened (step 4); saved values keep working. Places within a walk and
-  On each listing stay as they were until step 3.
-- **Step 2 BUILT Nov 5** (redesign/oct18-fixes): "+ New category page"
-  opens What kind of places? (search, every community's listing pages
-  with fields of their own, by name, the first three as the line,
-  "Already a page" opening this community's own), then "+ Make your own
-  page". A copy starts with its fields and kind; one made from nothing is
-  Plain. The kind radios are gone. "+ Add a field" opens Add a field
-  (search, "All pages" or one page, every field once by name with its
-  pages and choices; Address, Hours, Phone, Website as "Most pages").
-  A row opens the field: the pages it's on, In the list, In the filter,
-  On Add a place, "Add to <page>". Nothing matching offers "Make your
-  own: <typed>"; Make your own picks a kind, then opens the new field's
-  screen. Read through `/api/admin/ready-made` (an admin of any
-  community).
 - Not on the drawing, in step 2: a ready-made field is copied as it is,
   choices included, until boards 14-15 (shared or local choices) are
   decided. A new page's icon is its emoji until it has a line glyph.
   Test pages in the shared dev/test project show in the list on dev.
-- **Step 3 BUILT Nov 5** (redesign/oct18-fixes): Fields is the opened
-  listing's boxes in a visitor's order (`fieldBoxes.ts`, read the way
-  ListingView lays them out): Top, then the boxes the listing makes itself
-  (Food's Delivery, What isn't kosher, Main dishes, Davening times), the
-  admin's boxes with This Shabbos among them, lists of contacts in no box,
-  Contact, About. A row opens in place to its fields; Address and Phone
-  are rows in Contact, each opening a screen with "Remove this field" (the
-  "Every place has" ticks are gone; Hours, Website and Photo are fields
-  like any other). The admin's boxes drag, rename in place and have the
-  trash; a field moves by dragging it onto another box's row (dashed blue,
-  or red with why when it can't go there), or with the arrow keys on its
-  handle. "+ Add a box" opens a New box, its name selected. A field added
-  from one of the admin's boxes goes in it, and the box a new field lands
-  in opens. Within a walk is its own box ("+ Add a page", rows "Food · Up
-  to 30 min · by Food Type" opening in place). Copying a page now saves
-  its boxes too (the create never sent them). ListingPartsEditor is gone.
-- Not on the drawing, in step 3: A main card and a
-  Shabbos card can be taken off but not added (no drawn way); "+ Add
-  audience group" sits beside "+ Add a box". A New box left empty isn't
-  saved. Within a walk shows on every page with an address, "None" when
-  it has none (boards 4 and 6 leave it out, but it's the only way to add
-  one). A press while a name is being typed only puts
-  the keyboard away, so the first tap on a row after typing doesn't open it.
-- **Step 4 BUILT Nov 5** (redesign/oct18-fixes): Before it's opened sits
-  between Within a walk and Questions: a sample card (the page's first
-  choice of each field, "Neighborhood", "Open until 8 PM", the line being
-  opened outlined), then First, Second and Third line, each opening in
-  place (`cardLines.ts`). What the card works out says "Automatic" and
-  stays first; a chosen field has a handle and an ×; "+ Show a field"
-  opens Show on the second (or third) line, those on the card marked "On
-  the card". No DB change: a choice's `onCard`, the photo's `onCard:
-  false` (initials instead) and a short line's `showInHeader` are on the
-  fields. A field never set keeps the old rule (a badge with a filter),
-  so no live page changes; read on dev (22 pages) and live (16), the old
-  and new second lines match on every one. Taking a field off the card
-  leaves its filter; reordering a line moves only that line's fields.
-  "Not everything here is kosher" now shows for a caveat field even when
-  it's off the second line.
-- Not on the drawing, in step 4: Synagogues' boards list Next minyan and
-  the minyan's note, but a shul's category row shows neither (the user's
-  Oct 15 decision), so they aren't listed. A grocery's items line isn't
-  listed either. The photo row has no handle (it's always first), and
-  "+ Show the photo" brings it back once it's off (not drawn). A field's
-  screen still has "Also show on the collapsed card", which sets the same
-  thing. The preview stays beside Show on the line, as on every sub-screen.
-- **Step 5 BUILT Nov 5** (redesign/oct18-fixes): "Remove this field" on a
-  saved field counts its answers first. With some, it opens Remove <field>
-  from <page>? (board 16): "N places lose their answer", "<page>'s filter
-  loses <field>" when it's a filter, Remove it / Keep it. Remove it goes
-  back to the page with one change; Save then clears the answers without
-  the amber warning. With none, or a field only this draft has, it just
-  goes. Address and Phone ask the same way. The amber warning at Save is
-  left only for when the count couldn't be had.
-- Not on the drawing, in step 5: Address's step also says "<page> comes
-  off the map". The field screen's own button still says "Remove" (the
-  boards say "Remove this field", as Address and Phone do).
-- **The user's notes on the build, Nov 5**, fixed the same day: "+ New
-  category page" sits right of the heading on a computer, level with it
-  (board 1; it had been above the heading). Banner photo opens to the Home
-  page photo's picker (Upload image, Paste image, Paste URL, Remove, a wide
-  crop), in place of the banner upload with its own preview and a second
-  pasted-address box; a page's older pasted photo shows there until a new
-  one is chosen, and choosing or removing one clears it, so a page has one
-  photo. The Map and Eruv pages' Basics use the same picker. Add a field
-  matches boards 7-12: no page beside it (or beside a removal, board 16),
-  the list scrolls in its own box with Make your own field under it, a
-  field's samples stacked one per row with filled chips, the first
-  filter chip solid, and "Make your own" titling the kinds.
-- Not on the drawing, in those fixes: the page menu stays the width Places'
-  menus are (170px, the board's is as wide as its words).
-- **Preview BUILT Nov 5** (the user: "Yes, build both"): beside a page's
-  settings, Page · A listing · Adding (boards 4, 5). A listing opens the
-  page's fullest place (the most fields answered, `fullestListing.ts`);
-  Adding is the real Add form, sending nothing. No Adding on a page
-  visitors can't add to. Tapping it opens that one full size.
-- Not on the drawing, in the preview: Page is a computer's, A listing and
-  Adding a phone's; Computer · Phone is gone.
-- **Handles BUILT Nov 5**: the listing's own boxes before the admin's
-  (Delivery, What isn't kosher, Main dishes, Davening times, a named card,
-  a mikvah's sections) drag among each other, saved as `ListingParts.lead`
-  (link, caveat, main; unset is that order), and the listing and its
-  preview draw them in that order. No migration: it's in `listing_parts`.
-- **Renamed in place too, Nov 5** (the user: "even ones that could be
-  moved like Delivery"): the listing's own boxes take a new name where the
-  name comes from (`renameListingBox`). Delivery: the link's box title.
-  Main dishes and a list of contacts: the field's name. A mikvah's
-  section: its yes/no's filter word, so the filter chip says it too. What
-  isn't kosher: a new `caveat.title` on the hechsher, which the listing's
-  heading reads (`caveatTitle`). Not renamed: Davening times (the listing
-  heads its boxes Usual weekday times, This week's schedule, and so on),
-  This Shabbos, Top, Contact, About.
-- Not on the drawing, in the handles: they stay above the admin's boxes,
-  and a mikvah's sections move as one (the listing draws them together).
-  The main thing is one slot, so Main dishes and Davening times on one
-  page couldn't be split (no live page has both).
-- A field's own screen BUILT Nov 5 (board 13, `FieldScreen.tsx`), after the
-  user's note that it still opened the old form: its name and kind beside
-  it, Basics (Name, the note under it on Add a place, a link's button
-  words), Choices as rows with handles and ×, "+ Add a choice" and the
-  Other switch, then only the questions its kind asks as No / Yes
-  (required, part of the filter, both at once), and "Remove this field".
-  Opening a field turns the preview beside to Adding. A choice is renamed
-  by removing it and adding the new one; Save still offers to update the
-  places that had the old one.
 - Not on the drawing, in the field screen: a superadmin also gets "More",
   the old form as it was (only for some places, an audience, a link's own
   box, a badge in place of another, What isn't kosher, the order), so
@@ -3534,28 +1507,6 @@ after the deploy, dry run first, and needs its own go-ahead.
   doesn't outline the field being edited. Boards 14-15 (a ready-made
   field, fixed or local) are still waiting on the user, so no
   "Ready-made" pill yet.
-- Add a field says every field's kind on its line (hours, phone,
-  davening times and text said only their page) and draws each as it's
-  filled in, not an empty box (the user, Nov 5). BUILT ff32ea7b.
-- The listing's own boxes have no "+ Add a field" (the user noticed, Nov 5):
-  the listing puts a field in them by its kind, so one added there wouldn't
-  stay. Not drawn.
-- BUILT Nov 7 (canvas row "Each kind of field", the M boards): a
-  ready-made field's screen reads like a shop listing, before adding it and
-  after. "What this is" has a short paragraph (what it is, what people fill
-  in, what visitors see) and its Choices or what it Comes with. Then "What
-  you can change": switches for Required, In the filter and Your own
-  choices, or "Nothing" when none apply. Then Add to / Remove from the page,
-  with the page beside it on a computer (opened on Adding). The name, note
-  and what it does are baked in. The paragraphs are drafts
-  (`src/lib/fieldAbout.ts`). A field made with Make your own is marked
-  `madeHere` and keeps the old editable screen. A choice a page adds is
-  marked `own`, and other pages don't get it with the field.
-- Decided Nov 7: "How many, on the row" is not something a page changes
-  (the user: "lock that in"). In code it is `showCountInHeader`, which makes
-  a list the page's main list. It stays with the field: on for Kosher items
-  available and Main dishes, off for any other list. Only the superadmin's
-  More still shows it.
 - Done Nov 7, from the user's notes on the review page: a choice called
   just "Other" is left out wherever typed-in Other is on (the Add form and
   the field screen), so Denomination says Other once. A place that picked it
@@ -3569,25 +1520,12 @@ after the deploy, dry run first, and needs its own go-ahead.
   (artifact TdzYKX4Y3tRFEhFpEjUspn, 47 fields on dev, 34 only described by
   their kind). Per-field rules live in `fieldRules` (src/lib/fieldAbout.ts).
   Done so far, BUILT Nov 8:
-  - Food Type and Kosher Store: choices are set, no "Your own choices".
-  - Kosher Store: "Other" isn't a choice. `scripts/kosher-store-no-other.mjs`
-    applied on dev, and live Nov 8 with the user's go-ahead (philly Grocery
-    only; no place or pending submission ever picked Other). Live's cached
-    copy updates on the next deploy or an admin save of Grocery.
-  - Kosher Certification: "Everything here is kosher?" is a switch, since
-    some communities never have a partly kosher place (Riverton's has
-    none). Off drops both questions from the page; on adds them as Food asks
-    them (src/lib/kosherQuestions.ts). Before adding, off adds it without.
   - Open: Hospitals' Eruv is a plain choice field with the eruv names typed
     in by hand ("University City Eruv", "Center City Eruv", "Not inside an
     eruv"), shown in the hospital's This Shabbos box. The user asked whether
     it should take its choices from the Eruv page. Recommended: yes, the
     choices are the community's eruvim plus "Not inside an eruv", and the
     listing links to that eruv. Not built; waiting on the user.
-  - Fine as they are (the user, Nov 8): Childcare Services, Sukkah Size,
-    Store Type.
-  - Yes or no can be Required (BUILT Nov 8, FieldScreen's NEVER_REQUIRED).
-    A yes or no starts unanswered, so required means someone picks one.
   - "Type" (Restaurant / Bakery & Cafe / Ice Cream) was an old copy of
     Store Type (same key, `foodType`) from the starter Food page
     (src/data/categories.js, categoryTemplates.ts). Only dev's Riverton test
@@ -3595,21 +1533,6 @@ after the deploy, dry run first, and needs its own go-ahead.
     Cemetery has a different "Type" (Cemetery / Funeral Home), all 5 places
     use it: it stays. The starter Food page still carries the old Type; not
     changed.
-  - Dietary options: removed Nov 9 (the user). Off the starter Food page
-    (src/data/categories.js, categoryTemplates.ts) and dev's Riverton Food.
-  - Kosher Certification: no "Other Kosher" choice where Other is typed in
-    (the user, Nov 9). `pickableOptions` drops any choice starting "Other"
-    once allowOther is on, so it's never offered twice.
-    `scripts/kosher-cert-no-other.mjs` takes it out of the stored choices:
-    applied on dev. Live dry run: philly Food drops "Other Kosher", no live
-    place picked it. Applied live Nov 9 with the user's go-ahead; live's
-    cached copy updates on the next deploy or an admin save of Food. Note:
-    mekorWatch's `certsIn` still writes "Other Kosher" for a supervisor it
-    doesn't know; it shows as typed-in text, so it's left as is.
-  - Paragraphs written Nov 9 from the user's notes (fieldAbout's WRITTEN):
-    Kosher Store, Services, Size, Store Type, Keilim, Men's and Women's
-    tevillah, Email, Short description (shows under the name on its row),
-    Women's email (the mikvah's women's side).
   - BUILT Nov 9 (the user: "I like your recommendations in general"):
     - Each ready-made field's "What this is" lists "Kept up to date by",
       each source saying what a place needs for it (reworded Nov 9 after
@@ -3631,89 +1554,6 @@ after the deploy, dry run first, and needs its own go-ahead.
       Add list a partner isn't its own row; it comes with its field unless
       switched off. Not done: the page's own field list still shows the
       partner as a row of its own.
-    - Davening times: three switches, sign-up minyanim, join from home and
-      summer or winter only (`minyanOff` on the field). Switched off, the
-      minyan editors don't ask it, and More is gone when nothing is left
-      under it. Days, times and zman times always stay.
-  - BUILT Nov 9 (the user: "some fields have no edit and some have edit.
-    If you can edit then you can fully edit"): a ready-made field's
-    choices are either the community's or locked. The community's
-    (fieldRules' `choicesEditable`): Kosher Certification, Hospitals' Eruv
-    and Services (decided here: childcare varies by community, nothing
-    reads its values). Those get the full Choices box: rename in place,
-    ×, drag, + Add a choice, and the Other switch. Every other ready-made
-    choice field is locked, not even added to (Sukkah Size per the user;
-    also Food Type, Kosher Store, Store Type, Denomination, Cemetery's
-    Type). This goes back to the Nov 5 boards 14 and 15, which the Nov 7
-    build had turned into fixed choices plus "Your own choices". No page
-    on dev or live had a choice of its own, so locking dropped nothing.
-    A rename changes only a choice's words (`label`), never its stored
-    `value`: everything that shows a choice looks its words up, so
-    answers follow and a watch writing the value still matches, with
-    nothing to move. A field made here renames the same way
-    (src/components/admin/ChoiceList.tsx, shared by both).
-  - "What this is" has less in it (the user, Nov 9: "seems like a lot
-    going on"): only Choices are chips, and only when locked. Comes with
-    is a sentence at the end of the paragraph.
-  - BUILT Nov 9, later (the user: "something that's pretty explicit on
-    what it is", and a way to learn what a watch is): what keeps a field
-    up to date is a line of its own under the paragraph, "Watched:" in
-    bold, each source a sentence with how often it really runs: "Google
-    updates it about once a week, for places found on Google. For places
-    not on Google, a check every Sunday makes sure the link still works."
-    Websites, menus, the kosher lists and Refuah say "every night", shul
-    emails "as they come in". It ends in a link, How watches work: a
-    screen of its own under Watches (`/[community]/admin/watches/about`,
-    WatchesAbout.tsx), also linked from the top of Watches. It says what a
-    watch is in a sentence, what each reads and when (Google straight onto
-    the listing unless a field was typed in by hand; the rest wait on To
-    do; an eruv's up or down goes live), and what's left to the admin
-    (sources in Places, yes or no on To do, a job off on its page). A
-    test ties its "every night" and "every Sunday" to the jobs' schedules.
-  - BUILT Nov 9 (the user: "I'm not seeing an edit listing option in the
-    preview"): the preview's A listing has Edit listing at its foot, as a
-    visitor sees it, when the page lets visitors edit. It opens the
-    visitors' editor; Send shows the change in the preview and sends
-    nothing, like every send there (previewSend.tsx).
-    Recommended rather than a tooltip: a tooltip can't be opened on a
-    phone, and a screen of its own keeps Back working. Not a walkthrough:
-    one short screen, per "less reading".
-- BUILT Nov 9, later (the user: "these add a field pages seem to not
-  register as a new page so back and forward in the browser doesn't work
-  well"): a category page's screens are in the address and the browser's
-  history: a field (`?field=`), Add a field's list, a field looked at and
-  Make your own (`?add=`), a card line's picker (`?line=`), the preview
-  full size (`&preview=1`) and a Remove step (`&remove=1`). Back, Forward
-  and a reload land on each; a reload on a Remove step counts the places
-  again. Written through Next's router (useScreenHistory.ts), one move at
-  a time, never history.pushState, which after a reload left Back from
-  another tab changing the address without drawing the page. The leave
-  guard ("Leave without saving?") moved to src/lib/backGuard.ts, loaded
-  from the root layout so its Back listener comes before the router's:
-  added in an effect it came after, and Back out of a page with unsaved
-  changes left without asking, unless the page had been loaded directly.
-  Proved in a real browser by e2e-admin-write/editor-screens.spec.ts.
-  The other admin screens followed later the same day (below).
-- BUILT Nov 9, later still: every other screen inside a place is in the
-  address too, so Back, Forward, a reload and Back from another tab land
-  on each. Places' open place (`?place=`, `?add=`); a row of a listing's
-  editor and a minyan or person in it (`?row=minyans%3Aweekday/0`); in a
-  place, what a read found (`?found=`), a source's Change over the listing
-  (`?over=`) and a change's Edit (`?edit=`); an eruv's row and its Change;
-  in To do, a new place's or a change's rows and minyanim, and a broken
-  check's Give (`?step=`, under the thing's own name, since a place's
-  things are mounted side by side). Closing a step on the screen steps
-  back over its entry; where the entry behind isn't the place (opened from
-  a link or a reload) it replaces this one instead, so Back never leaves
-  the admin. src/lib/stepAddress.ts is the address side,
-  useStepsInAddress.ts keeps a screen and the address in step;
-  useHistoryDepth is gone. Proved in a real browser by
-  e2e-admin-write/place-screens.spec.ts (a listing and an eruv in Places,
-  a new place and a change in To do: 4 of 4 failed on the old code).
-  Not in the address: To do's Find the place sheet, the Archive question,
-  and an eruv being added (a reload there starts it again). A broken
-  check's Give and a change's Edit are covered by unit tests only: the
-  test project has no job readings to put a broken check in To do.
   - Answered, not built (the user's questions, Nov 9):
     - UES Grocery's "Kosher" yes or no (dev only) says less than Kosher
       Store (fully kosher, or some kosher items). Recommended: replace it
@@ -3723,30 +1563,10 @@ after the deploy, dry run first, and needs its own go-ahead.
       kosher questions. Hotel's general Notes is separate. Waiting on the
       user.
   - The rest of the fields: the user's, later.
-- BUILT Nov 9 (noted by the user Nov 7: the preview beside a field showed
-  it only as a "+ Denomination" link, and opened full size it went away):
-  beside a field, before adding or on its own screen, Adding opens on that
-  field's row, so it shows what people adding a place fill in. Full size
-  keeps the same copy, the field included, still open on it. That row is
-  not an entry in the browser's history, so Back goes back to the field
-  screen rather than closing it. A still picture was not needed. Nov 9,
-  later (the user: "when you click on the adding screen the field isn't
-  there"): Adding opened on the first field, and a new field not named
-  yet wasn't found at all. It now opens on the field the screen is on,
-  including one just made (previewFocus.ts), beside and full size.
-- (Changed Nov 10: every box renames now; see "Every box takes every
-  field" above.) Decided and BUILT Nov 7 (the user: "lock the name"): a ready-made
-  field's box on the listing keeps its name. Delivery, What isn't kosher,
-  Main dishes, a list of contacts and a mikvah's section have no Rename
-  unless their field was made here with Make your own. The admin's own
-  boxes (a hospital's "Who to call", "Rides"…) still rename. This takes
-  back part of 906bc5eb (Nov 5), which let every moving box rename.
 
 ## Small open decisions
 
 7. The "+" button covers part of the third tile in a row on the phone home.
-8. ~~Counts on the admin's To do tabs~~ Done with the admin redesign
-   (Oct 29): To do is one list, and the nav shows its count.
 9. To look at some time (flagged Nov 20): the drawing session "Draw:
    asking for location when it helps" (branch `claude/eager-nash-317067`,
    started from the public site review) is waiting on the user's look at
@@ -3759,30 +1579,6 @@ admin finds it clear. The minimum: it looks good, it's organized, and every
 field is accurate and works. Lighter than the public site's process: a
 brief, one round of drawings, then the build in pieces.
 
-1. **Audit: DONE Oct 28.** `docs/admin-audit.md` has every field traced to
-   the site. About 20 settings are dead, about 25 are mislabelled, and seven
-   are clear bugs (top of that file). The same work is split across screens:
-   two search tabs, the queue vs Watches, two archives, two admin rosters.
-2. **The clear bugs: DONE Oct 28.** Six fixed on `redesign/oct18-fixes`:
-   the hero photo can be cleared (no more City Hall on other communities),
-   the top nav can go empty without defaults reappearing, the dead heading
-   fields no longer block Save, `/admin/dishes` goes to Watches, the opened
-   review hides Approve until there's an address, and Watches names any
-   job that didn't load. "Suggest a Listing" going with its row is
-   deliberate; the redesign shows it in the admin.
-3. **The brief: AGREED Oct 28.** The user took all nine recommendations.
-   Places is the content an admin looks after (every listing; edit one
-   directly, add one, bring one back); Site is how the site is set up, so a
-   category page there holds its settings and kind, not its listings.
-   https://claude.ai/artifact/K8CbQxbpQbLyxJeJ5EQ2ad. Who it's for, what
-   done means, design rules, the shape: To do, Places,
-   Site, Reports, and a gear menu for Team and Communities, with a table of
-   where each of today's screens goes. Nine questions, each with my
-   recommendation: category kinds instead of slugs, deleting the dead
-   settings, one Save bar, folding `/philly/inbox` into To do, where About
-   and Privacy live, phone support, a setup checklist, what Reports holds,
-   nav counts. Build order: clean-up, shell, To do, Places, Site, Reports
-   and gear, checklist.
 4. **Drawings: ALL DRAWN Oct 28, waiting on the user.**
    https://claude.ai/artifact/9yEZYDSSXt88jyu38tFvWm, 21 boards: To do
    (desktop, and phone with a search opened), deciding a change (The Kosher
@@ -3830,19 +1626,6 @@ brief, one round of drawings, then the build in pieces.
    the user's yes on production (site_settings tagline and desktop_browse,
    desktop_davening and desktop_map eyebrow/heading; card_text_color on
    category and form; card_image_url on form).
-6. **Build, step 1 (shell): BUILT Oct 29.** A sidebar on a computer (To
-   do, Places, Site, Reports, then Settings, View the site and who's
-   signed in), a top bar with a gear and four tabs along the bottom on a
-   phone (`AdminFrame.tsx`, `adminAreas` in `adminNav.ts`). Every screen's
-   heading is its area's name, with the area's pages as tabs under it.
-   Site on a phone says "Open on a computer to edit the site". One look
-   for boxes, rows and empty screens (`AdminUI.tsx`); empty lists say
-   "Nothing to do." Intro paragraphs gone from every tab. History is in
-   the nav (Reports), with Approved/Rejected pills. Metrics is called
-   "Numbers" for now: it shows decisions, not visits, until step 5.
-   Still to come: the To do count (step 2, so it counts the one list).
-   Found on the way, for step 5: Metrics says 22 pending on dev while the
-   queue holds none, so its counts disagree with To do.
 7. **Build, step 2 (To do): BUILT Oct 29.** One list, grouped by what you
    decide (boards 1 and 2): New places, Changes (edits, removals, new
    categories, eruv fixes, each saying what it changes), Searches nobody
@@ -3876,39 +1659,6 @@ brief, one round of drawings, then the build in pieces.
    suggestion's wording (boards 3 and 4: "Update the listing", "Edit, then
    update", "Leave it") is still the old card's; its heading still says
    To do.
-8. **Build, step 3 (Places): BUILT Oct 29.** Every listing in one list
-   (board 5): "N on the site" and Add a place, a name search, a category
-   menu, and pills On the site, No address and Archived (the old Archived
-   tab is gone; `/admin/archived` lands on `places?show=archived`). A row
-   says when it last changed, amber when the address is missing, with its
-   category on the right. A place opens in the whole-listing editor and
-   "Update the listing" saves it straight to the site, filed as an
-   approved submission so History still has it
-   (`/api/admin/listings/[id]`, PATCH). "Archive it" asks once. An
-   archived place opens to "Bring it back" or "Delete for good" (asks
-   once). Add a place uses the category picked, or asks which.
-   Not as drawn: nothing.
-9. **Build, step 4a (Site by screen): BUILT Oct 29.** Site's tabs are the
-   site's screens (boards 7 and Menus): Home page, Category pages, Forms,
-   Header and menus, Campaigns, and About and Privacy for the site owner.
-   The old Basics / On a computer / On a phone addresses land on Home page
-   or Header and menus. Each settings tab shows the real home page beside
-   it with what hasn't been saved, on a computer or a phone, and saves
-   through one bar along the bottom ("2 changes", Undo, Save); leaving with
-   changes asks first (`SaveBar.tsx`). Home page: Top of the page (big
-   line, line under it, search box, photo), the cards below it as rows that
-   open in place (Small line above, Heading, Width, Move, "Take it off",
-   which asks once), Category groups, and the link-preview words. Header
-   and menus: Name and logo, the computer header's links, the phone tabs,
-   and Feedback with a switch. Forms is its own tab with "+ Add a form".
-   Subscribers open inside the email sign-up card.
-   Not as drawn: the header links and phone tabs keep their old editors
-   (fields per item, not rows with switches and drag handles); the photo
-   keeps the shared picker with its address box; Davening and Listings are
-   two rows, not one; the link preview has Title and Description, not one
-   line; Name and logo sit here until step 5 moves them to the gear; the
-   Forms tab's list is still the old cards (step 4c); About and Privacy is
-   the old editor (step 4c).
 10. **Build, step 4b (a category's page, around kinds): BUILT Oct 29.**
    Making a category starts with "What kind of places?": Shuls, Food,
    Groceries, Mikvahs, Hotels, Hospitals or Plain. A kind brings its
@@ -3931,45 +1681,6 @@ brief, one round of drawings, then the build in pieces.
    A kind can't be changed after it's made, as drawn.
    Still going by address, not kind: the kosher watch, the hospital
    watches and question reader, and the map's pins.
-11. **Build, step 4c (Forms, Campaigns, About and Privacy): BUILT Oct 29.**
-   Forms: a list with Feedback first, then each form, saying where it
-   shows and On/Off. Feedback has its own screen (footer button, heading,
-   after sending, "On the site", the form beside); it left Header and
-   menus. A form's screen: "On the site" (at once), Responses, its
-   questions as rows under their sections, saying what each takes and when
-   it's asked, each opening its own screen; After sending; the phone
-   preview beside. Every edit is kept as a draft by itself a moment later,
-   the bar says "Draft · N changes, not on the site yet", and only Publish
-   puts it on the site; Throw away goes back to what's on the site.
-   Campaigns: a list saying what each opens, when, and which is on now;
-   each its own screen with a preview card and Delete asking once. About
-   and Privacy: one note that it's one copy for every community, the two
-   pages as a switch, the Save bar.
-   Not as drawn: questions move with ↑ ↓ on their own screen, not by
-   dragging; a question's screen still has the old settings inside; the
-   form's name and icon are in a third box, "Its tile" (not drawn);
-   "+ Add a form" and "Delete this form" are kept (not drawn); a
-   campaign's photo is shown, not picked (it's fixed in code); the
-   campaign preview has no Computer/Phone switch; "Button first" is kept.
-12. **Build, step 5 (Reports and the gear): BUILT Oct 29.**
-   Reports (was Metrics): Week / Month / Year; listing views as a bar a
-   day (a month, for a year) with "N since …"; Most viewed places; Decided
-   this month as Taken / Left for New places, Changes and Removals,
-   grouped the way To do groups them; Searches nobody found (how many
-   different searches); History. History is no longer its own tab: it
-   opens from Reports, says Taken / Left, and a left-out card shows the
-   reason it was left out. The gear: Team lists every admin, adds one, and
-   removes one (asks once; nobody can remove themselves, your own row says
-   "You"), and has your two email switches; Community has Name and logo
-   (moved off Header and menus). Communities (site owner) no longer has
-   its own admin list: it links to that community's Team.
-   Migration 089 (`submission.review_reason`) is run on dev and live
-   (Oct 29).
-   Fixed on the way: saving a Site tab sent every setting, so a tab left
-   open could put back an older name or Feedback heading. It now sends
-   only what changed on that tab.
-   Not as drawn: nothing. Gone, as drawn: the Pending count (To do has
-   it), approval rate and time to approval.
 13. **Build, step 6 (Setup): BUILT Oct 29.**
    To do starts with "Set up your guide · N of 4 done" and a bar: Name and
    logo, A second admin, Your first category (made, with a place on the
@@ -4057,37 +1768,6 @@ brief, one round of drawings, then the build in pieces.
    Edit, then update covers both by hand. A new place still opens the old review (board 4
    not built).
 
-## Drawn Oct 28: the computer home and Before candles (waiting on the user)
-
-Canvas https://claude.ai/artifact/FtEAS6MWeWHynqJHzaRURu, 5 boards, with
-real prod numbers (Friday Oct 30, 1 PM; candles 5:44 PM).
-
-- **Before candles by item.** Today it shows the fewest open stores that
-  cover every item (`beforeCandles()` in `src/lib/todayHome.ts`), which
-  is usually one store (Trader Joe's on Arch has all three). Drawn instead:
-  one row per item, "Challah · 10 stores open · closest 0.2 mi". A tap
-  opens Grocery with "Has: Challah" and "Open now" on. Board 2 adds an
-  "All three in one stop" row on top, as the other option. Board 3 is the
-  Grocery page it lands on.
-- **The computer home doesn't need a redesign.** It catches up with the
-  phone: the trust line takes the subhead's place in the hero, and Right
-  now (candles card plus Before candles on Friday, Food and Grocery open
-  now on a weekday) sits beside Browse everything. Dropped: the Upcoming
-  Davening, Kept by the Community and Shabbat & Holiday Times cards (Right
-  now and the candles card answer them). The email signup becomes a thin
-  band above the footer.
-- **Decided Oct 28: per-item rows alone** (no one-stop row). **Built** on
-  `redesign/oct18-fixes`: `beforeCandles()` now gives a row per item (stores
-  open now with it, the nearest's distance), counted with the Grocery page's
-  own Has and Open now checks so the number is the list a tap opens
-  (`candleItemHref`: `?openNow=1&has_m=Challah`). "Other stores ›" is gone.
-  An item no store open now lists still gets its one line. One category
-  answers every row, the one whose open places carry the most of the items
-  (Grocery): Food's main dishes are an item list too, and on the test
-  project they answered "Challah" and "Chicken" with restaurants until this.
-- The computer home (boards 4 and 5) was overtaken by board U1 (built
-  Nov 15; see the top of this file).
-
 ## Building: the Watches tab by kind of place (drawings settled Oct 24)
 
 Canvas: https://claude.ai/artifact/VBDTZ5Zm7wR1R6FVQaKaMS. Every revision
@@ -4097,257 +1777,35 @@ nothing superseded: https://claude.ai/artifact/NDNpGaksvhsFk5beuX5ZWA
 
 **Building in five pieces** (agreed Oct 24, on `redesign/oct18-fixes`):
 
-1. **The tab's rows and each kind's page: BUILT Oct 25.** The tab starts
-   with a row per category in the site's order (alphabetical): its
-   sources line, then waiting for you / not checked / up to date, then
-   "Not watched:" for the kinds with no address. Each row opens
-   `/<community>/admin/watches/kind/<category>`, with the three tabs.
-   `watchPlaces.ts` puts each job's own standing for a place together,
-   so the counts can't disagree with the job pages. A list's finding
-   on a grocery goes under Grocery; a place only a list has goes under
-   Food. Not done yet, on purpose:
-   - Every row now opens in place (pieces 2 to 4).
-   - The old job rows stayed under "Job pages" until pieces 2 to 4 held
-     what they did; the job pages went Oct 26 (piece 6). The watch list
-     and Add a watch are gone (piece 5, What's tracked).
-   - On the test site Food shows 25 waiting (mostly places only a kosher
-     list has), 22 not checked and 49 up to date.
 2. **Up to date, opened in boxes: BUILT Oct 25.** An up-to-date row opens
    under itself on a computer, on its own screen on a phone, as drawn
    (FinalShuls3, FinalPhoneShul3, FinalAddSource3, FinalFoodMenus3). A
    box per part a source keeps, each footed "Same as <source> · read
    <day> · Change":
-   - Shuls: this week's (from its newsletter or page), usual weekday,
-     usual Shabbos. Mikvahs: a box per section. Food: Dishes, Kosher.
-     Hospitals: their Refuah boxes. Eruvim: Status, Details (from its
-     website) and Map, as the Eruv page has them (Oct 25).
-   - Then Google's fields ("Name and contact", or "Hours and contact"),
-     its website's, and a person's, each a box of its own. Google's and
-     the lists' have no Change.
-   - Under them: Add a source (a shul: a page or its newsletter's email;
-     a mikvah: a page; a food place with no menu link: its menu page),
-     Read it now / Read them now (none with only Google and a
-     newsletter), Open its listing.
-   - Change gives a page in place of the one read (the old one is
-     stopped), a newsletter's new email, a new menu link, or a new
-     Refuah page.
-   - A read that finds something moves the place, and the page says
-     where it went.
    Not done, on purpose:
    - Dishes come in one list: a menu reading keeps one page, so the
      drawing's heading per menu page needs the reader to keep its pages.
-   - No Add a source for hospitals: one source. A hospital's Change
-     gives a new Refuah page. An eruv's Status and Map have Change (a
-     status page or its emails; a map), and Add a source when nothing
-     gives its status. Its Status box has "Its page dates each week's
-     post".
-   - **Stop** (Oct 25), what each job page's Reads × did, asked first
-     ("Stop reading mekorhabracha.org/davening?"): a shul's or mikvah's
-     page stopped, a menu link unlinked (a menu found on its website:
-     No menu online), a Refuah page stopped, an eruv's status or map
-     emptied, its website's read paused. A hospital Refuah doesn't have
-     has Not on Refuah beside Give its page on Refuah. Newsletters have
-     no Stop, as on the Shul times page. A place's whole Off switch
-     isn't here: stopping each source does it, and giving a page turns
-     it back on.
-   - On the test site, 13 food places have an approved menu reading but
-     no dishes on the listing (Playa Bowls among them). They show no
-     Dishes box rather than a "Same as its menu" that isn't so.
 3. **Not checked, opened by what's wrong: BUILT Oct 25.** A not-checked
    row opens in place too, as drawn (FinalFood3, FinalPhonePlace3,
    FinalStopped2, EruvNotChecked): its pill, then a group per problem,
    lit, each "<page> · <what's wrong>", the fields it leaves unchecked,
    and its own button. Then "N more checked", a line each (what, the
    listing's value, its source and when, Change), and Open its listing.
-   - Google: "Nothing checks its name" (Find it on Google / Not on
-     Google); "its Google listing · failed every night since Sep 10"
-     (the same two). A field a page of its website would check, once it
-     loads, goes with that page and its Read it now.
-   - Pages: "never read · added Oct 23", "failed every night since Oct
-     22", "not read since …" with Read it now; a site that's down is one
-     group ("· 5 pages", Read them now). Times or hours that can't be
-     read: Give the page with its times. No page: Add a source.
-   - Menus: never read (Read it now), can't be read (Give its menu
-     page), didn't load (Read it now). Hospitals: Refuah didn't load
-     (Read it now), not found (Give its page on Refuah).
-   - Eruvim: no status (Find its status page, searching its website,
-     and Add a source), an email it couldn't read (the email, with It
-     says up / down / Not about the status, right there), a status page
-     or map that didn't load (Read it now). Both were links to the Eruv
-     page until Oct 25.
-   - Built with it, as agreed Oct 24: a "You" field goes back to Not
-     checked after a year; Not on Google on a match Google stopped
-     answering for drops the match (it used to be refused).
    Not done, on purpose:
-   - A matched place with a field nothing checks and no page to add
-     (a grocery's website) has "Check it against Google" (a paid call;
-     its answer waits with Use / Keep). It linked to the Google page
-     until Oct 26.
    - The pills are piece 1's ("Google stopped answering Oct 17"), not a
      count of the fields in the groups.
 4. **Waiting for you by source, in the agreed order: BUILT Oct 25.**
-   - **4a, the order: BUILT Oct 25.** A place off a kosher list first, its
-     pill red ("Off Keystone-K’s list · Oct 24"); then Google's closures
-     ("Closed for now, says Google · Oct 12"); then new places; then
-     changes. A closure waits until Keep closed (dated, so it stops
-     waiting until Google changes its answer again) or Show as open.
    - **4b, a waiting place opened in place: BUILT Oct 25**
      (`waitingGroups.ts`). A group per source, "From
      mekorhabracha.org/davening · Oct 25", what it would change lit with
      "Was …", its own buttons, then "3 more up to date" and Open its
      listing. Each group decides what its job page would, by the same
      calls:
-     - a change: Accept / Edit / Keep as is (Google's check: Use / Keep;
-       a menu read: Use / Skip; a kosher list's: only the Kosher box's
-       keys, through `kosherProposal`, now shared with the Kosher page);
-     - a closure: Keep closed / Show as open (FinalClosed);
-     - off a list with no hechsher left: Hechsher "None, was
-       Keystone-K", Remove the listing / Keep it / Edit (FinalDropped);
-     - a place only a list has: what it would add, Add as new / Don't
-       add (FinalNewPlace); one not filed yet says it's suggested after
-       tomorrow morning's read, with no buttons.
-     Fixed on the way: Open its listing on a place not checked went to
-     the job page it waits on, not its listing.
-     - **Edit opens the box here: BUILT Oct 25** (`findingEdits.ts`):
-       the same box its job page opens, filled in with what was read,
-       saved straight to the listing. A group with several changes opens
-       them one after another (a mikvah's two sections). An eruv's opens
-       the eruv editor. Each job page now builds its box from the same
-       code.
-     - **Bring it back: BUILT Oct 25.** A new place a kosher list has
-       that the guide archived ("Archived, as “…”") has Bring it back,
-       on its kind's row and on the Kosher page: the archived listing
-       comes back with the list's hechsher, and the suggestion closes.
-       It uses the Archived tab's restore, which already existed. Off a
-       list and archived: Bring it back alone.
      Not done, on purpose:
      - A waiting place with nothing a group can show (a page that
        differs, nothing filed from it yet) has Read it again, to file
        what it says. It linked to its job page until Oct 26. None seen on
        the test site.
-5. **Last night, a line per kind: BUILT Oct 25** (`nightKinds.ts`,
-   `NightlyRuns.tsx`, FinalNightly). Closed: "Everything read", or which
-   kinds weren't ("Kosher certification, minyan times and menus not all
-   read"), amber. Opened: Google, Kosher certification, Hospitals,
-   Eruvs, Minyan times, Mikvah hours, Menus, each its run's time and "11 of
-   20 read · 9 didn’t load". A kind opens to what it reads, Not read last
-   night (Never read, Didn’t load, Not reached; a place's pages as one
-   line, "· 5 pages"), each a link to its job page, and its last 14
-   nights.
-   - Last night comes from the sources as they are now (each watch's
-     last read, each listing's last Google answer), so one read again
-     since stops showing. The nights before come from the count each run
-     saves per community and kind (migration 087, 1f).
-   - Newsletters aren't counted: they're read as each email comes in.
-   - **Mikvah hours, not Websites** (the user, Oct 25): the line is the
-     mikvahs' pages of hours only. A listing's page goes by its
-     listing's category, as the watch list does (`listingReads.ts`), so
-     Mikvah Moishe Zvi's page ("its website") is no longer counted as
-     Minyan times. A page added by hand for no shul or mikvah isn't
-     counted (none on either site).
-   - Gone from the tab: the old row per job. Walks have no line; their
-     email when they break still goes out.
-   - **The read-menus job is part of Menus** (the user, Oct 25). A food
-     place whose menu was never read is Never read on it, by name,
-     linking to Dishes, whether its menu's watch loaded or not. When that
-     job failed, didn't run or isn't set up, the line says so ("reading
-     new menus failed"). A night it read some says "· 3 new menus read".
-   - Each place missed goes by its name ("Menu · Say She Ate" is Say
-     She Ate; "Center City Eruv’s website" is Center City Eruv).
-   - **What's tracked, in place of the watch list: BUILT Oct 25** (the
-     user: "I want to see everything that's being tracked"). The section
-     is renamed What's tracked. Each line opens "All N tracked": every
-     place or page it covers, one line per place, its status ("Read Oct
-     24", "Not loading since Oct 20"), problems first, each a link to its
-     job page.
-     - **Newsletters** is a line of its own, with no run time: "2
-       newsletters · last email Oct 24 · 1 to link". Needs a look lists
-       senders not linked to a shul (with the Link box and Not a shul),
-       quiet for a month, or whose last email couldn't be read.
-     - **Other pages**: pages added by hand for no shul or mikvah. Shows
-       only when there are some (none on either site).
-     - **Phone, email and hours** ("Reads a place’s own website when
-       Google doesn’t have them."): a food place's own website, read for
-       the phone and hours Google doesn't keep. Each place says why: "Not
-       on Google · Read Oct 25", "Google has no hours · …". Five on the
-       live site (four not on Google, Sababa Falafel with no hours there),
-       which had been counted as Mikvah hours. Shows only when there are
-       some.
-     - **Every kind of place: BUILT Oct 25** (the user: "read phone,
-       email and hours from the website for the other kinds of place
-       too, only where Google doesn't have them"). `ownSiteCategories`:
-       every kind of place but shuls, mikvahs and hospitals (their own
-       jobs), with a phone, an email or hours to read. A place with no
-       hours field (a hotel) is read for phone and email alone, by code,
-       no AI. Hours are read by the AI only when the page changes. What a
-       food place's site finds waits on Dishes. Dry run on the live
-       site: the next morning adds GIANT (grocery, Google has no phone),
-       CKids Philly (not on Google) and BZBI's Early Childhood (Google
-       has no hours). Schools and hotels have no gaps today; cemeteries
-       have no phone field.
-     - **Findings wait under their kind: BUILT Oct 25** (the user:
-       "every category that has a watch of some sort should be on the
-       watch list. So grocery should go to grocery"). What a grocery's,
-       childcare's, hotel's or school's own website finds now waits under
-       that kind's row (counted in its Waiting for you, opened there with
-       Accept / Edit / Keep as is), not in the
-       moderation queue; its email links to that page. Every kind with a
-       watch has a row: a kind Google doesn't cover gets one from its
-       read websites. On the live site every watched place is a mikvah,
-       food place, hospital or shul today; Childcare already has a row
-       (from Google), and its websites join it once read.
-     - **Weekly link check: BUILT Oct 25** (the user: "let's also add a
-       check for links now"). Every Sunday (`/api/cron/check-links`,
-       added to `vercel.json`) each link a listing shows that nothing
-       else opens — kosher certificates, Refuah, WhatsApp groups,
-       websites Google doesn't keep — is opened once. No AI, nothing
-       read. Not found or no such site counts at once; didn't answer
-       counts only on a second check a week later. What's tracked has a
-       Links line; a link that doesn't open puts its place on Not
-       checked ("Link doesn’t open") with Check it again. A hospital's
-       Refuah link isn't checked: its Refuah watch reads that page
-       already (the link carries a `?q=` search the watch doesn't). Dry
-       run on the live site: 85 links, 1 doesn't open — House of
-       Kosher's certificate (houseofkosher.com/Philadelphia, 404). With
-       the user's yes, the live listing now links its Keystone-K page,
-       keystone-k.org/kosher/house-of-kosher/ (Oct 25), so the first
-       run should find none. The cron first runs on
-       production once this branch deploys.
-     - **A website Google doesn't have counts as checked by Links: BUILT
-       Oct 27** (the user, on PKS Kosher Market). Once the Sunday check
-       opened it, Google's "who checks each field" says Links, and the
-       opened place shows "Website · Opens · checked <day>" instead of
-       Nothing checks its website. A link that stops opening goes back to
-       Nothing. Until the first Sunday run, PKS still shows not checked.
-     - Gone with the watch list: Add a watch, and Pause, Remove and Check
-       now on leftover pages. Pages are added from a place's own box (Add
-       a source).
-6. **The job pages gone: BUILT Oct 26** (the user: "my goal would be to
-   have everything accounted for so then we can remove job pages"). The
-   seven pages under `/admin/watches/` (Google, Dishes, Hospitals, Mikvah
-   hours, Shul times, Eruv status, Kosher certification) and their
-   components are deleted; what only they did is on the kinds' pages:
-   - **Not read** under an opened place: a shul or mikvah turned off, a
-     page of it stopped, a hospital off Refuah, a menu marked No menu
-     online, a food place's or eruv's website stopped. Each has Read it
-     again (the job pages' Turn back on).
-   - **Kosher:** a food place on neither list gets a Kosher box ("On
-     neither list") whose Change gives its page on Keystone-K's list; on
-     Keystone-K's, the same Change. Off a list that has it by a near
-     name: It's <name> now, beside Remove the listing / Keep it. Read it
-     now also reads the lists it's on.
-   - **Menus:** a menu that can't be read has Photos of the menu and No
-     menu online beside Give its menu page.
-   - **Check it against Google** on its own place, not a link away.
-   - **A kosher list** is stopped, or read again, from its line in
-     What's tracked (Kosher lists, All N tracked).
-   - Every link that went to a job page — What's tracked's lines, the
-     findings' emails — opens the place on its kind's page instead
-     (`?place=<id>`, on its tab). A kosher list's findings email links
-     to the Watches tab.
-   Dropped on purpose: a whole Off switch per place (stopping each source
-   does it; giving a page turns it back on), and Stop on a newsletter (it
-   had none on the Shul times page either).
 
 Settled with the user so far:
 
@@ -4480,172 +1938,9 @@ Settled with the user so far:
 **Gone Oct 26**: these pages were removed once the kinds' pages held what
 they did (piece 6 above). Kept for the history of what was decided.
 
-The user, Oct 21: "great, let's do it". There is one drawing per page, all
-agreed:
-- Shul times: https://claude.ai/artifact/B3vwpSiqwdK833s9VAVHBc
-- Mikvah hours: https://claude.ai/artifact/7MUNppcA4S4yvXKupEKJPR
-- Main dishes: https://claude.ai/artifact/7EYjgU1WcHrXG2W6Qpigb7
-- Hospitals: https://claude.ai/artifact/Jf2Nvzj8dy1fWop5ZzVFmy
-- Kosher certification: https://claude.ai/artifact/2PPYvecC87w2KLNeHgYfTN
-- Eruv status: https://claude.ai/artifact/9Kv6MGeAEooZREzW28hiBu
-
-**Rules on every page:**
-- An opened place is its listing's own boxes. Boxes with an update come
-  first, open; boxes with nothing new sit closed below them; Reads is last.
-- A changed row has one highlight colour. A row going away is crossed out,
-  with a tag saying why ("Not on the menu", "Not on Refuah"). A changed
-  value has "was …" beside it. A new row is only highlighted. There are no
-  New or Changed tags.
-- Pills: a place's row says "N updates". A box's pill names the kind when
-  it holds one kind ("1 new", "2 changes", "3 not on the menu"), and says
-  "N updates" only when it mixes kinds.
-- The buttons are Use this / Edit / Keep the listing. Use this takes off
-  what the source no longer has. Each box ends with "From X · read
-  Oct 21". After Use this, the box shows a grey "Used Oct 21".
-- Edit is the listing's own per-box Edit sheet (`BoxEditSheet`), filled
-  with the source's version, with the button "Save to the listing".
-- Reads: the Reading switch, then one line per page, each naming the boxes
-  it updated ("Usual weekday times · Usual Shabbos times", "Menu link ·
-  Main dishes"; "Nothing from it" if none), with a date or a greyed reason
-  and a ×. Below them: Add a page · Read them now · Open its listing.
-  Can't be read opens straight to Reads.
-- A field Google keeps (`details.googleFields`) isn't read from the
-  website. The address is never checked.
-
-**Per page:**
-- **Kosher:**
-  - The two lists sit at the top, each with the page's only Reading
-    switches.
-  - Each list speaks only for its own hechsher.
-  - "What isn't kosher?" is compared only for being there or not.
-  - No hechsher left: "Archive the listing".
-  - "It's <near name> now" is offered only when the list has a near name.
-  - A New on a list place that is left out isn't shown again.
-- **Hospitals:**
-  - Entries are compared by name, phones, email and website, never their
-    wording.
-  - Eruv and Sukkah aren't checked here.
-- **Eruv:**
-  - Status and map go live as today, with no Use this.
-  - Details (hotline, email-alerts link) are read from the eruv's website
-    and wait for Use this. "Where it goes" is never compared.
-  - "Up" is green.
-
-**Decided before building:**
-- An item an admin added by hand is never crossed out because a read missed
-  it. The reader is asked to look for it next time.
-- Watches never read the guide's own pages. **Built Oct 21:**
-  - `guidePage.ts` knows the guide's hosts: phillyjewishguide.com, plus
-    `NEXT_PUBLIC_SITE_URL` and Vercel's addresses.
-  - `fetchPublic` and the browser render refuse those hosts, a redirect
-    to one included. The reason given is "it's a page of this guide, not
-    the place's own".
-  - Both add-a-page routes refuse one.
-  - Dev's one such watch, Moishe Zvi's, is removed. Production had none,
-    so nothing there changed.
-- A read that agrees with the listing clears that watch's older finding.
-  **Not built yet.**
-- The uncommitted filing-side work is committed as it was, then built on.
-- Mikvah hours given as notes ("by appointment, 48 hours ahead"): the user,
-  Oct 22, "yes" to reading them as a note under the hours they belong to,
-  shown and approved like a changed time. Built with step 4.
-
-**Order:**
-1. The own-pages fix (built).
-2. Main dishes, which sets the shared box, Reads and Edit pieces.
-   **Built Oct 21** (compared with its drawing on dev, computer and phone):
-   - The shared pieces are in `JobBoxes.tsx`: a place's row (full screen
-     on a phone, "‹ Main dishes"), Box, its rows (gone crossed out with
-     its tag, new highlighted), Use this / Edit / Keep the listing, the
-     source line, and Reads with its switch and a × per page.
-   - `dishProposal.ts` marks the listing's list by the menu. A dish with
-     a menu date (`itemMenu`) that the menu no longer names is crossed out
-     and Use this takes it off. One with no menu date (added by hand or
-     by a visitor) is kept, "Not found on the menu", and looked for again.
-   - Edit is the listing's own dishes editor (`ListingEditor`'s new
-     `preset` and `adminSave`), saved through the route's `save`; its menu
-     link field is hidden there, since Reads has it. The route's `use` and
-     `save` write the list whole (`setMenuDishes`), so
-     `approve_menu_dishes` (migration 065) is no longer called.
-   - Reading switch off = No menu; the × on a menu link takes the link
-     off; on a website, No menu. Places not read yet are read as the page
-     opens, five at most.
-   - Board 3 **built Oct 22** (compared on dev, computer and phone,
-     Chalavita's hours finding stubbed in the browser): a food place whose
-     hours or phone Google doesn't keep gets a watch on its home page from
-     the daily run (`homePageWatchChanges`, no search; taken off again when
-     Google takes them over). Its hours are filed as the section `hours`,
-     shown as an open Hours box, a day the listing lacks highlighted with
-     nothing struck under it ("New"), Use this / Edit / Keep the listing
-     (`FoodHours.tsx`). Its phone is a Phone box (below). Main dishes
-     comes after them, then Same boxes, then Reads, which names the home
-     page "Hours · Phone" with a × that stops it. A finding puts the place
-     in To check even with No menu (`dishStatus`).
-   - Not built, as the drawing says: board 5 (a menu that moved, a "New
-     menu link" update in Reads).
 3. Shul times. **Built Oct 22** (compared with its drawing on dev, computer
    and phone, with the shul's updates stubbed in the browser; dev's own
    are older, unsplit filings):
-   - A box per update, named for its part: Usual Shabbos times ("7 new"),
-     This week's schedule ("Oct 21–24"), Usual weekday times. Rows sit
-     under their days ("Friday night", "Monday to Friday", "Wed, Oct 21
-     and Thu, Oct 22"), a tefillah's times on one line ("6:45 and 8:15
-     AM"), a changed time beside its old one (`timesProposal.ts`).
-   - A usual part a page gives that matches is a closed "Same" box, "Same
-     as" its page.
-   - Each check now records the parts its page gave (`WatchCheck.parts`,
-     `partsGiven`); older checks are worked out from their lines
-     (`partsFromRead`). Reads names each page by the parts it gave, pages
-     that gave a part first, greyed ones last.
-   - A finding carries its part and page (`watchFindings.ts`). Use this
-     approves only that part. Edit is the listing's own box editor
-     (`BoxEditSheet`'s `preset` and `save`), filled with the website's
-     version; the hours route's `?item=` hands it the listing.
-   - A filing from before parts (dev has three, Sons of Israel's) shows
-     whole in a "From its website" box with Compare.
-   - A newsletter's times are filed by part too (the user, Oct 22), one
-     update each, boxed "From its newsletter". So a newsletter no longer
-     files one whole update that stops the website reader filing for that
-     shul. Older newsletter updates stay whole until decided.
-   - Edit on a This week's schedule that gives two weeks (Kol Tzedek's,
-     Mikveh Israel's: this week and next) had no Edit; it opens both
-     weeks now, a list each under its dates, one Save (the user, Oct 22).
-   - A day a week's schedule leaves out (Kol Tzedek's Oct 22–24 is only
-     Shabbos morning) shows the usual times plainly; it said "Times for
-     Oct 18 – Oct 24 times not posted". A Yom Tov day still says not
-     posted.
-   - A calendar's lines carry an event's end ("8:10 AM–8:40 AM"), so the
-     reader can note it (Rodeph Shalom's Thursday minyan, the user, Oct
-     22). Every calendar's lines change, so each is read once more.
-   - A Zoom link from a calendar: **built Oct 22**, PR #346 (see "Done
-     Oct 22: a minyan's join link" below). Not from a newsletter: the
-     Apps Script sends the email's plain text, which has no links
-     (Society Hill's "Click here to Zoom", BZBI's weekday minyan).
-   - This week's schedule made only of dated services (BZBI's newsletter
-     "Sat Oct 24") had no line under it; it has the confirmed line and
-     Edit now (the user, Oct 22).
-   - Kol Tzedek's Friday night is on its Weekly Services page
-     (kol-tzedek.org/shabbat.html, "All Friday services begin at
-     6:30pm"), which isn't one of its watched pages yet. Nothing to add
-     by hand: the morning's search follows the links on a shul's Google
-     website, like Main dishes, and finds it (and calendar.html, and
-     the Shtiebel's /calendar; checked Oct 22, fetch only). It went live
-     Oct 22, so its first morning is Oct 23. "Read them now" searches
-     first too now, a shul with pages or without (the user, Oct 22).
-     BZBI's and Chabad of the Main Line's websites turn the reader away
-     (403), so only BZBI's newsletter is read.
-   - "Read them now" on Sons of Israel said "Unexpected token 'A'…"
-     (Oct 22): its pages, read by the AI one after another, passed the
-     host's 60s and the host's error page isn't JSON. Now every page is
-     read: the job page asks for each one in its own request, in order,
-     and the row says "Reading 2 of 4…". The search gets 10s, and an
-     answer that isn't JSON says "That took too long. Try again." on any
-     admin page. "Turn back on" reads the same way.
-   - Sons of Israel was read again every time Shul times opened (Oct 22):
-     its newsletter-links page was never reached, so it always counted as
-     not read yet, and opening the page searched and re-read all its
-     pages, filing its suggestions afresh. Opening the page now reads only
-     pages never read, and only those.
    - The page with a date wins (the user, Oct 22: "since calendar has date
      and 9am we go with that"). Sons of Israel's calendar gives this
      Saturday's Shacharis at 9:00, its Tefillot page 8:30. A usual time a
@@ -4656,252 +1951,24 @@ agreed:
      times aren't held against a date. Its 8:30 suggestions already in
      production's queue (37673a26, f113d578) and the home page's "Off:
      9:00" (b5dde002) are still there for the user to decide.
-   - A shul's newsletter is one of its reads (the user, Oct 22): a line in
-     its Reads ("communications@bzbi.org · Newsletter · read Oct 22"), and
-     a shul read from one is Checked, not Can't be read. Off the Watches
-     tab's list once linked; a sender not tied to a shul yet stays there.
-   - A page whose read waited behind a suggestion already in the queue
-     kept "In the queue" after that suggestion was decided, with nothing
-     to open (Sons of Israel's home page, Oct 22). It settles once a
-     finding is decided after the read (`settles`, watches.ts).
 4. Mikvah hours. **Built Oct 22** (compared with its drawing on dev,
    computer and phone; Lower Merion's update stubbed in the browser, Moishe
    Zvi's two from a real read on dev):
-   - A box per section the listing ticks (Women's, Men's, Keilim;
-     `hoursSections.ts`), each with Hours ("Sunday 7:30–9:30 PM", the old
-     hours struck beside a changed day) and Notes (a changed note lit
-     whole, the old one struck under it). "N changes" or "Same", "Same as"
-     its page (`MikvahHours.tsx`).
-   - Notes are read too: each section's notes go to the reader beside its
-     hours, which is told to keep the guide's note when it says the same.
-     A page that only says "by appointment" is found and read.
-   - A reading is filed a section at a time (`splitSections`), its source
-     naming the section and its keys. Use this approves only those keys
-     onto the listing as it is then (`rebaseSection` in
-     `approveSubmission`), so approving Women's never undoes Men's. A
-     section waiting from the same page is replaced; one filed before
-     isn't filed again.
-   - Edit is the section's own editor ("Women's hours", its hours and
-     notes), filled with the website's, saving only that section's keys.
-   - An older finding whose lines all sit in one section shows as that
-     section's box; one across sections shows whole with Compare.
-   - The Contact box **built Oct 22** (compared on dev, computer and
-     phone; Lower Merion's email change stubbed, Moishe Zvi's Same from its
-     real fields). See "Phone and Contact boxes" below.
-   - **Phone and Contact boxes** (all three job pages, `ContactBoxes.tsx`,
-     `contactRead.ts`): each listing page read also reads the phones and
-     emails on it, by code, no AI. Only what Google doesn't keep is checked
-     (`googleKeeps`: `placeId` set and the field in `googleFields`); the
-     address never. A number is "the same" however it's written; a change
-     is proposed only when the listing's is gone and exactly one new one of
-     that kind is there; an email only when none the listing knows is on
-     the page. Filed as the section `contact`, apart from hours and times.
-     The box is "Phone" when that's all it checks, else "Contact". An
-     update is open, after the hours or times updates and above the Same
-     boxes; Same is closed, after them, "Same as" its page. Edit is the
-     listing's own contact box (address, phone, website, email), and
-     whatever the admin changes there is saved with it (the approval takes
-     `reviewEdit.fields` too). Shul times shows a shul's Phone the same
-     way (Leyv Ha-Ir's, as its notes say); not drawn as a box, so built in
-     the page's pattern.
    - **Waiting on the user:** a mikvah's section phones and emails
      (Women's Phone, Men's Phone…) are checked in its Contact box, not in
      the Women's / Men's boxes. The drawing doesn't say which; tell me if
      they belong in their sections.
-5. Hospitals. **Built Oct 22** (compared with its drawing on dev,
-   computer and phone; updates stubbed in the browser):
-   - An opened hospital is its listing's boxes that hold contacts (Who to
-     call, Kosher food, A place to stay, Rides, Also; `hospitalBoxes.ts`).
-     A box Refuah updates comes first, open: each person a row, "From X ·
-     who · note" under the name, phones on the right, a changed phone
-     beside what it was, a person going crossed out "Not on Refuah". Boxes
-     that agree sit closed, "Same as Refuah". Reads is last: the one
-     Refuah page, its × stops it (kept as a stopped page, so the daily
-     match doesn't put it back), "Not on Refuah" when it can't be read.
-   - Refuah's reading is filed a box at a time, its source naming the box
-     and its keys, and approved onto the listing as it is then
-     (`rebaseSection`). A box waiting with the same reading stays; one
-     filed before isn't filed again. Edit is the box's own editor, the one
-     visitors use (a row a person, Add a person), filled with Refuah's.
-   - **Only what came from Refuah is ever crossed out.** Entries carry no
-     source, so the watch remembers the entries it matched
-     (`WatchCheck.refuahHad`, carried forward each read). An entry the
-     guide has that Refuah doesn't is crossed out only if it's on that
-     list; otherwise it's kept, and listed in the note as added by hand.
-     The first read matches everything, so nothing is crossed out until a
-     later one. The cost: an entry Refuah dropped before the first read
-     (or before choosing a different Refuah page) counts as hand-added and
-     stays until someone removes it.
-   - An older whole-hospital filing shows in a "From Refuah" box with
-     Compare.
-   - Found while comparing: Mikvah hours strikes a changed day's old hours
-     (the shared `BoxRow`), where its drawing has "was 8:30–10:30 PM" in
-     small grey, as Hospitals now does. Not changed yet: `MikvahHours.tsx`
-     and `TimesProposal.tsx` were being edited by the Contact/Phone boxes
-     session, which has now committed (Oct 22), so they're free.
-6. Kosher. **Built Oct 22** (compared with its drawing on dev, computer
-   and phone; the lists' findings stubbed in the browser):
-   - The page says "N places have an update from a list." The Lists box
-     holds both lists, each with its page, "read <date>" and the page's
-     only Reading switches, and Read them now. Tabs: To check, New on a
-     list, Checked, On neither list.
-   - An opened place is its listing's Kosher box (`kosherBox.ts`: the
-     editor's facts row headed by a hechsher): Hechsher, Meat, dairy or
-     parve, Certificate, What isn't kosher?. A new value only highlighted,
-     a changed one with "was …", What isn't kosher? compared only for
-     being there. Use this takes only the rows it changes; Edit is the
-     listing's own Kosher box, filled with the list's, saved onto the
-     listing as it is now (everything else as it is today, not as it was
-     when the list was read). Reads is last: the place's pages on the
-     lists, with no switch, and Add a page (its page on Keystone-K's list).
-   - No hechsher left: the rows crossed out, "Not on Keystone-K's list",
-     Archive the listing / Edit / Keep the listing, and "It's <name> now"
-     only when the list has a place by a near name. Renamed, archived (an
-     edit that leaves none files a removal), Edit on a removal and Add a
-     page are each filed as the list's own suggestion and approved at once
-     (`POST /api/admin/watches/kosher`), so the listing's history says so.
-   - New on a list: a Place box (name, address, category, Google's line)
-     and a Kosher box, Add it / Edit (the whole new-listing editor, filled
-     in) / Leave it out. One left out isn't shown again.
-   - An older finding wider than the box shows whole, with Compare. A
-     grocery has no hechsher, so no Kosher box: its findings show whole.
-   - Food only (the user, Oct 22: "We only need to check Food, not grocery
-     stores"). Groceries aren't on the page and no new grocery is
-     suggested; they're still matched with the lists, so one on a list
-     isn't a new place (`KOSHER_JOB_CATEGORIES`, `kosherJob.ts`).
-   - Not as drawn: the tabs show their counts on all four (the other job
-     pages hide an empty one), and "It's … now" uses the list's full
-     name for the place.
-7. Eruv. **Built Oct 22** (compared with its drawing on dev, computer and
-   phone; the eruvim stubbed in the browser):
-   - Each eruv's website is read every day, by code with no AI
-     (`eruvWebsite.ts`, `eruvWebsiteRun.ts`), for its hotline and its
-     email-alerts link. Hotline: offered only when the eruv's number is
-     gone from the page and exactly one other number is there; the eruv's
-     wording ("option 3") stays while the number does. Email alerts:
-     offered only when the eruv has none or its link is gone, and the page
-     has exactly one sign-up link. Where it goes and the website itself
-     are never compared.
-   - The daily run gives each eruv website its own watch (`createdBy`
-     "eruv website", no migration), takes away one no eruv has, and keeps
-     a paused one. A change is filed as an ordinary eruv suggestion from
-     "Its website (automated, eruv)", waiting on Eruv status, not the
-     moderation queue; the same reading is never filed twice, and a newer
-     one replaces one still waiting.
-   - The page: "N eruvim have an update from their websites", tabs To
-     check / Can't be read / Checked. An opened eruv is Details (Use this
-     takes only the rows it changes; Edit is the eruv's own suggestion
-     form, filled with the website's, "Save to the listing"), Status (green
-     Up, the words, the date, "on the site at once"), Map, and Reads (the
-     website's switch, a line per page, merged into "Status page · Status,
-     Details" when the status page is the website; × asks before it stops
-     reading; Find its status page, Add a page, Add its emails, Read them
-     now, Open its listing). An email it couldn't read and "Its page dates
-     each week's post" stay in Reads.
-   - The Watches tab's Eruv row now counts To check, and an eruv's website
-     isn't listed among the other watches.
-   - Not as drawn: a map that didn't load can't say "last read Oct 15"
-     (a failed read overwrites that date); the Reading switch is the
-     website's only, so an eruv with no website has one that does nothing;
-     "was …" shows the whole old value, as on every other page; an eruv
-     with no hotline is never given one.
-   - **Live once it reaches `main`:** the daily run then adds a website
-     watch per eruv in production and files what differs. Nothing is
-     written before that.
 8. Watches tab tidy-up. **Built Oct 22** (the user's go-ahead):
-   - The "Menu" section is gone: the daily run's menu watches aren't
-     listed (an admin's own watch on a menu still is). A menu page that
-     didn't open this morning is now on Main dishes instead: the place is
-     in Can't be read, "Menu didn't load", and its line in Reads says
-     "didn't load" (`menuDidntLoad`, `watchJobs.ts`). A read of that page
-     since (Read now) clears it. The Dishes row's "didn't load" counts the
-     same places.
-   - The tab no longer looks like it reloads: the list shows once its own
-     read is back, each job row's counts as theirs are ("Loading…" until
-     then), and coming back to it shows what it last showed while it reads
-     again. Job pages still load afresh each visit.
-   - Faster loads (the user's go-ahead, "solve it appropriately"). Opening
-     the tab re-runs no job, but two reads fetched outside sites live: the
-     Kosher page read Keystone-K's and Mekor's lists every time, and the
-     tab's Hospitals counts asked Refuah. Now each list's run keeps what
-     it read on its watch (`last_check.listRead`, no migration) and the
-     Kosher page shows that; it reads a list live only before the list's
-     first run since this change (so once per list, on its next daily run
-     or Check now). The tab asks for Hospitals with `?counts`, which skips
-     Refuah. Every admin read also checks the sign-in and the community's
-     admins at once rather than one after the other.
-   - Opening a job page does no work (the user, Oct 22: "why is AI
-     reading menus and searching places' websites when we're just trying
-     to load what we already did"). Mikvah hours and Shul times searched
-     the website of every place with no page on each open, because the
-     morning's search threw away a "found nothing". It now keeps why, and
-     when, as a never-read watch per place and job (`hours search`,
-     `recordSearch` in `hoursJobRun.ts`, no migration); the page shows
-     that, or "Not searched yet" until the first morning run or Check
-     now reaches it. Main dishes read up to 5 never-read menus by AI on
-     open; a new daily cron, `/api/cron/read-menus` (07:30, `vercel.json`),
-     reads up to 5 a morning instead (`menuPlaceRead.ts`), and "Read now"
-     still reads one on demand. On dev nothing runs the crons, so dev
-     shows "Not searched yet" until Check now.
-   - A row moves as soon as it's decided (the user, Oct 22: "I would've
-     expected it to move to the other tab"). Rows used to stay in the tab
-     they loaded in for the whole visit. Now each row's tab follows what it
-     is now, on all five job pages. Used or kept with nothing left goes to
-     Checked; reading turned off goes to Off; a stopped page goes to Can't
-     be read; Read now that finds an update goes to To check. The tab counts
-     follow. On Kosher, a new place added or left out, and a finding that
-     matches no place, leave the page once decided. Off stays open while
-     it's the tab showing, even after its last row leaves.
-   - Eruv status (the user, Oct 22). Center City's map said "timeout",
-     but that was a dev row left from Oct 15: a good read of an unchanged
-     map saved nothing, so it never cleared an old error. Production
-     reads it fine. Now a good read clears it, and Read them now dates the
-     map's read even when the map is the same. Details named no source
-     until the daily run had given the eruv's website its watch, and dev
-     never runs that. Now the box says "Read from its website · not read
-     yet", and Read them now gives the website its watch and reads it
-     (`POST /api/admin/watches/eruv { action: 'read' }`).
-   - Main dishes: a menu read that agrees with the listing is kept (the
-     user, Oct 22: "If I add the menu it should have that as it's date last
-     seen"). Adding a menu, Read now or a photo whose dishes are all the
-     listing's already dates them "seen" from that menu, as Use this would,
-     and the row goes to Checked. A read with anything new still waits.
-   - Shul times: a calendar's week that's the same now shows what it
-     read (Rodeph Shalom, Leyv Ha-Ir: "Same" with nothing under it). The
-     week's dated lines show in a "This week's schedule" box, "Same as" its
-     page, until an update to it is kept.
    - Shul times: the South Philadelphia Shtiebel's calendar is read from
      its "Add our Calendar" link (`calendar/u/0?cid=…`); its embed is drawn
      by a script. It still needs its page: Add a page,
      southphiladelphiashtiebel.org/calendar.
-   - Mikvah hours: notes as updates (the user, Oct 22). Ohel Leah's pages
-     hadn't changed since notes began to be read, so the morning run never
-     read their notes. A page last read before then (`NOTES_READ_FROM`, the
-     merge of #340) is read once more. A note that differs from the
-     listing's only in its spacing (Lower Merion's blank lines) is the same
-     note. On dev, Read them now reads them.
    - Main dishes: menus read better (the user, Oct 22). A menu page's
      pictures that say they're the menu are read beside words that name
      dishes, and add what only they name (LUHV: four products in words, its
      menus as pictures). A holiday's menu link comes after the everyday
      one (House of Kosher's Thanksgiving PDF came first). House of Kosher's
      menu link is still the Thanksgiving PDF: set it to the catering menu.
-   - Main dishes: up to three menu pages per place, put together (the
-     user, Oct 22). A menu link is read with the other menu pages its
-     website links to (Rita's location page and Treats page, Playa Bowls'
-     Bowls and Smoothies, the Sweet Shop's Catering and Sweet Shop);
-     dishes from the first page come first, each once, ten at most. Each
-     page is an AI read, from the morning run's budget too. A picture's
-     alt text counts as the page's words (Rita's Blendini, Concrete and
-     Shakes are named only in pictures); a Wix picture's address is read
-     whole (the Sweet Shop's Bakery Menu came out broken). A chain's
-     "Find a bakery" or locations page is never a menu page. A menu page
-     whose pictures have alt text has a new fingerprint, so the morning
-     run reads it once more. On dev, Read now on each.
-   - A dish added by hand on the Dishes page (Edit, Save to the listing)
-     is dated "seen" that day, as one added through the queue is; it
-     showed no date until a reading found it (the user, Oct 22). Never an
-     "on its menu" date, so a read that misses it still can't cross it out.
 
 Each page is compared with its drawing, side by side, before it's called
 done. All of it is on dev. Anything live (Refuah watches, hospital fields)
@@ -5010,211 +2077,24 @@ compare, and one it can't read, on desktop and phone.
 **Build order**
 1. **Finish menus:** BUILT Oct 21 on `redesign/oct18-fixes`. What it does
    and doesn't do yet:
-   - **Already true before this, and easy to miss:** approving a reading
-     on Main dishes writes the page it was read from as the place's menu
-     link (`approve_menu_dishes`; since Oct 21 `setMenuDishes`). So most "menu links" are
-     the reader's own finds, and were watched daily already.
-   - **New: a place with no menu link yet** is watched on the page its
-     latest reading found the menu on. Conditions: dishes were read there
-     (not photos, a failure or "no menu"), and the page is on the place's
-     own website or is a PDF (`foundMenuPage`, `menuWatch.ts`). A reading
-     waiting or skipped counts. A menu link that's an ordering app gives
-     way to it.
-   - **New: a watched page that stops opening sends the run back to the
-     website** (`findMenus`, as Main dishes does). A menu found on another
-     page of the place's own site is saved as a reading waiting on Main
-     dishes: "Its menu page stopped opening, and the menu is now at …
-     Approving makes that its menu link." The watch keeps failing until
-     then, and its error says where the menu went, so the admin's email
-     says it too.
-   - **Never moved without a person.** That's stricter than the plan above
-     ("one it found itself can be replaced"): a found link and one an
-     admin typed look the same once approved, so the run never tells them
-     apart and only ever proposes. Once a reading is from another page
-     (waiting, skipped or approved), that place isn't searched again.
-   - **Budget:** one search per daily run (`MENU_SEARCHES_PER_RUN`). It
-     takes one of the run's three AI reads, so the run's AI time doesn't
-     grow. Check now always searches.
-   - **Tried on real sites, with writes refused:** PLNT Burger, watched on
-     a dead page, found `/menu` and would have saved six dishes with that
-     note, in 38s (nearly all of it the AI). Judah's menu times out at
-     45s on the AI on every read, the ordinary one too: not new, worth a
-     look. Dev's 11 failing menu watches all open fine now: stale.
    - **Not done yet:** the monthly re-search, and searching again when a
      page still opens but no longer has the menu. Both need somewhere to
      keep when a place was last searched. Watching the page that links to
      a PDF (a "menu-fall-2026.pdf" renamed each season) is also not done.
 2. **Hospitals:** BUILT Oct 21 on `redesign/oct18-fixes`. What it does
    and doesn't do yet:
-   - **The Watches tab starts with two job rows,** Dishes and Hospitals,
-     each with checked / to check / can't be read / didn't load today.
-     The whole row opens its page. Main dishes is no longer a tab: it's
-     the Dishes page (`/admin/watches/dishes`; the old address
-     redirects). Hospital watches are off the tab's list, and "Hospital
-     on Refuah" is no longer something Add a watch offers.
-   - **Matched automatically, every morning, before the reads**
-     (`syncRefuahWatches`, `refuahMatch.ts`): each hospital listing on
-     the map gets the Refuah hospital nearest it, if within 0.2 mi. Two
-     listings nearest one record: the nearer gets it. Refuah's list is
-     asked per hospital position (`hospitals:list` with no position
-     returns 50 hospitals, none in Philly). It never touches a page an
-     admin gave, and removes only its own watches. Refuah down: nothing
-     removed.
-   - **The Hospitals page** (`/admin/watches/hospitals`): To check, Can't
-     be read (not found, or its page didn't load), Not read yet, Checked,
-     and quiet "Nothing on Refuah yet" and "Off" sections. Each row says
-     what it is matched to: "Matched to Refuah's Pennsylvania Hospital,
-     800 Spruce St · same spot on the map", or "Given by hand: …". Opened:
-     its Refuah page, Check now, "Choose a different Refuah hospital" (the
-     nearest four, or a pasted link), "Fill it in yourself", Turn off.
-     Can't be read offers the nearest four and "Not on Refuah"; Off has
-     "Turn back on", which reads it straight away.
-   - **"Not read yet"** includes a watch whose page opened but whose
-     result wasn't kept: every Refuah watch today except dev's CHOP,
-     since the live site runs `main`'s code. Each fills in on the first
-     run of this branch's code, or on Check now.
-   - **Live data, read only (Oct 21):** all seven Philly hospitals match
-     on their own to the same Refuah pages they were given by hand, so
-     the first live run adds and removes nothing.
    - **Not done yet:** the per-category job switch isn't built.
      (Differences wait on the page with Compare since step 6.)
      "Off" here is the hospitals' own (a paused watch, or a "not on
      Refuah" marker watch).
 3. **Mikvahs:** one dry run first (read each website once, save nothing,
    count how many it reads right), then connected.
-   - **Dry run, Oct 21, live data, nothing saved**
-     (`scripts/hours-pages-dry-run.mts`, finding pages with
-     `hoursPages.ts`): 4 of 4 mikvahs read right, from 14 pages, with no
-     page given by hand. Lower Merion: its home page (women's), Men's
-     Mikvah and Keilim Mikvah pages were all found from its home page's
-     links. Women's reads 7:30–9:30 PM, Sun–Thu, against the listing's
-     8:30–10:30 PM, the known change. Men's agrees (its Friday "until 1 hour
-     before candle lighting" rightly left out). Keilim agrees. Mei Shalva,
-     Moishe Zvi and Ohel Leah are by appointment only: nothing read from
-     any of their 10 pages, which is right; Ohel Leah's "the kelim mikvah
-     closes at sunset" isn't weekly hours, and wasn't read as any.
-   - **One judgement call:** "every weeknight" was read as Sunday to
-     Thursday; the listing has Sunday closed.
-   - **The pages the AI read hours from are exactly the ones with a clock
-     time on them** ("7:30PM", "4:30 AM"), so the daily search for pages
-     can be done without the AI.
-   - **Connected, BUILT Oct 21 (not merged).** Every morning, before the
-     reads, `/api/cron/watches` searches each mikvah's website
-     (`syncHoursWatches`, `hoursJobRun.ts`): its home page and up to four
-     of its links that may give hours (`hoursPages`), each kept if it has
-     a clock time on it (`looksLikeHours`). Fetches only, no AI; all
-     places at once, each given 20s. A page it finds is watched as
-     "listing pages (found)" and read by the AI on its first morning
-     (a page found, not given by hand, used to only get its fingerprint
-     taken then, so it was never read until it changed; fixed Oct 21),
-     within the run's three AI reads shared with menus, so a few new
-     pages can take a few mornings; Check now reads one at once. It
-     never touches a page an admin gave, and removes only its own
-     pages it no longer finds; one that just didn't load, a website that
-     won't open, or a place turned off is left as it is.
-   - **The Mikvah hours page** (`/admin/watches/hours`, a row on the
-     Watches tab; its pages aren't listed below there any more): To
-     check, Can't be read, Not read yet, Checked, and a closed "Off". The
-     intro says what's read ("Women's Hours, Men's Hours and Keilim
-     Hours"). Opened, a place shows each page it's read from, where that
-     came from ("Found from its website's Men's Mikvah link", "Added by
-     hand") and what its last read found, with Check now; one added by
-     hand can be stopped. Can't be read says why ("Read its website: no
-     weekly hours on it.", "No website on Google.", "Its website wouldn't
-     open: …"), with "Fill it in yourself", "Give its hours page" and "No
-     hours online". Any place can be turned off; "Turn back on" reads its
-     pages straight away, or searches its website then and there.
-   - **Live data, read only (Oct 21):** each of the four already has its
-     home page watched, given by hand on Oct 19. The first live run adds
-     Lower Merion's Men's Mikvah and Keilim Mikvah pages, and nothing
-     else: its home page is the one given (as http://; a page is the same
-     page with http or https, www. or not, `samePage`), and the other
-     three are by appointment only, so they show under Can't be read
-     ("Read its page: no weekly hours on it.") until "No hours online" is
-     pressed for each. That is the deployed code writing watches, so it
-     happens only once this branch is merged.
    - **Not done yet:** no "Add photos"; no "Read it for" per page
      (every page is read for all the named hours); "What the reader did"
      isn't shown for a page added by hand; there's no monthly re-search
      (it's every morning, cheap since it's fetches only).
 4. **Shuls:** the same dry run. Its count decides how far this goes for
    shuls, or whether newsletters are the real source.
-   - **Dry run, Oct 21, live data, nothing saved**
-     (`scripts/shul-pages-dry-run.mts`, finding pages with `timesPages`:
-     links called davening, minyanim, services, schedule, Shabbat,
-     calendar…). Run twice. Of 14 shuls:
-     - **6 read right, and would file only what's right:** B'nai Abraham
-       (its Minyans page, agrees), Rodeph Shalom (its calendar's
-       Thursday online minyan, as on Oct 20), Shivtei Yeshuron (agrees),
-       Mikveh Israel (Friday night 6:00 PM, new), Kol Tzedek (Friday
-       6:30 PM, new, as on Oct 19), BZBI (its week from its Shabbat
-       page's calendar; the listing has no times).
-     - **3 read their times right but would also file something wrong:**
-       Mekor Habracha (the OU's daily 1:00 PM Tehillim phone call on its
-       bulletin board, as a minyan every day, both runs; and "Fri 7:00 PM"
-       beside the listing's "at candle lighting, not after 7:00 PM"),
-       Society Hill (its once-a-month family service as every week, and
-       end times: "6:00–7:15 pm, was 5:30pm"), Kesher Israel (only end
-       times: "8:00 AM – 8:40 AM, was 8:00am", six times over).
-     - **2 have nothing to read:** Leyv Ha-Ir (its calendar is empty this
-       week, as on Oct 20), South Philadelphia Shtiebel (its calendar is
-       drawn by script; its holiday pages rightly read as nothing).
-     - **3 turn the reader away:** Lower Merion Synagogue, Sons of Israel
-       (406), Chabad of the Main Line (403).
-   - **Finding the page works:** 8 of the 9 pages given by hand on Oct 19
-     were found on their own (not Chabad of the Main Line's, whose site is
-     blocked). Two finder bugs the run turned up, fixed for mikvahs too: a
-     page's query was dropped (Leyv Ha-Ir's pages are all
-     `index.cfm?…pageId=`), and /calendar and /calendar/ were two pages.
-   - **The AI varies on labels between runs:** Rodeph Shalom's and BZBI's
-     Shabbat morning service was Shacharis one run and "other" the next.
-   - **Decided (the user, Oct 21):** "I don't mind adding shuls
-     automatically, but we should be able to see what they're reading…
-     and then an admin can remove or replace them or just check the
-     website". So shuls are connected the mikvahs' way, and the reader's
-     faults were fixed first. And on Mekor's Friday ("at candle lighting,
-     not after 7:00 PM" against the website's "7:00 PM" in summer): "we're
-     just trying to show what they have. So if they say it one way we can
-     adjust and show it on our site that way." A website's different
-     wording for the same time is a change to suggest, not a match.
-   - **Reader fixes, BUILT Oct 21 (not merged)** (`scheduleReader.ts`):
-     a service not held every week ("once a month", "the last Shabbat of
-     the month"), a phone call, a class or a program is left out, by the
-     prompt and again after it; a time range ("6:00–7:15 pm") is its
-     start; a time labelled for one season ("Summer", "Winter") is read
-     as "Summer only"/"Winter only", and compared only in its season
-     (`compareTimes`), so a listing with both seasons' times isn't
-     offered the other season's.
-   - **Reader fixes, BUILT Oct 22** (`scheduleReader.ts`): a rule in a
-     sentence is the rule the listing keeps: Sons of Israel's
-     "Approximately 15 minutes before shkiah." is 15 min before Sunset,
-     not a change (a full stop, "shkiya", "within 10 minutes after",
-     "following", and times up to 60 characters). "Within 10 minutes
-     of" candle lighting or havdalah is still kept as written: it
-     doesn't say before or after. A morning "Shabbat service" or
-     "Services" is that day's Shacharis (Kesher Israel's was left out as
-     a program), its start the time and its end in the notes; a range
-     with no am/pm ("9:00–11:30") is its start.
-   - **Dry run again after the fixes (Oct 21, nothing saved):** the
-     Tehillim call, the monthly family service and Kesher Israel's end
-     times are gone. What would be filed: Rodeph Shalom's Thursday
-     8:10 AM and BZBI's week (as before), Mikveh Israel's and Kol
-     Tzedek's Friday nights (new), Society Hill's Friday 6:00 PM (was
-     5:30 PM) and Mekor's Friday 7:00 PM (was "At Candle Lighting (not
-     after 7:00 PM)"), both what the websites say.
-   - **Connected, BUILT Oct 21 (not merged):** the same morning search
-     as mikvahs, for shuls (`timesPages`), and the **Shul times page**
-     (`/admin/watches/times`, a row on the Watches tab: "N shuls, from
-     their websites"). The same sections as Mikvah hours. Opened, a shul
-     shows each page with what it read ("It read": Shacharis Mon–Fri
-     7:00 AM…), "Stop reading this page" on any page (a stopped page is
-     kept, turned off, and never found again; "Read it again" turns it
-     back on and reads it), "Open its website", and "Give another page
-     with its times" to replace one. Mikvah hours has the same controls.
-   - **Live data, read only:** the first live run adds the shuls' found
-     pages and reads them over the next mornings, filing what differs to
-     the queue. That is the deployed code writing, so it happens only
-     once this branch is merged.
    - **The newsletter stays the source** for the three shuls whose
      websites turn the reader away (Lower Merion Synagogue, Sons of
      Israel 406, Chabad of the Main Line 403) and for the Orthodox shuls
@@ -5222,81 +2102,14 @@ compare, and one it can't read, on desktop and phone.
 5. **Eruv and Kosher certification** move onto job pages. **BUILT Oct 21
    (not merged).** The Watches tab stays, under that name: it is the page
    of job rows, and the one-off watches below them.
-   - **Eruv status page** (`/admin/watches/eruv`, a row on the Watches
-     tab: "N eruvim. Goes live on its own"). Sections: Can't be read (no
-     source, or an email it couldn't make out), Didn't load, Read. Each
-     eruv says what it reads from ("Read from its status page, …", "Read
-     from its emails, from …"), with Check now, "Use a different page"
-     and "Stop reading" (confirmed on the page). The row's "to check" is
-     "–": an eruv's status goes live with no approval.
-   - **"Find it on its website"** searches the eruv's website for pages
-     that say it's up or down (`eruvFind.ts`, the eruv words in
-     `hoursPages.ts`) and offers each, with what it says: "Read its status
-     from here". **Offered, never set on its own**, because a status shows
-     on the site at once. Saves nothing until the admin picks one.
    - **Elkins Park stays "No source":** its website in the guide
      (yiep.org/eruv-map) answers 404. Its website or status page is the
      user's to give.
-   - **Kosher certification page** (`/admin/watches/kosher`, a row: "N
-     food places, from Keystone-K's and Mekor Habracha's lists"). Both
-     lists are read when the page opens and compared with every approved
-     food place (`kosherJob.ts`). Sections: To check (a list says
-     something the listing doesn't, each to Compare on its row (step 6),
-     "here after tomorrow morning's read" or decided before), On a list,
-     not in the guide, and closed: Checked, Decided before, On neither
-     list. Each list shows its size and its morning read, with Check now
-     and Pause. This answers "Kosher certification when the two lists
-     disagree": a place shows each list's line beside the listing's.
-     Redrawn Oct 22 as the listing's Kosher box (see "Building next: the
-     job pages", item 6).
-   - **The lists' morning reads file what differs,** as before; since
-     step 6 it waits on this page, not in the moderation queue.
-   - **"Add a watch" no longer offers an eruv or a kosher list**; they are
-     given on their job pages.
-   - Fixes found on the way: every site on WordPress.com (192.0.78.x) was
-     refused as a private address, Elkins Park's eruv among them
-     (`menuReader.ts`; only 192.0.0.x and 192.0.2.x are set aside); a
-     Keystone-K entry
-     whose label's colon sits outside its bold read as ": Dairy – …"; an
-     eruv website that didn't open now says "Its website, …, wouldn't
-     open: …"; Mekor's "updated 2026-10-12" says "Oct 12".
 6. **Findings on the job pages: BUILT Oct 21** (the user: "let's do step
    6"; on `redesign/oct18-fixes`, not merged). What a watch finds waits on
    the job page that reads the place (Mikvah hours, Shul times, Hospitals,
    Kosher certification), on its row, beside what the listing says, not in
    the moderation queue. "The queue keeps what people send in."
-   - **Storage is unchanged.** A watch still files a pending suggestion,
-     so the runs' never-twice rule is the same. The queue leaves out those
-     a job page shows (`watchFindings.ts`, `onAJobPage`). Refuah's and the
-     kosher lists' always are. A website's or a newsletter's are only
-     when its place is in a category a job reads, so a hand-added watch
-     elsewhere still files to the queue. Decided ones stay in the
-     queue's history.
-   - **Compare** opens a finding: in place on desktop, its own screen on
-     the phone with "‹ {job}" back. It shows a line per field: the
-     listing says / its page (newsletter, Refuah, Keystone-K, Mekor) says.
-     There is a tick per line; untick one and "Update 2 on the listing"
-     becomes "Update 1". Update is the queue's own approval, with
-     `only` (the ticked lines; the unticked stay as the listing says), so
-     it dates the listing ("confirmed by Refuah" and so on) and refreshes
-     the site. "Skip for now" is a rejection: it's not shown again until
-     its source says something new.
-   - **A line that would empty the listing starts unticked.** This is for
-     a field what was read leaves empty but the listing has. An approval
-     replaces the details whole, so a finding filed before the listing
-     gained, say, its main dishes would have emptied them (seen in dev,
-     Oct 21: Keystone-K findings from Oct 17). It also covers a list
-     taking a hechsher off; ticking it empties the listing's. The "confirmed
-     at" date isn't a line: every approval sets it.
-   - **Sections count what waits:** a place with a finding waiting is To
-     check. Once decided, it's Checked, and its row says "Updated on the
-     listing Oct 21." or "Skipped Oct 21: shown again if its page
-     changes." A row acted on stays where it was until reload. Check now
-     that files something fetches it, to compare there.
-   - **The Watches tab** says findings wait on each job's page. "Add a
-     watch" says which page a place's findings wait on (the listings carry
-     `job`), or the moderation queue when no job reads it. Digest emails
-     link to the job page (built before).
    - **Not built:** "also sent in by a visitor, in the queue" (planned as
      a follow-up). A place with a visitor's suggestion waiting is still not
      filed, and its row says so with a link to the queue. Also not built:
@@ -5315,86 +2128,6 @@ compare, and one it can't read, on desktop and phone.
    and **Off** when there are any, each with its count, A–Z within. It
    opens on the first with anything in it. A row stays in its tab for the
    visit, so one just checked doesn't vanish; its pill says what it is now.
-   - **Every row, closed,** has the place, how its last read compares
-     ("Differs from the listing", "Couldn't read", "Didn't load", "Not
-     read yet", "Same as the listing", "Off"), where it read from and when
-     ("From mekorhabracha.org/davening · read Oct 21"), and **Check now**
-     (Turn back on for one that's off). A finding to Compare sits under it.
-   - **The count at the top** is "5 need you · 16 shuls".
-   - **Opened:** each page, how it was found, what it read and how that
-     compares, with "Use a different page" (gives one and stops the old
-     one) and "Stop reading this page". Stopped pages have "Read it again".
-     Then "Add a page", "Turn off this place" (or "No times online" for
-     one with nothing to read), "Open its listing" and "Open its website".
-   - **Check now works on every row,** "Not read yet" included: it reads
-     all the place's pages. A place with no page has its website searched
-     now, and the pages found are added and read. Opening the page also
-     adds what its website search finds, as the morning's run would. So a
-     row is never stuck with nothing to check, and the Watches tab, which
-     searches nothing, now counts those as not read rather than "can't be
-     read" (it showed 13 can't be read for Shul times, against the
-     page's 4).
-   - **Next, once the user has seen it:** Dishes, Hospitals, Eruv and
-     Kosher onto the same page; the Watches tab's "Menu" list goes (it is
-     Dishes again; done Oct 22, item 8 under the job pages); and the tab's
-     row counts come from the same statuses.
-   - **Decided Oct 21 (the user):** a read that agrees with the listing
-     clears that watch's older finding still waiting (Mekor Habracha's
-     Oct 20 finding, which its Oct 21 read agrees with). Not built; see
-     "Building next" above.
-   - **Redrawn for Shul times, Oct 21, not built**
-     (https://claude.ai/artifact/B3vwpSiqwdK833s9VAVHBc, replaces board 6
-     of the keeping-current drawing for this page). The user: "website
-     wins", mimic it ("if the website says 10 minutes before shkiyah that's
-     what we want"), and show "what the reader proposes the new listing
-     should be and how it differs. Like the moderation queue."
-     - No Compare step: the row says the change in a line; opened, it is
-       the proposal in the listing's own boxes, changes marked, with Use
-       this · Edit · Keep the listing.
-     - A Reading on/off switch per shul, in place of Turn off / Turn back
-       on / No times online.
-     - **Usual times and this week's schedule are proposed separately**
-       (the user: "there's a whole difference between this week schedule
-       and usual times"). A page of usual times proposes only usual times;
-       a posted week proposes only that week, as This week's schedule
-       (Use this week · Edit · Skip this week).
-     - **"Not read yet" goes** (the user, Oct 21): a page is read as soon
-       as it's found, so the tabs are To check · Can't be read · Checked
-       (and Off).
-     - Found drawing it, **fixed Oct 21:** the reader didn't write seasons
-       the website's way. Mekor's website gives Friday night as 7:00 PM in
-       summer and around candle-lighting in winter. Its Oct 20 finding kept
-       the all-year row, and its Oct 21 read called the listing a match.
-       Three causes:
-       - a page of usual times was compared in this season only;
-       - "at candle lighting (not after 7:00 PM)" counted as the same as
-         "at candle lighting";
-       - the AI split one Friday night minyan into two or three prayers.
-
-       Now a page that labels seasons is compared season by season, a
-       rule's limit counts, and evening prayers at one time are one
-       Mincha & Maariv. Read three times, Mekor's page gave the same
-       proposal each time, as drawn. Mekor's Oct 20 finding is still
-       waiting in the queue on dev.
-     - **Read-only check of all 27 shul pages on dev, Oct 21:** besides
-       Mekor, Kol Tzedek and Society Hill each propose one new Friday
-       evening time. It also found pages that shouldn't be read, all
-       added by the website search. **Fixed Oct 21:**
-       - Beth Zion-Beth Israel had 5 pages, two of them High Holy Days
-         pages, all showing the same site calendar, so each would propose
-         the same week. Now pages that show one calendar are read as one:
-         the page whose own words give the most times (its Worship page).
-       - The Shtiebel's pages were its High Holidays 5785, Sukkot and
-         Chanukah pages. A page for one holiday, one Hebrew year or a
-         sermon is never read for shul times now, whatever folder it's
-         in.
-       - The Rosenbach (a museum, 5 pages) and Mikveh Israel's About and
-         Visit pages passed because any clock time counted: opening hours,
-         a footer's office hours. Now a shul's page needs a clock time
-         beside a davening word (Shacharit, Mincha, services, minyan…).
-       - Rodeph Shalom's calendar page loads; it was given by hand and
-         read its calendar this morning. Nothing to fix.
-
        Of the 27 pages on dev, 16 are now stopped (3 had been stopped by
        hand already) and 11 are still read. Production has no found
        pages yet, so nothing there changes. The Rosenbach is archived on production; dev's copy is
@@ -5403,61 +2136,9 @@ compare, and one it can't read, on desktop and phone.
        Open: the Shtiebel now has no page. Its home and calendar pages
        show no times the reader can see (production also reads its
        newsletter).
-     - **A page's dated times are this week's schedule, Oct 21.** Mikveh
-       Israel's home page gives "Shabbat Lekh Lekha", Friday 6:00 PM. It
-       was proposed as one day's extra, "as well as the regular times".
-       The user: "If we have specific dates then it should all go on this
-       week." Now a website page's dated times are proposed as that
-       week's schedule, from the first date to Shabbos, with the usual
-       times those days kept in it. They are apart from its usual times,
-       and a week already on the listing isn't filed again. The newsletter
-       and the paste box still read dated times as before.
-     - **A calendar posted as pictures is read, Oct 21.** Mikveh Israel's
-       Calendar page has an empty event list. The month is two images,
-       "Oct. High Holiday calendar 2026.png" and "Calendar September
-       2026.png". Now a shul's page with no calendar and no davening time
-       in its words is read from its calendar pictures, the way a PDF is,
-       a week at a time. Each week becomes that week's schedule, like a
-       calendar feed's.
-       - Which pictures: ones whose file name or alt text says calendar,
-         schedule, davening, zmanim or luach, then ones the shape of a
-         printed page (upright, at least 1000 pixels tall). At most two.
-         Never a logo, a banner or a photo. Never a picture that names a
-         month the weeks aren't in, so September's is skipped in October.
-       - Not on a page that gives its times in words, and never on a
-         mikvah's hours page.
-       - The morning search keeps a page with such a picture, as it keeps
-         a PDF. Pages showing the same pictures are read once.
-       - The pictures are downloaded only when the AI reads them. The
-         page's fingerprint changes when a picture is replaced, on
-         Sunday, and on Thursday when next week is added. So the daily run
-         reads each week once. That is one AI read with images for each
-         week.
-       - Also fixed: "9:00 A.M." (with dots) was kept as text, so it never
-         matched the listing's 9:00am.
-
-       Dry read on dev, as of Thursday Oct 22, using the October picture:
-       Mon/Thu Shacharis 7:15 AM; Mincha 2:00 PM Monday to Thursday;
-       Friday 6:00 PM on Oct 23 and 5:45 PM on Oct 30; Shabbos 9:00 AM.
-       It would file the two Friday times, each in its week's schedule.
-       Read twice. On the second read the cheapest model missed Monday
-       Oct 26's Mincha. Nothing was taken off the listing, because a usual
-       minyan a week doesn't mention is kept.
        The page is still stopped on dev. "Read it again" on the Shul times
        page starts it again. Production has no found pages, so to use this
        there, give the page by hand.
-     - **Kol Tzedek's calendar is read, Oct 21.** Its home page embeds a
-       Google Calendar, but the embed names the calendar in base64, so
-       the feed address the reader built was a 404. And Google's feed is
-       every event the calendar ever had (4.8 MB), over the 3 MB a page
-       may be. Now the name is decoded, and a calendar feed may be up to
-       20 MB. Dev's home page now reads "Sat Oct 24 10:00 AM In-Person
-       Shabbat Morning Services" and the rest of the week. Production
-       watches the same home page (given by hand), so it reads the
-       calendar once this is deployed; its newsletter is read too.
-       Calendars the reader takes: iCal links, Google Calendar embeds,
-       event lists in a page's scripts, and (since later Oct 21) a month
-       posted as pictures. Not: one drawn by a script from its own server.
 
 ## Building: admin for a newcomer, and watches that work (started Oct 31, on `redesign/oct18-fixes`)
 
@@ -5468,16 +2149,6 @@ and Places, then build them; category switches, home wording, hiding forms.
 
 **One rule for a week: it holds dated rows only, never a usual time.**
 
-- Done: one message can make two weeks. Mekor's Oct 30 newsletter gave this
-  Shabbos and "Weekday Services: November 1 to November 6". The dates were
-  only in a heading, so `weekdaysOnGuideWeek` moved the times onto the current
-  week (Nov 1 on Oct 25, Nov 6 on Oct 30), and they went into last week's post,
-  which shares the heading "Shabbat Schedule". A message that writes a read
-  date anywhere now stays on its dates, and `applyUpdate` posts one schedule
-  per guide week, from any source.
-- Done: a pasted week no longer takes the usual times it left out (Lower
-  Merion's 17 rows), and a paste leaves the days before today alone (its lost
-  Thursday Late Maariv). `keepBefore` on the shul card's route.
 - Done: editing a week goes by its dates. The row shows only the times dated
   in that guide week, so a post running across two weeks (Mekor's Oct 23 – 31)
   no longer shows Oct 24's 9:15 as this Saturday's, and a time set there goes on
@@ -5496,168 +2167,13 @@ and Places, then build them; category switches, home wording, hiding forms.
 dated schedule goes day by day, only the days that differ, as the listing would
 pick them (`changeLines.ts`). A new place still uses the old review.
 
-**Ways back, and changes nobody proposed.**
-
-- Done: a change no longer says "last confirmed" or hidden Google `hours` went
-  to none. `confirmedAt` is an app-owned key now, so a submitter can't set it
-  and an edit keeps it; `hours` only shows where the category has an hours
-  field. Approving a shul's change can still drop its hidden `hours`, which
-  nothing reads.
-- Done: tapping To do or Places while one is open goes back to the list. A place
-  is a history entry, so swiping back lands on Places. Places and Add have the
-  chevron; Settings has one to To do on a phone. Not changed: "Edit, then
-  update" isn't a history entry, so swiping back from it leaves the change.
-
-**Watches and Places.** Done, to the approved boards (canvas VKdnqd5xkP37DP1DKcN5qy).
-
-- Watches: one sentence, Needs fixing, Jobs, Needs one step, + Add a watch. A
-  job has its own page: last night, schedule, Not read last night, All tracked,
-  Last 14 nights as a check or an X, + Add, Turn off this job. Off is a marker
-  row per community (`jobOff.ts`), no migration; every cron and run skips it.
-- Places: search and three menus, On the site, Category, Checked by. A place
-  stays in the list and says what isn't watched, the main thing first. Edit
-  listing shows what checks each row.
-- Find on Google is on To do now, and counts toward the To do number.
-- Differs from the boards: "+ Add a place" is on its own row, because the title
-  belongs to the admin layout and on a phone shares it with the Settings gear. WhatsApp isn't listed as Not watched. Contact is one
-  row in Edit listing. Setup, Add a watch and the turn-off confirm weren't drawn.
-
-**One place at a time.** The user, Oct 31: the three-tab page of a whole kind
-(Waiting for you, Not checked, Up to date) is gone.
-
-- A place opens on its own screen, `watches/place/<id>`, from a job's row, Find
-  on Google, To do or an email. Back goes where it was opened from. Once nothing
-  is left to do for it, the screen goes back by itself.
-- To do now holds everything waiting on a decision: a closure Google reports, a
-  change from Google or a menu, an eruv's. They're in Changes and count in the
-  number, which comes in a moment after the rest because every job has to answer.
-- The Eruvs job lists every eruv, with a website or not. + Add an eruv opens the
-  Eruv category's editor.
-- Already-sent emails still work: `kind/…?place=` goes to the place, `kind/…` to
-  To do. A list's digest (Keystone, Mekor) opens To do.
-
 **Built Nov 1 (the rest of the newcomer batch):**
 
-- Category pages hold places only. Map, Candle Lighting and Eruv are switches
-  under "On the site", on by default for a new community, empty or cloned. A
-  community with no row yet shows the switch off; the first on creates the row.
-  **Changed Nov 3 (the user):** the Map and Candle Lighting are bare switches
-  with nothing to open (the Map's name and photos showed nowhere; its zoom
-  radius stays as stored, 10 miles on dev and live, with no field to change
-  it). The Eruv moved out of that box into the category list, in name order,
-  with Visible/Hidden and Edit (its eruvim) and no Delete. A new community
-  still starts with all three on. No category row has "+ Add listing" any
-  more: places are added from Places' Add a place, which offers hidden
-  categories too (a seasonal one ahead of its reveal is seeded there).
 - Jewish Medical Resources is gone from admin and isn't cloned. Its public code
   stays, unreachable; Philly's row stays hidden. Deleting that row needs a yes.
-- Forms are hidden (`features.formsTab`). Responses is now Feedback, without the
-  inbox sentence. The forms page still answers at its address. Nothing needed
-  changing on the live site: Support and Volunteer were already off on Philly.
-- Searches are off To do. Reports shows "Asked more than once"; every search
-  folds under it.
-- Home page: boxes renamed, hovering or tabbing into one lights its part of the
-  preview beside it (computer-width admin only, a phone has no preview beside),
-  "Not on the phone version." when it isn't there, a sample link-preview card,
-  one line on what a campaign is for.
-- Delete shows on the community card, except the default community's.
 
 **To do for the user:** Washington has no Map, Candle Lighting or Eruv rows, so
 after this deploys its switches show off. Flip them in its Category pages.
-
-**Built Nov 1 (the *4, *5, *6 and *7 boards on canvas VKdnqd5xkP37DP1DKcN5qy):**
-a job's row opens the Places listing, with Back to the job, unless a change or a
-failed read waits, which opens the same place screen as To do. Each listing row
-names only its job ("Stopped" and "Nothing" in amber); its bubble holds one line
-("Its menu · Oct 20 · Change"), with Stop reading it and Start reading inside
-Change. Fields Google keeps say "Google · Oct 19 · Stop", then Use Google's, and
-a cleared field stays blank. Archive is a red bin beside Update the listing.
-Eruvs are places: a category in Places, opened as a listing, and offered by Add
-a place. Their map colour and left-out parts stay on the category page (Nov 9: the
-parts and markers moved to the Map row, and the colour is automatic). Eruv maps
-are read only by the nightly job.
-
-Differences from the drawing, decided while building: the button says "No changes
-yet" until something is typed, as every listing's does. Stop reading it asks
-nothing first, since Start reading undoes it. Save on Change doesn't report a
-failed read; only Start reading does. The "Checked by" filter doesn't cover eruvs.
-Gone with the old screen, as drawn: "Read it now" and "Open its listing" for a
-place with nothing waiting.
-
-**Drawn Nov 1, not built (the *8 boards on the same canvas), waiting on the
-user:** Add a place says how each field will be watched, in the same rows and
-one line as a saved listing. It starts with Find the place, as visitors' Add
-does, and Google is read as soon as the listing is added. Before saving, the
-line reads "Google · Stop", "Google stops keeping this", "Its website · tomorrow
-morning · Change" or "Nothing reads this · Add a source". Change's box starts
-empty, since nothing is searched until it's saved, and a page given there is
-read on adding. If that read fails, the screen says "Couldn't read that page"
-instead of going back to the list. Added while drawing, for the user to judge: a
-job's name on the "Not on the listing yet" lines; "Find it on Google" on a place
-filled in by hand; "when one comes" for a newsletter's email. Drawn for a shul
-only; kosher places and hospitals aren't traced yet.
-
-**Agreed Nov 1, drawn, not built (the *9 boards):** a row names where it's read
-from, not the job: Google, Website, Newsletter, Keystone, Refuah, Nothing or
-Stopped. This replaces the row words on the *8 boards and the built "Watches
-names" on listings. Jobs stay as how the system runs.
-
-**Agreed Nov 1, drawn, not built (the *10 boards, which replace those words):**
-"Email", never "Newsletter" (row, line, Add a source's box, the job as "Shul
-emails"). A row with both set up says "Website, Email", with one line each
-inside. The Website job is renamed "Phone, email and hours". A link the Sunday
-job checks says "Link check", WhatsApp included. A page that isn't being read
-waits in To do under "Not being read", since today it shows only on Watches.
-Watches lists the jobs under their source and leaves To do.
-
-**Drawn Nov 1, not built (the *11 boards):** no source word on "Not on the
-listing yet" lines; the line appears once one is opened. Agreed Watches isn't a
-tab. The row at the top of Places looked crowded on a phone, so it's drawn at
-the foot of Places, under Show all, with "+ Add a place" beside the title.
-**Waiting on the user:** that placement.
-
-**Drawn Nov 1, not built (the *12 boards):** the other kinds of place on Add a
-place. A hospital's contact rows say "Refuah · tomorrow morning · Change". A food
-place's kosher row says both lists get checked, then names the one it was found
-on. A mikvah takes a page only. An eruv uses the same Add screen, with sources
-given before it goes live; today a name alone puts it on the site. After an email
-source, a line says to sign up with the guide's address, and "No email has come
-in 3 weeks" waits in To do under Not being read. The canvas now holds only
-current boards, in labelled rows. **Waiting on the user:** all of these.
-
-**Drawn Nov 1, not built (the *13 boards):** Read now while adding. A website or
-Refuah line says "Read now" and fills in the form before the place goes live,
-which needs a read that saves nothing. Without it, Add listing reads afterward
-and shows what it found, to add in one tap. Kosher shows at once from the lists'
-morning copy ("On Keystone-K’s list · Use it"). An email says "within the hour",
-as the Gmail script looks back 14 days each hour. A shul's minyan rows get a
-second link, Add a source, so an email can sit beside a website.
-
-**Places and the opened row, built Nov 1.** A row in Places no longer shows
-when it changed: only "No address" or "Archived Oct 3" when there's something
-to say. In admin's listing and eruv, an opened row's source line now sits on
-the gray under the white card, then a solid Done, as drawn (it was inside the
-card, tight above Done). The public editor keeps Done inside its card.
-
-**Building the Add a place and Watches boards (Nov 1, the user: "ready to build
-everything").** Built so far: rows name their source; Watches at the foot of
-Places, its jobs under Google, Websites, Email, Outside lists and Link check; To
-do's Not being read, with "No email has come in 3 weeks". The kosher job's Watches
-row says "Keystone-K and Mekor Habracha", as it reads both (the board says
-Keystone-K only). Add a place starts at Find the place and its rows say what reads
-them. Add listing saves the choices, reads the place at once, and offers what it
-found in one tap, or Decide later in To do. A food place's dishes go to its Dishes
-page, not this screen. Read now on the Add screen reads a shul's or mikvah's page,
-a website's phone and email, a menu, Refuah and an eruv's status page, and fills in
-the rows with nothing saved; a food place shows at once if it's on the kosher lists,
-from their kept copy, with Use it.
-
-**Add a place, all boards built and compared (Nov 1).** Not as drawn: rows follow
-the saved listing, so a shul has an Address row and "Usual weekday" and "Usual
-Shabbos times" rather than one "Usual minyan times"; adding an eruv doesn't look in
-the Gmail (only Read now; the hourly check covers it); a food place's dishes on Add
-go to the Dishes page. A mikvah section can't be said to exist on Add with nothing
-written in it; tick it on the listing's What's here afterwards.
 
 **Read now for email, built (the *14 boards).** The Gmail script can be deployed as
 a web app: two more setup steps (Deploy it, Paste its link), the link tried at once
@@ -5673,38 +2189,9 @@ a web app and pastes its link. Saving the link writes `web_app_url` on Philly's
 `newsletter_setup` row and nothing else. Until then Read now for email stays off and
 says "The guide's Gmail isn't set up".
 
-**Built Nov 1 (the *15, *16 and E boards, on `redesign/oct18-fixes`):**
-- No Menu link box on Add or for visitors; Change on the source line gives the menu
-  page, and the listing keeps its Full menu link.
-- Watches is the first row on Places, ringed green like Minyanim by time, with its
-  count line and no chevron. Add a place is the site's floating "+ Add". It covers
-  part of a row on a phone, the cost of that choice.
-- The main site's bottom bar has the admin bar's grey, weight and solid white.
-- Read now on a saved place's source lines; none on Google's. An agreeing read dates
-  the row "just now". One that differs opens To do's change screen, filed as the
-  nightly read would; Back without answering leaves it on the row ("Its website has
-  a change · Open") and in To do. A failed read says so in red and changes nothing.
-  Tried on dev on shuls, a mikvah and a food place.
-
-**Not as drawn:** a menu that differs opens the screen To do opens for a menu
-(Accept, Edit, Keep as is), not the change screen ReadChangeDishes16 drew, because
-menus aren't filed as submissions. To do still has those two screens.
-
 **Untried:** Read now by email, until the user re-pastes Philly's Gmail script,
 deploys it as a web app and pastes its link. Read now was never drawn on a computer;
 it's the same code at the wider width, and I only tried it on a phone.
-
-**Fixed Nov 1: creating a community could sit on its form.** The community was
-made, then the page stayed on the form with no message. It's what failed
-`test:admin-write` on `main` in CI. Creating now lands with a plain page load.
-
-**Moved Nov 2: Synagogues' Minyanim row is above the search**, the user's call: it
-matches Watches and the phone home, and it's what's different about the page. It
-stays while typing and answers for every shul, so the box holds still (244 before and
-after "chabad" and a word that finds nothing, at phone width). A prayer name
-("shacharis", "mincha") still opens the Minyanim view, which has no row, so there the
-box moves up about 100px with the rest of the page. Left as it is. While typing, the
-row takes about a row's height above the results on a phone.
 
 **To do's look is next, not built.** Canvas "To do screens"
 (https://claude.ai/artifact/EmkcJDi4XaA9rPgXTMFhsH) shows what each kind of item looks
@@ -5716,10 +2203,6 @@ and questions, Refuah and kosher findings.
 **After this, once the user follows up, not before:** step back and assess
 whether the synagogue admin logic is patches on patches and can be rewritten
 simpler ("it really shouldn't be that complicated").
-
-**Done on the live site, Oct 31, with the user's yes:** Mekor's Nov 1-6 times
-are posted by hand from its Oct 30 newsletter. Its post "Times for Oct 23 –
-Oct 30" runs to Oct 31 and ends on its own.
 
 ## Decided, so not to reopen
 
