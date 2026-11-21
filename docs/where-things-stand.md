@@ -119,7 +119,14 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 
 ### Mine to build or fix (nobody waiting)
 
-56. Partial Prefetching (on now; the admin's last run is going).
+56. Partial Prefetching: the public site is done on branch
+    `claude/ensure-static` (ensureStatic = 'navigation' on the community
+    layout; full e2e green, made-up addresses 404 with no proxy list). The
+    admin still fails for a community built after a deploy (bailout, or
+    React #412 inside a boundary; ensureStatic = false doesn't help).
+    Next: 'navigation' on the admin too, which needs generateStaticParams
+    on its ~10 screens with an id in the address (each split into a
+    server page and its client screen). Before Next 17.
 57. The search box, Open now and filters can drop from the address on
     a refresh (FindResourcesConnected).
 58. "See the whole page" in the editor leaves ?field=hours in the address.
