@@ -927,8 +927,8 @@ For the user:
    makes a missing key refuse on live: contributions and the AI readers
    stop. Sentry shows nothing unresolved, and a refusal would be
    reported there, so they're probably set. Worth a look.
-2. Run migrations 103, 104 and 105: dev, then live. Then say whether
-   live gets 067 (Today's settings) now or when Today comes back.
+2. Run migrations 103, 104 and 105: dev, then live. 067 (Today's
+   settings) waits on live until Today comes back (decided Nov 21).
 3. Say whether to drop `site_settings.contribution_note` (a migration).
 4. Copy the Gmail script again from Newsletters into the guide's Gmail.
    Then say whether an eruv email with no Authentication-Results header
@@ -1113,8 +1113,10 @@ Soon:
     The page still carries on without it. `schemaMissingReported.test.ts`
     fails on a store checking the wording itself. Red 8/8 against the old
     stores.
-  - **For the user:** run 105, dev then live. Then decide on 067 for
-    live (run it, or leave it until Today comes back).
+  - **For the user:** run 105, dev then live.
+  - **Decided Nov 21:** 067 waits on live until Today comes back. Run
+    it on live in the same change that turns Today on in
+    `src/lib/features.ts`, before that deploys.
   - Not done: `site_settings.contribution_note` is still there on dev
     and live (read Nov 20). Migration 033 was deleted with the feature
     (Aug 27), but nothing dropped the column. Dropping it is a migration,
