@@ -1380,15 +1380,21 @@ go stale. What changes is who may write those keys:
    only the keys it's given (and an approved edit's columns) in one
    statement, with an optional "only if still" guard. It and the SQL
    functions that already write the site's keys (confirm, unconfirm, item
-   marks, approved dishes) are marked `jpc.writes_site_state`. Every site
+   marks, approved dishes) turn on `jpc.writes_site_state` around their
+   update (re-created in 111 from their latest migration, the flag lines
+   the only change). The first version attached the setting to each
+   function instead (`alter function … set`), which Supabase's SQL editor
+   refuses ("permission denied to set parameter"), so it rolled back on dev
+   and live on Nov 21; `resourceState.test.ts` now fails on that, and on
+   an update of a listing in a function without the flag around it. Every site
    writer of a listing's details goes through `patchListing`
    (`listingPatch.ts`): Google's job, the nightly sync, menu links and
    dishes, source dates, a category's field clean-ups, and approving an
    edit. So a save landing between a job's read and its write is no
    longer wiped. Where 111 hasn't run, `patchListing` writes the whole
    `details` as before. `siteStateWriters.test.ts` fails on a new whole
-   write. **111 needs running on dev, live and the test project** (it
-   needs 110 first).
+   write. **111 (fixed) needs running on dev and live** (dev is also the
+   test project; 109 and 110 ran on both Nov 21).
 3. **Written, held**: migration 112 turns the trigger round. A write not
    marked as a site writer keeps the listing's `state`, and its `details`
    gets the site's keys from it, so an approved week-old edit, an admin's

@@ -4,8 +4,9 @@
 --
 -- Until now `state` was copied from every write of `details` (110). Now it's
 -- the other way round. A write that isn't marked as a writer of the site's
--- state (`jpc.writes_site_state`, set on patch_resource_details and the
--- confirm / mark / dishes functions by 111) keeps the listing's `state`, and
+-- state (`jpc.writes_site_state`, turned on around their update by
+-- patch_resource_details and the confirm / mark / dishes functions, 111)
+-- keeps the listing's `state`, and
 -- its `details` gets the site's keys from `state`. So an approved edit
 -- carrying a week-old copy of the listing, an admin's save, or a script
 -- writing the whole `details` can no longer wipe a confirmation, an item
