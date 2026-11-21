@@ -1,6 +1,5 @@
 'use client'
 
-import { whenSettled } from '@/lib/whenSettled'
 import { Fragment, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, selectValues, type CategoryConfig } from '@/lib/categories'
@@ -24,7 +23,7 @@ import { candlesToday, isVouchedFor } from '@/lib/listingRow'
 import { useZmanim } from '@/lib/useZmanim'
 import { usePersistedState } from '@/lib/usePersistedState'
 import { useSharedPreference } from '@/lib/useSharedPreference'
-import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
+import { GenericListingCard } from './GenericListingCard'
 import MinyanimView from './MinyanimView'
 import { PinIcon, PlusIcon } from '@/components/icons'
 import { AddButton } from '@/components/AddButton'
@@ -58,7 +57,6 @@ import SaveButton from '@/components/SaveButton'
 import { makeSavedSearch } from '@/lib/savedSearches'
 import { useSavedSearches } from '@/lib/savedSearchesContext'
 import { categoryHref } from '@/lib/searchLands'
-import { useOptionalLocation } from '@/lib/locationContext'
 import { useCategories } from '@/lib/useCategories'
 import { getCategoryColor, getCategoryTilePhoto } from '@/lib/categoryColor'
 import { SwipeRowGroup } from '@/components/SwipeRow'
@@ -69,51 +67,14 @@ import { TappedMinyanContext, type TappedMinyan } from './TappedMinyan'
 import { stepsIn } from '@/lib/stepAddress'
 import SearchAnnouncer from '@/components/SearchAnnouncer'
 
-/** How a change to the address is recorded. `replace`: in place, no step.
- *  `step`: a step the browser's Back undoes, named in history.state so the
- *  page's own way back can take that same step (the Minyanim view, Oct 6).
- *  Neither: a navigation of its own. */
-export type ParamsOpts = { replace?: boolean; step?: string }
-
-/** A question the Filters were read from (`read=1`), and what it turned on
- *  there: taken off again when the question is edited or cleared. */
-type Landed = { search: string; openNow: boolean; bool: string[]; select: Record<string, string[]>; has: Record<string, string[]> }
-
-/** The Filters an address carries: `f_<key>=1`, `sel_<key>=a,b`,
- *  `has_<key>=Challah,Wine`. */
-function addressFilters(category: CategoryConfig, params: Record<string, string>) {
-  const bools: Record<string, boolean> = {}
-  const sels: Record<string, string[]> = {}
-  const has: Record<string, string[]> = {}
-  for (const f of category.detailFields) {
-    if (f.type === 'tags') {
-      const raw = params[`has_${f.key}`]
-      if (raw) has[f.key] = raw.split(',').map((v) => itemName(v)).filter(Boolean)
-    }
-    if (f.filterable && f.type === 'boolean' && params[`f_${f.key}`] === '1') bools[f.key] = true
-    if (f.filterable && f.type === 'select') {
-      const raw = params[`sel_${f.key}`]
-      if (raw) sels[f.key] = raw.split(',').filter(Boolean)
-    }
-  }
-  return { bools, sels, has }
-}
-
-/** Whether an address carries a search or Filters for this page. */
-function carriesSearch(category: CategoryConfig, params: Record<string, string>) {
-  const { bools, sels, has } = addressFilters(category, params)
-  return !!params.q?.trim() || params.openNow === '1' || [bools, sels, has].some((x) => Object.keys(x).length > 0)
-}
-
-/** `chosen` with `gone` taken out of it, key by key. */
-function withoutChosen(chosen: Record<string, string[]>, gone: Record<string, string[]>): Record<string, string[]> {
-  if (Object.keys(gone).length === 0) return chosen
-  const out = { ...chosen }
-  for (const [key, values] of Object.entries(gone)) out[key] = (out[key] ?? []).filter((v) => !values.some((g) => sameItem(g, v)))
-  return out
-}
-const MINYANIM_STEP = 'minyanim'
-const LISTING_STEP = 'listing'
+import { LISTING_STEP, type ParamsOpts } from './directoryAddress'
+export type { ParamsOpts } from './directoryAddress'
+import { useDirectorySearch } from './useDirectorySearch'
+import { useMinyanimView } from './useMinyanimView'
+import { useFiltersInAddress } from './useFiltersInAddress'
+import { useControlsStuck } from './useControlsStuck'
+import { useRowScroller } from './useRowScroller'
+import { useListingCards } from './useListingCards'
 
 // Loaded on the first tap of "+": nobody browsing pays for the box.
 const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'), { loading: () => null })
@@ -197,28 +158,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // visitor drilled into, never the home grid itself. Called further down,
   // once it's known whether a listing is this screen (a phone, from a link).
 
-  // What the address says, on Back and Forward too (Nov 18): Forward to a
-  // search shows the search. Before, back/forward arrivals landed on a
-  // blank page, and after a reload that blank page differed from the
-  // server's render (a hydration error).
-  const [search, setSearch] = useState(initialSearch ?? '')
-  const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
-  // Multi-select: each key maps to the set of chosen values (empty = no filter).
-  const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
-  // "Has": items in a listing's item list (`?has_<key>=Challah,Wine`; see
-  // searchLands.ts), each listing having every one ticked, always or
-  // sometimes.
-  const [hasFilters, setHasFilters] = useState<Record<string, string[]>>({})
-  // A question whose meaning is already in the Filters (`?read=1`: the AI
-  // reader read it, here or on the home search): it stays in the box, as
-  // asked, but isn't searched by again while it's unchanged, so switching
-  // one of its filters off really widens the list. Typing anything else
-  // searches as usual. And what it was read as goes with it: editing or
-  // clearing the question takes off the Filters it turned on (`landed`),
-  // and leaves the ones the visitor ticked.
-  const [landed, setLanded] = useState<Landed | null>(null)
-  const landedSearch = landed?.search ?? null
-
   // Which card currently has its listing open — the desktop column or the
   // mobile sheet. On a phone the floating Add button steps aside while it's
   // up: the listing's own row (Suggest an edit, its overflow) passes under
@@ -227,7 +166,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // itself is Suggest an edit's, which opens the box about it
   // (ListingEditBar, via TellAboutContext).
   const [openDialogItemId, setOpenDialogItemId] = useState<string | null>(null)
-  const [openNow, setOpenNow] = useState(initialOpenNow ?? false)
   // Drives the "Open now" filter below. Without it the filter answers for the
   // moment the page rendered, so a list narrowed to what's open at 4pm still
   // shows those places at 10pm. Null until the page has hydrated (see
@@ -235,204 +173,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const clock = useNow()
   const now = clock === null ? null : new Date(clock)
 
-  // ── Apply a shared link's search/openNow/filters once they actually arrive ──
-  // The lazy initializers above already cover the common case (this component
-  // mounts with the real query string already known), but SlugScreen's
-  // Suspense fallback can mount THIS SAME instance first with none of it read
-  // yet (see FindResources' own doc on searchQuery etc.) — too late for a
-  // lazy initializer to catch. Each of these applies its prop's arrival
-  // exactly once, guarded by its own ref, rather than forcing a remount of
-  // this whole component the way `openMinyanimView` below still does: once
-  // this component started writing search-as-you-type / toggles / filter
-  // picks BACK into these same props (see the sync effects further down), a
-  // remount-on-prop-change would keep firing on every one of those self
-  // writes and wipe out whatever the visitor had just set mid-session.
-  const appliedInitialSearchRef = useRef(false)
-  useEffect(() => {
-    if (appliedInitialSearchRef.current || !initialSearch) return
-    appliedInitialSearchRef.current = true
-    setSearch(initialSearch)
-  }, [initialSearch])
-  const appliedInitialOpenNowRef = useRef(false)
-  useEffect(() => {
-    if (appliedInitialOpenNowRef.current || !initialOpenNow) return
-    appliedInitialOpenNowRef.current = true
-    setOpenNow(true)
-  }, [initialOpenNow])
-  // `initialFilters` is `null` until FindResourcesConnected hydrates, then a
-  // real (possibly empty) object from then on — see FindResources' own doc —
-  // so that transition alone, not any specific key inside it, is the signal
-  // to read it once. Reads `category.detailFields` directly rather than the
-  // `filterableBooleans`/`filterableSelects` computed further down (this runs
-  // before those are in scope, and duplicating the two-line filter here is
-  // cheaper than reordering the whole component around it).
-  const appliedInitialFiltersRef = useRef(false)
-  // The Filters an address carries, and, for a question read into them
-  // (`read=1`), that question with them.
-  const applyAddressFilters = (params: Record<string, string>) => {
-    const { bools, sels, has } = addressFilters(category, params)
-    if (Object.keys(bools).length > 0) setBoolFilters((prev) => ({ ...prev, ...bools }))
-    if (Object.keys(sels).length > 0) setSelectFilters((prev) => ({ ...prev, ...sels }))
-    if (Object.keys(has).length > 0) setHasFilters((prev) => ({ ...prev, ...has }))
-    if (params.read === '1' && params.q) {
-      setLanded({ search: params.q, openNow: params.openNow === '1', bool: Object.keys(bools), select: sels, has })
-    }
-  }
-  useEffect(() => {
-    if (appliedInitialFiltersRef.current || !initialFilters) return
-    appliedInitialFiltersRef.current = true
-    applyAddressFilters(initialFilters)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialFilters, category])
-  // Resets this screen's own search/openNow/filters to blank, both in local
-  // state and (via onParamsChange) back out to the address bar — what a
-  // return to this screen with no search in its address shows. A ref,
-  // read through by the effect below, rather than
-  // a plain function: it closes over onParamsChange, which is often a fresh
-  // closure every parent render, and neither effect should re-run just
-  // because of that.
-  const clearFiltersRef = useRef<() => void>(undefined)
-  // Written in an effect, not during render (react-hooks/refs) — a render
-  // can run more than once, or be thrown away, before it commits, so writing
-  // to a ref here has to wait until it's actually committed. No dependency
-  // array: this needs to stay current after EVERY render, the same reason
-  // this is a ref instead of a plain function in the first place (see this
-  // block's own doc above) — category/onParamsChange can be a fresh value
-  // each render, and the two effects below only ever call this well after
-  // it, never in the same commit, so ordinary (not layout) timing is fine.
-  // Only this screen's own state; clearFiltersRef clears the address too.
-  const blankRef = useRef<() => void>(undefined)
-  // This screen's state as an address has it (`?q=challah&has_m=Challah`).
-  const fromAddressRef = useRef<(params: Record<string, string>) => void>(undefined)
-  useEffect(() => {
-    fromAddressRef.current = (params) => {
-      blankRef.current!()
-      setSearch(params.q ?? '')
-      setOpenNow(params.openNow === '1')
-      applyAddressFilters(params)
-    }
-    blankRef.current = () => {
-      setSearch('')
-      setOpenNow(false)
-      setBoolFilters({})
-      setSelectFilters({})
-      setHasFilters({})
-      setLanded(null)
-    }
-    clearFiltersRef.current = () => {
-      blankRef.current!()
-      const changes: Record<string, string | null> = { q: null, openNow: null, read: null }
-      for (const f of category.detailFields) {
-        if (f.filterable && f.type === 'boolean') changes[`f_${f.key}`] = null
-        if (f.filterable && f.type === 'select') changes[`sel_${f.key}`] = null
-        if (f.type === 'tags') changes[`has_${f.key}`] = null
-      }
-      onParamsChange?.(changes, { replace: true })
-    }
+  const { search, setSearch, boolFilters, setBoolFilters, selectFilters, setSelectFilters, hasFilters, setHasFilters, landedSearch, openNow, setOpenNow } = useDirectorySearch({
+    category,
+    initialSearch,
+    initialOpenNow,
+    initialFilters,
+    onParamsChange,
   })
-  // A category screen is NOT torn down and remounted when a visitor
-  // navigates away and back to it — it's kept alive under React's own
-  // <Activity> instead (see ResourceMap.tsx's and homeRevealSignal.ts's own
-  // comments on the same mechanism for Home). Activity's actual contract,
-  // confirmed live here (an instrumented effect logged a fresh "activated"
-  // entry on every return visit, plain click or back/forward alike, while
-  // the DOM node and this component's own state both survived unchanged):
-  // effects tear down while hidden and RE-RUN when Activity reactivates the
-  // subtree — the same "on a true first mount, and again whenever Activity
-  // reactivates it" behavior homeRevealSignal.ts documents for Landing.
-  //
-  // That re-run is exactly the hook this needs, and unlike trying to catch
-  // the navigation event itself (confirmed live, and the wrong shape of fix
-  // regardless — this effect's own reactivation always happens one tick
-  // after the navigation that caused it, so it can never observe that same
-  // navigation firing), it needs no external signal at all: a ref survives
-  // Activity's hide/reveal the same way state does, so "have I activated
-  // before" is answerable from entirely inside this component. `initialXxx`
-  // props are of no help on a reactivation regardless — confirmed live,
-  // they're already-undefined by the time Activity reveals this screen
-  // again, hydrated-once refs and all — so any later activation blanking
-  // unconditionally is the right call, not just the achievable one.
-  //
-  // But effects also tear down and re-run when a Suspense boundary above
-  // hides this screen for a moment while some code loads (the user's note
-  // 10, Oct 10: a listing tapped in search results on a phone loaded its
-  // view, the search was cleared, and the listing closed again). Leaving
-  // for another screen has already changed the address by the time this
-  // screen is hidden; a pause while code loads hasn't. So it clears only
-  // when the address it was hidden at isn't this screen's own.
-  //
-  // Come back by a link that carries a search (the home search's "Grocery ·
-  // 10 with Challah" is `?q=challah`), it's that search, not a blank page:
-  // the `initialXxx` props were applied once, on the first visit, and a
-  // second search from home landed on the whole list (the user, Oct 13).
-  // Back and Forward too: the address is what the page shows (Nov 18).
-  const hasActivatedBeforeRef = useRef(false)
-  const hiddenAtRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (hasActivatedBeforeRef.current && hiddenAtRef.current !== window.location.pathname) {
-      const params = Object.fromEntries(new URLSearchParams(window.location.search))
-      if (!carriesSearch(category, params)) clearFiltersRef.current!()
-      else fromAddressRef.current!(params)
-    }
-    hasActivatedBeforeRef.current = true
-    return () => {
-      hiddenAtRef.current = window.location.pathname
-    }
-    // On each activation only (Activity re-runs it), never on a change of
-    // category: a category is its own screen.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // ── Sync search + "Open now" into the URL (see onParamsChange's own doc) ──
-  // Skips the very first render on purpose: `search`/`openNow` there is just
-  // `initialSearch`/`initialOpenNow` echoed back, and writing it out again
-  // would be a pointless replace on every mount. Debounced for `search` so
-  // typing doesn't fire a history replace per keystroke; `openNow` is a
-  // single toggle, so it goes out immediately.
-  const searchSyncedOnce = useRef(false)
-  // Read when the debounce fires, not when it was set: arriving by a link,
-  // the question can reach `search` a render before `landed` does, and
-  // `read=1` came off the address (Oct 13).
-  const landedSearchRef = useRef(landedSearch)
-  useEffect(() => {
-    landedSearchRef.current = landedSearch
-  })
-  useEffect(() => {
-    if (!searchSyncedOnce.current) {
-      searchSyncedOnce.current = true
-      return
-    }
-    const timer = setTimeout(() => {
-      const kept = landedSearchRef.current !== null && search === landedSearchRef.current
-      onParamsChange?.({ q: search.trim() || null, ...(kept ? {} : { read: null }) }, { replace: true })
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [search, onParamsChange])
-  // The question edited or cleared: the Filters it was read as come off
-  // with it (see `landed`). What's typed now is searched, and read again
-  // if it needs it.
-  useEffect(() => {
-    if (!landed || search === landed.search) return
-    const was = landed
-    // Follows the visitor's own edit of the box, once: not state derived
-    // from props.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLanded(null)
-    if (was.openNow) setOpenNow(false)
-    if (was.bool.length) setBoolFilters((prev) => ({ ...prev, ...Object.fromEntries(was.bool.map((key) => [key, false])) }))
-    setSelectFilters((prev) => withoutChosen(prev, was.select))
-    setHasFilters((prev) => withoutChosen(prev, was.has))
-    // Only the box's own changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search])
-  const openNowSyncedOnce = useRef(false)
-  useEffect(() => {
-    if (!openNowSyncedOnce.current) {
-      openNowSyncedOnce.current = true
-      return
-    }
-    onParamsChange?.({ openNow: openNow ? '1' : null }, { replace: true })
-  }, [openNow, onParamsChange])
   // Distance first, always (the user, Oct 15): with no location set, the
   // miles from the community's centre that every row already shows, which
   // the top of the page says it's measuring from. Popular only where there
@@ -457,70 +204,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
   // The Filters sheet (see ListHeading and FiltersSheet).
   const [filtersOpen, setFiltersOpen] = useState(false)
-  // A plain lazy initializer here would only ever see the FIRST render:
-  // SlugScreen's Suspense fallback renders this tree once with the query
-  // string not yet read (openMinyanimView is undefined then, same as
-  // `initialSearch` is at that point — see FindResources' own doc), then
-  // FindResourcesConnected hydrates and this same component instance
-  // re-renders with the real value — too late for a lazy initializer to
-  // catch. Solved the same way `initialSearch` already is: FindResources
-  // folds `openMinyanimView` into the `key` it gives ResourceLoader, so
-  // the value arriving forces a fresh mount of this whole subtree instead
-  // of an update to the existing one, and the lazy initializer below runs
-  // again with the real value.
-  // Synagogues' Minyanim view (step 4, agreed Oct 1): every minyan by time,
-  // in place of the list of shuls. `?davening=1` (the home page's and the
-  // Next minyan card's "All davening times") arrives on it. It replaced
-  // the old week-of-times dialog, which knew nothing of Yom Tov.
-  const [minyanimViewOn, setMinyanimViewOn] = useState(!!openMinyanimView)
+  const { minyanimViewOn, setMinyanimViewOn, showMinyanimView, closeMinyanimView } = useMinyanimView(openMinyanimView, onParamsChange)
   // The Minyanim view's own Filters (Oct 15): Tefillah, and How far, one at
   // a time; and how many minyanim it shows, for the sheet's Show button.
   const [minyanTefillos, setMinyanTefillos] = useState<string[]>([])
   const [minyanWithin, setMinyanWithin] = useState<string | null>(null)
   const [minyanimShowing, setMinyanimShowing] = useState(0)
-  // Same one-way-in problem `search`/`openNow` already solve above: without
-  // this, switching back to Synagogues left `?davening=1` sitting in the
-  // URL, so a reload reopened the view the visitor had already left.
-  // Clears `day` alongside `davening` — a stale `?day=` with no view to
-  // pick a day in is meaningless on its own. Skips the
-  // first render for the same reason `openNowSyncedOnce` does: the initial
-  // value here is just `openMinyanimView` echoed back, and re-writing it
-  // immediately would be a pointless replace on a URL that's already
-  // correct.
-  //
-  // Only when the view opens or closes, never because onParamsChange is a
-  // new function: on Back, Next re-renders with a new one before the
-  // popstate listener below has read the address, and re-writing the
-  // still-open view's `?davening=1` then undid the Back (found Oct 6).
-  const minyanimViewSyncedOnce = useRef(false)
-  // Set when the page itself opens the view (showMinyanimView, below).
-  const openedHere = useRef(false)
-  const writeMinyanimView = useEffectEvent((on: boolean) => {
-    const step = on && openedHere.current
-    openedHere.current = false
-    onParamsChange?.(on ? { davening: '1' } : { davening: null, day: null }, step ? { step: MINYANIM_STEP } : { replace: true })
-  })
-  useEffect(() => {
-    if (!minyanimViewSyncedOnce.current) {
-      minyanimViewSyncedOnce.current = true
-      return
-    }
-    writeMinyanimView(minyanimViewOn)
-  }, [minyanimViewOn])
-  // Opened from the page, the view is a step Back undoes (Oct 6): the
-  // browser's, and on a phone a swipe. It used to replace the address, so
-  // Back left Synagogues altogether. Its own ways back (the header's ‹ on a
-  // phone, the switch's first half anywhere) take that same step when there
-  // is one, so Forward doesn't reopen it; arriving on `?davening=1`, there's
-  // none, and they just close it.
-  const showMinyanimView = () => {
-    openedHere.current = true
-    setMinyanimViewOn(true)
-  }
-  const closeMinyanimView = () => {
-    if ((window.history.state as { step?: string } | null)?.step === MINYANIM_STEP) window.history.back()
-    else setMinyanimViewOn(false)
-  }
   const isMobile = useIsMobile()
   // For getCategoryColor and the tile's picture below, as the home reads them.
   const categories = useCategories()
@@ -545,79 +234,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const filterableBooleans = fields.filter((f) => f.filterable && f.type === 'boolean')
   const filterableSelects = fields.filter((f) => f.filterable && f.type === 'select')
 
-  // Sync boolFilters/selectFilters into the URL — same `?f_<key>=`/
-  // `?sel_<key>=` shape initialFilters reads above, and the same
-  // skip-the-first-render + replace (not push) reasoning as the search/
-  // openNow sync effects. Recomputes the FULL set of this category's
-  // filterable-field params from current state every time (not a diff
-  // against the previous set) — cheap (a handful of fields per category)
-  // and it means a field toggled off is still explicitly nulled out rather
-  // than requiring separate bookkeeping of what was previously set.
-  //
-  // Debounced (like search) rather than firing on every click: a
-  // multi-select filter is exactly the case where a visitor picks several
-  // values in quick succession (e.g. three "Type" checkboxes in a row), and
-  // an immediate `router.replace` per click meant each of those clicks
-  // forced its own live navigation — a full re-render of this whole
-  // directory's listing grid, back to back, only microseconds apart. That
-  // read as actual jank (a lagging/"glitching" cursor while the main thread
-  // was busy re-rendering) purely from clicking a checkbox list a few times,
-  // not from anything wrong with the click handling itself. One replace
-  // after the visitor pauses is both cheaper and closer to "done choosing."
-  const boolFiltersSyncedOnce = useRef(false)
-  useEffect(() => {
-    if (!boolFiltersSyncedOnce.current) {
-      boolFiltersSyncedOnce.current = true
-      return
-    }
-    const timer = setTimeout(() => {
-      const changes: Record<string, string | null> = {}
-      for (const f of filterableBooleans) changes[`f_${f.key}`] = boolFilters[f.key] ? '1' : null
-      onParamsChange?.(changes, { replace: true })
-    }, 300)
-    return () => clearTimeout(timer)
-    // filterableBooleans is a fresh array every render (derived from the
-    // stable `category` prop) — including it here would refire this on
-    // every unrelated render instead of only when the filter state itself
-    // changes; `category` doesn't change without remounting this component.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boolFilters, onParamsChange])
-
-  const selectFiltersSyncedOnce = useRef(false)
-  useEffect(() => {
-    if (!selectFiltersSyncedOnce.current) {
-      selectFiltersSyncedOnce.current = true
-      return
-    }
-    const timer = setTimeout(() => {
-      const changes: Record<string, string | null> = {}
-      for (const f of filterableSelects) {
-        const chosen = selectFilters[f.key] ?? []
-        changes[`sel_${f.key}`] = chosen.length > 0 ? chosen.join(',') : null
-      }
-      onParamsChange?.(changes, { replace: true })
-    }, 300)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectFilters, onParamsChange])
-
-  const hasFiltersSyncedOnce = useRef(false)
-  useEffect(() => {
-    if (!hasFiltersSyncedOnce.current) {
-      hasFiltersSyncedOnce.current = true
-      return
-    }
-    const timer = setTimeout(() => {
-      const changes: Record<string, string | null> = {}
-      for (const f of itemFields(category)) {
-        const chosen = hasFilters[f.key] ?? []
-        changes[`has_${f.key}`] = chosen.length > 0 ? chosen.join(',') : null
-      }
-      onParamsChange?.(changes, { replace: true })
-    }, 300)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasFilters, onParamsChange])
+  useFiltersInAddress({ category, boolFilters, selectFilters, hasFilters, onParamsChange })
 
   // "All davening times" — only for categories with a `minyanim`-type field
   // (today, just Synagogues) and at least one listing with structured data.
@@ -658,275 +275,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const showSearch = ui.search.directory && caps.directorySearch
   const liveCount = (item: DirectoryResource) => voteCounts[item.id] ?? item.upvotes ?? 0
 
-  // Every rendered card's row, keyed by listing id — a callback ref rather
-  // than a plain array so a card can be found and scrolled to by id after
-  // the list re-sorts, not just by its position at mount. Shared by the
-  // reopen-on-mount scroll below and the "I'm here" scroll further down.
-  const itemRowRefs = useRef(new Map<string, HTMLDivElement>())
-  const setItemRowRef = (id: string) => (el: HTMLDivElement | null) => {
-    if (el) itemRowRefs.current.set(id, el)
-    else itemRowRefs.current.delete(id)
-  }
-  // The search/filter/sort controls below (`lg:sticky lg:top-14`) — this
-  // used to only account for the site header's own height, not this SECOND
-  // sticky bar sitting right under it on `lg:` widths. Every scroll target
-  // landed short by however tall that bar is: the target's row ended up
-  // tucked behind it, above the visible content, often the whole row.
-  // `position === 'sticky'` (not a `window.innerWidth` guess) is what tells
-  // us whether it's actually occupying that fixed strip right now, since
-  // `lg:` isn't this component's only breakpoint concern to keep in sync.
-  const controlsRef = useRef<HTMLDivElement>(null)
-  // Whether the controls bar is currently actually pinned against content
-  // scrolling underneath it, vs. still sitting inline before you've scrolled
-  // to it — a plain `window.innerWidth`/breakpoint check can't tell the two
-  // apart, only "has this specific element's own sticky position engaged."
-  // Drives the border/shadow below: without it, a border on an element still
-  // in normal flow reads as a stray line floating in whitespace rather than
-  // a bar visibly docked against the cards below it.
-  //
-  // A sentinel + IntersectionObserver, not the `position === 'sticky'` check
-  // scrollItemIntoView uses above: that one is read imperatively at the
-  // moment of a click, which is fine for a one-off measurement, but this
-  // needs to re-render whenever stuck-ness actually changes — polling
-  // getComputedStyle on every scroll frame just to catch that would be far
-  // more work for the same answer an observer gives you for free.
-  //
-  // Re-run on crossing the phone/computer line (isMobile): that remounts
-  // the sentinel (CategoryBandFrame wraps the list only on a computer), and
-  // an observer left on the old, detached node read top 0, "stuck", so the
-  // bar kept its docked white box on an unscrolled page (the user, Nov 17:
-  // desktop → phone → desktop). Keyed on isMobile, not a callback ref held
-  // as state: that cost a second render on every load. And not watched at
-  // all on a phone, where the docked look is never drawn: there each change
-  // re-rendered the page under an open sheet, and a shul's sheet opened from
-  // its address lost its Edit button mid-test (one-sheet.spec, 2 runs in 15).
-  const controlsSentinelRef = useRef<HTMLDivElement>(null)
-  const [controlsStuck, setControlsStuck] = useState(false)
-  useEffect(() => {
-    const sentinel = controlsSentinelRef.current
-    if (!sentinel || isMobile) return
-    // rootMargin's top matches `lg:top-14` (56px) below — the sentinel sits
-    // in normal flow immediately above the controls bar, so it stops
-    // "intersecting" at exactly the scroll position where the bar's own
-    // sticky offset would engage, not a moment before or after.
-    function makeObserver() {
-      const observer = new IntersectionObserver(([entry]) => setControlsStuck(!entry.isIntersecting), {
-        threshold: 0,
-        rootMargin: '-56px 0px 0px 0px',
-      })
-      observer.observe(sentinel!)
-      return observer
-    }
-    let observer = makeObserver()
-    // Resyncing by replacing the observer alone (disconnect + a fresh
-    // `makeObserver()`) isn't enough: confirmed by hand, in real browser
-    // testing, that even a BRAND NEW IntersectionObserver's very first
-    // callback can misreport — this isn't limited to the original,
-    // mount-time instance. IntersectionObserver's callback is asynchronous
-    // by spec (scheduled some time "after layout and paint"), and nothing
-    // guarantees that delivery race resolves correctly on every instance,
-    // every time. `getBoundingClientRect()` has no such race — it's a
-    // synchronous, always-current measurement — so `resync` sets
-    // `controlsStuck` directly from it. The observer is still replaced
-    // alongside that (cheap, and worth doing so a later plain scroll isn't
-    // still checking a sentinel bound to a stale rootMargin/layout
-    // snapshot), just no longer trusted to deliver the correction itself.
-    function resync() {
-      setControlsStuck(sentinel!.getBoundingClientRect().top < 56)
-      observer.disconnect()
-      observer = makeObserver()
-    }
-    // Two separate races this bar's "docked" look (white background, the
-    // border, the shadow — all `lg:`-gated on `controlsStuck`) can lose,
-    // both confirmed by hand and both invisible on their own since neither
-    // has any effect below the `lg:` breakpoint:
-    //
-    // Mount: this component's very first observation can land against a
-    // not-yet-settled layout — content above the sentinel still streaming
-    // or hydrating in — and, once wrong, does NOT self-correct from a later
-    // legitimate layout shift, even long after that content has finished
-    // loading. `load` (or immediately, via a double rAF, if it already
-    // fired before this effect ran) is the resync point: a real signal that
-    // layout has settled, not a guessed timeout.
-    //
-    // Resize: rotating a device, or crossing the `lg:` breakpoint by
-    // resizing a browser window, reshuffles the whole page above the
-    // sentinel — the mobile address banner disappears, the desktop hero/
-    // badge appear. Debounced to the quiet period after the last event in a
-    // resize burst so it resyncs against the settled size once, not a
-    // different mid-transition layout on every intermediate event.
-    if (document.readyState === 'complete') {
-      requestAnimationFrame(() => requestAnimationFrame(resync))
-    } else {
-      window.addEventListener('load', resync, { once: true })
-    }
-    let resizeTimer: ReturnType<typeof setTimeout> | null = null
-    function handleResize() {
-      if (resizeTimer != null) clearTimeout(resizeTimer)
-      resizeTimer = setTimeout(() => {
-        resizeTimer = null
-        resync()
-      }, 150)
-    }
-    window.addEventListener('resize', handleResize)
-    return () => {
-      window.removeEventListener('resize', handleResize)
-      window.removeEventListener('load', resync)
-      if (resizeTimer != null) clearTimeout(resizeTimer)
-      observer.disconnect()
-    }
-  }, [isMobile])
-  const scrollItemIntoView = (id: string, behavior: ScrollBehavior) => {
-    const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
-    // A listing open in the list's column (desktop): its row is hidden, so
-    // bring the column's top back into view instead, and only if the page
-    // has scrolled past it.
-    const column = listingColumnRef.current
-    if (column) {
-      const top = column.getBoundingClientRect().top
-      if (top < headerH) window.scrollTo({ top: Math.max(0, window.scrollY + top - headerH), behavior })
-      return
-    }
-    const el = itemRowRefs.current.get(id)
-    if (!el) return
-    const controls = controlsRef.current
-    const controlsH = controls && getComputedStyle(controls).position === 'sticky' ? controls.offsetHeight : 0
-    const top = el.getBoundingClientRect().top + window.scrollY - headerH - controlsH
-    window.scrollTo({ top: Math.max(0, top), behavior })
-  }
+  const { controlsSentinelRef, controlsStuck } = useControlsStuck(isMobile)
+  const { setItemRowRef, controlsRef, listingColumnRef, scrollItemIntoViewWhenSettled } = useRowScroller()
 
-
-  // Same target, but waits for the row's own position to stop moving first —
-  // for a scroll fired around the same moment something else can still
-  // reorder the list under it (distance-sort landing once geolocation
-  // resolves, "I'm here" re-anchoring below). A one-shot scroll measured
-  // before that settles targets where the row WAS, not where it ends up:
-  // the visitor lands scrolled past it, or short of it, off by however far
-  // the reorder moved it — with no sign the scroll even fired. Polls rather
-  // than guessing a delay, since what it's waiting on (a re-render a
-  // couple of contexts away) has no single fixed latency.
-  //
-  // setTimeout, not requestAnimationFrame: rAF is paused entirely while the
-  // tab is backgrounded, which would silently drop this if the visitor
-  // switched apps mid-wait and back.
-  //
-  // It gives up after a few seconds (whenSettled), and any wait still going
-  // when the list goes away is stopped, so a row that never shows up can't
-  // keep a timer running.
-  const settleWaits = useRef(new Set<() => void>())
-  useEffect(() => {
-    const waits = settleWaits.current
-    return () => {
-      for (const cancel of waits) cancel()
-      waits.clear()
-    }
-  }, [])
-  const scrollItemIntoViewWhenSettled = (id: string, behavior: ScrollBehavior) => {
-    const cancel = whenSettled(
-      () => listingColumnRef.current ?? itemRowRefs.current.get(id),
-      () => {
-        settleWaits.current.delete(cancel)
-        scrollItemIntoView(id, behavior)
-      },
-    )
-    settleWaits.current.add(cancel)
-    return () => {
-      cancel()
-      settleWaits.current.delete(cancel)
-    }
-  }
-
-  // Every rendered card's open/close handle, keyed by listing id — same
-  // "callback ref in a Map, not an array" shape as itemRowRefs above, and
-  // for the same reason (found by id, not position, after a re-sort).
-  // Desktop-only in practice (see GenericListingCardHandle's own comment):
-  // arrow-key next/prev needs to close ONE card and open a SIBLING it has
-  // no other way to reach, since `expanded` is that card's own local state
-  // rather than something lifted here.
-  const cardRefs = useRef(new Map<string, GenericListingCardHandle>())
-  const setCardRef = (id: string) => (handle: GenericListingCardHandle | null) => {
-    if (handle) cardRefs.current.set(id, handle)
-    else cardRefs.current.delete(id)
-  }
-  // Which cards have their listing open right now, kept by each card's
-  // onExpandedChange (below). A ref, not state: the effect below reads it on
-  // Activity's reveal, where a state value from an earlier render would be
-  // exactly the stale answer this exists to avoid.
-  const openCardIdsRef = useRef(new Set<string>())
-
-  useEffect(() => {
-    // A listing left open from an earlier visit closes first. Leaving a
-    // category (browser Back to home) hides this screen under <Activity>
-    // rather than unmounting it, so the card that was open stays open in
-    // the hidden tree. Coming back with a different `?item=` then opened a
-    // second dialog on top of the first — reported live on desktop: open a
-    // listing, press Back, pick another from the home search, and both were
-    // up, one over the other. Coming back with no `?item=` at all (the
-    // Categories menu) showed the old one again. This effect re-runs on
-    // Activity's reveal as well as on a new `?item=`, which covers both.
-    // Only open cards are closed: close() clears `?item=` in the URL, so
-    // calling it on every card would write the URL once per listing.
-    for (const id of [...openCardIdsRef.current]) {
-      if (id !== reopenItemId) cardRefs.current.get(id)?.close()
-    }
-    if (!reopenItemId) return
-    // Actually opens the card too, not just scrolls to it — `defaultExpanded`
-    // (below, on each card) only seeds that card's OWN expand state on ITS
-    // OWN first mount, which does nothing if this directory is already
-    // mounted from an earlier visit: Next's Cache Components keep a recent
-    // route's component tree alive via <Activity> instead of unmounting it,
-    // so navigating back into an already-open category with a NEW `?item=`
-    // (e.g. a different listing picked from the home search dropdown) left
-    // the URL pointing at the right listing but no modal actually open —
-    // confirmed live, and only a full reload (a genuine fresh mount) fixed
-    // it. Calling .open() on the genuine first-mount case (already true via
-    // defaultExpanded) is a harmless no-op.
-    cardRefs.current.get(reopenItemId)?.open()
-    // Settle-aware, not a plain one-shot scrollItemIntoView — this list can
-    // still reorder right after mount (distance sort landing once
-    // geolocation resolves is the common case: a `?item=` deep link into a
-    // distance-sorted category, opened before a location's ever been set).
-    // A scroll measured before that reorder lands targets the row's
-    // pre-reorder position, so the visitor ends up scrolled to wherever
-    // that used to be — short of or past where the reopened listing
-    // actually settled, off by however far the reorder moved it.
-    return scrollItemIntoViewWhenSettled(reopenItemId, 'instant')
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only reopenItemId should retrigger this; scrollItemIntoViewWhenSettled is a fresh closure every render
-  }, [reopenItemId])
-
-  // Tapping a listing's "I'm here" (see SetLocationButton) re-anchors every
-  // distance to it, which — for anyone not already on Distance sort — flips
-  // the whole list to Distance and reorders it. On a long list, scrolled deep
-  // in, that reorder happens entirely off-screen: the visitor is left looking
-  // at whatever listing now occupies the spot they were scrolled to, with no
-  // sign their tap did anything. This follows the tapped listing back into
-  // view once the reorder actually lands.
-  //
-  // anchorListingId, not the whole anchor: a typed address or a GPS fix also
-  // changes anchorLabel and re-sorts, but there's no single card to return
-  // to for those — this is specifically the "I tapped a listing" case.
-  const anchorListingId = useOptionalLocation()?.anchorListingId ?? null
-  // Skips the very first commit, which is either the initial mount (nothing
-  // to follow back to yet) or a returning visitor's already-stored anchor
-  // restoring — neither should yank the page to a card the visitor didn't
-  // just tap.
-  const anchorSettledRef = useRef(false)
-  useEffect(() => {
-    if (!anchorSettledRef.current) {
-      anchorSettledRef.current = true
-      return
-    }
-    if (!anchorListingId) return
-    // This commit is the anchor id changing — the sortByPopular effect above
-    // (and every card's own distance-label recompute) hasn't reacted to the
-    // new anchorLabel yet, so the tapped card's row is still at its OLD
-    // position. A fixed delay isn't reliably enough: setting an anchor also
-    // stops GPS tracking and touches several other contexts upstream (see
-    // setListingAnchor), and their re-renders can land a tick or two apart —
-    // scrollItemIntoViewWhenSettled polls instead of guessing one.
-    return scrollItemIntoViewWhenSettled(anchorListingId, 'smooth')
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- only anchorListingId should retrigger this; scrollItemIntoViewWhenSettled is a fresh closure every render
-  }, [anchorListingId])
+  const { cardRefs, setCardRef, openCardIdsRef } = useListingCards({ reopenItemId, scrollItemIntoViewWhenSettled })
 
   // On the Minyanim tab, what's typed narrows the minyanim (MinyanimView,
   // the user's note 4): it isn't a search of the shuls, nor a question for
@@ -987,7 +339,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     if (!asksMinyan) return
     const timer = setTimeout(() => setMinyanimViewOn(true), 700)
     return () => clearTimeout(timer)
-  }, [asksMinyan])
+  }, [asksMinyan, setMinyanimViewOn])
   // ── The order the search asks for ──
   // "Pizza near me", "closest pizza": nearest first; "best pizza", "sort by
   // popularity": most liked first, while it's in the box, whatever the Sort
@@ -1552,7 +904,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const hostedId = openDialogItemId && (!isMobile || openDialogItemId === pagedItemId) ? openDialogItemId : null
   const columnItem = hostedId ? (items.find((i) => i.id === hostedId) ?? null) : null
   const phonePage = isMobile && !!columnItem
-  const listingColumnRef = useRef<HTMLDivElement>(null)
   // Another listing in its place: the one being read closes, the other
   // opens (its closed group too), and the page comes back up to the top of
   // the column if it had scrolled past it.
