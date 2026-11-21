@@ -1329,6 +1329,49 @@ Partial Prefetching before Next 17.
 Checked and not so: the nightly email does record a failed send, as a
 warning, not a failure.
 
+## The save survey (Nov 21, read-only; nothing fixed yet)
+
+Saves that make more than one write, through separate supabase-js calls
+with no transaction, and what a failure partway leaves. Only the
+`toggle_vote`, `confirm_*`, `mark_item`/`unmark_item`, `clear_item_gone`
+and `bump_daily_count` functions are atomic, and each covers one row.
+`approve_menu_dishes` (065) is defined and never called.
+
+Worst first (checked in the code: 1 and the unchecked read):
+
+1. **An approval can be left "approved" with nothing on the site.**
+   `approveNow` (`submissionStore.ts`) claims the submission, then
+   applies it (Google lookups, geocoding), then marks it reviewed. If the
+   function is killed or times out while applying, the catch that puts it
+   back to waiting never runs; its own write ignores its error too. The
+   change leaves the queue and never appears, and no screen reopens it.
+   Every approval goes through here (queue, admin add/edit/remove, found,
+   kosher, Google, a part at a time).
+2. **An edit's read of the listing ignores its error** (`applyListing`'s
+   update path). If that read fails, the update rebuilds `details` from
+   nothing and wipes the listing's own keys (googleFields, item dates,
+   confirmations).
+3. The admin's own add: if the final mark fails after the listing is in,
+   the admin sees "Could not add listing" and a retry adds it twice. If
+   the approval fails cleanly, the admin's add sits in the queue as a
+   visitor's suggestion, once per retry.
+4. Renaming a field's options: listings are updated one by one after the
+   category; a failure partway, then a reload, strands the rest on the
+   old name (they stop matching filters), with no way to finish it.
+5. "Not anymore" and its undo: a failed follow-up write can leave the
+   warning on a listing with nothing in the queue to clear it.
+6. Smaller, each fixable from the admin: new-category approval leaves an
+   empty category (retry makes "label-2"); new eruv leaves a bare one;
+   part-at-a-time leaves a stray copy; kosher "Bring it back" / archive
+   leave the finding waiting; deleting a category, form or community can
+   stop halfway (a retry finishes it); creating a community can stop
+   halfway (delete and make it again); a Tell-us message filed partly
+   sends no admin email; the hours/hospitals page swaps can leave the
+   old page read or the marker gone.
+7. Low: activity rows, job-run finishes, Google sync's resource update
+   ignoring its error (the same closure reported again the next night),
+   orphan uploads (the weekly sweep clears them).
+
 ## The speed and scale sweep (Nov 20, on `claude/bands-and-search`)
 
 The user (Nov 20): "I want the site to be a good site… with the ability
