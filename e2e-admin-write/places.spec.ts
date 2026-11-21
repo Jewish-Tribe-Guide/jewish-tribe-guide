@@ -61,7 +61,15 @@ test('a place is found by name, archived after asking, and brought back', async 
 
   await page.getByRole('button', { name: 'Archive it' }).click()
   await expect(page.getByText(`Take ${name} off the site? It stays under Archived.`)).toBeVisible()
+  // Each write waited on its own answer, not on a 5s poll of the database.
+  // The archive is six database calls one after another, and with e2e's
+  // seven servers reading the same test project, each can queue a second or
+  // two: PR 405's first CI run took 10.4s, the poll gave up at 5s, and the
+  // cleanup below then deleted the suggestion the server was still
+  // approving ("Submission not found" in its log, a symptom, not the cause).
+  const archived = page.waitForResponse((r) => r.request().method() === 'DELETE' && r.url().includes('/api/admin/listings/'))
   await page.getByRole('button', { name: 'Archive it' }).click()
+  expect((await archived).status(), 'the archive’s answer').toBe(200)
   await expect.poll(status).toBe('archived')
 
   // Back on the list: no longer on the site, under Archived instead.
@@ -71,7 +79,9 @@ test('a place is found by name, archived after asking, and brought back', async 
   await page.getByRole('menuitemradio', { name: /^Archived/ }).click()
   await expect(page).toHaveURL(/show=archived/)
   await page.getByRole('button', { name: `Open ${name}` }).click()
+  const restored = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/api/admin/archived-listings/'))
   await page.getByRole('button', { name: 'Bring it back' }).click()
+  expect((await restored).status(), 'bringing it back’s answer').toBe(200)
   await expect.poll(status).toBe('approved')
 })
 

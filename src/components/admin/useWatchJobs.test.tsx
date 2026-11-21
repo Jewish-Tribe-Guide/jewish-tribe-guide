@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { useState } from 'react'
+import { Activity, useState } from 'react'
 import { act, cleanup } from '@testing-library/react'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -159,6 +159,46 @@ describe('noteJobSwitched', () => {
     expect(hook.jobs.runs?.off).toEqual([])
     cleanup()
 
+    answering()
+    renderWithProviders(<Probe />)
+    expect(hook.jobs.runs?.off).toEqual([])
+    await answerAll()
+  })
+
+  it('a screen kept hidden while the job was switched shows the switch when it comes back', async () => {
+    // job-off (admin-write, PR 405's first CI run, Nov 20): Links turned
+    // back on from Add a watch, and Watches still showed it off. Next keeps
+    // a route it left behind React's <Activity>, hidden with its state and
+    // its effects off, so the Watches that came back was the one from
+    // before Add a watch: it had missed the switch, and showed the job off
+    // until its own read again came back, over 5s on CI's busy test project.
+    answering()
+    let watches: Hook | undefined
+    let show: (shown: boolean) => void = () => {}
+    const keepWatches = (h: Hook) => void (watches = h)
+    const keepShow = (s: (shown: boolean) => void) => void (show = s)
+    function Kept() {
+      keepWatches(useWatchJobsAndReload('t'))
+      return null
+    }
+    function Shell() {
+      const [shown, setShown] = useState(true)
+      keepShow(setShown)
+      return <Activity mode={shown ? 'visible' : 'hidden'}><Kept /></Activity>
+    }
+    renderWithProviders(<Shell />)
+    await answer({ runs: { available: true, kinds: [{ id: 'links' }], off: ['links'] } })
+    expect(watches!.jobs.runs?.off).toEqual(['links'])
+
+    act(() => show(false)) // to Add a watch
+    noteJobSwitched('test-community', 'links', false) // turned on there
+    act(() => show(true)) // back on Watches
+    expect(pending.length, 'it reads again on coming back').toBe(1)
+    expect(watches!.jobs.runs?.off).toEqual([])
+    await answerAll()
+    cleanup()
+
+    // And what it remembers for the next screen isn't its old copy.
     answering()
     renderWithProviders(<Probe />)
     expect(hook.jobs.runs?.off).toEqual([])

@@ -954,6 +954,36 @@ Fix first:
 
 Soon:
 
+- Two admin-write tests failed on PR 405's first CI run and passed on
+  its rerun: `places.spec.ts:53` (the archive's status stayed
+  "approved", the server logging "Submission not found: Cannot coerce…")
+  and `job-off.spec.ts:12` (Links not shown after Turn on). **Built Nov
+  20** (`claude/vanishing-rows`). Neither was a flake.
+  - places: the archive took 10.4s in that run. It is six database calls
+    one after another, and the test project was carrying e2e's seven
+    servers and the other suites at once (locally, a burst of 120 reads
+    delays one read beside it by 1–2s). The test polled the database for
+    5s, gave up, and its cleanup then deleted the suggestion the server
+    was still approving: "Submission not found" was that, not the cause.
+    It now waits on the archive's own answer, and Bring it back's. With a
+    6s delay put into the archive route: old test red, new green (the
+    delay isn't committed).
+  - job-off: a real bug. Next keeps a route it leaves behind React's
+    `<Activity>`, its state kept and its effects off, so the Watches that
+    came back from Add a watch was the one from before. It had missed the
+    Turn on, showed Links off until its own read answered (over 5s on
+    CI), and remembered that for the next screen. `useWatchJobs` keeps a
+    log of switches now, and a screen catches up on the ones it missed
+    when it shows again. Unit test red 1/1 against the old hook; the e2e
+    test holds Watches' read back, red against the old hook in a real
+    browser. The same test failed Nov 14 and Nov 16.
+  - Since Nov 20 every suite runs at once against the one test project.
+    Other admin-write CI failures since Nov 12 with the same shape (a
+    wait shorter than a busy database) and not looked into here:
+    `todo-scroll.spec.ts:75` (4 times on Nov 20, `claude/bands-and-search`),
+    `main-dishes` (3), `category-editor` (3), `community-editor:61` (1),
+    and "Cannot coerce" once more in a moderation Reject (run 43954048161,
+    Nov 16), probably the same cleanup race.
 - Reads cut off at 1,000 rows with no error: vote counts first (checked).
   **Built Nov 20**: every list read of a table that grows pages through
   `readAll` (`src/lib/readAll.ts`), ordered to the key so pages don't
