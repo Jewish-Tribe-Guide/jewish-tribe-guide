@@ -152,10 +152,14 @@ describe('DELETE /api/resource/:id/confirm', () => {
   it('refuses a note that was altered, made up, for another listing or box, or out of date', async () => {
     const good = note()
     const [body, mac] = good.split('.')
+    // A changed signature: its last character swapped for another. Not a
+    // fixed "AA" ending, which one real signature in 4,096 already has
+    // (CI, Nov 21, PR 421).
+    const altered = `${mac.slice(0, -1)}${mac.endsWith('A') ? 'B' : 'A'}`
     const forged = Buffer.from(JSON.stringify({ id: ID, section: null, at: YES, prev: null, exp: Date.now() + 1e6 })).toString('base64url')
     for (const undo of [
       `${forged}.${mac}`,
-      `${body}.${mac.slice(0, -2)}AA`,
+      `${body}.${altered}`,
       `${body}`,
       'nonsense',
       42,
