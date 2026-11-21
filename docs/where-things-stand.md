@@ -1326,7 +1326,7 @@ Soon:
     …). `envExample.test.ts` fails on a setting the code reads that it
     doesn't name, or a value that isn't a placeholder. Red 3/3.
 
-Later or bigger: the two 2,000-line screens (map, category page);
+Later or bigger:
 foreign keys; `details`
 holding app state (planned, below); an old-iOS floor
 decision; the parked Today
@@ -1338,6 +1338,14 @@ Done Nov 21 (`claude/later-list`): font sizes are rem (999 classes;
 text size. Hebrew keeps its own direction: listing names sit in `<bdi>`,
 written notes and descriptions carry `dir="auto"`, and so do the text
 boxes people type into (never a phone or number box).
+
+The two big screens are split (Nov 21, no behaviour change):
+`ResourceMapView.tsx` 2,797 → 1,177 lines (18 new files in
+`src/components/map/`: search, categories, eruvim, points, filters,
+the address read, the desktop sidebar and chrome as hooks and
+components) and `GenericDirectory.tsx` 2,271 → 1,093 (22 new files in
+`src/components/resources/`). Checked by tsc, lint, the unit suite and
+e2e (419 passed), not by eye.
 
 Redundant indexes: migration 108 drops ten one-column indexes a key or
 102's indexes already cover (nine `<table>_community_idx` from 027, plus
