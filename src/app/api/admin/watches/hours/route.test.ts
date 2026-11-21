@@ -341,6 +341,25 @@ describe('POST /api/admin/watches/hours', () => {
     expect(body).toMatchObject({ ok: true, off: false, pages: [{ source: 'Added by hand' }] })
   })
 
+  // Nov 21, the save survey: the swap is done before the read, and a page
+  // that won't save leaves its Off where it was.
+  it('give: a read that fails still leaves the old page stopped and the Off gone', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'home' }), w({ id: 'off', url: hoursOffUrl(LMC), createdBy: HOURS_OFF_CREATOR, active: false })], available: true })
+    m.runAndRecord.mockRejectedValueOnce(new Error('timeout'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect((await POST(req('POST', { action: 'give', resourceId: LMC, url: 'lmcmikvah.org/hours', replaces: 'home' }))).status).toBe(502)
+    expect(m.updateWatch).toHaveBeenCalledWith('philly', 'home', { createdBy: PAGE_STOPPED_CREATOR, active: false })
+    expect(m.removeWatch).toHaveBeenCalledWith('philly', 'off')
+  })
+
+  it('give: a page that won’t save keeps its Off', async () => {
+    m.listWatches.mockResolvedValue({ watches: [w({ id: 'off', url: hoursOffUrl(MEI), resourceId: MEI, createdBy: HOURS_OFF_CREATOR, active: false })], available: true })
+    m.addWatch.mockRejectedValueOnce(new Error('timeout'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect((await POST(req('POST', { action: 'give', resourceId: MEI, url: 'philamikvah.org/hours' }))).status).toBe(502)
+    expect(m.removeWatch).not.toHaveBeenCalled()
+  })
+
   it('give: refuses a page read for another place, or not a web address', async () => {
     m.listWatches.mockResolvedValue({ watches: [w({ url: 'https://lmcmikvah.org/' })], available: true })
     const taken = await POST(req('POST', { action: 'give', resourceId: MEI, url: 'http://www.lmcmikvah.org' }))
