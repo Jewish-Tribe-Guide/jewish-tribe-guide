@@ -119,14 +119,8 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 
 ### Mine to build or fix (nobody waiting)
 
-56. Partial Prefetching: the public site is done on branch
-    `claude/ensure-static` (ensureStatic = 'navigation' on the community
-    layout; full e2e green, made-up addresses 404 with no proxy list). The
-    admin still fails for a community built after a deploy (bailout, or
-    React #412 inside a boundary; ensureStatic = false doesn't help).
-    Next: 'navigation' on the admin too, which needs generateStaticParams
-    on its ~10 screens with an id in the address (each split into a
-    server page and its client screen). Before Next 17.
+56. Partial Prefetching: built on `claude/ensure-static`, in a PR
+    (Nov 21). On when it merges; every suite green.
 57. The search box, Open now and filters can drop from the address on
     a refresh (FindResourcesConnected).
 58. "See the whole page" in the editor leaves ?field=hours in the address.
@@ -521,6 +515,10 @@ Found and not fixed:
   the browser's Back as soon as Request removal showed, before the
   router had written its address, so Back left the listing. It now waits
   for the address (4 of 4 red on the old test with router requests slowed).
+- e2e `search-reader.spec.ts:102` on the map (mobile, full suite, Nov 21):
+  fixed Nov 21. Its "nothing read at 1.5s" check ran late on a loaded
+  machine and caught the 2.5s pause's rightful read. Reads are timed now
+  (red 4/4 with the pause cut to 1s).
 - 25 of 104 older migrations can't be told run or not from what they
   made (a policy, an index, a data fix).
 - 5 moderate `npm audit` findings, all `glob`/`minimatch` in Sentry's
@@ -728,40 +726,26 @@ on every visitor's download (the home's JS budget is 400 KB), and React
 and Next aren't tested there. Revisit only if analytics show real visits
 from iOS 15 or older.
 
-Partial Prefetching (tried Nov 21, not switched on): with
-`partialPrefetching: true`, e2e went 419 passed to 412 and **7 failed,
-all the same way: a made-up address answers 200, not 404** (an unknown
-category, community, listing, shared question, `/favicon.ico`, the old
-travel-time endpoint). The page still says "Page not found", but crawlers
-and link previews would take dead links as real pages. Cause, from Next's
-ISR docs: with the flag on, a path not prerendered is sent the route's
-App Shell at once, so the status is out before the page finds the
-address isn't real. `instant = false` doesn't help (it's validation
-only). What would work: `proxy.ts` answering 404 for an unknown community
-or category before rendering, against a cached list of slugs; a cost on
-every request, to measure. The gain is small today: measured with a
-production build, the home sends the same prefetches either way (3
-requests; most links already have `prefetch={false}`), and a category
-arrives on the click in about 0.4s. Next 17 turns it on for everyone, so
-it has to be done before that upgrade; the 7 e2e tests fail if it's
-flipped without the fix.
+Partial Prefetching (switched on Nov 21, `claude/ensure-static`):
+`partialPrefetching: true` sends an address that wasn't prerendered its
+App Shell at once, before the page knows the address is real. That broke
+two things: a made-up address answered 200, not 404 (7 e2e tests), and a
+community made after the build bailed out of its prerender
+(`NEXT_STATIC_GEN_BAILOUT`) or, read inside a boundary, had its stream cut
+off (React #412). `ensureStatic = 'navigation'` on both community
+layouts fixes both: such an address renders whole on its first request,
+so `notFound()` runs before anything is sent. It needs
+`generateStaticParams` on every screen with an id in its address, so the
+admin's seven are each a server `page.tsx` and a client `Screen.tsx`.
+`partialPrefetching.test.ts` fails if either layout loses the line.
+(The proxy's list of real addresses, built and reverted first, commit
+55ae2dc6, isn't needed.)
 
-Built Nov 21 and reverted the same evening (commit 55ae2dc6, kept in
-history): the proxy kept a cached list of real addresses and sent the rest
-to the 404 page with a 404, and `api/[...path]` answered made-up API
-paths. e2e passed (419). **But the write suites found a second, bigger
-problem:** with the flag on, a page that wasn't prerendered at build time
-fails ("uncached or runtime data during prerendering",
-`NEXT_STATIC_GEN_BAILOUT`): `[community]`, `[slug]/[id]`, `map`, `about`,
-the admin's pages. Next renders those without their address first, and
-the community layout reads its address outside any `<Suspense>` (the
-same cause `[slug]/[id]/page.tsx`'s comment describes for the build). On
-live that would be every listing, category or community added since the
-last deploy, until the next one. e2e never sees it (philly is
-prerendered); admin-write and cache-roundtrip do (their community is made
-after the build). The real fix is the community layout (and the admin's)
-reading `params` inside a boundary, with the content loaded below it:
-a bigger change, worth its own plan before Next 17.
+The gain is small today: a production build sends the same prefetches
+either way (phone 3 requests, 225 KB, all the Map; computer 70 KB, What
+changed), since the category tiles and most links have `prefetch={false}`,
+and a category arrives on the click in about 0.4s with the flag on or
+off. It is done for Next 17, which turns it on for everyone.
 
 Foreign keys (Nov 21, `claude/foreign-keys`): migration 113 **run on
 dev and live Nov 21** (the user). Every table's `community_id` points at
