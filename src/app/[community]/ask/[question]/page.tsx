@@ -75,9 +75,8 @@ export async function generateStaticParams() {
   return communities.flatMap((c) => [...questions].map((question) => ({ community: c.slug, question })))
 }
 
-// The params are read inside the boundary, so a question nobody built ahead
-// still gets the page's shell straight away and the rest streams in, rather
-// than the whole page waiting on it.
+// A question nobody built ahead is rendered whole on its first request and
+// kept (the community layout's ensureStatic = 'navigation').
 export default function AskPage(props: PageProps<'/[community]/ask/[question]'>) {
   return (
     <Suspense fallback={<div className="flex-1" />}>
@@ -88,9 +87,7 @@ export default function AskPage(props: PageProps<'/[community]/ask/[question]'>)
 
 // A link with no readable question in it (mangled in the copying, or
 // longer than any question) opens the plain home page rather than a 404:
-// the shell has already been sent by the time the question is read, so a
-// 404 here would arrive as a 200 anyway, and the home page is the useful
-// thing to land on.
+// the home page is the useful thing to land on.
 async function AskContent({ params }: { params: PageProps<'/[community]/ask/[question]'>['params'] }) {
   const { community, question: segment } = await params
   const question = questionFromSlug(segment) ?? undefined
