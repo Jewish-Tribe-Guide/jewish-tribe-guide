@@ -14,6 +14,7 @@ import { listEruvimForAdmin, type AdminEruv } from '@/lib/eruvStore'
 import { noteValidated } from '@/lib/validatedDuring'
 import { addWatch, listWatches, removeWatch } from '@/lib/watchStore'
 import { MIN_PAGE_WORDS, WATCH_FETCH_HEADERS, pageWords } from '@/lib/websiteWatch'
+import { publicFetch } from '@/lib/menuReader'
 import { ERUV_SUGGESTION_FIELDS, type EruvSuggestion } from '@/lib/eruvSuggestion'
 import type { CheckFound, WatchCheck, WatchOutcome } from '@/lib/watches'
 import {
@@ -59,7 +60,7 @@ type Filed = { id: string; status: string; payload: Partial<EruvSuggestion> }
 /** The eruvim whose website this is: usually one. */
 export const eruvimOf = (eruvim: readonly AdminEruv[], url: string) => eruvim.filter((e) => eruvWebsiteUrl(e.website) === url)
 
-export async function runEruvWebsiteWatch(community: string, url: string, fetcher: typeof fetch = fetch): Promise<WatchOutcome> {
+export async function runEruvWebsiteWatch(community: string, url: string, fetcher: typeof fetch = publicFetch): Promise<WatchOutcome> {
   const eruvim = eruvimOf((await listEruvimForAdmin(community)).eruvim, url)
   if (!eruvim.length) return { ok: false, error: 'No eruv in the guide has this website any more' }
 

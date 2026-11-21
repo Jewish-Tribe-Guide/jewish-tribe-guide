@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { confirmedEmail } from './confirmedEmail'
 import { getCommunityAdminEmails } from './communityStore'
 
 // The single source of truth for who may administer the site: a comma-separated
@@ -73,8 +74,8 @@ async function askSupabase(token: string): Promise<string | null> {
   })
 
   const { data, error } = await supabase.auth.getUser(token)
-  const email = data.user?.email
-  if (error || !email) return null
+  const email = error ? null : confirmedEmail(data.user)
+  if (!email) return null
   return email
 }
 

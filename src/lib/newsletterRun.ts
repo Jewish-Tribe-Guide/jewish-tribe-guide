@@ -46,6 +46,9 @@ export type NewsletterEmail = {
   text: string
   /** Its first PDF or picture, if any: shuls often send the times as one. */
   attachment: { mime: string; b64: string } | null
+  /** Gmail's Authentication-Results header for it: who Gmail found really
+   *  sent it (emailAuth.ts). Missing from a script copied before Nov 20. */
+  auth?: string | null
 }
 
 /** What became of it, for the script: `unknown`, `unlinked` and a failure

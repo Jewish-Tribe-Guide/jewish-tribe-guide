@@ -46,6 +46,22 @@ describe('readEruvMap: the eruv’s own map, read now', () => {
   })
 })
 
+// The map file is an address an admin saved: only the public internet is
+// read (the health sweep, Nov 20).
+describe('readEruvMap: whose file', () => {
+  it('by default, an address that isn’t the public internet isn’t read', async () => {
+    const sent = vi.fn(async () => new Response(geo(B)))
+    vi.stubGlobal('fetch', sent)
+    try {
+      const read = await readEruvMap(source({ lineUrl: 'http://169.254.169.254/line.geojson' }), NOW)
+      expect(read.save).toEqual({ ok: false, error: 'Not a public web address', at: NOW.toISOString() })
+      expect(sent).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
 describe('newlyMissing: admins hear once', () => {
   it('only what they haven’t been told of', () => {
     expect(newlyMissing(['Old border'], [])).toEqual(['Old border'])

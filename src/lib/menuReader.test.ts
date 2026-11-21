@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fetchPublic, findMenu, findMenus, htmlToText, isOrderingApp, isPrivateAddress, MAX_MENU_PAGES, MAX_MENU_PICTURES, menuLinks, menuMessages, menuPages, menuPictures, menuText, readMenu, readMenuPage, readMenus, tidyMenuReading, troubleClause, unreadMenuNote, type MenuSource, type Trouble } from './menuReader'
+import { fetchPublic, publicFetch, findMenu, findMenus, htmlToText, isOrderingApp, isPrivateAddress, MAX_MENU_PAGES, MAX_MENU_PICTURES, menuLinks, menuMessages, menuPages, menuPictures, menuText, readMenu, readMenuPage, readMenus, tidyMenuReading, troubleClause, unreadMenuNote, type MenuSource, type Trouble } from './menuReader'
 
 const publicDns = async () => ['93.184.216.34']
 const page = (body: string, type = 'text/html; charset=utf-8', status = 200, headers: Record<string, string> = {}) =>
@@ -69,6 +69,34 @@ describe('only the public internet', () => {
     const big = () => vi.fn().mockResolvedValue(page('BEGIN:VCALENDAR' + ' '.repeat(4_800_000), 'text/calendar'))
     expect(await fetchPublic('https://calendar.google.com/x.ics', { fetchImpl: big(), resolve: publicDns })).toBeNull()
     expect(await fetchPublic('https://calendar.google.com/x.ics', { fetchImpl: big(), resolve: publicDns, maxBytes: 20_000_000 })).toMatchObject({ type: 'html' })
+  })
+})
+
+// The eruv readers fetched their saved addresses with plain fetch (the
+// health sweep, Nov 20); this is the fetch they use now.
+describe('publicFetch: fetch for a saved address', () => {
+  it('refuses an address that isn’t the public internet, before asking it', async () => {
+    const fetchImpl = vi.fn()
+    for (const url of ['http://169.254.169.254/latest/', 'http://localhost:3000/', 'http://10.0.0.1/', 'http://metadata.google.internal/', 'file:///etc/passwd']) {
+      await expect(publicFetch(url, {}, { fetchImpl, resolve: publicDns }), url).rejects.toThrow('Not a public web address')
+    }
+    await expect(publicFetch('http://eruv.example', {}, { fetchImpl, resolve: async () => ['127.0.0.1'] })).rejects.toThrow('Not a public web address')
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('follows a public redirect with the caller’s own headers, and stops at one to a private address', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 301, headers: { location: '/status' } }))
+      .mockResolvedValueOnce(new Response('The eruv is up'))
+    const res = await publicFetch('https://eruv.example', { headers: { 'User-Agent': 'x' } }, { fetchImpl, resolve: publicDns })
+    expect(await res.text()).toBe('The eruv is up')
+    expect(fetchImpl.mock.calls.map(([u]) => String(u))).toEqual(['https://eruv.example/', 'https://eruv.example/status'])
+    expect(fetchImpl.mock.calls[1][1]).toMatchObject({ headers: { 'User-Agent': 'x' }, redirect: 'manual' })
+
+    fetchImpl.mockReset().mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/' } }))
+    await expect(publicFetch('https://eruv.example', {}, { fetchImpl, resolve: publicDns })).rejects.toThrow('Not a public web address')
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 })
 

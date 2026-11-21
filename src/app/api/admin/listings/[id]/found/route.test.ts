@@ -53,6 +53,9 @@ describe('/api/admin/listings/:id/found', () => {
     m.sync.mockResolvedValueOnce({ outcome: 'synced' })
     expect(await (await post('google')).json()).toEqual({ ok: true, read: true })
     expect(m.revalidate).toHaveBeenCalledOnce()
+    // Its own community's listing only: an id from another community's
+    // isn't read or written (the health sweep, Nov 20).
+    expect(m.load).toHaveBeenLastCalledWith('philly', 'L1')
   })
 
   // Only what reaches the listing drops the public site's cache: the email

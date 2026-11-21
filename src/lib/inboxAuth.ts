@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { confirmedEmail } from './confirmedEmail'
 
 // The single source of truth for who may read form-response data: a
 // comma-separated list in the INBOX_EMAILS env var. Deliberately separate from
@@ -33,8 +34,8 @@ export async function getInboxViewer(request: Request): Promise<{ email: string 
   })
 
   const { data, error } = await supabase.auth.getUser(token)
-  const email = data.user?.email
-  if (error || !email) return null
+  const email = error ? null : confirmedEmail(data.user)
+  if (!email) return null
 
   if (!isAllowedInboxEmail(email)) return null
   return { email }

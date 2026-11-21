@@ -309,7 +309,7 @@ describe('PATCH /api/admin/submissions/:id — Google sync after approval', () =
     m.syncOneListing.mockResolvedValue({ outcome: 'synced' })
     await patch({ status: 'approved' })
     await runAfter()
-    expect(m.loadSyncableListing).toHaveBeenCalledWith('res1')
+    expect(m.loadSyncableListing).toHaveBeenCalledWith('ues', 'res1') // the admin's own community's
     expect(m.syncOneListing).toHaveBeenCalledWith(unsynced)
   })
 

@@ -1,6 +1,7 @@
 import { isStale, localParts, pageText, readStatus, type Eruv } from './eruv'
 import type { StatusWrite } from './eruvStore'
 import { fetchDatesInfo } from './dateZmanim'
+import { publicFetch } from './menuReader'
 
 // ── Reading the eruvim's pages (Oct 7) ──────────────────────────────────────
 // On demand: /api/eruv reads any page whose last read is older than the
@@ -18,7 +19,7 @@ const TRIES = 2
 const USER_AGENT = 'Mozilla/5.0 (compatible; PhillyJewishGuide/1.0; eruv status)'
 
 /** One page's status, or why it couldn't be read. */
-export async function readEruvPage(url: string, now: Date, fetchImpl: typeof fetch = fetch): Promise<StatusWrite> {
+export async function readEruvPage(url: string, now: Date, fetchImpl: typeof fetch = publicFetch): Promise<StatusWrite> {
   const at = now.toISOString()
   try {
     const res = await fetchWithRetry(url, fetchImpl)
@@ -57,7 +58,7 @@ export async function candlesToday(place: { latitude: number; longitude: number;
  *  side by side; a save that fails is logged and the read still shown. */
 export async function refreshStale(
   eruvim: Eruv[],
-  { now, timezone, candles, save, fetchImpl = fetch }: { now: Date; timezone: string; candles: number | null; save: (id: string, read: StatusWrite) => Promise<void>; fetchImpl?: typeof fetch },
+  { now, timezone, candles, save, fetchImpl = publicFetch }: { now: Date; timezone: string; candles: number | null; save: (id: string, read: StatusWrite) => Promise<void>; fetchImpl?: typeof fetch },
 ): Promise<Eruv[]> {
   return Promise.all(
     eruvim.map(async (e) => {

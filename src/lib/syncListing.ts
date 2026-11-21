@@ -60,11 +60,16 @@ async function websiteFieldKey(communityId: string, categoryId: string): Promise
  *  incidental: syncing an archived listing would ask Google about a place
  *  that's already been taken down, and a CLOSED_PERMANENTLY answer would file
  *  a fresh removal submission for it — putting a listing an admin just
- *  archived straight back into the moderation queue. */
-export async function loadSyncableListing(resourceId: string): Promise<SyncedRow | null> {
+ *  archived straight back into the moderation queue.
+ *
+ *  Only `community`'s: an admin's route passes its own, so one community's
+ *  admin can't run a Google read on, and write to, another's listing by
+ *  its id (the health sweep, Nov 20). */
+export async function loadSyncableListing(community: string, resourceId: string): Promise<SyncedRow | null> {
   const { data } = await getAdminClient()
     .from('resource')
     .select('id,name,phone,address,details,category,community_id')
+    .eq('community_id', community)
     .eq('id', resourceId)
     .eq('status', 'approved')
     .maybeSingle()

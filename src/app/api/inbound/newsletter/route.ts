@@ -7,9 +7,11 @@ import { senderEmail } from '@/lib/eruvEmail'
 import { communityOfNewsletterKey, recordNewsletterCheck } from '@/lib/newsletterSetupStore'
 
 // POST /api/inbound/newsletter   Authorization: Bearer <key>
-//   { community, messageId, from, list?, subject, date?, text, attachment?: { mime, b64 } }
+//   { community, messageId, from, list?, subject, date?, text, attachment?: { mime, b64 }, auth? }
 // `list` is the mailing list it came through (its List-Post address), when
-// it did: a list's emails are from whoever posted them.
+// it did: a list's emails are from whoever posted them. `auth` is Gmail's
+// Authentication-Results header for it, which an eruv's email must pass
+// (emailAuth.ts).
 // A shul's newsletter, sent by the Google Apps Script in the guide's own
 // Gmail (scripts/newsletter-apps-script.js), one email a request
 // (newsletter.ts has the rules; newsletterRun.ts reads and files it).
@@ -112,6 +114,7 @@ export async function POST(request: Request) {
     date,
     text: str(body.text, MAX_TEXT),
     attachment,
+    auth: str(body.auth, 4000) || null,
   }
 
   try {

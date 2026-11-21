@@ -1006,6 +1006,41 @@ Soon:
 - Eruv status set from an unauthenticated email (inferred), admin sign-in
   not checking the email is confirmed (depends on Supabase settings),
   a cross-community Google sync route, eruv fetchers with no SSRF guard.
+  **Built Nov 20** (`claude/health-security`), all four:
+  - Sign-in: a token for an email never confirmed is refused by the admin
+    and inbox checks (`confirmedEmail.ts`). Live and dev both have
+    "Confirm email" on today (read from `/auth/v1/settings`: signups open,
+    `mailer_autoconfirm: false`), so nobody could do this yet; it no longer
+    rests on that setting. Every admin here signs in by magic link, which
+    confirms. Red 3/3 against the old checks.
+  - Google read on a place (`found` route, and approving a suggestion):
+    `loadSyncableListing` takes the admin's community and reads only its
+    listings. Before, an admin of one community could run a Google read on,
+    and write to, another's listing by its id. Red 3/3.
+  - The eruv readers (status page, map file, website watch) fetched their
+    saved addresses with plain fetch. They use `publicFetch`
+    (`menuReader.ts`) now: public internet only, every redirect checked,
+    as the menu reader already was. Red 3/3.
+  - Eruv emails: confirmed from code that nothing checked who sent one. The
+    route needs the script's key, but the script picks emails by their
+    From and List-Post headers, which anyone can write; a spoofed email
+    that reached the inbox would set the eruv's status at once. Gmail's
+    own verdict is in each email's Authentication-Results header. The
+    script now sends it (the first one, the header Gmail added, from the
+    raw message), and an eruv email is read only when DKIM, SPF or DMARC
+    passed for the eruv's address's domain (`emailAuth.ts`); otherwise
+    `unverified`, not read, reported to Sentry. Red 5/5. **For the user:**
+    copy the Gmail script again from Newsletters into the guide's Gmail.
+    Until then the old script sends no header, and an eruv email is read
+    as before, with a Sentry issue "the Gmail script sends no
+    Authentication-Results" each time. Once it's copied, say whether an
+    email with no header should be refused outright (one line in
+    `eruvEmailRun.ts`).
+  - Seen once in this branch's admin-write run, not reproduced (0 of 6
+    alone): `home-preview-spot.spec.ts:33`, browser Forward after "← Back
+    to editor" left the editor showing instead of the full-size preview.
+    Nothing here touches the admin screens; its trace was lost to the
+    rerun. Next time, read the trace before rerunning.
 - Spend: no site-wide cap on the AI photo readers; Turnstile and rate
   limits fail open when their keys are missing. **Built Nov 20**: the
   two photo readers share a day of 300 reads (`PHOTO_READS_A_DAY` in
