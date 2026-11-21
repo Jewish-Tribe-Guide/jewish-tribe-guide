@@ -79,6 +79,9 @@ const mockAddEruv = vi.hoisted(() => vi.fn())
 const mockRemoveEruv = vi.hoisted(() => vi.fn())
 vi.mock('./eruvStore', () => ({ listEruvimForAdmin: mockListEruvimForAdmin, updateEruv: mockUpdateEruv, addEruv: mockAddEruv, removeEruv: mockRemoveEruv }))
 
+const mockReportServerError = vi.hoisted(() => vi.fn())
+vi.mock('./serverError', () => ({ reportServerError: mockReportServerError }))
+
 const {
   activityForApproval,
   approveSubmission,
@@ -133,6 +136,7 @@ afterEach(() => {
   mockGeocode.mockReset()
   mockFetchPlaceSync.mockReset()
   mockRecordActivity.mockReset()
+  mockReportServerError.mockReset()
   mockRpc.mockReset()
   mockListEruvimForAdmin.mockReset()
   mockUpdateEruv.mockReset()
@@ -523,7 +527,7 @@ describe('approveSubmission', () => {
       payload: listingPayload({ name: 'Renamed Shul' }) as unknown as Record<string, unknown>,
     })
     const submissionBuilder = chainable({ data: sub, error: null })
-    const resourceUpdateBuilder = chainable({ error: null })
+    const resourceUpdateBuilder = chainable({ data: { id: 'res-1', details: {} }, error: null })
     const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
 
     let submissionCalls = 0
@@ -589,6 +593,52 @@ describe('approveSubmission', () => {
     mockFrom.mockImplementation((table: string) => (table === 'submission' ? submissionBuilder : resourceUpdateBuilder))
 
     await expect(approveSubmission('sub-1')).rejects.toThrow('Failed to archive listing: db down')
+  })
+
+  // Nov 21, the save survey: the claim came before Google and the map
+  // point, so a function stopped there left the change "approved" with
+  // nothing on the site, out of the queue for good.
+  it('does the slow work before claiming it: if that fails, it was never marked approved', async () => {
+    const sub = baseSubmission({ operation: 'create', payload: listingPayload({ geo: undefined }) as unknown as Record<string, unknown> })
+    const submissionBuilder = chainable({ data: sub, error: null })
+    mockFrom.mockImplementation((table: string) => (table === 'submission' ? submissionBuilder : chainable({ error: null })))
+    mockGetCategoryById.mockResolvedValue(null)
+    mockGeocode.mockRejectedValue(new Error('timed out'))
+
+    await expect(approveSubmission('sub-1')).rejects.toThrow('timed out')
+    expect(submissionBuilder.update).not.toHaveBeenCalled()
+  })
+
+  it('says so when a change that failed can’t be put back to waiting', async () => {
+    const sub = baseSubmission({ operation: 'delete', target_id: 'res-1' })
+    let submissionCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'resource') return chainable({ error: { message: 'db down' } })
+      submissionCalls += 1
+      if (submissionCalls === 1) return chainable({ data: sub, error: null })
+      if (submissionCalls === 2) return chainable({ data: { id: 'sub-1' }, error: null })
+      return chainable({ error: { message: 'still down' } })
+    })
+
+    await expect(approveSubmission('sub-1')).rejects.toThrow('Failed to archive listing: db down')
+    expect(mockReportServerError).toHaveBeenCalledWith(expect.stringContaining('sub-1'), 'still down')
+  })
+
+  // An edit keeps the listing's own keys from the listing as it is; a read
+  // that failed went on as if there were none, and the update wiped them.
+  it('doesn’t update a listing it couldn’t read first', async () => {
+    const sub = baseSubmission({ operation: 'update', target_id: 'res-1', payload: listingPayload() as unknown as Record<string, unknown> })
+    const resourceBuilder = chainable({ data: null, error: { message: 'timeout' } })
+    let submissionCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'resource') return resourceBuilder
+      submissionCalls += 1
+      return chainable({ data: submissionCalls === 1 ? sub : { id: 'sub-1' }, error: null })
+    })
+    mockGetCategoryById.mockResolvedValue(null)
+
+    await expect(approveSubmission('sub-1')).rejects.toThrow('Couldn’t read the listing: timeout')
+    expect(resourceBuilder.update).not.toHaveBeenCalled()
   })
 
   it('does not fail approval when tag-vocabulary growth throws (best-effort)', async () => {
