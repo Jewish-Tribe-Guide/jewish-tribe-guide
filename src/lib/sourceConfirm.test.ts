@@ -7,11 +7,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const m = vi.hoisted(() => ({
   rows: [] as { id: string; details: Record<string, unknown> | null }[],
   writes: [] as { id: string; details: Record<string, unknown>; filter: string[] }[],
+  patches: [] as { p_id: string; p_set: Record<string, unknown>; p_unset: string[]; p_if: Record<string, string | null> }[],
+  // What patch_resource_details answers: false when a box moved since the read.
+  patched: true as boolean,
+  rpcError: null as { message: string } | null,
   revalidateTag: vi.fn(),
 }))
 vi.mock('next/cache', () => ({ revalidateTag: m.revalidateTag }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
+    rpc: (_name: string, args: (typeof m.patches)[number]) => {
+      m.patches.push(args)
+      return Promise.resolve(m.rpcError ? { data: null, error: m.rpcError } : { data: m.patched, error: null })
+    },
     from: () => {
       let write: { id?: string; details?: Record<string, unknown>; filter: string[] } | null = null
       const q = {
@@ -46,6 +54,9 @@ const NOW = '2026-10-19T07:47:31.000Z'
 beforeEach(() => {
   m.rows = []
   m.writes = []
+  m.patches = []
+  m.patched = true
+  m.rpcError = null
   m.revalidateTag.mockClear()
 })
 
@@ -88,9 +99,11 @@ describe('confirmFromSource', () => {
       { id: 'c', details: { sectionConfirmed: { weekday: '2026-10-19T03:00:00Z', shabbos: '2026-10-19T03:00:00Z' }, sectionFrom: { weekday: AT('A shul', '2026-10-19T03:00:00Z'), shabbos: AT('A shul', '2026-10-19T03:00:00Z') } } },
     ]
     expect(await confirmFromSource('philly', ['a', 'b', 'c', 'a'], 'A shul', ['weekday', 'shabbos'], NOW)).toBe(2)
-    expect(m.writes.map((w) => [w.id, w.filter, w.details.sectionConfirmed])).toEqual([
-      ['a', ['details->sectionConfirmed->>weekday=2026-10-18T00:00:50.603Z', 'details->sectionConfirmed->>shabbos is null'], { weekday: NOW, shabbos: NOW }],
-      ['b', ['details->sectionConfirmed->>weekday is null', 'details->sectionConfirmed->>shabbos is null'], { weekday: NOW, shabbos: NOW }],
+    // Only the dates it moves are sent (Nov 21): a listing edit saved
+    // between the read and the write stays.
+    expect(m.patches.map((w) => [w.p_id, w.p_if, Object.keys(w.p_set).sort(), w.p_set.sectionConfirmed])).toEqual([
+      ['a', { 'sectionConfirmed.weekday': '2026-10-18T00:00:50.603Z', 'sectionConfirmed.shabbos': null }, ['sectionConfirmed', 'sectionFrom'], { weekday: NOW, shabbos: NOW }],
+      ['b', { 'sectionConfirmed.weekday': null, 'sectionConfirmed.shabbos': null }, ['sectionConfirmed', 'sectionFrom'], { weekday: NOW, shabbos: NOW }],
     ])
     expect(m.revalidateTag).toHaveBeenCalledTimes(1)
     expect(m.revalidateTag).toHaveBeenCalledWith('resources:philly', 'max')
@@ -98,7 +111,7 @@ describe('confirmFromSource', () => {
   it('the boxes can depend on the listing: a hospital’s, by what Refuah gave', async () => {
     m.rows = [{ id: 'h', details: { liaisons: [{ name: 'x' }] } }]
     expect(await confirmFromSource('philly', ['h'], 'Refuah', (d) => (d.liaisons ? ['liaisons'] : []), NOW)).toBe(1)
-    expect(m.writes[0].details.sectionFrom).toEqual({ liaisons: AT('Refuah', NOW) })
+    expect(m.patches[0].p_set.sectionFrom).toEqual({ liaisons: AT('Refuah', NOW) })
   })
   it('still counts its dates when there is no site cache to refresh (the daily test-project job runs outside Next)', async () => {
     m.rows = [{ id: 'a', details: null }]
@@ -127,5 +140,24 @@ describe('confirmFromSource', () => {
   it('does nothing for no listings', async () => {
     expect(await confirmFromSource('philly', [], 'Keystone-K', ['kosher'], NOW)).toBe(0)
     expect(m.revalidateTag).not.toHaveBeenCalled()
+  })
+})
+
+describe('confirmFromSource: when a box moved, or before migration 111', () => {
+  it('doesn’t count a listing whose box moved since the read', async () => {
+    m.rows = [{ id: 'a', details: null }]
+    m.patched = false
+    expect(await confirmFromSource('philly', ['a'], 'Keystone-K', ['kosher'], NOW)).toBe(0)
+    expect(m.revalidateTag).not.toHaveBeenCalled()
+  })
+  it('writes the whole details, guarded the same way, where patch_resource_details isn’t there yet', async () => {
+    m.rows = [{ id: 'a', details: { sectionConfirmed: { weekday: '2026-10-18T00:00:50.603Z' } } }]
+    m.rpcError = { message: 'Could not find the function public.patch_resource_details(p_columns, p_community, p_id, p_if, p_set, p_unset) in the schema cache' }
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await confirmFromSource('philly', ['a'], 'A shul', ['weekday', 'shabbos'], NOW)).toBe(1)
+    quiet.mockRestore()
+    expect(m.writes.map((w) => [w.id, w.filter, w.details.sectionConfirmed])).toEqual([
+      ['a', ['community_id=philly', 'details->sectionConfirmed->>weekday=2026-10-18T00:00:50.603Z', 'details->sectionConfirmed->>shabbos is null'], { weekday: NOW, shabbos: NOW }],
+    ])
   })
 })

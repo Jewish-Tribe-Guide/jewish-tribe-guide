@@ -10,6 +10,7 @@ const m = vi.hoisted(() => ({
   searchPlaces: vi.fn(),
   readOwnSiteNow: vi.fn(),
 }))
+vi.mock('@/lib/listingPatch', () => import('@/test/patchAsWholeWrite'))
 vi.mock('@/lib/hoursJobRun', () => ({ readOwnSiteNow: m.readOwnSiteNow }))
 
 // The resource table, in memory: select().eq()… awaited or maybeSingle(),

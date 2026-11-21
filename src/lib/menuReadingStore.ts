@@ -7,6 +7,7 @@ import { MENU_LINK_KEY } from './menuLink'
 import { MENU_CANT_READ_NOTE, READING_GIVES_UP_MS } from './watchJobs'
 import { noteValidated } from './validatedDuring'
 import { readAll } from '@/lib/readAll'
+import { patchListing } from './listingPatch'
 
 // What the menu reader proposed for each food place, and what an admin
 // decided (menu_reading, migration 065). Uncached: an admin screen. A
@@ -213,19 +214,23 @@ export async function clearMenuReading(community: string, resourceId: string): P
 
 /** Puts a menu link on a live listing, or takes it off (null) (details.menuUrl, menuLink.ts): the
  *  admin's "Give its menu link". From then on the tab reads it first and
- *  the menu watch watches it (syncMenuWatches). Read, then written whole,
- *  as other admin writes to details are. False when the listing isn't live. */
+ *  the menu watch watches it (syncMenuWatches). Read, then only the link
+ *  written (listingPatch.ts). False when the listing isn't live. */
 export async function saveMenuLink(community: string, resourceId: string, url: string | null): Promise<boolean> {
   const supabase = getAdminClient()
   const { data, error } = await supabase.from('resource').select('details').eq('community_id', community).eq('id', resourceId).eq('status', 'approved').maybeSingle()
   if (error) throw new Error(`Failed to load the listing: ${error.message}`)
   if (!data) return false
   // null: "Stop reading it", the link taken off.
-  const details: Record<string, unknown> = { ...((data as { details: Record<string, unknown> | null }).details ?? {}) }
+  const had = (data as { details: Record<string, unknown> | null }).details ?? {}
+  const details: Record<string, unknown> = { ...had }
   if (url) details[MENU_LINK_KEY] = url
   else delete details[MENU_LINK_KEY]
-  const { error: saveError } = await supabase.from('resource').update({ details }).eq('community_id', community).eq('id', resourceId)
-  if (saveError) throw new Error(`Failed to save the menu link: ${saveError.message}`)
+  try {
+    await patchListing(community, resourceId, had, details)
+  } catch (e) {
+    throw new Error(`Failed to save the menu link: ${(e as Error).message}`)
+  }
   return true
 }
 
@@ -278,8 +283,8 @@ export function withMenuDishes(
   return out
 }
 
-/** Sets a live listing's dish lists (withMenuDishes). Read, then written
- *  whole, as saveMenuLink. False when the listing isn't live. */
+/** Sets a live listing's dish lists (withMenuDishes). Read, then what changed
+ *  written, as saveMenuLink. False when the listing isn't live. */
 export async function setMenuDishes(
   community: string,
   resourceId: string,
@@ -291,9 +296,12 @@ export async function setMenuDishes(
   const { data, error } = await supabase.from('resource').select('details').eq('community_id', community).eq('id', resourceId).eq('status', 'approved').maybeSingle()
   if (error) throw new Error(`Failed to load the listing: ${error.message}`)
   if (!data) return false
-  const details = withMenuDishes((data as { details: Record<string, unknown> | null }).details ?? {}, fieldKey, lists, dated)
-  const { error: saveError } = await supabase.from('resource').update({ details }).eq('community_id', community).eq('id', resourceId)
-  if (saveError) throw new Error(`Failed to save the dishes: ${saveError.message}`)
+  const had = (data as { details: Record<string, unknown> | null }).details ?? {}
+  try {
+    await patchListing(community, resourceId, had, withMenuDishes(had, fieldKey, lists, dated))
+  } catch (e) {
+    throw new Error(`Failed to save the dishes: ${(e as Error).message}`)
+  }
   return true
 }
 
@@ -334,7 +342,7 @@ export function withMenuChecked(details: Record<string, unknown>, fieldKey: stri
 }
 
 /** Dates a live listing's dishes from its menu (withMenuChecked). Read,
- *  then written whole, as setMenuDishes. True when it wrote. */
+ *  then what changed written, as setMenuDishes. True when it wrote. */
 export async function dateMenuDishes(community: string, resourceId: string, fieldKey: string, names: readonly string[], at = new Date().toISOString()): Promise<boolean> {
   if (names.length === 0) return false
   const supabase = getAdminClient()
@@ -344,9 +352,10 @@ export async function dateMenuDishes(community: string, resourceId: string, fiel
   if (menuNamesListed(had, fieldKey, names)) noteValidated(resourceId, ['menus'])
   const details = withMenuChecked(had, fieldKey, names, at)
   if (!details) return false
-  const { error: saveError } = await supabase.from('resource').update({ details }).eq('community_id', community).eq('id', resourceId)
-  if (saveError) {
-    console.error(`[menu-watch] couldn’t date ${resourceId}’s dishes:`, saveError.message)
+  try {
+    await patchListing(community, resourceId, had, details)
+  } catch (e) {
+    console.error(`[menu-watch] couldn’t date ${resourceId}’s dishes:`, (e as Error).message)
     return false
   }
   // As sourceConfirm.ts: outside Next there's no cache, and the date is

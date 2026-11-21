@@ -1365,7 +1365,57 @@ ever) — then read the last year only, rather than deleting anything.
 Checked and not so: the nightly email does record a failed send, as a
 warning, not a failure.
 
-## `details` holding the site's own state: a plan, not started (Nov 21)
+## `details` holding the site's own state: started Nov 21 (the user's yes)
+
+**Changed again while building (Nov 21), to fewer steps and no change to
+any reader.** `details` keeps a copy of the site's keys for good, kept by
+the trigger, so nothing that reads a listing changes, and the copy can't
+go stale. What changes is who may write those keys:
+
+1. **Built**: migration 110 adds `state` and a trigger that copies the
+   site's keys (`SITE_STATE_KEYS`, `syncFields.ts`; `site_state_keys()` in
+   the migration, held together by `resourceState.test.ts`) from every
+   write of `details`, and copies every row once.
+2. **Built**: migration 111 adds `patch_resource_details`, which changes
+   only the keys it's given (and an approved edit's columns) in one
+   statement, with an optional "only if still" guard. It and the SQL
+   functions that already write the site's keys (confirm, unconfirm, item
+   marks, approved dishes) turn on `jpc.writes_site_state` around their
+   update (re-created in 111 from their latest migration, the flag lines
+   the only change). The first version attached the setting to each
+   function instead (`alter function … set`), which Supabase's SQL editor
+   refuses ("permission denied to set parameter"), so it rolled back on dev
+   and live on Nov 21; `resourceState.test.ts` now fails on that, and on
+   an update of a listing in a function without the flag around it. Every site
+   writer of a listing's details goes through `patchListing`
+   (`listingPatch.ts`): Google's job, the nightly sync, menu links and
+   dishes, source dates, a category's field clean-ups, and approving an
+   edit. So a save landing between a job's read and its write is no
+   longer wiped. Where 111 hasn't run, `patchListing` writes the whole
+   `details` as before. `siteStateWriters.test.ts` fails on a new whole
+   write. **111 (fixed) needs running on dev and live** (dev is also the
+   test project; 109 and 110 ran on both Nov 21).
+3. **Written, held**: migration 112 turns the trigger round. A write not
+   marked as a site writer keeps the listing's `state`, and its `details`
+   gets the site's keys from it, so an approved week-old edit, an admin's
+   save or a script can no longer wipe or roll back a confirmation, an
+   item date or Google's record. A write that sets `state` itself keeps it.
+   **Run it only after 111 and this branch's deploy are live.** Before
+   running it: the old one-off scripts in `scripts/` that write site keys
+   whole (`backfill-place-ids`, `backfill-verified-directions`,
+   `migrate-mismatched-placeids`, `sync-google-hours`,
+   `reconcile-google-provenance`, `merge-food-categories`) would have
+   those writes ignored, and `run-test-project-server.mjs`'s fixture
+   upserts should send `state: {}` to keep resetting them. Checked on a
+   fresh Postgres 17: a stale whole write, the patch, `confirm_resource`,
+   an unrelated update, an explicit `state`.
+
+The earlier order, kept for the record: reads merging `{...details,
+...state}`, every writer writing `state`, then removing the keys from
+`details`. Dropped because each reader would have changed for no gain
+once only the site's writers can touch the keys.
+
+The plan as first written:
 
 A listing's `details` jsonb holds what people wrote (hours, notes, the
 fields an admin set up) and, beside it, about 26 keys the site keeps for

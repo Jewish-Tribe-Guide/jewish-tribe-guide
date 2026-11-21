@@ -26,6 +26,7 @@ import {
 } from './googleJob'
 import type { ResourceSubmission } from '@/types'
 import { readAll } from '@/lib/readAll'
+import { patchListing } from './listingPatch'
 
 // ── The Watches tab's Google page, on the server (googleJob.ts) ─────────────
 // Who checks each field is worked out here from each job's own rule:
@@ -273,9 +274,14 @@ async function onePlace(community: string, id: string, now: number): Promise<Goo
   return placeOf(row, category, watches, now, community, null)
 }
 
-async function writeDetails(community: string, id: string, details: Record<string, unknown>): Promise<void> {
-  const { error } = await getAdminClient().from('resource').update({ details }).eq('community_id', community).eq('id', id)
-  if (error) throw new Error(`Failed to save: ${error.message}`)
+/** Writes what changed from `before` (the listing as loaded) to `details`
+ *  (listingPatch.ts), so a save in between keeps the rest. */
+async function writeDetails(community: string, id: string, before: Record<string, unknown>, details: Record<string, unknown>): Promise<void> {
+  try {
+    await patchListing(community, id, before, details)
+  } catch (e) {
+    throw new Error(`Failed to save: ${(e as Error).message}`)
+  }
 }
 
 function googleValues(sync: PlaceSync): CheckValues {
@@ -284,7 +290,7 @@ function googleValues(sync: PlaceSync): CheckValues {
 
 /** Asks Google about the listing's match: the fields that already match
  *  become Google's to keep, and its answer is kept to decide the rest. */
-async function compareWithGoogle(community: string, row: Row, category: CategoryConfig, placeId: string, now: number, extra: Record<string, unknown> = {}): Promise<void> {
+async function compareWithGoogle(community: string, row: Row, category: CategoryConfig, placeId: string, now: number, extra: Record<string, unknown> = {}, stored: Record<string, unknown> = row.details ?? {}): Promise<void> {
   const sync = await fetchPlaceSync(placeId)
   if (!sync) throw new GoogleJobError('Google didn’t answer. Try again shortly.', 502)
   const values = googleValues(sync)
@@ -292,7 +298,7 @@ async function compareWithGoogle(community: string, row: Row, category: Category
   const stopped = stoppedOf(details)
   const matches = fieldsOf(category).filter((f) => !stopped.includes(f) && !syncMayWrite(details, f, valueOf(f, row, category)) && shown(f, values[f]) !== '—' && same(f, values[f], valueOf(f, row, category)))
   const at = new Date(now).toISOString()
-  await writeDetails(community, row.id, {
+  await writeDetails(community, row.id, stored, {
     ...details,
     ...(matches.length || !Array.isArray(details.googleFields) ? { googleFields: nextGoogleFields(details, matches) } : {}),
     googleCheck: { at, values } satisfies StoredCheck,
@@ -326,7 +332,7 @@ export async function pickGooglePlace(community: string, id: string, placeId: st
   const before = matchOf(details)
   // A different match: what the old one said describes another place.
   for (const k of ['lastSyncError', 'lastSyncFailedAt', 'notOnGoogle', 'verifiedPlaceId', ...(before && before !== placeId ? ['googleSyncedAt', 'googleStatusCheckedAt'] : [])]) delete details[k]
-  await compareWithGoogle(community, { ...row, details }, category, placeId, now, { placeId })
+  await compareWithGoogle(community, { ...row, details }, category, placeId, now, { placeId }, row.details ?? {})
   return onePlace(community, id, now)
 }
 
@@ -344,7 +350,7 @@ export async function keepTheListing(community: string, id: string, now = Date.n
   const [{ row, category }, { watches }] = await Promise.all([loadOne(community, id), listWatches(community)])
   const details = row.details ?? {}
   const check = storedCheck(details)
-  await writeDetails(community, id, {
+  await writeDetails(community, id, details, {
     ...details,
     googleKept: keptNow(row, category, watches, now),
     ...(check ? { googleCheck: { ...check, decided: { what: 'kept', at: new Date(now).toISOString() } } } : {}),
@@ -367,11 +373,11 @@ export async function notOnGoogle(community: string, id: string, now = Date.now(
     for (const k of ['placeId', 'lastSyncError', 'lastSyncFailedAt', 'verifiedPlaceId', 'googleSyncedAt', 'googleStatusCheckedAt']) delete details[k]
   }
   const said = { ...details, notOnGoogle: new Date(now).toISOString() }
-  await writeDetails(community, id, said)
+  await writeDetails(community, id, row.details ?? {}, said)
   // A page that won't read leaves its fields to you, as before.
   await readOwnSiteNow(community, id).catch((err) => console.error('[googleJob] reading its website failed:', err))
   const [{ row: after }, { watches }] = await Promise.all([loadOne(community, id), listWatches(community)])
-  await writeDetails(community, id, { ...(after.details ?? said), googleKept: keptNow(after, category, watches, now) })
+  await writeDetails(community, id, after.details ?? {}, { ...(after.details ?? said), googleKept: keptNow(after, category, watches, now) })
   return onePlace(community, id, now)
 }
 
@@ -393,7 +399,7 @@ export async function wrongPlace(community: string, id: string, now = Date.now()
   if (!placeId) throw new GoogleJobError('This listing has no Google match.', 400)
   const wrong = Array.isArray(details.googleWrong) ? (details.googleWrong as unknown[]).filter((x): x is string => typeof x === 'string') : []
   for (const k of MATCH_KEYS) delete details[k]
-  await writeDetails(community, id, { ...details, googleWrong: [...new Set([...wrong, placeId])] })
+  await writeDetails(community, id, row.details ?? {}, { ...details, googleWrong: [...new Set([...wrong, placeId])] })
   return onePlace(community, id, now)
 }
 
@@ -404,7 +410,7 @@ export async function notThisPlace(community: string, id: string, placeId: strin
   const { row } = await loadOne(community, id)
   const details = { ...(row.details ?? {}) }
   const wrong = Array.isArray(details.googleWrong) ? (details.googleWrong as unknown[]).filter((x): x is string => typeof x === 'string') : []
-  await writeDetails(community, id, { ...details, googleWrong: [...new Set([...wrong, placeId])] })
+  await writeDetails(community, id, row.details ?? {}, { ...details, googleWrong: [...new Set([...wrong, placeId])] })
 }
 
 /** The listing with some of its fields set, through the queue and
@@ -476,7 +482,7 @@ export async function editFromGoogle(community: string, id: string, values: Part
   const [{ row: after }, { watches }] = await Promise.all([loadOne(community, id), listWatches(community)])
   const details = after.details ?? {}
   const latest = storedCheck(details)
-  await writeDetails(community, id, {
+  await writeDetails(community, id, details, {
     ...details,
     googleKept: keptNow(after, category, watches, now),
     ...(latest ? { googleCheck: { ...latest, decided: { what: 'used', at: new Date(now).toISOString() } } } : {}),
@@ -501,7 +507,7 @@ export async function stopField(community: string, id: string, name: string, now
   // A listing with no provenance yet has Google filling its blanks: the
   // list it would have had, so stopping one leaves the rest as they were.
   const owned = Array.isArray(details.googleFields) ? (details.googleFields as string[]) : fieldsOf(category).filter((f) => syncMayWrite(details, f, valueOf(f, row, category)))
-  await writeDetails(community, id, {
+  await writeDetails(community, id, details, {
     ...details,
     googleFields: owned.filter((f) => f !== field),
     googleStopped: [...new Set([...stoppedOf(details), field])],
@@ -523,7 +529,7 @@ export async function takeGoogleField(community: string, id: string, name: strin
   const details = after.details ?? {}
   const left = stoppedOf(details).filter((f) => f !== field)
   const { googleStopped: _dropped, ...rest } = details
-  await writeDetails(community, id, {
+  await writeDetails(community, id, details, {
     ...rest,
     // A name that shares nothing with Google's takes the match away.
     ...(matchOf(details) ? { googleFields: nextGoogleFields(details, [field]) } : {}),
@@ -536,7 +542,7 @@ async function markDecided(community: string, id: string, what: 'used' | 'kept',
   const { row } = await loadOne(community, id)
   const details = row.details ?? {}
   const check = storedCheck(details)
-  if (check) await writeDetails(community, id, { ...details, googleCheck: { ...check, decided: { what, at: new Date(now).toISOString() } } })
+  if (check) await writeDetails(community, id, details, { ...details, googleCheck: { ...check, decided: { what, at: new Date(now).toISOString() } } })
 }
 
 /** Show as open, over Google's closure; or Google's answer again, which is
@@ -552,6 +558,6 @@ export async function showAsOpen(community: string, id: string, open: boolean, n
     delete details.businessStatusOverride
     details.businessStatusKeptAt = new Date(now).toISOString()
   }
-  await writeDetails(community, id, details)
+  await writeDetails(community, id, row.details ?? {}, details)
   return onePlace(community, id, now)
 }

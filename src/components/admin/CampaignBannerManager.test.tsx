@@ -7,7 +7,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
 import { fetchJson } from '@/lib/fetchJson'
 import type { CampaignBanner } from '@/lib/campaignBanner'
-import CampaignBannerManager, { dateRange } from './CampaignBannerManager'
+import CampaignBannerManager, { dateRange, forgetCampaigns } from './CampaignBannerManager'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -43,11 +43,33 @@ function renderCampaigns(openId: string | null, banners = [sukkot, always], cats
 
 afterEach(() => {
   cleanup()
+  forgetCampaigns()
   vi.unstubAllGlobals()
   vi.resetAllMocks()
 })
 
 describe('Campaigns', () => {
+  // Each screen is its own address, so a new mount: opening one, or Add,
+  // waited on both loads again (CI, Nov 21: "Loading…" at 5s). What the list
+  // loaded shows at once.
+  it('a campaign opened from the list shows at once, from what the list loaded', async () => {
+    renderCampaigns(null)
+    await screen.findByRole('button', { name: /Sukkah Map/ })
+    cleanup()
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})))
+    renderWithProviders(<CampaignBannerManager token="tok" openId="new" onOpen={vi.fn()} onClose={vi.fn()} />, { community: { slug: 'philly' } })
+    expect(screen.getByRole('heading', { name: 'New campaign' })).toBeInTheDocument()
+  })
+
+  it('never shows another community’s', async () => {
+    renderCampaigns(null)
+    await screen.findByRole('button', { name: /Sukkah Map/ })
+    cleanup()
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})))
+    renderWithProviders(<CampaignBannerManager token="tok" openId={null} onOpen={vi.fn()} onClose={vi.fn()} />, { community: { slug: 'ues' } })
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
   it('lists each campaign with what it opens and when, and which is on now', async () => {
     const user = userEvent.setup()
     const { onOpen } = renderCampaigns(null)

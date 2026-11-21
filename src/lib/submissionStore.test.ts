@@ -33,6 +33,7 @@ function chainable(result: unknown) {
 
 const mockFrom = vi.hoisted(() => vi.fn())
 const mockRpc = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/listingPatch', () => import('@/test/patchAsWholeWrite'))
 vi.mock('./supabase/admin', () => ({
   getAdminClient: () => ({ from: mockFrom, rpc: mockRpc }),
 }))

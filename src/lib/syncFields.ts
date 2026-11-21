@@ -154,3 +154,15 @@ export function submitterDetails(
   if (menu !== undefined) next[MENU_LINK_PROPOSED] = menu
   return next
 }
+
+/** The keys the site keeps for itself, moving out of `details` into the
+ *  listing's own `state` column (migration 110, Nov 21; the plan is in
+ *  docs/where-things-stand.md). The app's own keys above, less the two a
+ *  person may write (`googleDescription` where configured, `menuUrl`), plus
+ *  `googleFields`, which the sync and the editor work out rather than
+ *  anyone authoring it. Must match `site_state_keys()` in migration 110:
+ *  resourceState.test.ts holds them together. */
+export const SITE_STATE_KEYS: readonly string[] = [
+  ...SYNC_INTERNAL_FIELDS.filter((k) => k !== SHOWN_WHEN_CONFIGURED && k !== MENU_LINK_PROPOSED),
+  'googleFields',
+]
