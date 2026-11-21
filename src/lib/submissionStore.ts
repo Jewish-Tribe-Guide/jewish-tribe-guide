@@ -576,6 +576,7 @@ async function approveNow(
   // stopped partway then leaves the change waiting, never "approved" with
   // nothing on the site and no way back to the queue.
   const writeListing = submission.target_type === 'listing' ? await prepareListing(submission) : null
+  const writeCategory = submission.target_type === 'category' ? await prepareCategory(submission) : null
 
   // Claimed before anything goes on the site: of two approvals at once (two
   // tabs, two admins, a retry after a slow save), only the one whose claim
@@ -598,8 +599,8 @@ async function approveNow(
   try {
     if (writeListing) {
       ;({ id: affectedResourceId, newItems, changes } = await writeListing())
-    } else if (submission.target_type === 'category') {
-      await applyCategory(submission)
+    } else if (writeCategory) {
+      await writeCategory()
     } else if (submission.target_type === 'eruv' && submission.operation === 'update') {
       await applyEruv(submission)
     } else if (submission.target_type === 'eruv' && submission.operation === 'create') {
@@ -777,7 +778,13 @@ async function applyNewEruv(submission: SubmissionRow): Promise<void> {
     },
     { statusUrl: null, lineUrl: null },
   ).catch(async (err) => {
-    await removeEruv(submission.community_id, id)
+    // The suggestion's own error is the one to show; a failed removal only
+    // leaves the bare eruv, which the admin can see and remove.
+    try {
+      await removeEruv(submission.community_id, id)
+    } catch (backErr) {
+      reportServerError(`[submissions] a new eruv (${id}) stays bare: filling it in failed, and so did taking it back out`, backErr)
+    }
     throw err
   })
 }
@@ -1408,12 +1415,23 @@ async function growTagVocabulary(community: string, payload: ResourceSubmission)
 }
 
 // Approving a category creates the category, then its first listing (approved).
-async function applyCategory(submission: SubmissionRow): Promise<void> {
+/** A new category and its first listing. The address's map point is looked
+ *  up first, before the claim, and the returned write makes the category
+ *  and the listing together: if the listing can't go in, the category comes
+ *  back out, so approving again doesn't make "label-2" beside an empty one
+ *  (Nov 21, the save survey). */
+async function prepareCategory(submission: SubmissionRow): Promise<() => Promise<void>> {
   if (submission.operation !== 'create') {
     throw new Error(`Unsupported category operation: ${submission.operation}`)
   }
   const payload = submission.payload as unknown as CategorySubmissionPayload
+  const first = payload.firstListing
+  const geo = first.geo ?? (first.address?.trim() ? await geocode(first.address) : null)
+  return () => applyCategory(submission, payload, geo)
+}
 
+async function applyCategory(submission: SubmissionRow, payload: CategorySubmissionPayload, geo: Awaited<ReturnType<typeof geocode>> | undefined): Promise<void> {
+  const first = payload.firstListing
   const category = await createCategory(submission.community_id, {
     label: payload.label,
     icon: payload.icon,
@@ -1421,8 +1439,6 @@ async function applyCategory(submission: SubmissionRow): Promise<void> {
     upvotesEnabled: payload.upvotesEnabled,
   })
 
-  const first = payload.firstListing
-  const geo = first.geo ?? (first.address?.trim() ? await geocode(first.address) : null)
   const { error } = await getAdminClient().from('resource').insert({
     community_id: submission.community_id,
     category: category.id,
@@ -1436,5 +1452,9 @@ async function applyCategory(submission: SubmissionRow): Promise<void> {
     submitted_by: submission.submitted_by,
     reviewed_at: new Date().toISOString(),
   })
-  if (error) throw new Error(`Failed to create first listing: ${error.message}`)
+  if (error) {
+    const { error: backErr } = await getAdminClient().from('category').delete().eq('community_id', submission.community_id).eq('id', category.id)
+    if (backErr) reportServerError(`[submissions] a new category (${category.id}) stays with no listing: its first listing failed, and so did taking it back out`, backErr.message)
+    throw new Error(`Failed to create first listing: ${error.message}`)
+  }
 }

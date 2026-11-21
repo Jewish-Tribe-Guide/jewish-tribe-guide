@@ -2200,3 +2200,69 @@ describe('a new eruv suggestion', () => {
     expect(mockRemoveEruv).toHaveBeenCalledWith('philly', 'overbrook')
   })
 })
+
+// Nov 21, the save survey (6): a new category's approval used to make the
+// category, then its first listing; a failed listing left an empty category
+// and approving again made "label-2" beside it.
+describe('approveSubmission: a new category whose first listing fails', () => {
+  const payload: CategorySubmissionPayload = {
+    label: 'New Category',
+    firstListing: { name: 'First Place', anchorId: '', distance: null, address: '456 Oak Ave', phone: '' },
+  }
+  const sub = baseSubmission({ target_type: 'category', payload: payload as unknown as Record<string, unknown> })
+
+  function tables(categoryDelete: { error: { message: string } | null }) {
+    const order: string[] = []
+    const categoryBuilder = chainable(categoryDelete)
+    let submissionCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      order.push(table)
+      if (table === 'submission') return chainable(++submissionCalls === 1 ? { data: structuredClone(sub), error: null } : { data: { id: 'sub-1' }, error: null })
+      if (table === 'category') return categoryBuilder
+      return chainable({ error: { message: 'insert refused' } })
+    })
+    mockCreateCategory.mockImplementation(async () => {
+      order.push('createCategory')
+      return { id: 'new-category' }
+    })
+    mockGeocode.mockImplementation(async () => {
+      order.push('geocode')
+      return { lat: 40, lng: -75 }
+    })
+    return { order, categoryBuilder }
+  }
+
+  it('takes the category back out and puts the change back to waiting', async () => {
+    const { categoryBuilder } = tables({ error: null })
+    await expect(approveSubmission('sub-1', 'philly')).rejects.toThrow('Failed to create first listing: insert refused')
+    expect(categoryBuilder.delete).toHaveBeenCalled()
+    expect(categoryBuilder.eq).toHaveBeenCalledWith('id', 'new-category')
+    expect(mockReportServerError).not.toHaveBeenCalled()
+  })
+
+  it('looks up the address before claiming it', async () => {
+    const { order } = tables({ error: null })
+    await expect(approveSubmission('sub-1', 'philly')).rejects.toThrow()
+    expect(order.indexOf('geocode')).toBeLessThan(order.indexOf('submission', 1))
+  })
+
+  it('says so when the category can’t be taken back out either', async () => {
+    tables({ error: { message: 'down' } })
+    await expect(approveSubmission('sub-1', 'philly')).rejects.toThrow('Failed to create first listing: insert refused')
+    expect(mockReportServerError).toHaveBeenCalledWith(expect.stringContaining('new-category'), 'down')
+  })
+})
+
+describe('a new eruv whose removal fails too', () => {
+  it('shows the suggestion’s own error, and says the bare eruv stays', async () => {
+    const payload = { eruvId: 'overbrook', name: 'Overbrook Eruv', covers: null, website: null, hotline: null, alertsUrl: null, details: {}, statusAt: null, map: null }
+    mockFrom.mockReturnValue(chainable({ data: baseSubmission({ operation: 'create', target_type: 'eruv', target_id: null, payload }), error: null }))
+    mockListEruvimForAdmin.mockResolvedValue({ available: true, eruvim: [] })
+    mockListCategories.mockResolvedValue([])
+    mockAddEruv.mockResolvedValue(true)
+    mockUpdateEruv.mockRejectedValue(new Error('Failed to save the eruv: down'))
+    mockRemoveEruv.mockRejectedValue(new Error('remove failed'))
+    await expect(approveSubmission('sub-1', 'philly')).rejects.toThrow('Failed to save the eruv: down')
+    expect(mockReportServerError).toHaveBeenCalledWith(expect.stringContaining('overbrook'), expect.any(Error))
+  })
+})
