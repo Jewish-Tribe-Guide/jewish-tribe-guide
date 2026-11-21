@@ -1327,11 +1327,30 @@ Soon:
     doesn't name, or a value that isn't a placeholder. Red 3/3.
 
 Later or bigger:
-foreign keys; ~~`details`
+~~foreign keys~~ (written Nov 21, below); ~~`details`
 holding app state~~ (done Nov 21, below); an old-iOS floor
 decision; the parked Today
 features (keep or delete); `/inbox` per community; this file's size;
 Partial Prefetching before Next 17.
+
+Foreign keys (Nov 21, `claude/foreign-keys`): migration 113 written,
+**not run anywhere yet**. Every table's `community_id` points at
+`community` (deleting a community deletes its rows), a listing's category
+must exist (a category with listings can't be deleted; `delete_category`
+takes them first), and a listing's menu readings and watches, a form's
+responses and a category's banners and taught words go with it. History
+keeps no key on purpose: `activity`'s ids and `submission.target_id`
+outlive a deleted listing (live has 111 such approved removals).
+`anchor_id` holds 'all'/'community' too, so it has none. Each key is added
+NOT VALID and then checked against the rows already there; where old rows
+break it (dev has test leftovers: 13 categories of deleted communities, 5
+listings in gone categories, 50 menu readings of gone listings), it's
+skipped with a notice and still holds for new rows. Surveyed (read only)
+Nov 21: live clean. Checked on local Postgres 17: runs twice clean; a
+listing in a missing category, a row for a missing community and deleting
+a category with listings are refused; `delete_category`, `delete_form`,
+`delete_community` and a direct community delete all leave nothing
+behind.
 
 Done Nov 21 (`claude/later-list`): font sizes are rem (999 classes;
 `remFontSizes.test.ts` fails on a px one), so text follows the browser's
