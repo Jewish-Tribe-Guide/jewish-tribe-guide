@@ -55,7 +55,9 @@ export function kindsColumnMissing(message: string | undefined): boolean {
   return schemaMissing('kinds', message)
 }
 
-const quietly = (what: string) => (err: unknown) => console.error(`[job-run] ${what}:`, err)
+// Reported to Sentry, not only the log (Nov 21, the save survey): a run
+// whose finish isn't saved reads as cut off, and nobody heard why.
+const quietly = (what: string) => (err: unknown) => reportServerError(`[job-run] ${what}:`, err)
 
 /** Saves that a run started: its id, or null when nothing could be saved. */
 async function startRun(job: JobId, now: Date, community?: string): Promise<string | null> {
@@ -65,11 +67,11 @@ async function startRun(job: JobId, now: Date, community?: string): Promise<stri
   let { data, error } = await insert(community ? { ...row, community_id: community } : row)
   if (error && community && communityColumnMissing(error.message)) ({ data, error } = await insert(row))
   if (error) {
-    if (!runTableMissing(error.message)) console.error(`[job-run] couldn’t save ${job}’s start:`, error.message)
+    if (!runTableMissing(error.message)) reportServerError(`[job-run] couldn’t save ${job}’s start:`, error.message)
     return null
   }
   const before = new Date(now.getTime() - KEEP_DAYS * 86_400_000).toISOString()
-  await db.from('job_run').delete().eq('job', job).lt('started_at', before).then(({ error: e }) => e && console.error('[job-run] prune:', e.message), quietly('prune'))
+  await db.from('job_run').delete().eq('job', job).lt('started_at', before).then(({ error: e }) => e && reportServerError('[job-run] prune:', e.message), quietly('prune'))
   return (data as { id: string }).id
 }
 

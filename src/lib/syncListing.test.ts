@@ -66,6 +66,22 @@ afterEach(() => {
   mockSubmitClosure.mockReset()
 })
 
+vi.mock('@/lib/serverError', () => ({ reportServerError: vi.fn() }))
+
+// Nov 21, the save survey: the update's error was ignored, so an answer
+// never saved counted as synced, and its closure was filed and told of.
+describe('syncOneListing: a save that fails', () => {
+  it('is a failure, files no closure, and is said', async () => {
+    const { reportServerError } = await import('@/lib/serverError')
+    mockFetchPlaceSync.mockResolvedValue({ ...GOOGLE, businessStatus: 'CLOSED_PERMANENTLY' })
+    mockSubmitClosure.mockResolvedValue({ id: 's' })
+    mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'timeout' } }))
+    expect(await syncOneListing(row)).toEqual({ outcome: 'failed' })
+    expect(mockSubmitClosure).not.toHaveBeenCalled()
+    expect(reportServerError).toHaveBeenCalledWith(expect.stringContaining('couldn’t be saved'), 'timeout')
+  })
+})
+
 describe('syncOneListing', () => {
   it('writes a status onto a listing that has never had one', () => {
     mockFetchPlaceSync.mockResolvedValue({ ...GOOGLE, businessStatus: 'CLOSED_TEMPORARILY' })

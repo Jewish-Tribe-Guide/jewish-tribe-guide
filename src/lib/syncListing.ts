@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { fetchPlaceSync, nextGoogleFields, syncMayWrite, type OwnableSyncField } from '@/lib/googlePlaces'
 import { submitGoogleClosure } from '@/lib/submissionStore'
@@ -103,7 +104,7 @@ export async function syncOneListing(row: SyncedRow, { statusOnly = false }: { s
     // listings are failing, not just how many — see the sync-coverage
     // report in the admin Metrics tab. Cleared on the next successful
     // sync below, so a stale failure never lingers once Google recovers.
-    await supabase
+    const { error } = await supabase
       .from('resource')
       .update({
         details: {
@@ -113,6 +114,7 @@ export async function syncOneListing(row: SyncedRow, { statusOnly = false }: { s
         },
       })
       .eq('id', row.id)
+    if (error) reportServerError(`[sync] ${row.id}: Google didn’t answer, and saying so failed too`, error.message)
     return { outcome: 'failed' }
   }
 
@@ -194,7 +196,14 @@ export async function syncOneListing(row: SyncedRow, { statusOnly = false }: { s
 
   details.googleFields = nextGoogleFields(row.details, wrote)
 
-  await supabase.from('resource').update(update).eq('id', row.id)
+  // Its error checked (Nov 21, the save survey): unsaved, Google's answer
+  // was counted as synced, and its closure or status change told of again
+  // the next night, as if new.
+  const { error } = await supabase.from('resource').update(update).eq('id', row.id)
+  if (error) {
+    reportServerError(`[sync] ${row.id}: Google’s answer couldn’t be saved`, error.message)
+    return { outcome: 'failed' }
+  }
 
   // Route permanent closures through the moderation queue so an admin can
   // review and approve before the listing is removed from the public directory.
@@ -211,7 +220,7 @@ export async function syncOneListing(row: SyncedRow, { statusOnly = false }: { s
       // Told of in the nightly email, with the rest of the night's finds.
       if (submission) flaggedClosed = true
     } catch (err) {
-      console.error(`[sync] submitGoogleClosure failed for ${row.id}:`, err)
+      reportServerError(`[sync] submitGoogleClosure failed for ${row.id}:`, err)
     }
   }
 

@@ -144,11 +144,12 @@ describe('recordJobRun', () => {
     expect(console.error).not.toHaveBeenCalled()
   })
 
-  it('a save that fails is logged, not thrown', async () => {
-    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+  // To Sentry, not only the log (Nov 21, the save survey): a run whose
+  // finish isn't saved reads as cut off, and nobody heard why.
+  it('a save that fails is reported, not thrown', async () => {
     db.error = { message: 'connection reset' }
     await expect(recordJobRun('watches', async () => 'done', () => ({ ok: true, summary: '' }), clock())).resolves.toBe('done')
-    expect(logged).toHaveBeenCalled()
+    expect(reported).toContainEqual([expect.stringContaining('couldn’t save watches’s start'), 'connection reset'])
   })
 
   // The job's last runs as the table holds them after this one's finish.
