@@ -1,34 +1,12 @@
-'use client'
+import Screen from './Screen'
 
-import Link from 'next/link'
-import { useParams } from 'next/navigation'
-import { useAdminSession } from '@/components/admin/AdminAuthGate'
-import SubmissionHistory from '@/components/admin/SubmissionHistory'
-import { adminBase } from '@/lib/adminNav'
-import { useCommunitySlug } from '@/lib/communityContext'
+// The admin is static output (its layout's ensureStatic = 'navigation'), so
+// a screen with an id in its address names some ids to build ahead. Its two lists.
+// The screen itself is a Client Component and reads the id from the address.
+export function generateStaticParams() {
+  return [{ status: 'approved' }, { status: 'rejected' }]
+}
 
-// /{community}/admin/history/approved and .../history/rejected — what the
-// Metrics tab's tiles link to. 'use client', so the status comes from
-// useParams(), same as /admin/[community]/categories/[[...id]] — no
-// Suspense boundary needed (that's only a useSearchParams requirement).
-export default function AdminHistoryPage() {
-  const session = useAdminSession()
-  const community = useCommunitySlug()
-  const params = useParams<{ status: string }>()
-  const status = params.status === 'approved' || params.status === 'rejected' ? params.status : null
-
-  return (
-    <div>
-      {status ? (
-        <SubmissionHistory token={session.access_token} status={status} />
-      ) : (
-        <p className="text-sm text-red-700">
-          Unknown status &ldquo;{params.status}&rdquo;.{' '}
-          <Link href={`${adminBase(community)}/metrics`} className="underline">
-            Back to Reports
-          </Link>
-        </p>
-      )}
-    </div>
-  )
+export default function Page() {
+  return <Screen />
 }

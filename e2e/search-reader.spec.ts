@@ -16,31 +16,47 @@ import { categoryWithHoursField, defaultCommunity, ready } from './helpers'
 // (QUESTION_READER=off), and no test may spend on OpenAI or write a reading.
 
 const QUESTION = 'zqxw qvvjk'
+/** useLearnAfterPause's LEARN_PAUSE_MS. */
+const PAUSE_MS = 2500
+
+/** When each read reached the stand-in, by the test's clock. */
+const askedAt = new WeakMap<string[], number[]>()
 
 async function standIn(page: Page, categoryId: string) {
   const asked: string[] = []
+  const at: number[] = []
+  askedAt.set(asked, at)
   await page.route('**/api/ask/read**', async (route) => {
     asked.push((route.request().postDataJSON() as { question: string }).question)
+    at.push(Date.now())
     await route.fulfill({ json: { ok: true, reading: { categories: [{ id: categoryId, openNow: true }] }, remembered: true } })
   })
   return asked
 }
 
+/** No read has come sooner than the pause after `typed`. Timed rather
+ * than checked for none at 1.5s: on a loaded machine that check itself ran
+ * a second late and caught the read the pause had rightly made (Nov 21). */
+function noReadBeforePause(asked: string[], typed: number) {
+  for (const at of askedAt.get(asked)!) expect(at - typed).toBeGreaterThanOrEqual(PAUSE_MS)
+}
+
 /** Typed, read once the typing stops (useLearnAfterPause's 2.5s), once. */
 async function typeAndLeave(page: Page, box: ReturnType<Page['getByRole']>, asked: string[]) {
+  const typed = Date.now()
   await box.fill(QUESTION)
-  await page.waitForTimeout(1500)
-  expect(asked).toEqual([])
   await expect.poll(() => asked, { timeout: 8000 }).toEqual([QUESTION])
+  noReadBeforePause(asked, typed)
   await page.waitForTimeout(3000)
   expect(asked).toEqual([QUESTION])
 }
 
 /** Typed, Enter before the pause is up: read at once, and only once. */
 async function typeThenEnter(page: Page, box: ReturnType<Page['getByRole']>, asked: string[]) {
+  const typed = Date.now()
   await box.fill(QUESTION)
   await page.waitForTimeout(1500)
-  expect(asked).toEqual([])
+  noReadBeforePause(asked, typed)
   await box.press('Enter')
   await expect.poll(() => asked).toEqual([QUESTION])
   await page.waitForTimeout(3000)
@@ -116,11 +132,13 @@ test('typed and left, without Enter: read once the typing stops, on every page',
 
   // Each page is its own visit: the tab's answers don't carry over a load.
   asked.length = 0
+  askedAt.get(asked)!.length = 0
   await page.goto(`/${community}/${category.id}`)
   await ready(page)
   await typeAndLeave(page, page.getByRole('searchbox', { name: `Search ${category.pluralLabel}` }), asked)
 
   asked.length = 0
+  askedAt.get(asked)!.length = 0
   await page.goto(`/${community}/map`)
   await ready(page)
   await typeAndLeave(page, page.getByPlaceholder(/Search name, address/).filter({ visible: true }), asked)
