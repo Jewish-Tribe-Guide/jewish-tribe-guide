@@ -1,10 +1,10 @@
 'use client'
 
 import { track } from '@vercel/analytics'
-import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MapPoint } from './ResourceMap'
 import { createHighlight } from './highlight'
-import CategoryFilter, { type FilterOption } from './CategoryFilter'
+import CategoryFilter from './CategoryFilter'
 import MapFiltersSheet, { type MapFilterSection } from './MapFiltersSheet'
 import NearbyList from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
@@ -12,28 +12,24 @@ import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbyS
 import type { HostedEditor } from '@/components/resources/ListingEditor'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
-import { DEFAULT_CATEGORY_ICON, resolveCapabilities, selectValues } from '@/lib/categories'
+import { selectValues } from '@/lib/categories'
 import {
   filterCount,
   filterFields,
   keepsHours,
   openNowAll,
   passesFields,
-  readMapFilters,
   setOpenNowFor,
   toggleBool,
   toggleOpenNow,
   toggleSelect,
   writeMapFilters,
-  type MapFilterState,
 } from '@/lib/mapFilters'
 import { useHospitals } from '@/lib/useHospitals'
 import { useIsMobile } from '@/lib/useIsMobile'
 import type { LatLng } from '@/lib/googleMapsLinks'
-import { listingSearchText } from '@/lib/searchListing'
 import { useNow } from '@/lib/useNow'
 import { ui } from '@/lib/uiConfig'
-import { getCategoryColor, HOSPITAL_COLOR, HOSPITAL_ICON } from '@/lib/categoryColor'
 import { usePinned } from '@/lib/pinnedContext'
 import { CURRENT_LOCATION_LABEL } from '@/lib/useLiveLocation'
 import { useDroppedPins } from '@/lib/droppedPinsContext'
@@ -56,6 +52,7 @@ import {
   ERUV_PREFIX,
   HOSPITALS_ID,
   NOOP_LIVE_TRACKING,
+  mapShellClass,
   normalizeSearch,
   openNowIdsFor,
   resolveInitialSelected,
@@ -64,7 +61,10 @@ import {
   type SelectablePoint,
 } from './mapViewShared'
 import { MapWithHover, SearchSuggestions } from './mapViewParts'
+import { useMapPoints } from './useMapPoints'
 import { useMapSearch } from './useMapSearch'
+import { useMapFilters } from './useMapFilters'
+import { useViewFromLink } from './useViewFromLink'
 import { useMapCategories } from './useMapCategories'
 import { useMapEruvim } from './useMapEruvim'
 import { CampaignChip, EruvButton, FiltersButton, PinnedChip } from './mapChips'
@@ -74,6 +74,7 @@ import { DesktopTrackingButton, MobileRecenterButton } from './LocationButtons'
 import CategoriesPickerScreen from './CategoriesPickerScreen'
 import DroppedPinEditors from './DroppedPinEditors'
 import DesktopMapChrome from './DesktopMapChrome'
+import { DesktopSidebar, SidebarScroll } from './DesktopSidebar'
 
 type Props = ResourceMapViewProps
 
@@ -451,83 +452,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     [],
   )
 
-  const colorById = useMemo(() => {
-    const map = new Map<string, string>()
-    ;(categories ?? []).forEach((c) => map.set(c.id, getCategoryColor(categories, c.id)))
-    return map
-  }, [categories])
-
-  const allPoints = useMemo(() => {
-    // `raw` carries the underlying listing so field filters (open-now / kosher /
-    // type) can be applied; hospital pins have none.
-    const out: (MapPoint & { filterId: string; searchText: string; raw?: DirectoryResource })[] = []
-
-    // Hospital pins are a patient-oriented overlay — only when that module is on.
-    if ((categories ?? []).some((c) => c.kind === 'medical')) {
-      for (const h of hospitalsData ?? []) {
-        out.push({
-          filterId: HOSPITALS_ID,
-          id: `hospital:${h.id}`,
-          lat: h.latitude,
-          lng: h.longitude,
-          name: h.name,
-          color: HOSPITAL_COLOR,
-          glyph: HOSPITAL_ICON,
-          categoryLabel: 'Hospital',
-          searchText: h.name.toLowerCase(),
-        })
-      }
-    }
-
-    const catById = new Map((categories ?? []).map((c) => [c.id, c]))
-    for (const r of listings ?? []) {
-      const lat = r.geo?.lat
-      const lng = r.geo?.lng
-      if (typeof lat !== 'number' || typeof lng !== 'number') continue
-      const cat = catById.get(r.category)
-      // A category whose Map button capability is off (or that no longer
-      // resolves — e.g. a stale/deleted category) never gets pins here, same
-      // as it not showing up as a filter chip.
-      if (!cat || !resolveCapabilities(cat.capabilities).map) continue
-      out.push({
-        filterId: r.category,
-        id: r.id,
-        lat,
-        lng,
-        name: r.name,
-        address: r.address || undefined,
-        phone: r.phone,
-        color: colorById.get(r.category) ?? '#64748b',
-        glyph: cat?.icon ?? DEFAULT_CATEGORY_ICON,
-        // The map's pins always show the category's own icon, even for a
-        // listing that's uploaded its own photo — a pin is too small and too
-        // dense on-screen (often dozens at once) for a real photo to read as
-        // anything but noise. NearbyList reads the listing's own photo off
-        // `raw` directly (see PHOTO_FIELD_KEY) — a scrollable list of a few
-        // rows is where a real logo actually helps recognition.
-        categoryLabel: cat?.label ?? r.category,
-        // Same haystack the category directory searches against (name, address,
-        // tags, detail fields) — so a query that matches in the directory
-        // matches here too.
-        searchText: listingSearchText(r, cat),
-        raw: r,
-        pinned: pinnedIds.has(r.id),
-      })
-    }
-    return out
-  }, [listings, categories, colorById, hospitalsData, pinnedIds])
-
-  // `pinned` (from usePinned) is every pinned listing regardless of category —
-  // it has no idea a category can be non-mappable (WhatsApp Groups, Networking:
-  // `hasAddress: false`, so `capabilities.map` is forced off — see categories.ts).
-  // `allPoints` above already excludes those (no geo, no map capability), so an
-  // entry that made it in and is still marked `pinned` is guaranteed mappable.
-  // The Pinned chip's visibility/count must be driven by THIS, not by
-  // `pinned.length` directly — otherwise pinning a WhatsApp group flips the
-  // chip on and counts a pin that can never actually appear as a marker, the
-  // same "chip with nothing behind it" bug categories.ts's own doc describes
-  // for a stale/deleted category.
-  const mappablePinnedCount = useMemo(() => allPoints.filter((p) => p.pinned).length, [allPoints])
+  const { colorById, allPoints, mappablePinnedCount, options } = useMapPoints({ categories, listings, hospitalsData, pinnedIds })
 
   // Restores the pin `initialPlaceId` named, once it's actually in allPoints
   // (a plain state initializer would run before listings have loaded).
@@ -552,25 +477,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     selectPlace(point)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPoints, standalone, initialPlaceId, isMobile])
-
-  const options = useMemo<FilterOption[]>(() => {
-    const counts = new Map<string, number>()
-    for (const p of allPoints) counts.set(p.filterId, (counts.get(p.filterId) ?? 0) + 1)
-
-    const opts: FilterOption[] = []
-    if (counts.get(HOSPITALS_ID)) {
-      opts.push({ id: HOSPITALS_ID, label: 'Hospitals', icon: HOSPITAL_ICON, color: HOSPITAL_COLOR, count: counts.get(HOSPITALS_ID)! })
-    }
-    for (const c of categories ?? []) {
-      const count = counts.get(c.id) ?? 0
-      if (count === 0) continue
-      opts.push({ id: c.id, label: c.pluralLabel, icon: c.icon, color: colorById.get(c.id) ?? '#64748b', count })
-    }
-    // Highest listing count first — the assumption being a category with more
-    // listings is more likely to be the one a visitor's actually looking for.
-    // Hospitals gets no special pinning here; it sorts in with everyone else.
-    return opts.sort((a, b) => b.count - a.count)
-  }, [allPoints, categories, colorById])
 
   // initialSelectedCategories (a full toggle set restored from history after
   // browser back) takes precedence over initialCategory (the single-category
@@ -645,120 +551,37 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     nearbySheetRef,
     setDesktopSelected,
   })
-  // ── Filters, per category (see mapFilters.ts) ────────────────────────────
-  // Read from the link (or a category page's own Map button) once the
-  // categories have loaded, since a filter belongs to one of them; the
-  // visitor's own changes replace that reading from then on. Open now is
-  // each category's own, where it keeps hours.
-  const initialFiltersQuery = {
-    open: initialFilters?.openNow ? '1' : initialFilters?.openIn?.join(',') || null,
-    is: initialFilters?.bool?.join(',') || null,
-    sel:
-      Object.entries(initialFilters?.select ?? {})
-        .filter(([, vs]) => vs.length)
-        .map(([k, vs]) => `${k}:${vs.join('|')}`)
-        .join(',') || null,
-  }
-  const filtersForCategory = initialCategory ?? (initialSelectedCategories && [...initialSelectedCategories].length === 1 ? [...initialSelectedCategories][0] : null)
-  const [ownFilters, setOwnFilters] = useState<MapFilterState | null>(null)
-  // What "no Filters of the visitor's own" falls back to: the Filters of the
-  // address this screen was opened or navigated to, kept as they were then.
-  // Not the live initial* props: those also carry this screen's own address
-  // writes echoed back (see ownWritesRef), so clearing a reading's Open now
-  // fell back to the Open now the reading had just written.
-  const [baseFilters, setBaseFilters] = useState(() => ({ query: initialFiltersQuery, forCategory: filtersForCategory }))
-  const filters = useMemo<MapFilterState>(
-    () => ownFilters ?? (categories ? readMapFilters(baseFilters.query, categories, baseFilters.forCategory) : {}),
-    [ownFilters, categories, baseFilters],
-  )
-  const hasFilters = Object.keys(filters).length > 0
-  const filtersKey = JSON.stringify(filters)
-  const updateFilters = (next: (f: MapFilterState) => MapFilterState) => setOwnFilters(next(filters))
-  const [filtersOpen, setFiltersOpen] = useState(false)
+  const {
+    initialFiltersQuery,
+    filtersForCategory,
+    setOwnFilters,
+    setBaseFilters,
+    filters,
+    hasFilters,
+    filtersKey,
+    updateFilters,
+    filtersOpen,
+    setFiltersOpen,
+  } = useMapFilters({ initialFilters, initialCategory, initialSelectedCategories, categories })
 
-  // Re-applies the query-string-derived view (selected chips, search text,
-  // bool/select filters) whenever a NEW navigation actually changes it — a
-  // category directory's own "Map" button (or any shared map link) carries
-  // its filter as a query param specifically so the map it opens matches
-  // what was clicked, per this component's whole initial*-props design (see
-  // MapScreen's own top comment). But every one of those props above is only
-  // ever read by a useState *initializer*, which React runs once, on this
-  // component's very first mount — and since Cache Components keeps this
-  // screen mounted (not remounted) across navigations away and back (see
-  // next.config.ts's cacheComponents note), a visitor who toggles a chip on
-  // the map, leaves for a category directory, and clicks that category's own
-  // "Map" button back kept seeing whatever they'd toggled last: the new
-  // props arrived, but nothing ever re-read them.
-  //
-  // Keyed off a plain string built from the props themselves, not the props
-  // directly — MapScreen recomputes initialSelectedCategories/initialFilters
-  // as new array/object literals from parseMapQuery() on every one of ITS
-  // renders even when the URL hasn't changed, so comparing by reference would
-  // treat every unrelated re-render as a fresh navigation and stomp on
-  // whatever the visitor had just toggled. Comparing by value (via the ref
-  // below) only re-syncs when the URL's own filter actually changed.
-  const categoriesKey =
-    initialSelectedCategories !== undefined
-      ? `set:${[...initialSelectedCategories].sort().join(',')}`
-      : initialCategory
-        ? `one:${initialCategory}`
-        : 'all'
-  const initialViewKey = [
-    categoriesKey,
-    initialPinned ? 'pinned' : '',
-    initialEruvim === 'only' ? 'eruv-only' : initialEruvim ? 'eruv' : '',
+  const { thisRender, applyingRenderRef, ownWritesRef, appliedInitialViewKeyRef } = useViewFromLink({
+    initialSelectedCategories,
+    initialCategory,
+    initialPinned,
+    initialEruvim,
     initialQueryText,
-    initialFiltersQuery.open ?? '',
-    [...(initialFilters?.bool ?? [])].sort().join(','),
-    Object.entries(initialFilters?.select ?? {})
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}=${[...v].sort().join('|')}`)
-      .join(';'),
-  ].join('::')
-  const appliedInitialViewKeyRef = useRef<string | null>(initialViewKey)
-  // Each render's own mark, and the render whose commit applied a link.
-  const thisRender = {}
-  const applyingRenderRef = useRef<object | null>(null)
-  // The query strings this screen wrote to its own address bar (the sync
-  // effect below), oldest first, until Next echoes each one back. Next does:
-  // history.replaceState feeds useSearchParams in this version (see
-  // node_modules/next/dist/docs, "Native History API"), so every write
-  // returns as new initial* props a moment later. Those are this screen's
-  // own state, not a navigation, and must not be re-applied: one that
-  // arrives after the visitor has moved on (tapped "Clear search" right
-  // after a reading set the categories and Open now) would put the old
-  // search back. A real navigation's address was never written here.
-  const ownWritesRef = useRef<string[]>([])
-  // Hidden (another screen showing; this one is kept mounted), nothing
-  // echoes: what it wrote and never heard back would otherwise take the
-  // next link to that address for an echo, and ignore it.
-  useEffect(
-    () => () => {
-      ownWritesRef.current = []
-    },
-    [],
-  )
-  useEffect(() => {
-    if (initialViewKey === appliedInitialViewKeyRef.current) return
-    const echo = viewSearch === undefined ? -1 : ownWritesRef.current.indexOf(normalizeSearch(viewSearch))
-    if (echo >= 0) {
-      // Next may skip echoing a write that a later one replaced: those go too.
-      ownWritesRef.current = ownWritesRef.current.slice(echo + 1)
-      appliedInitialViewKeyRef.current = initialViewKey
-      return
-    }
-    appliedInitialViewKeyRef.current = initialViewKey
-    applyingRenderRef.current = thisRender
-    setSelected(resolveInitialSelected(initialSelectedCategories, initialCategory, initialPinned, initialEruvim))
-    // The link's Pinned too: "All" turns it on, and it outlives this screen.
-    setPinnedSelected(initialPinned)
-    setEruvimOn(!!initialEruvim)
-    setInput(initialQueryText)
-    setCommittedQuery(initialQueryText)
-    setOwnFilters(null)
-    setBaseFilters({ query: initialFiltersQuery, forCategory: filtersForCategory })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialViewKey])
+    initialFilters,
+    initialFiltersQuery,
+    filtersForCategory,
+    viewSearch,
+    setSelected,
+    setPinnedSelected,
+    setEruvimOn,
+    setInput,
+    setCommittedQuery,
+    setOwnFilters,
+    setBaseFilters,
+  })
 
   // Filterable hours-field keys per category, for the open-now predicate.
   const hoursKeysByCat = useMemo(() => {
@@ -1234,41 +1057,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     />
   )
 
-  // The sidebar's scroll region. One definition for the list and the place
-  // detail, so neither can lose the overscroll settings below. Keyed on what
-  // it's showing, so each starts at the top: shared, the list's scroll
-  // offset carried into a place picked from deep in it. The list's offset
-  // is kept meanwhile, and put back on the way back (Oct 16).
-  //
-  // overscroll-contain: without it, a trackpad swipe closing a
-  // NearbyList row's pin action can still bleed into the
-  // browser's own swipe-to-go-back gesture once it reaches
-  // this scroll boundary, even though the row's own wheel
-  // handler already calls preventDefault (see NearbyList).
-  //
-  // This WAS removed once, on the theory that the row-level
-  // handler's own `< 2` noise-floor threshold (see NearbyList's
-  // own comment) already closed that gap on its own — tested
-  // live and it didn't: without this, the row's own swipe
-  // itself started misbehaving (the back-gesture recognizer
-  // competing with it mid-drag), which is worse than losing
-  // back-swipe over this panel. Put back; a bare Google Maps
-  // embed has this same "no back-swipe over the interactive
-  // surface" limitation everywhere, so this screen having it
-  // too, specifically here, is a smaller cost than a broken
-  // row swipe.
-  //
-  // Sideways, none rather than contain (Oct 16): contain still let the
-  // list itself rubber-band sideways, and a scroll's sideways drift
-  // reaches it, so a row's swipe pulled "a little more of the sheet"
-  // than the row. Nothing here scrolls sideways, so there's nothing to
-  // give.
-  const sidebarScroll = (key: string, content: ReactNode, list = false) => (
-    <div key={key} ref={list ? keptSidebarScroll.ref : undefined} onScroll={list ? keptSidebarScroll.onScroll : undefined} data-testid="sidebar-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain overscroll-x-none px-3 pb-3">
-      {content}
-    </div>
-  )
-
   return (
     // Mobile: a flex column that grows to fill <main> (itself a flex column —
     // see page.tsx) via flex-1/min-h-0, so the map below can flex-1 to fill
@@ -1278,46 +1066,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // map filling the rest, both full height, instead of the old stacked/
     // boxed layout. ──────────────────────────────────────────────────────
     <div
-      className={`flex flex-1 min-h-0 flex-col desktop:flex-row desktop:overflow-hidden ${
-        fullscreen
-          ? // Unprefixed (not desktop:-only) now — mobile gets this too. It
-            // used to be desktop-only on the theory that mobile was already
-            // "effectively full-bleed" via plain flex layout (see the
-            // `fullscreen` state's own doc), but plain flow content doesn't
-            // paint behind env(safe-area-inset-top) the way a fixed layer
-            // does: confirmed live as a gray gap (the page's own background
-            // showing through) above the floating search bar on a real
-            // notched phone. `fullscreen` is only ever true here for the
-            // standalone map screen on mobile — the admin's boxed
-            // category-preview map is the only other caller, and its own
-            // fullscreen TOGGLE BUTTON is `desktop:flex` (hidden on mobile),
-            // so mobile never has a way to set it true there.
-            //
-            // bottom is an explicit reservation instead of inset-0's implied
-            // 0, because unlike desktop (which has no bottom chrome to clear
-            // in fullscreen — it already covers the header entirely, see
-            // below), mobile's fixed tab bar (MobileTabBar.tsx, z-40) still
-            // needs to stay visible under this z-50 layer — reserving the
-            // exact same space `<main>`'s own padding used to reserve for it
-            // (see MapScreen.tsx) means the map's own painted area simply
-            // never reaches those pixels, so there's nothing for the tab
-            // bar's own z-index to have to win against.
-            'fixed inset-x-0 top-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-50 rounded-none ring-0 desktop:inset-0'
-          // desktop:isolate: boxed mode (the admin's category-preview map,
-          // the only caller that still renders non-fullscreen) has no
-          // z-index of its own on this wrapper, so without a stacking context
-          // here the search box's z-40 below (ResourceMapView's own overlay,
-          // meant only to sit above the map/sidebar inside this box) leaked
-          // straight into the root stacking context and tied with
-          // SiteHeader's own z-40 — DOM order then let it paint over the
-          // header, including the Categories dropdown nested inside it.
-          // `isolate` contains that z-40 to this box without renumbering it
-          // (fullscreen mode needs no such fix: its z-50 fixed layer already
-          // establishes its own stacking context, and covering the header
-          // there is a separate, intentional tradeoff — see the `controls`
-          // prop's own doc above).
-          : 'desktop:relative desktop:isolate desktop:h-[70vh] desktop:min-h-[420px] desktop:flex-none desktop:rounded-2xl desktop:ring-1 desktop:ring-slate-900/5'
-      }`}
+      className={mapShellClass(fullscreen)}
     >
       {loading ? (
         <div className="flex min-h-0 w-full flex-1 items-center justify-center bg-slate-100 text-sm text-slate-500">
@@ -1347,74 +1096,42 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             // map instead for exactly this reason. Overlaying it here (with
             // its own elevation) means the map's box never changes size, so
             // that ResizeObserver never fires and nothing under it moves.
-            <aside
-              className={`hidden flex-col overflow-hidden bg-white desktop:absolute desktop:inset-y-0 desktop:left-0 desktop:z-30 desktop:flex desktop:min-h-0 desktop:shadow-xl ${
-                sidebarVisible ? 'desktop:border-r desktop:border-slate-200' : ''
-              }`}
-              // Width lives here, not in a `desktop:w-[...]` class, now that
-              // it's draggable (see sidebarWidth/the resize handle below) —
-              // `hidden`/`desktop:flex` above still fully suppress this on an
-              // actual mobile viewport via CSS regardless, so nothing here
-              // needs its own `desktop:` gate. Transition off entirely while
-              // actively dragging: same reasoning as MobileSheet's own
-              // dragHeight — a CSS transition retargeting on every single
-              // pointermove frame reads as laggy/rubber-banding rather than
-              // tracking the cursor.
-              style={{
-                width: sidebarVisible ? sidebarWidth : 0,
-                transition: isDraggingSidebar ? 'none' : 'width 200ms ease-in-out',
-              }}
-            >
-              {/* No search/chips header here anymore — the floating bar
-                  (rendered once, below, positioned relative to the whole
-                  row) sits on top of this panel instead, so it never has to
-                  resize or relocate when this panel appears. This spacer is
-                  a real layout sibling (not just padding on the scroll area
-                  below) so it reserves that space permanently — padding
-                  alone would only clear it on first paint; once scrolled,
-                  list rows would slide up underneath the floating bar since
-                  padding is part of the same scrolling content. ────────── */}
-              <div className="h-[72px] shrink-0" />
+            <DesktopSidebar sidebarVisible={sidebarVisible} sidebarWidth={sidebarWidth} isDraggingSidebar={isDraggingSidebar}>
               {ui.map.nearbyList &&
                 // No "Back to list" in here: the ← in the search box above
                 // is the way back on a computer (Oct 15).
                 (desktopSelected?.filterId === ERUV_FILTER_ID && eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length)) ? (
-                  sidebarScroll(desktopSelected.id, eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length), undefined, onPlaceEditor))
+                  <SidebarScroll key={desktopSelected.id}>{eruvDetail(desktopSelected.id.slice(ERUV_PREFIX.length), undefined, onPlaceEditor)}</SidebarScroll>
                 ) : desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
-                  sidebarScroll(
-                    `place:${desktopSelected.id}`,
+                  <SidebarScroll key={`place:${desktopSelected.id}`}>
                     <MapPlaceDetail
                       item={desktopSelected.raw}
                       category={desktopSelectedCategory}
                       color={desktopSelected.color}
                       found={foundOnPoint(desktopSelected.raw.id)}
                       onEditor={onPlaceEditor}
-                    />,
-                  )
+                    />
+                  </SidebarScroll>
                 ) : (
-                  sidebarScroll(
-                    'list',
-                    <>
-                      {activeLocation && visiblePoints.length > 0 && (
-                        <p className="mb-2 px-1 text-xs text-slate-400">
-                          Sorted by distance from your location{tracking ? ', updating live as you move.' : '.'}
-                        </p>
-                      )}
-                      <NearbyList
-                        points={visiblePoints}
-                        userLocation={activeLocation}
-                        onViewListing={onViewListing}
-                        onSelectPlace={selectPlace}
-                        eruvim={listedEruvim}
-                        onSelectEruv={openEruv}
-                        onHover={hover.set}
-                        empty={searchedNothing ? nothingBox(committedQuery) : undefined}
-                      />
-                    </>,
-                    true,
-                  )
+                  <SidebarScroll key="list" kept={keptSidebarScroll}>
+                    {activeLocation && visiblePoints.length > 0 && (
+                      <p className="mb-2 px-1 text-xs text-slate-400">
+                        Sorted by distance from your location{tracking ? ', updating live as you move.' : '.'}
+                      </p>
+                    )}
+                    <NearbyList
+                      points={visiblePoints}
+                      userLocation={activeLocation}
+                      onViewListing={onViewListing}
+                      onSelectPlace={selectPlace}
+                      eruvim={listedEruvim}
+                      onSelectEruv={openEruv}
+                      onHover={hover.set}
+                      empty={searchedNothing ? nothingBox(committedQuery) : undefined}
+                    />
+                  </SidebarScroll>
                 ))}
-            </aside>
+            </DesktopSidebar>
           )}
 
           {!isMobile && (
