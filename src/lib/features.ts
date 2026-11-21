@@ -10,7 +10,9 @@ type Features = {
   /** The home that changes with the day (step 6): its blocks, Pinned on the
    *  home and the Pinned page, and its settings in the admin's Site tab. Off,
    *  every visitor gets the classic home, whatever SiteSettings.homeStyle
-   *  says. */
+   *  says. Before turning it on: live doesn't have migration 067
+   *  (today_home), which its settings save needs. Run it on live first
+   *  (decided Nov 21). */
   todayHome: boolean
   /** What changed (step 7a): its page, its admin tab, the link at the foot
    *  of the category list, and the home's read of the activity log. */

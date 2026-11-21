@@ -927,17 +927,18 @@ For the user:
    makes a missing key refuse on live: contributions and the AI readers
    stop. Sentry shows nothing unresolved, and a refusal would be
    reported there, so they're probably set. Worth a look.
-2. Run migrations 103, 104 and 105: dev, then live. Then say whether
-   live gets 067 (Today's settings) now or when Today comes back.
-3. Say whether to drop `site_settings.contribution_note` (a migration).
+2. Run migrations 103, 104 and 105: dev, then live. 067 (Today's
+   settings) waits on live until Today comes back (decided Nov 21).
+3. Run migration 106 (drops the unused `site_settings.contribution_note`):
+   dev, then live.
 4. Copy the Gmail script again from Newsletters into the guide's Gmail.
    Then say whether an eruv email with no Authentication-Results header
    should be refused outright.
 5. Check Database → Backups on live, and run the first live copy
    (`npm run backup -- --prod`, read-only).
-6. Sentry cron monitors: set `SENTRY_CRON_MONITORS=on` in Vercel's
-   Production once Sentry's plan is checked (it bills past a free
-   allowance).
+6. Sentry cron monitors: the plan has one (checked Nov 21), so set
+   `SENTRY_CRON_MONITORS=nightly-email` in Vercel's Production and
+   redeploy. The nightly email already tells of the other jobs.
 7. The next production build's log should say Node 24.
 8. A design call: on a phone, You's saved places and searches can only
    be removed by a swipe.
@@ -1013,8 +1014,10 @@ Fix first:
    and the nightly email counts a send that failed as a failed run (it was
    a warning). The heartbeat is Sentry's cron monitors
    (`src/lib/cronHeartbeat.ts`), one per job, **off until the user sets
-   `SENTRY_CRON_MONITORS=on`** in Vercel's production settings: Sentry
-   bills monitors past its free allowance, so check the plan first. Red
+   `SENTRY_CRON_MONITORS`** in Vercel's production settings. The plan
+   has one monitor (Nov 21), so the setting now names jobs too
+   (`on` is all of them): `nightly-email` is the one to watch, since
+   that email already tells of any other job that failed or didn't run. Red
    3/3 against the old code (the route guard, the job report, the email).
 5. **The community list caches its one-community fallback for days**
    after any Supabase error (checked, `listCommunities`). **Built
@@ -1113,12 +1116,14 @@ Soon:
     The page still carries on without it. `schemaMissingReported.test.ts`
     fails on a store checking the wording itself. Red 8/8 against the old
     stores.
-  - **For the user:** run 105, dev then live. Then decide on 067 for
-    live (run it, or leave it until Today comes back).
-  - Not done: `site_settings.contribution_note` is still there on dev
-    and live (read Nov 20). Migration 033 was deleted with the feature
-    (Aug 27), but nothing dropped the column. Dropping it is a migration,
-    so it's the user's call. Rebuilding a fresh project from the folder (grants, and the
+  - **For the user:** run 105, dev then live.
+  - **Decided Nov 21:** 067 waits on live until Today comes back. Run
+    it on live in the same change that turns Today on in
+    `src/lib/features.ts`, before that deploys.
+  - `site_settings.contribution_note` was still there on dev and live
+    (read Nov 20): migration 033 was deleted with the feature (Aug 27),
+    but nothing dropped the column. Migration 106 drops it (written
+    Nov 21; nothing reads it). **For the user:** run 106, dev then live. Rebuilding a fresh project from the folder (grants, and the
     restore drill) is untouched.
 - Hidden communities' data through the public API routes. **Built Nov
   20**: the proxy now sees the public API routes too, and answers 404 to

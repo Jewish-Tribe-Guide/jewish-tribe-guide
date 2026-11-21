@@ -14,10 +14,25 @@ import { NIGHTLY_JOBS, type JobId } from './jobRuns'
 // anywhere else this only runs the job. Each monitor is created on its
 // first check-in, from the job's own schedule here.
 
-/** Runs `fn` as job `job`'s check-in, when monitors are on. */
+//
+// SENTRY_CRON_MONITORS is `on` for every job, or the jobs to watch by id,
+// comma-separated. The plan has one monitor (Nov 21), so live sets it to
+// `nightly-email`: that email already tells of any other job that failed or
+// didn't run (nightlyEmailRun.ts), so the one thing nothing watched was the
+// email itself.
+
+/** Whether job `job` checks in with Sentry, from SENTRY_CRON_MONITORS. */
+export function monitored(job: JobId, setting = process.env.SENTRY_CRON_MONITORS): boolean {
+  const value = setting?.trim()
+  if (!value) return false
+  if (value === 'on') return true
+  return value.split(',').some((id) => id.trim() === job)
+}
+
+/** Runs `fn` as job `job`'s check-in, when its monitor is on. */
 export function cronHeartbeat<T>(job: JobId, fn: () => Promise<T>): Promise<T> {
   const spec = NIGHTLY_JOBS.find((j) => j.id === job)
-  if (process.env.SENTRY_CRON_MONITORS !== 'on' || !spec) return fn()
+  if (!monitored(job) || !spec) return fn()
   return Sentry.withMonitor(`job-${job}`, fn, {
     schedule: { type: 'crontab', value: spec.cron },
     timezone: 'Etc/UTC',

@@ -26,6 +26,23 @@ describe('cronHeartbeat', () => {
     })
   })
 
+  it('watches only the jobs named, so one monitor can go on the nightly email', async () => {
+    vi.stubEnv('SENTRY_CRON_MONITORS', 'nightly-email')
+    await cronHeartbeat('watches', async () => 'done')
+    expect(withMonitor).not.toHaveBeenCalled()
+    await cronHeartbeat('nightly-email', async () => 'sent')
+    expect(withMonitor).toHaveBeenCalledTimes(1)
+    expect(withMonitor.mock.calls[0][0]).toBe('job-nightly-email')
+  })
+
+  it('reads a list of jobs, spaces allowed', async () => {
+    vi.stubEnv('SENTRY_CRON_MONITORS', 'watches, nightly-email')
+    await cronHeartbeat('watches', async () => 'done')
+    await cronHeartbeat('sync-hours', async () => 'done')
+    await cronHeartbeat('nightly-email', async () => 'sent')
+    expect(withMonitor.mock.calls.map((c) => c[0])).toEqual(['job-watches', 'job-nightly-email'])
+  })
+
   it('passes a job’s failure on, so Sentry marks the check-in failed', async () => {
     vi.stubEnv('SENTRY_CRON_MONITORS', 'on')
     await expect(cronHeartbeat('sync-hours', async () => Promise.reject(new Error('boom')))).rejects.toThrow('boom')
