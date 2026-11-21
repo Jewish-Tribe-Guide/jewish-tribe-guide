@@ -85,6 +85,7 @@ vi.mock('./serverError', () => ({ reportServerError: mockReportServerError }))
 const {
   activityForApproval,
   approveOwn,
+  decidePart,
   approveSubmission,
   listPendingSubmissions,
   listSubmissionsByStatus,
@@ -2264,5 +2265,61 @@ describe('a new eruv whose removal fails too', () => {
     mockRemoveEruv.mockRejectedValue(new Error('remove failed'))
     await expect(approveSubmission('sub-1', 'philly')).rejects.toThrow('Failed to save the eruv: down')
     expect(mockReportServerError).toHaveBeenCalledWith(expect.stringContaining('overbrook'), expect.any(Error))
+  })
+})
+
+// Nov 21, the save survey (6): approving one part of an edit files a copy
+// of the edit holding that part and approves it.
+describe('decidePart: approving one part', () => {
+  const category = { id: 'grocery', label: 'Grocery', hasAddress: true, detailFields: [{ key: 'notes', label: 'Notes', type: 'textarea' }] }
+  const listing = { id: 'res-1', community_id: 'philly', category: 'grocery', name: 'Shop', address: '1 Main St', phone: '215-555-0100', status: 'approved', details: { notes: 'Old.' } }
+  const edit = baseSubmission({
+    operation: 'update',
+    target_id: 'res-1',
+    payload: listingPayload({ category: 'grocery', name: 'Shop', address: '1 Main St', phone: '215-555-0199', details: { notes: 'New.' } }) as unknown as Record<string, unknown>,
+  })
+
+  /** `submission` answers, in order: the edit, the copy's insert, then the
+   *  copy's approval (read, claim, mark) and the edit's own update. */
+  function tables(submission: Array<{ data?: unknown; error: { message: string } | null }>) {
+    const builders: ReturnType<typeof chainable>[] = []
+    let n = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'resource') return chainable({ data: structuredClone(listing), error: null })
+      const b = chainable(submission[Math.min(n++, submission.length - 1)])
+      builders.push(b)
+      return b
+    })
+    mockGetCategoryById.mockResolvedValue(category)
+    mockRecordActivity.mockResolvedValue([])
+    return builders
+  }
+
+  it('a copy that fails to approve is taken out while it waits, and a failure to do that is said', async () => {
+    const builders = tables([
+      { data: structuredClone(edit), error: null },
+      { data: { id: 'copy-1' }, error: null },
+      { data: null, error: null }, // the copy can't be read back: approving it fails
+      { error: { message: 'down' } }, // and taking it back out fails too
+    ])
+    await expect(decidePart('sub-1', 'philly', 'phone', 'approved', 'admin@example.org')).rejects.toThrow()
+    const cleanup = builders[3]
+    expect(cleanup.delete).toHaveBeenCalled()
+    expect(cleanup.eq).toHaveBeenCalledWith('status', 'pending')
+    expect(mockReportServerError).toHaveBeenCalledWith(expect.stringContaining('copy-1'), 'down')
+  })
+
+  it('once the part is on the listing, a failed update of the edit itself doesn’t read as a failed approval', async () => {
+    tables([
+      { data: structuredClone(edit), error: null },
+      { data: { id: 'copy-1' }, error: null },
+      { data: { ...structuredClone(edit), id: 'copy-1' }, error: null },
+      { data: { id: 'copy-1' }, error: null },
+      { data: { ...structuredClone(edit), id: 'copy-1', status: 'approved' }, error: null },
+      { data: null, error: { message: 'down' } },
+    ])
+    const out = await decidePart('sub-1', 'philly', 'phone', 'approved', 'admin@example.org')
+    expect(out).toMatchObject({ whole: false, submission: { id: 'sub-1', payload: { someApproved: true } } })
+    expect(mockReportServerError).toHaveBeenCalledWith(expect.stringContaining('sub-1'), 'down')
   })
 })

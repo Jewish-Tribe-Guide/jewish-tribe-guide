@@ -661,9 +661,9 @@ async function approveNow(
  *  and Archive). If approving fails, what was filed is taken back out
  *  while it still waits, so a failed Add never sits in the queue as a
  *  suggestion, one more for each try (Nov 21, the save survey). */
-export async function approveOwn(filed: SubmissionRow, community: string, reviewedBy: string): Promise<SubmissionRow> {
+export async function approveOwn(filed: Pick<SubmissionRow, 'id'>, community: string, reviewedBy: string | undefined, edited?: unknown): Promise<SubmissionRow> {
   try {
-    return await approveSubmission(filed.id, community, reviewedBy)
+    return await approveSubmission(filed.id, community, reviewedBy, edited)
   } catch (err) {
     const { error } = await getAdminClient().from('submission').delete().eq('id', filed.id).eq('community_id', community).eq('status', 'pending')
     if (error) reportServerError(`[submissions] an admin’s own change (${filed.id}) failed and stays in the queue`, error.message)
@@ -713,18 +713,23 @@ export async function decidePart(
       .select('id')
       .single()
     if (error || !copy) throw new Error(`Failed to approve a part: ${error?.message}`)
-    try {
-      await approveSubmission(copy.id, community, reviewedBy, edited)
-    } catch (err) {
-      await supabase.from('submission').delete().eq('id', copy.id)
-      throw err
-    }
+    // A copy that fails is taken back out while it waits, and a failure to
+    // do that is said (Nov 21, the save survey): it would sit in the queue
+    // as a second copy of the edit.
+    await approveOwn(copy as Pick<SubmissionRow, 'id'>, community, reviewedBy, edited)
     // What's approved now matches the listing, so it no longer shows.
     next = { ...payload, someApproved: true }
   } else {
     next = leavingPart(payload, listing, part, fields)
   }
   const { data, error } = await supabase.from('submission').update({ payload: next }).eq('id', id).select('*').single()
+  if (error && decision === 'approved') {
+    // The part is on the listing, and the edit no longer shows it (it
+    // matches the listing now). Only the "some approved" mark is lost, so
+    // the approval stands rather than reading as a failure.
+    reportServerError(`[submissions] a part of ${id} is on the listing, but the edit's own record couldn’t be updated`, error.message)
+    return { whole: false, submission: { ...submission, payload: next as unknown as Record<string, unknown> } }
+  }
   if (error) throw new Error(`Failed to keep the rest of the change: ${error.message}`)
   return { whole: false, submission: data as SubmissionRow }
 }
