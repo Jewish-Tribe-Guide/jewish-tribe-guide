@@ -1328,7 +1328,7 @@ Soon:
 
 Later or bigger: the two 2,000-line screens (map, category page);
 foreign keys; `details`
-holding app state; an old-iOS floor
+holding app state (planned, below); an old-iOS floor
 decision; the parked Today
 features (keep or delete); `/inbox` per community; this file's size;
 Partial Prefetching before Next 17.
@@ -1356,6 +1356,46 @@ ever) — then read the last year only, rather than deleting anything.
 
 Checked and not so: the nightly email does record a failed send, as a
 warning, not a failure.
+
+## `details` holding the site's own state: a plan, not started (Nov 21)
+
+A listing's `details` jsonb holds what people wrote (hours, notes, the
+fields an admin set up) and, beside it, about 26 keys the site keeps for
+itself: Google sync state (`googleSyncedAt`, `googleKept`, `notOnGoogle`,
+`businessStatus*`, `lastSyncError`, …), confirmations
+(`confirmedAt/From/By`, `sectionConfirmed`, `sectionFrom`), item marks
+(`itemSeen`, `itemGone`, `itemMenu`), `googleFields`, `verifiedPlaceId`,
+`legacyId` (`SYNC_INTERNAL_FIELDS` and `DIFF_ONLY_HIDDEN_FIELDS`,
+`syncFields.ts`). Measured: 53 source files name them, and 10 SQL
+functions write them in place (057, item marks, 065, the five
+section-confirm migrations, 091's visitor confirm).
+
+Why it matters: every write of a whole `details` has to carry those keys
+through, or it wipes them. That is how save-survey item 2 could erase a
+listing's Google state and confirmations, and why `prepareSubmission`,
+the moderation diff and the editor each keep their own list of keys to
+strip, hide or keep.
+
+The move, in steps that each ship alone and leave the site working:
+
+1. Migration: `resource.state jsonb not null default '{}'`, and a
+   backfill copying the 26 keys into it (`details` untouched).
+2. Reads: one `listingFromRow` merges `{...details, ...state}`, so every
+   screen and test reading `item.confirmedAt` keeps working unchanged.
+3. Writes, one writer at a time: the Google sync, the confirm and
+   item-mark SQL functions (new versions writing `state`), the menu
+   reader. Each writes `state` and still mirrors to `details` until 5.
+4. Submissions and approvals stop carrying site keys at all: a payload's
+   `details` is people's words only, and the strip/hide lists shrink to
+   nothing. Approval writes `details` whole without reading it first.
+5. A second migration removes the 26 keys from `details`.
+
+Decision for the user before starting: whether it's worth it now. It
+removes a class of bug (a whole-`details` write wiping the site's
+state) that today is guarded case by case, and it touches most of the
+listing code; roughly a week of steps, each needing a migration run on
+dev then live at the right moment (step 1 before 3's deploy, 5 only
+after 4 is live).
 
 ## The save survey (Nov 21; 1–5 fixed the same day, the rest open)
 
