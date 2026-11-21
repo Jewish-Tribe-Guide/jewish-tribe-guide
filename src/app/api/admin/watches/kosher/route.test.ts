@@ -32,6 +32,7 @@ vi.mock('@/lib/submissionStore', () => ({
   submitListingUpdate: m.submitListingUpdate,
   submitListingDelete: m.submitListingDelete,
   approveSubmission: m.approveSubmission,
+  approveOwn: (filed: { id: string }, ...rest: unknown[]) => m.approveSubmission(filed.id, ...rest),
   rejectSubmission: m.rejectSubmission,
 }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: m.revalidatePublicContent }))
@@ -337,6 +338,28 @@ describe('POST /api/admin/watches/kosher', () => {
     expect(m.rejectSubmission).toHaveBeenCalledWith(FINDING, 'philly', 'me@x.co')
   })
 
+  // Nov 21, the save survey: the archive is on before the finding closes.
+  // A close that fails is said, not answered as a failure, and archiving
+  // again (the place now archived) closes it rather than a 404 for ever.
+  it('archive: a finding that won’t close leaves the place archived, and archiving again closes it', async () => {
+    m.single.submission = finding({ operation: 'update', note: 'IKC dropped it.' })
+    m.rejectSubmission.mockRejectedValueOnce(new Error('timeout'))
+    expect((await post({ action: 'archive', id: FINDING })).status).toBe(200)
+    m.single.resource = { ...row, status: 'archived' }
+    vi.clearAllMocks()
+    expect((await post({ action: 'archive', id: FINDING })).status).toBe(200)
+    expect(m.submitListingDelete).not.toHaveBeenCalled()
+    expect(m.rejectSubmission).toHaveBeenCalledWith(FINDING, 'philly', 'me@x.co')
+  })
+
+  it('a place not archived and not in the guide is still not found', async () => {
+    m.single.resource = { ...row, status: 'pending' }
+    expect((await post({ action: 'archive', id: FINDING })).status).toBe(404)
+    m.single.resource = { ...row, status: 'archived' }
+    expect((await post({ action: 'edit', id: FINDING, details: {} })).status).toBe(404)
+    expect(m.rejectSubmission).not.toHaveBeenCalled()
+  })
+
   it('edit on a removal: only the Kosher box’s fields, onto the listing as it is', async () => {
     expect((await post({ action: 'edit', id: FINDING, details: { kosherCert: ['IKC'], k: null, s: 'Hacked', name: 'x' } })).status).toBe(200)
     expect(savedAs()[2].details).toEqual({ kosherCert: ['IKC'], t: ['Meat'], s: 'Steaks', k: null })
@@ -367,6 +390,21 @@ describe('POST /api/admin/watches/kosher', () => {
       expect(m.rejectSubmission).toHaveBeenCalledWith(FINDING, 'philly', 'me@x.co')
       expect(m.revalidatePublicContent).toHaveBeenCalled()
       expect(m.runWalkRoutesAfterChange).toHaveBeenCalledWith('philly')
+    })
+
+    // Nov 21, the save survey: once it's back, a failure after is said, and
+    // the new place stays waiting to be decided.
+    it('a Kosher box that won’t save leaves it back, and the new place waiting', async () => {
+      m.submitListingUpdate.mockRejectedValueOnce(new Error('timeout'))
+      expect((await post({ action: 'restore', resourceId: OLD, id: FINDING })).status).toBe(200)
+      expect(m.rejectSubmission).not.toHaveBeenCalled()
+      expect(m.runWalkRoutesAfterChange).toHaveBeenCalledWith('philly')
+    })
+
+    it('a new place that won’t close leaves it back', async () => {
+      m.rejectSubmission.mockRejectedValueOnce(new Error('timeout'))
+      expect((await post({ action: 'restore', resourceId: OLD, id: FINDING })).status).toBe(200)
+      expect(m.approveSubmission).toHaveBeenCalledWith('filed', 'philly', 'me@x.co')
     })
 
     it('with nothing filed yet, only restores it', async () => {
