@@ -53,7 +53,7 @@ export function scriptPreview(script: string): string {
     .join('\n')
 }
 
-function Status({ data, now, onSetUp }: { data: NewslettersLoaded; now: number; onSetUp: () => void }) {
+function Status({ data, now, onSetUp, onUpdate }: { data: NewslettersLoaded; now: number; onSetUp: () => void; onUpdate: () => void }) {
   if (!data.checkedAt) {
     return (
       <div className="flex items-center gap-3 rounded-[10px] border border-slate-200 bg-white px-4 py-3.5">
@@ -71,10 +71,16 @@ function Status({ data, now, onSetUp }: { data: NewslettersLoaded; now: number; 
         <span className="text-[15px] font-semibold text-slate-900 [overflow-wrap:anywhere]">{stopped ? `Stopped checking ${where}` : `Checking ${where}`}</span>
         <span className={`text-[13px] ${stopped ? 'font-semibold text-amber-800' : 'text-slate-600'}`}>Last checked {checkedWhen(data.checkedAt, now)} · Read now {data.readNow ? 'on' : 'off'}</span>
       </span>
-      {(stopped || !data.readNow) && (
+      {stopped || !data.readNow ? (
         <button type="button" onClick={onSetUp} className={BUTTON}>
           Set up
         </button>
+      ) : (
+        data.script && (
+          <button type="button" onClick={onUpdate} className={BUTTON}>
+            Update the script
+          </button>
+        )
       )}
     </div>
   )
@@ -95,16 +101,9 @@ function Step({ n, title, line, children }: { n: number; title: React.ReactNode;
   )
 }
 
-function SetUp({ script, onLink }: { script: string; onLink: (url: string) => Promise<string | null> }) {
+/** The script's first lines and its Copy button. */
+function CopyScript({ script }: { script: string }) {
   const [copied, setCopied] = useState<boolean | null>(null)
-  const [link, setLink] = useState('')
-  const [linkError, setLinkError] = useState<string | null>(null)
-  const [trying, setTrying] = useState(false)
-  async function tryLink() {
-    setTrying(true)
-    setLinkError(await onLink(link.trim()))
-    setTrying(false)
-  }
   async function copy() {
     try {
       await navigator.clipboard.writeText(script)
@@ -114,19 +113,61 @@ function SetUp({ script, onLink }: { script: string; onLink: (url: string) => Pr
     }
   }
   return (
+    <>
+      <span className="mt-1.5 flex flex-wrap items-center gap-2.5">
+        <code className="min-w-0 flex-[1_1_320px] overflow-hidden whitespace-pre rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12.5px] leading-relaxed text-slate-700">
+          {scriptPreview(script)}
+        </code>
+        <button type="button" onClick={() => void copy()} className={PRIMARY}>
+          {copied ? 'Copied' : 'Copy the script'}
+        </button>
+      </span>
+      {copied === false && <span className="text-[13px] text-red-700">Couldn’t copy. Try again.</span>}
+    </>
+  )
+}
+
+// A running script is a copy of scripts/newsletter-apps-script.js from when
+// it was pasted. When that file changes (Nov 20: it sends Gmail's verdict on
+// who sent an email), the new one goes over the old in the same project, as
+// a new version of the same deployment, so its link and key stay.
+function UpdateScript({ script }: { script: string }) {
+  return (
+    <AdminBox title="Update the script">
+      <ol className="m-0 list-none p-0">
+        <Step n={1} title="Copy the script">
+          <CopyScript script={script} />
+        </Step>
+        <Step
+          n={2}
+          title={
+            <a href="https://script.google.com/home" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              Open script.google.com ↗
+            </a>
+          }
+          line="Open the guide’s project, paste over what’s there, Save"
+        />
+        <Step n={3} title="Deploy a new version" line="Deploy, Manage deployments, the pencil, New version" />
+      </ol>
+    </AdminBox>
+  )
+}
+
+function SetUp({ script, onLink }: { script: string; onLink: (url: string) => Promise<string | null> }) {
+  const [link, setLink] = useState('')
+  const [linkError, setLinkError] = useState<string | null>(null)
+  const [trying, setTrying] = useState(false)
+  async function tryLink() {
+    setTrying(true)
+    setLinkError(await onLink(link.trim()))
+    setTrying(false)
+  }
+  return (
     <AdminBox title="Set it up">
       <ol className="m-0 list-none p-0">
         <Step n={1} title="Make a Gmail for the guide" line="Sign it up for each shul’s newsletter" />
         <Step n={2} title="Copy the script">
-          <span className="mt-1.5 flex flex-wrap items-center gap-2.5">
-            <code className="min-w-0 flex-[1_1_320px] overflow-hidden whitespace-pre rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12.5px] leading-relaxed text-slate-700">
-              {scriptPreview(script)}
-            </code>
-            <button type="button" onClick={() => void copy()} className={PRIMARY}>
-              {copied ? 'Copied' : 'Copy the script'}
-            </button>
-          </span>
-          {copied === false && <span className="text-[13px] text-red-700">Couldn’t copy. Try again.</span>}
+          <CopyScript script={script} />
         </Step>
         <Step
           n={3}
@@ -228,6 +269,7 @@ export default function NewslettersPage({ token }: { token: string }) {
   const [busy, setBusy] = useState(false)
   const [adding, setAdding] = useState(false)
   const [setUpAgain, setSetUpAgain] = useState(false)
+  const [updating, setUpdating] = useState(false)
   // Read once a load; the page is reloaded to refresh.
   const [now, setNow] = useState(() => Date.now())
 
@@ -277,11 +319,12 @@ export default function NewslettersPage({ token }: { token: string }) {
     <div className="space-y-3.5">
       {back}
       {data.available ? (
-        <Status data={data} now={now} onSetUp={() => setSetUpAgain((s) => !s)} />
+        <Status data={data} now={now} onSetUp={() => setSetUpAgain((s) => !s)} onUpdate={() => setUpdating((u) => !u)} />
       ) : (
         <p className="rounded-[10px] border border-slate-200 bg-white px-4 py-3.5 text-[15px] text-slate-600">Shul emails can’t be set up here yet.</p>
       )}
       {showSteps && <SetUp script={data.script!} onLink={saveLink} />}
+      {!showSteps && updating && data.script && <UpdateScript script={data.script} />}
       {error && <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <AdminBox
         title="Emails"

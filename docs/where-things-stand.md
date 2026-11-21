@@ -931,7 +931,9 @@ For the user:
    settings) waits on live until Today comes back (decided Nov 21).
 3. Run migration 106 (drops the unused `site_settings.contribution_note`):
    dev, then live.
-4. Copy the Gmail script again from Newsletters into the guide's Gmail.
+4. Copy the Gmail script again from Newsletters into the guide's Gmail
+   (live admin, Update the script, since Nov 21: a running script had
+   no way to get the script again).
    Then say whether an eruv email with no Authentication-Results header
    should be refused outright.
 5. Check Database → Backups on live, and run the first live copy

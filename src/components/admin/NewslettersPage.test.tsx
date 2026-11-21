@@ -132,6 +132,19 @@ describe('NewslettersPage, Read now', () => {
     show(loaded({ checkedAt: new Date().toISOString(), account: 'guide@gmail.com', readNow: true }))
     expect(await screen.findByText(/Read now on/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Set up' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Update the script' })).toBeNull()
+  })
+
+  it('Read now on: the script can still be copied again, to update the running one (Nov 21)', async () => {
+    show(loaded({ checkedAt: new Date().toISOString(), account: 'guide@gmail.com', readNow: true }))
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Update the script' }))
+    const box = screen.getByRole('region', { name: 'Update the script' })
+    expect(within(box).getByText(/New version/)).toBeInTheDocument()
+    // Not the first-time steps: a new deployment would change the link.
+    expect(screen.queryByRole('region', { name: 'Set it up' })).toBeNull()
+    await user.click(within(box).getByRole('button', { name: 'Copy the script' }))
+    expect(await navigator.clipboard.readText()).toBe(SCRIPT)
   })
 
   it('Paste its link: tried at once, and says if it doesn’t answer (SetupSteps14, SetupBad14)', async () => {
