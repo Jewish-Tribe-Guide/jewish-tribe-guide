@@ -1365,7 +1365,33 @@ ever) — then read the last year only, rather than deleting anything.
 Checked and not so: the nightly email does record a failed send, as a
 warning, not a failure.
 
-## `details` holding the site's own state: a plan, not started (Nov 21)
+## `details` holding the site's own state: started Nov 21 (the user's yes)
+
+**Order changed from the plan below, before building.** Merging reads
+first (old step 2) would bring a cleared key back: a writer that clears
+one (an item's "gone", a sync error, an undone confirmation) clears it in
+`details` only, and `state` still has it. So writers move before readers:
+
+1. **Built (`claude/details-state`)**: migration 110 adds `state` and a
+   trigger that copies the site's keys (`SITE_STATE_KEYS`,
+   `syncFields.ts`; `site_state_keys()` in the migration, held together by
+   `resourceState.test.ts`) from every write of `details`, so every writer
+   (site, SQL function, script) keeps it exact with no code change; and
+   copies every row once. Checked on a fresh Postgres 17: inserts, confirm
+   and its undo, an unrelated update, a second run. **Needs running on dev
+   then live**; nothing reads it yet.
+2. Reads merge `{...details, ...state}`: no change while the trigger copies.
+3. Every writer of the site's keys writes `state` itself, key by key (the
+   SQL functions in a new migration, the site's writers through one),
+   still into `details` too.
+4. The trigger stops deriving `state` (a migration); submissions and
+   approvals stop carrying the site's keys.
+5. A migration removes the keys from `details`.
+
+`googleDescription` and `menuUrl` stay in `details` (a person may write
+them); `googleFields` moves.
+
+The plan as first written:
 
 A listing's `details` jsonb holds what people wrote (hours, notes, the
 fields an admin set up) and, beside it, about 26 keys the site keeps for
