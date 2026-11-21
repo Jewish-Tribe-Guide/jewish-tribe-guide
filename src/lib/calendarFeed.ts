@@ -18,6 +18,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { joinText, parseTimeToMinutes, TEFILLAH_LABELS } from './davening'
+import { addDays } from './isoDay'
 import { dateText, type SpecialSchedule } from './schedules'
 
 export type CalendarEntry = {
@@ -303,10 +304,6 @@ export function withJoinLinks(schedules: readonly SpecialSchedule[], joins: read
     return touched ? { ...s, minyanim } : s
   })
   return { schedules: next, changes }
-}
-
-function addDays(date: string, n: number): string {
-  return new Date(Date.parse(`${date}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
 }
 
 const weekdayNumber = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay()

@@ -8,6 +8,7 @@
 
 import type { DayKey } from './hours'
 import type { Season } from './season'
+import { clockMinutes } from './clockMinutes'
 import { DAY_KEYS, fmt12 } from './hours'
 
 export type { DayKey }
@@ -280,22 +281,13 @@ export const SEASON_LABELS: Record<Season, string> = {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 /**
- * Parse "7:30am" / "7:30 AM" / "19:30" to minutes-since-midnight for sorting.
+ * Parse "7:30am" / "7 AM" / "19:30" to minutes-since-midnight for sorting.
  * Returns Infinity for relative times ("At sunset", "15 min before sunset").
+ * The same reader as the listing's own (clockMinutes.ts), so a time it
+ * shows is a time this can sort.
  */
 export function parseTimeToMinutes(time: string): number {
-  const t = time.trim()
-  const hhmm = t.match(/^(\d{1,2}):(\d{2})$/)
-  if (hhmm) return parseInt(hhmm[1]) * 60 + parseInt(hhmm[2])
-  const ampm = t.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i)
-  if (ampm) {
-    let h = parseInt(ampm[1])
-    const m = parseInt(ampm[2])
-    if (ampm[3].toLowerCase() === 'pm' && h !== 12) h += 12
-    if (ampm[3].toLowerCase() === 'am' && h === 12) h = 0
-    return h * 60 + m
-  }
-  return Infinity
+  return clockMinutes(time) ?? Infinity
 }
 
 /** Returns true when `v` is a valid Minyan[]. */

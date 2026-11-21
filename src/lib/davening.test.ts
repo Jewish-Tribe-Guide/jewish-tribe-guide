@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { clockMinutes } from './clockMinutes'
 import {
   clampTimeText,
   formatAnchorRule,
@@ -45,11 +46,21 @@ describe('parseTimeToMinutes', () => {
     expect(parseTimeToMinutes('')).toBe(Infinity)
   })
 
-  // Documents a real gap: a shul that enters "7am" rather than "7:00am" sorts
-  // to the end of its group instead of first. The intake form produces the
-  // padded form, so this only bites hand-edited/imported data.
-  it('does not parse an hour without minutes', () => {
-    expect(parseTimeToMinutes('7am')).toBe(Infinity)
+  // A shul that enters "7am" rather than "7:00am" used to sort to the end of
+  // its group, and was never its next minyan: this read only "7:15 AM" and
+  // "19:30", while minyanText's clockMinutes read the rest (the health
+  // sweep, Nov 20). One reader now.
+  it('reads an hour without minutes, and a.m./p.m. with dots', () => {
+    expect(parseTimeToMinutes('7am')).toBe(7 * 60)
+    expect(parseTimeToMinutes('7 PM')).toBe(19 * 60)
+    expect(parseTimeToMinutes('7:15 a.m.')).toBe(7 * 60 + 15)
+    expect(parseTimeToMinutes('12pm')).toBe(12 * 60)
+  })
+
+  it('reads every time the way the listing writes them does', () => {
+    for (const t of ['7am', '7 AM', '7:15am', '7:15 AM', '7:15 a.m.', '12:05am', '12pm', '19:30', '0:30', '7', '25:00', '7:75', 'At Havdalah', '']) {
+      expect([t, parseTimeToMinutes(t)]).toEqual([t, clockMinutes(t) ?? Infinity])
+    }
   })
 })
 

@@ -8,8 +8,8 @@
 // original and by far the most common case) sits in the SAME ordered list as
 // the desktop home screen's singleton built-in blocks, one per card.
 // Reordering or removing any of them is just reordering/removing a row in
-// this same list — see HomeSectionManager.tsx and Landing.tsx's ordered
-// block walk.
+// this same list — see SiteSettingsEditor.tsx (saveHomeSections) and
+// Landing.tsx's ordered block walk.
 //
 // 'zmanim' (Davening Times + the community card, paired side-by-side),
 // 'shabbat' (Shabbat Times + Stay in the Loop, also paired), and 'featured'

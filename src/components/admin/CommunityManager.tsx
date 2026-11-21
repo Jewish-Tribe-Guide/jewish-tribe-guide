@@ -145,8 +145,7 @@ export default function CommunityManager({ token }: { token: string }) {
   const [detailsOpen, setDetailsOpen] = useState(false)
   // Which community's delete-confirmation panel is open, if any — and what
   // the admin has typed into its "retype the slug" field so far. Only one
-  // open at a time (opening a second closes whichever was open), same
-  // pattern as ArchivedListings.tsx's confirmDeleteId.
+  // open at a time (opening a second closes whichever was open).
   const [deletingSlug, setDeletingSlug] = useState<string | null>(null)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)

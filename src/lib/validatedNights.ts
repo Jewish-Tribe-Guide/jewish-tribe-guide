@@ -1,4 +1,5 @@
 import type { JobId, KindCount, NightKindId } from './jobRuns'
+import { dayInTimezone } from './isoDay'
 import { changeDay } from './whatChanged'
 
 // ── What each night validated, for Activity (the user, Nov 17) ──────────────
@@ -54,15 +55,13 @@ export type Night = {
   groups: { id: GroupId; ids: string[] }[]
 }
 
-const dateIn = (at: string, timezone: string) => new Date(Date.parse(at)).toLocaleDateString('en-CA', { timeZone: timezone })
-
 /** The nights in these runs, newest first. A job run twice in a night
  *  counts its latest run. A night that validated nothing has no row. */
 export function nightsFrom(runs: readonly NightRun[], timezone: string): Night[] {
   const latest = new Map<string, NightRun>()
   for (const r of runs) {
     if (!NIGHT_JOBS.includes(r.job)) continue
-    const k = `${dateIn(r.startedAt, timezone)} ${r.job}`
+    const k = `${dayInTimezone(timezone, r.startedAt)} ${r.job}`
     const had = latest.get(k)
     if (!had || Date.parse(r.startedAt) > Date.parse(had.startedAt)) latest.set(k, r)
   }

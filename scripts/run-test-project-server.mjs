@@ -157,10 +157,9 @@ async function ensureCacheRoundtripFixtureCategory(supabase) {
   })
   if (resourceError) throw new Error(`Could not seed cache-roundtrip fixture listing: ${resourceError.message}`)
 
-  // A listing category only renders on /all if it's grouped into a home
-  // section (AllCategories.tsx groups by home_section, with a "More" bucket
-  // for anything left over — but a category in NO section at all is never a
-  // card to begin with, see resourceCards/groupCardsIntoSections in
+  // A listing category only shows as a home card if it's grouped into a
+  // home section (a category in NO section at all is never a card, see
+  // resourceCards/groupCardsIntoSections in
   // src/components/home/sections.tsx). Its own dedicated section, for the
   // same "nothing else ever touches this" reason as the category above.
   const { error: sectionError } = await supabase.from('home_section').upsert({

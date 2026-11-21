@@ -1,5 +1,5 @@
 import type { SubmissionOperation, SubmissionStatus, SubmissionTargetType } from '@/types'
-import { dayInTimezone } from './activity'
+import { addDays, dayInTimezone } from './isoDay'
 import type { MissCountRow } from './missedSearches'
 import { isNewPlace } from './todo'
 
@@ -30,12 +30,6 @@ export type ReportRange = {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-
-function addDays(day: string, n: number): string {
-  const d = new Date(`${day}T00:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
 
 function lastDayOfMonth(year: number, month: number): string {
   return new Date(Date.UTC(year, month + 1, 0)).toISOString().slice(0, 10)

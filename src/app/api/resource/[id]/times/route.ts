@@ -1,4 +1,5 @@
 import { reportServerError } from '@/lib/serverError'
+import { dayInTimezone } from '@/lib/isoDay'
 import { after } from 'next/server'
 import { submitListingUpdate } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
@@ -45,7 +46,7 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
     const applied = applyUpdate(regularMinyanim(listing[field.key]), readSchedules(listing[key]), update, {
       evenIfSame: true,
       // Today where the shul is: its community's clock, not the deployment's.
-      keepBefore: new Intl.DateTimeFormat('en-CA', { timeZone: community.timezone }).format(new Date()),
+      keepBefore: dayInTimezone(community.timezone, Date.now()),
     })
     const note = [
       update.kind === 'week' ? 'Times for particular days, sent from the shul’s card.' : `${update.season ? `Their ${update.season} schedule` : 'Their schedule'}, sent from the shul’s card.`,

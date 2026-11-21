@@ -1,4 +1,5 @@
 import type { ActivityKind, ActivitySource, EditedBy } from './activity'
+import { dayInTimezone } from './isoDay'
 import type { ChangePart } from './changeParts'
 
 // ── What changed (step 7a) ───────────────────────────────────────────────────
@@ -109,7 +110,7 @@ export function whatChanged(rows: readonly ChangeLogRow[], timezone: string, opt
   return changes.filter((c) => {
     if (c.hidden) return !!opts.includeHidden
     if (c.kind !== 'google') return true
-    const day = new Date(c.at).toLocaleDateString('en-CA', { timeZone: timezone })
+    const day = dayInTimezone(timezone, c.at)
     const n = (googleOnDay.get(day) ?? 0) + 1
     googleOnDay.set(day, n)
     return n <= GOOGLE_PER_DAY
@@ -187,7 +188,7 @@ export function changeSentence(change: Change): { before: string; name: string; 
 /** The day heading a change goes under, in the community's time: "Today",
  *  "Yesterday", else "Wednesday, Sep 30". */
 export function changeDay(at: string, now: number, timezone: string): string {
-  const dayOf = (ms: number) => new Date(ms).toLocaleDateString('en-CA', { timeZone: timezone })
+  const dayOf = (ms: number) => dayInTimezone(timezone, ms)
   const day = dayOf(Date.parse(at))
   if (day === dayOf(now)) return 'Today'
   // Noon today less a day: the day before, across a clock change.

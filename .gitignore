@@ -49,6 +49,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# Placeholders only, no real values (src/test/envExample.test.ts checks).
+!.env.example
 
 # vercel
 .vercel

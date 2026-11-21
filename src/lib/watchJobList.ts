@@ -1,4 +1,5 @@
 import type { CategoryConfig } from './categories'
+import { dayInTimezone } from './isoDay'
 import { isCategorySyncEligible } from './categories'
 import { hoursJobCategories, ownSiteCategories } from './hoursJob'
 import type { NightKindId } from './jobRuns'
@@ -112,7 +113,7 @@ export function needsFixing(jobs: readonly Pick<NightKindView, 'id' | 'name' | '
 export function lastRunWord(iso: string, now: number, nightly: boolean): string {
   const at = Date.parse(iso)
   const zone = { timeZone: 'America/New_York' } as const
-  const day = (t: number) => new Date(t).toLocaleDateString('en-CA', zone)
+  const day = (t: number) => dayInTimezone(zone.timeZone, t)
   const hours = (now - at) / 3_600_000
   if (nightly && hours < 30) return 'Last night'
   if (!nightly && day(at) === day(now)) return 'Today'

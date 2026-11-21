@@ -1,4 +1,5 @@
 import { fetchPublic } from '@/lib/menuReader'
+import { addDays, dayInTimezone } from '@/lib/isoDay'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
 import { readRegular } from '@/lib/scheduleReader'
 import { fetchDatesInfo } from '@/lib/dateZmanim'
@@ -25,9 +26,6 @@ import type { PageSource } from '@/lib/listingPageRun'
 // its newsletter's weeks, the rule says what each part of this week and
 // next is; what this page decides is put on as that part's week
 // (shulWeekFiling.ts). Its usual times are compared as they always were.
-
-const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
-const dayIn = (now: number, timezone: string) => new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(now)
 
 /** What a shul's page gave and would change, for the watch to file. */
 export type ShulPageReading = {
@@ -163,7 +161,7 @@ export async function readShulPage(
   },
 ): Promise<ShulPageReading> {
   const { timezone } = where
-  const today = dayIn(now, timezone)
+  const today = dayInTimezone(timezone, now)
   const weeks = calendarWeeks(today).map((w) => ({ from: w.sunday, to: addDays(w.sunday, 6) }))
   const span = { from: weeks[0].from, to: weeks.at(-1)!.to }
   const coords = listing.geo ?? where.mapCenter

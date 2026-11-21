@@ -11,7 +11,7 @@ import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 // write path invalidates every tag the read path uses. Neither has ever
 // watched the two halves actually meet: an admin saves, and a real visitor's
 // next page load shows the change. This does — against the disposable test
-// Supabase project (see run-cache-e2e-server.mjs), through the real admin API,
+// Supabase project (see scripts/run-test-project-server.mjs), through the real admin API,
 // with a real production build so Cache Components behaves as it does live.
 //
 // This asserts on the <title> tag, not the page body. AGENTS.md documents

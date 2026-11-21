@@ -1,4 +1,5 @@
 import { reportServerError } from './serverError'
+import { dayInTimezone } from './isoDay'
 import type { ResourceRow, SubmissionRow } from '@/types'
 import { getAdminClient } from './supabase/admin'
 import { listCommunities } from './communityStore'
@@ -11,7 +12,7 @@ import { NIGHTLY_JOBS, jobAlert, jobHealth, lateAfterMs, type JobRun } from './j
 import { statusChangesSince } from './nightNoteStore'
 import { recentJobRuns } from './jobRunStore'
 import { adminAppUrl, sendNightlyEmail } from './email'
-import { buildNightlyEmail, dayIn, waitingRow, type Night, type StoppedRow, type WaitingRow } from './nightlyEmail'
+import { buildNightlyEmail, waitingRow, type Night, type StoppedRow, type WaitingRow } from './nightlyEmail'
 import type { Watch } from './watches'
 import { readAll } from '@/lib/readAll'
 
@@ -141,7 +142,7 @@ async function queue(slug: string, since: string, today: string): Promise<{ wait
 /** A community's night. */
 async function gatherNight(community: Night['community'] & { timezone: string }, now: Date, runs: ReadonlyMap<string, readonly JobRun[]>): Promise<Night> {
   const since = new Date(now.getTime() - NIGHT_MS).toISOString()
-  const today = dayIn(now, community.timezone)
+  const today = dayInTimezone(community.timezone, now)
   const [{ waiting, earlier, people }, { watches }, google] = await Promise.all([
     queue(community.slug, since, today),
     listWatches(community.slug),

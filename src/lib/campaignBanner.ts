@@ -4,6 +4,8 @@
 // one place that decides "is one live right now", so the home banner and the
 // map's own highlighted chip can't drift out of sync with each other.
 
+import { dayInTimezone } from './isoDay'
+
 export type CampaignBanner = {
   id: string
   categoryId: string
@@ -22,13 +24,10 @@ export type CampaignBanner = {
 }
 
 /** `now` (epoch ms) as the community's own local calendar date, 'YYYY-MM-DD'
- *  — the `en-CA` locale formats that way natively, which happens to also be
- *  exactly the format Postgres `date` columns compare against as strings.
- *  Same `Intl.DateTimeFormat({ timeZone })` idiom season.ts's offsetMinutes
- *  uses, for the same reason: the community's own clock, not the server's or
- *  the visitor's. */
+ *  — exactly the format Postgres `date` columns compare against as strings.
+ *  The community's own clock, not the server's or the visitor's. */
 function localDateString(timezone: string, now: number): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date(now))
+  return dayInTimezone(timezone, now)
 }
 
 /** The one banner currently in its visible window, or null. Takes `now`

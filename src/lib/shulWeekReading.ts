@@ -1,4 +1,5 @@
 import type { Community } from '@/lib/communityStore'
+import { dayInTimezone } from './isoDay'
 import type { DirectoryResource } from '@/types'
 import { fetchDatesInfo } from './dateZmanim'
 import { leaveOutHeldElsewhere } from './heldElsewhere'
@@ -40,7 +41,7 @@ export async function readShulWeek(
 ) {
   const { timezone } = where
   const now = Date.now()
-  const dayOf = (ms: number) => new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date(ms))
+  const dayOf = (ms: number) => dayInTimezone(timezone, ms)
   const today = dayOf(now)
   // A message sent days ago (a newsletter): its days start when it was sent,
   // at most two weeks back, so its "this Shabbos" lands where it meant.

@@ -10,7 +10,7 @@ import type { KeptEmail } from './eruvEmail'
 // where its map is. Uncached: the status changes through the day, and
 // /api/eruv reads it fresh. A missing table (the migration not run yet)
 // isn't an error: the page falls back to the old list. The maps themselves
-// are /api/eruv/maps (eruvMaps.ts), the saved copy of each eruv's own file
+// are /api/eruv/maps (its route.ts), the saved copy of each eruv's own file
 // (migration 076). 081's line_color and 074's sort_order are no longer read
 // (Nov 9): a too-pale line is darkened by itself (eruvLine.ts), and eruvim
 // are listed by name like every other place.

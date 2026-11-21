@@ -1136,7 +1136,25 @@ Soon:
     Vercel token can't open the project, and Sentry had no recent server
     events. This Mac runs Node 26; `nvm use` picks up `.nvmrc`.
 - Two time parsers disagree ("8am" is Infinity in `parseTimeToMinutes`,
-  checked); date helpers copied 8–9 times; `partDates` twice.
+  checked); date helpers copied 8–9 times; `partDates` twice. **Built
+  Nov 20** (`claude/health-cleanup`):
+  - One clock-time reader, `src/lib/clockMinutes.ts`;
+    `parseTimeToMinutes` is it with Infinity for words. A shul's "8am" or
+    "7 PM" used to sort last and was never its next minyan: the row skipped
+    it and said "Shacharis today: 8am" under the next one as if it were
+    words. The editors called it a time they couldn't read. Red 3/3: the
+    old test that pinned "7am" as unreadable, flipped; an agreement test;
+    and the row in `upcomingDavening.test.ts`.
+  - `src/lib/isoDay.ts` holds `addDays` (6 copies) and `dayInTimezone`
+    (17 copies in 16 files; `activity.ts` re-exports it for its 8
+    importers). `partDates` is shulTimes'. `oneDayHelper.test.ts` fails on
+    a new copy of any of the three (red 3/3).
+  - Not merged, on purpose: the parsers that find a time *inside* running
+    text (hours, calendar titles, the shul page and schedule readers,
+    ask). They answer a different question. `nightKinds.ts`,
+    `watchJobList.ts` and `openedPlaceBoxes.ts` still hard-code New
+    York's clock for the Watches page's days: right for Philly and UES,
+    wrong for a community in another time zone.
 - knip: a 4-line config takes it from 42 files / 243 exports to 0 / 31
   real ones; put it in CI. **Built Nov 20**: `knip.json` names the entry
   points knip can't see (scripts, Playwright setup files, the service
@@ -1148,9 +1166,24 @@ Soon:
   which refuse to load without the test project's keys (CI's lint job
   has none), so it listed every spec as unused. The specs and configs
   are listed as entry points instead.
-  Still open: stale comments (11 names that no longer exist).
+  Stale comments (11 names that no longer exist): **Built Nov 20**
+  (`claude/health-cleanup`), each pointed at what replaced it, or the
+  pointer dropped where nothing did. Not testable: a test can't tell a
+  comment's history ("this was X") from a pointer ("see X"), so the
+  historical mentions were left as they are.
 - Preview emails go out without [DEV] (checked); `.env.example` has
-  never been committed, `.gitignore` drops it (checked).
+  never been committed, `.gitignore` drops it (checked). **Built Nov 20**
+  (`claude/health-cleanup`):
+  - The [DEV] tag goes by `VERCEL_ENV === 'production'`, Sentry's gate.
+    It was `NODE_ENV`, which is 'production' on every build, a preview
+    (dev database) and the suites' `next start` included. Red 2/2.
+  - `.env.example` is in the repo: `!.env.example` after `.env*`. It
+    held two real email addresses (an admin's and the guide's inbox); the
+    repo is public, so they're `example.com` now. It named none of 15
+    settings the code reads (`OPENAI_API_KEY`, the server Places key,
+    `DEV_ADMIN_BYPASS_SECRET`, the `PROD_*` read keys with a warning,
+    …). `envExample.test.ts` fails on a setting the code reads that it
+    doesn't name, or a value that isn't a placeholder. Red 3/3.
 
 Later or bigger: the two 2,000-line screens (map, category page);
 foreign keys and transactions for deletes and approvals; `details`

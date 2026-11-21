@@ -1,4 +1,5 @@
 import { DAY_KEYS, type DayKey } from './hours'
+import { addDays } from './isoDay'
 import { formatAnchorRule, parseTimeToMinutes, TEFILLAH_ORDER, type Minyan, type MinyanDayKey, type Tefillah, type ZmanAnchor } from './davening'
 import { dateText, saturdayOf, signUpGroup, weekKeepsHeading, type ScheduleDay, type ScheduleMinyan, type SpecialSchedule } from './schedules'
 import type { Season } from './season'
@@ -174,12 +175,6 @@ export function seasonFromNotes<T extends Pick<Minyan, 'season' | 'notes'>>(m: T
 type Timed = Pick<Minyan, 'time' | 'anchor' | 'offsetMinutes' | 'notBefore' | 'notAfter'>
 
 export const weekdayOf = (date: string): DayKey => DAY_KEYS[new Date(`${date}T12:00:00Z`).getUTCDay()]
-
-function addDays(date: string, n: number): string {
-  const d = new Date(`${date}T12:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
 
 /** Every date from `from` to `to`, at most 8. */
 export function datesBetween(from: string, to: string): string[] {

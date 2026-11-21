@@ -1,3 +1,4 @@
+import { dayInTimezone } from './isoDay'
 import { jobHealth, nextRunAt, NIGHTLY_JOBS, type JobId, type NightlyJob, type JobRun, type KindCount, type NightKindId, type RunKinds } from './jobRuns'
 import { watchGroupOf, type ReadsOf } from './watchGroups'
 import { isIgnoredSender, isNewsletterWatch } from './newsletter'
@@ -156,7 +157,7 @@ export type NightKindView = {
 export type KindFix = KindMiss & { whole?: boolean }
 
 const ZONE = 'America/New_York'
-const dayKey = (t: number) => new Date(t).toLocaleDateString('en-CA', { timeZone: ZONE })
+const dayKey = (t: number) => dayInTimezone(ZONE, t)
 const dayName = (t: number) => new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: ZONE })
 const weekdayOf = (t: number) => new Date(t).toLocaleDateString('en-US', { weekday: 'long', timeZone: ZONE })
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: ZONE })

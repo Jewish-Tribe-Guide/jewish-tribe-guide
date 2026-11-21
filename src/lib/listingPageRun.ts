@@ -1,4 +1,5 @@
 import { getAdminClient } from '@/lib/supabase/admin'
+import { dayInTimezone } from '@/lib/isoDay'
 import { resolveCommunity } from '@/lib/communityStore'
 import { listCategoriesUncached } from '@/lib/categoryStore'
 import { getResourceRowById, listApprovedResources, normalizeRow } from '@/lib/resourceStore'
@@ -101,7 +102,7 @@ export async function readListingPage(url: string, opts: { timezone: string; fet
   const page = await fetchPublic(url, { fetchImpl: opts.fetchImpl, headers: WATCH_FETCH_HEADERS, trouble: opts.trouble })
   if (!page) return null
   if (page.type === 'pdf') return { url: page.url, text: null, pdf: page.body }
-  const today = dayIn(opts.now ?? Date.now(), opts.timezone)
+  const today = dayInTimezone(opts.timezone, opts.now ?? Date.now())
   const weeks = calendarWeeks(today)
   // From this week's Sunday, so the text is the same all week (withCalendar).
   const [first, last] = [weeks[0].sunday, weeks.at(-1)!.to]
@@ -233,9 +234,6 @@ export type PageReading = {
   /** A shul's page, as sources (shulPageRead.ts): kept on its check. */
   shulReads?: SourceRead[]
 }
-
-/** "2026-10-22", the community's day. */
-const dayIn = (now: number, timezone: string) => new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(now)
 
 /** The last morning a shul's page was due its read, changed or not (the
  *  user, Oct 26): Friday's (Thursday night's run), for this Shabbos's
@@ -421,7 +419,7 @@ export async function runListingPageWatch(
   // A shul's page is read twice a week, changed or not (the user, Oct 26):
   // a page whose words stay put still gives the new week's times, and one
   // read on a Thursday filed only up to Saturday week (weeklyReadDue).
-  const today = dayIn(opts.now ?? Date.now(), where.timezone)
+  const today = dayInTimezone(where.timezone, opts.now ?? Date.now())
   const weekDue = reads.kind === 'times' && !!watch.pageHash && (watch.lastCheck?.readWeek ?? '') < weeklyReadDue(today)
   // A difference that waited behind a suggestion already in the queue is
   // read again in full once nothing waits for the listing: what still

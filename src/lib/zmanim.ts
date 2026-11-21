@@ -1,4 +1,5 @@
 import type { ZmanimData, ZmanEntry } from '@/types'
+import { addDays, dayInTimezone } from './isoDay'
 import { roshChodeshDates, calendarDaysFrom, readHebcalDay } from './jewishDays'
 
 // ── Hebcal data layer ─────────────────────────────────────────────────────────
@@ -108,31 +109,12 @@ function weekdayAndDate(iso: string, tz: string): string {
 /** Today's civil date (YYYY-MM-DD) and weekday index in the given timezone. */
 function todayInTimezone(tz: string): { dateStr: string; dayOfWeek: number } {
   const now = new Date()
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now)
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
-  const dateStr = `${get('year')}-${get('month')}-${get('day')}`
+  const dateStr = dayInTimezone(tz, now)
   const shortDow = new Intl.DateTimeFormat('en-US', {
     weekday: 'short',
     timeZone: tz,
   }).format(now)
   return { dateStr, dayOfWeek: WEEKDAY_INDEX.indexOf(shortDow) }
-}
-
-/** Adds `days` civil days to a "YYYY-MM-DD" string, returning the same
- *  shape. Calendar-day arithmetic only — deliberately not timezone-aware
- *  (there's no instant here to convert, just a date to walk forward from),
- *  which is why this parses the parts by hand into Date.UTC rather than
- *  letting `new Date(dateStr)` interpret the string in the machine's own
- *  local time and risk landing on the wrong civil day. */
-function addDays(dateStr: string, days: number): string {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  const shifted = new Date(Date.UTC(y, m - 1, d + days))
-  return shifted.toISOString().slice(0, 10)
 }
 
 /** How many days ahead the Shabbat & Holiday Times card looks for an
