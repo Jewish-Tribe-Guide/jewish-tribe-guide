@@ -1,7 +1,7 @@
 import { reportServerError } from '@/lib/serverError'
 import { validateSubmission, getResourceRowById, normalizeRow, listResourcesForAdmin, toAdminPlace } from '@/lib/resourceStore'
 import { getCategoryById, listCategoriesUncached } from '@/lib/categoryStore'
-import { submitListingCreate, approveSubmission } from '@/lib/submissionStore'
+import { submitListingCreate, approveOwn } from '@/lib/submissionStore'
 import { normalizeUrl } from '@/lib/validation'
 import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { after } from 'next/server'
@@ -20,7 +20,7 @@ type Body = {
 // Reuses the real submission pipeline's own work (validation, geocoding,
 // Google-sync field ownership) rather than re-implementing it: this inserts a
 // normal pending submission via submitListingCreate, then immediately calls
-// approveSubmission — the exact function the moderation queue's own approve
+// approveOwn (approveSubmission, taking the submission back out if it fails) — the exact function the moderation queue's own approve
 // action calls — so every side effect of a real approval happens here too.
 export const POST = adminWrite(async (request: Request, { community, admin }) => {
   let body: Body
@@ -57,7 +57,7 @@ export const POST = adminWrite(async (request: Request, { community, admin }) =>
       ...payload,
       submittedBy: { name: admin.email, email: admin.email },
     })
-    const approved = await approveSubmission(submission.id, community.slug, admin.email)
+    const approved = await approveOwn(submission, community.slug, admin.email)
     const resourceRow = approved.target_id ? await getResourceRowById(approved.target_id, community.slug) : null
     if (!resourceRow) {
       return Response.json({ ok: false, errors: ['Listing was created but could not be loaded.'] }, { status: 502 })

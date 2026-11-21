@@ -22,19 +22,22 @@ const m = vi.hoisted(() => ({
 vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: m.enforceRateLimit, clientIp: () => '1.2.3.4' }))
 vi.mock('next/cache', () => ({ revalidateTag: m.revalidateTag }))
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => fn() }))
-// The withdrawal's query, recorded as one call with its filters; the
-// listing's row (its community) as m.row.
+// A queue query (the undo's check and withdrawal, the queue read), recorded
+// as one call with its filters and whether it deletes; the listing's row
+// (its community) as m.row.
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     rpc: m.rpc,
     from: (table: string) => {
       const filters: unknown[][] = []
+      let op = 'select'
       const chain = {
-        delete: () => chain,
+        delete: () => ((op = 'delete'), chain),
         eq: (...a: unknown[]) => (filters.push(['eq', ...a]), chain),
         gte: (...a: unknown[]) => (filters.push(['gte', ...a]), chain),
-        select: () => (table === 'resource' ? chain : m.del(table, filters)),
+        select: () => chain,
         maybeSingle: () => m.row(table, filters),
+        then: (ok: (v: unknown) => unknown, fail: (e: unknown) => unknown) => Promise.resolve(m.del(table, filters, op)).then(ok, fail),
       }
       return chain
     },
@@ -103,10 +106,22 @@ describe('POST /api/resource/:id/item/gone (Not anymore)', () => {
 
   it('already reported and waiting on an admin: files nothing more', async () => {
     m.rpc.mockResolvedValue(marked(false))
+    m.del.mockResolvedValue({ data: [{ payload: { details: { m: ['Challah'] } } }], error: null })
     const json = await (await POST(req('POST', { field: 'm', item: 'Chicken' }), ctx())).json()
     expect(json).toMatchObject({ ok: true, changed: false })
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
     expect(m.recordActivity).not.toHaveBeenCalled()
+  })
+
+  // Nov 21, the save survey: a warning whose removal was never filed (the
+  // filing failed, and so did taking the warning down) stayed up for good,
+  // since the next "Not anymore" saw the warning and filed nothing.
+  it('a warning with nothing in the queue for it: files the removal now', async () => {
+    m.rpc.mockResolvedValue(marked(false))
+    m.del.mockResolvedValue({ data: [], error: null })
+    const json = await (await POST(req('POST', { field: 'm', item: 'Chicken' }), ctx())).json()
+    expect(m.submitListingUpdate).toHaveBeenCalledTimes(1)
+    expect(json).toMatchObject({ ok: true, changed: true, submissionId: SUB })
   })
 
   it('takes the warning back down when the removal can’t be filed', async () => {
@@ -155,11 +170,13 @@ describe('POST /api/resource/:id/item/gone (Not anymore)', () => {
 describe('DELETE /api/resource/:id/item/gone (undo)', () => {
   const undo = { field: 'm', item: 'Chicken', goneAt: '2026-10-01T14:00:00.000Z', submissionId: SUB, activityId: 8 }
 
-  it('withdraws only that pending removal, from the last hour, then takes the warning down', async () => {
+  it('takes the warning down, then withdraws only that pending removal, from the last hour', async () => {
     m.del.mockResolvedValue({ data: [{ id: SUB }], error: null })
     m.rpc.mockResolvedValue({ data: [{ out_community: 'philly', out_changed: true }], error: null })
     expect(await (await DELETE(req('DELETE', undo), ctx())).json()).toEqual({ ok: true, changed: true })
-    const [table, filters] = m.del.mock.calls[0]
+    const withdrawal = m.del.mock.calls.find((c) => c[2] === 'delete')!
+    expect(m.rpc.mock.invocationCallOrder[0]).toBeLessThan(m.del.mock.invocationCallOrder[m.del.mock.calls.indexOf(withdrawal)])
+    const [table, filters] = withdrawal
     expect(table).toBe('submission')
     expect(filters).toEqual(
       expect.arrayContaining([
@@ -178,6 +195,17 @@ describe('DELETE /api/resource/:id/item/gone (undo)', () => {
     m.del.mockResolvedValue({ data: [], error: null })
     expect(await (await DELETE(req('DELETE', undo), ctx())).json()).toEqual({ ok: true, changed: false })
     expect(m.rpc).not.toHaveBeenCalled()
+  })
+
+  // Nov 21, the save survey: the removal used to leave the queue first, so
+  // a warning that then failed to come down stayed up with nothing to
+  // review, and Undo again found no removal and changed nothing.
+  it('a warning that won’t come down leaves the removal in the queue, so Undo can be tried again', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    m.del.mockResolvedValue({ data: [{ id: SUB }], error: null })
+    m.rpc.mockResolvedValue({ data: null, error: { message: 'timeout' } })
+    expect((await DELETE(req('DELETE', undo), ctx())).status).toBe(502)
+    expect(m.del.mock.calls.some((c) => c[2] === 'delete')).toBe(false)
   })
 
   it('refuses a report id that isn’t one', async () => {

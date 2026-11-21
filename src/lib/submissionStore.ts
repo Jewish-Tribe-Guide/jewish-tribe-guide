@@ -1,3 +1,4 @@
+import { reportServerError } from '@/lib/serverError'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { SYNC_INTERNAL_FIELDS } from './syncFields'
 import { MENU_LINK_KEY, keepsMenuLink, readMenuLink } from './menuLink'
@@ -570,6 +571,12 @@ async function approveNow(
     } as unknown as Record<string, unknown>
   }
 
+  // A listing's slow work (Google, the address's map point) happens before
+  // the claim, and writes nothing (Nov 21, the save survey): a function
+  // stopped partway then leaves the change waiting, never "approved" with
+  // nothing on the site and no way back to the queue.
+  const writeListing = submission.target_type === 'listing' ? await prepareListing(submission) : null
+
   // Claimed before anything goes on the site: of two approvals at once (two
   // tabs, two admins, a retry after a slow save), only the one whose claim
   // finds it still waiting goes on; the other is told it was decided
@@ -589,8 +596,8 @@ async function approveNow(
   let newItems: { fieldKey: string; item: string }[] = []
   let changes: ChangePart[] | undefined
   try {
-    if (submission.target_type === 'listing') {
-      ;({ id: affectedResourceId, newItems, changes } = await applyListing(submission))
+    if (writeListing) {
+      ;({ id: affectedResourceId, newItems, changes } = await writeListing())
     } else if (submission.target_type === 'category') {
       await applyCategory(submission)
     } else if (submission.target_type === 'eruv' && submission.operation === 'update') {
@@ -602,7 +609,9 @@ async function approveNow(
       throw new Error(`Unsupported submission target_type: ${submission.target_type}`)
     }
   } catch (err) {
-    await supabase.from('submission').update({ status: 'pending', reviewed_at: null }).eq('id', id)
+    const { error: backErr } = await supabase.from('submission').update({ status: 'pending', reviewed_at: null }).eq('id', id)
+    // Left "approved" with nothing applied: it's out of the queue, so say so.
+    if (backErr) reportServerError(`[submissions] ${id} couldn’t be applied, nor put back to waiting: it shows as approved with nothing on the site`, backErr.message)
     throw err
   }
 
@@ -629,8 +638,36 @@ async function approveNow(
       .single(),
     submission.target_type === 'listing' ? recordActivity(activityForApproval(submission, affectedResourceId, newItems, changes)) : null,
   ])
-  if (error) throw new Error(`Failed to mark submission approved: ${error.message}`)
+  // The change is on the site by now: a failure here loses only the
+  // record's who and what (Nov 21, the save survey). Failing the approval
+  // would tell the admin it didn't happen, and their Add again would put
+  // the listing on twice.
+  if (error) {
+    reportServerError(`[submissions] ${id} is on the site, but its record couldn’t be finished`, error.message)
+    return {
+      ...submission,
+      status: 'approved',
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: reviewedBy ?? submission.reviewed_by,
+      ...(savedPayload ? { payload: savedPayload } : {}),
+      target_id: submission.target_id ?? affectedResourceId,
+    }
+  }
   return data as SubmissionRow
+}
+
+/** An admin's own change, filed and approved at once (Places' Add, Edit
+ *  and Archive). If approving fails, what was filed is taken back out
+ *  while it still waits, so a failed Add never sits in the queue as a
+ *  suggestion, one more for each try (Nov 21, the save survey). */
+export async function approveOwn(filed: SubmissionRow, community: string, reviewedBy: string): Promise<SubmissionRow> {
+  try {
+    return await approveSubmission(filed.id, community, reviewedBy)
+  } catch (err) {
+    const { error } = await getAdminClient().from('submission').delete().eq('id', filed.id).eq('community_id', community).eq('status', 'pending')
+    if (error) reportServerError(`[submissions] an admin’s own change (${filed.id}) failed and stays in the queue`, error.message)
+    throw err
+  }
 }
 
 /** One part of an edit decided on its own (reviewParts.ts). `whole`: it's
@@ -1219,7 +1256,10 @@ function menuOf(payload: unknown): { url: string | null } | null {
 
 type AppliedListing = { id: string | null; newItems: { fieldKey: string; item: string }[]; changes?: ChangePart[] }
 
-async function applyListing(submission: SubmissionRow): Promise<AppliedListing> {
+/** A listing submission made ready to go on: every read and outside call
+ *  (Google, geocoding) done, nothing written. The function it returns makes
+ *  the writes, once the approval has claimed the submission. */
+async function prepareListing(submission: SubmissionRow): Promise<() => Promise<AppliedListing>> {
   const supabase = getAdminClient()
   const now = new Date().toISOString()
   const named = submissionSource(submission).named
@@ -1234,38 +1274,48 @@ async function applyListing(submission: SubmissionRow): Promise<AppliedListing> 
     payload.details = withConfirmedNow(payload.details, now, named, community)
     const dated = await withItemDates(submission.community_id, payload.details, payload.category, null, now)
     payload.details = dated.details
-    const { data: created, error } = await supabase
-      .from('resource')
-      .insert({
-        ...(await listingColumnsWithGeo(payload)),
-        community_id: submission.community_id,
-        status: 'approved',
-        submitted_by: submission.submitted_by,
-        reviewed_at: now,
-      })
-      .select('id')
-      .single()
-    if (error) throw new Error(`Failed to create listing: ${error.message}`)
-    const id = (created as { id: string } | null)?.id ?? null
-    // Side by side: both best-effort, neither reads what the other writes.
-    const [, changes] = await Promise.all([
-      growTagVocabulary(submission.community_id, payload),
-      saidForVisitors(submission.community_id, payload, (category) =>
-        newListingFacts({ id: id ?? '', category: payload.category, name: payload.name, anchorId: payload.anchorId, address: payload.address ?? '', distance: 0, phone: payload.phone ?? undefined, ...payload.details }, category),
-      ),
-    ])
-    return { id, newItems: dated.newItems, changes }
+    const columns = await listingColumnsWithGeo(payload)
+    return async () => {
+      const { data: created, error } = await supabase
+        .from('resource')
+        .insert({
+          ...columns,
+          community_id: submission.community_id,
+          status: 'approved',
+          submitted_by: submission.submitted_by,
+          reviewed_at: now,
+        })
+        .select('id')
+        .single()
+      if (error) throw new Error(`Failed to create listing: ${error.message}`)
+      const id = (created as { id: string } | null)?.id ?? null
+      // Side by side: both best-effort, neither reads what the other writes.
+      const [, changes] = await Promise.all([
+        growTagVocabulary(submission.community_id, payload),
+        saidForVisitors(submission.community_id, payload, (category) =>
+          newListingFacts({ id: id ?? '', category: payload.category, name: payload.name, anchorId: payload.anchorId, address: payload.address ?? '', distance: 0, phone: payload.phone ?? undefined, ...payload.details }, category),
+        ),
+      ])
+      return { id, newItems: dated.newItems, changes }
+    }
   }
 
   if (submission.operation === 'update') {
     if (!submission.target_id) throw new Error('Update submission missing target_id.')
+    const target = submission.target_id
     const payload = submission.payload as unknown as ResourceSubmission
-    const { data: existingData } = await supabase
+    // The listing as it is: the edit keeps its own keys (Google's fields,
+    // item dates, confirmations) from it. A failed read used to go on as
+    // if there were none, and the update wiped them (Nov 21, the save
+    // survey).
+    const { data: existingData, error: readErr } = await supabase
       .from('resource')
       .select('*')
       .eq('community_id', submission.community_id)
-      .eq('id', submission.target_id)
+      .eq('id', target)
       .maybeSingle()
+    if (readErr) throw new Error(`Couldn’t read the listing: ${readErr.message}`)
+    if (!existingData) throw new ReviewEditError('The listing this changes couldn’t be found.')
     payload.details = withResolvedPlaceId(payload.details, payload)
     const googleFields = await resolveGoogleFields(
       submission.community_id,
@@ -1289,33 +1339,39 @@ async function applyListing(submission: SubmissionRow): Promise<AppliedListing> 
     // source's.
     const fixed = !!(payload as { reviewEdit?: { fields?: string[] } }).reviewEdit?.fields?.length
     payload.details = fixed ? dated.details : withSourceBoxDated(dated.details, submissionSource(submission), now)
-    const { error } = await supabase
-      .from('resource')
-      .update({ ...(await listingColumnsWithGeo(payload)), reviewed_at: now })
-      .eq('community_id', submission.community_id)
-      .eq('id', submission.target_id)
-    if (error) throw new Error(`Failed to update listing: ${error.message}`)
-    const existing = existingData ? normalizeRow(existingData as ResourceRow) : null
-    const [, changes] = await Promise.all([
-      growTagVocabulary(submission.community_id, payload),
-      saidForVisitors(submission.community_id, payload, (category) => visitorChanges(existing, payload, category.detailFields)),
-    ])
-    return { id: submission.target_id, newItems: dated.newItems, changes }
+    const columns = await listingColumnsWithGeo(payload)
+    return async () => {
+      const { error } = await supabase
+        .from('resource')
+        .update({ ...columns, reviewed_at: now })
+        .eq('community_id', submission.community_id)
+        .eq('id', target)
+      if (error) throw new Error(`Failed to update listing: ${error.message}`)
+      const existing = existingData ? normalizeRow(existingData as ResourceRow) : null
+      const [, changes] = await Promise.all([
+        growTagVocabulary(submission.community_id, payload),
+        saidForVisitors(submission.community_id, payload, (category) => visitorChanges(existing, payload, category.detailFields)),
+      ])
+      return { id: target, newItems: dated.newItems, changes }
+    }
   }
 
   if (submission.operation === 'delete') {
     if (!submission.target_id) throw new Error('Delete submission missing target_id.')
-    // Soft delete: archived rows never show publicly but can be restored.
-    const { error } = await supabase
-      .from('resource')
-      .update({ status: 'archived', reviewed_at: now })
-      .eq('community_id', submission.community_id)
-      .eq('id', submission.target_id)
-    if (error) throw new Error(`Failed to archive listing: ${error.message}`)
-    return { id: submission.target_id, newItems: [] }
+    const target = submission.target_id
+    return async () => {
+      // Soft delete: archived rows never show publicly but can be restored.
+      const { error } = await supabase
+        .from('resource')
+        .update({ status: 'archived', reviewed_at: now })
+        .eq('community_id', submission.community_id)
+        .eq('id', target)
+      if (error) throw new Error(`Failed to archive listing: ${error.message}`)
+      return { id: target, newItems: [] }
+    }
   }
 
-  return { id: null, newItems: [] }
+  return async () => ({ id: null, newItems: [] })
 }
 
 /** What an approval changed, as What changed says it (changeParts.ts).

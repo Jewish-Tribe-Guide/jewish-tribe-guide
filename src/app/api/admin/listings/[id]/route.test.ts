@@ -23,7 +23,7 @@ vi.mock('@/lib/categoryStore', () => ({ getCategoryById: async () => ({ id: 'foo
 vi.mock('@/lib/submissionStore', () => ({
   submitListingUpdate: m.submitListingUpdate,
   submitListingDelete: m.submitListingDelete,
-  approveSubmission: m.approveSubmission,
+  approveOwn: (filed: { id: string }, c: string, r: string) => m.approveSubmission(filed.id, c, r),
 }))
 vi.mock('@/lib/communityStore', () => ({ resolveCommunity: async () => ({ slug: 'philly' }), communitySlugFromRequest: () => 'philly' }))
 vi.mock('@/lib/walkRouteJob', () => ({ runWalkRoutesAfterChange: m.runWalkRoutesAfterChange }))

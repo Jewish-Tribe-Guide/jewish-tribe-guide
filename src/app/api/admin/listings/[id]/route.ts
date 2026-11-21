@@ -1,7 +1,7 @@
 import { reportServerError } from '@/lib/serverError'
 import { validateSubmission, getResourceRowById, normalizeRow } from '@/lib/resourceStore'
 import { getCategoryById } from '@/lib/categoryStore'
-import { submitListingUpdate, submitListingDelete, approveSubmission } from '@/lib/submissionStore'
+import { submitListingUpdate, submitListingDelete, approveOwn } from '@/lib/submissionStore'
 import { normalizeUrl } from '@/lib/validation'
 import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { after, type NextRequest } from 'next/server'
@@ -38,7 +38,7 @@ export const PATCH = adminWrite(async (request: NextRequest, { community, admin 
 
   try {
     const submission = await submitListingUpdate(community.slug, id, payload, null, { name: admin.email, email: admin.email })
-    await approveSubmission(submission.id, community.slug, admin.email)
+    await approveOwn(submission, community.slug, admin.email)
     const row = await getResourceRowById(id, community.slug)
     after(() => runWalkRoutesAfterChange(community.slug))
     return Response.json({ ok: true, listing: row ? normalizeRow(row) : null })
@@ -57,7 +57,7 @@ export const DELETE = adminWrite(async (_request: NextRequest, { community, admi
 
   try {
     const submission = await submitListingDelete(community.slug, id, null, { name: admin.email, email: admin.email })
-    await approveSubmission(submission.id, community.slug, admin.email)
+    await approveOwn(submission, community.slug, admin.email)
     after(() => runWalkRoutesAfterChange(community.slug))
     return Response.json({ ok: true })
   } catch (err) {

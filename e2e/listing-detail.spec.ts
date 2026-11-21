@@ -2,6 +2,12 @@ import { expect, test } from '@playwright/test'
 import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, listingWithFourActions, openListingEditor, ready, settled } from './helpers'
 import { changedByTests } from './suiteRows'
 
+// A screen opens at once; its address follows when Next's navigation to it
+// lands (router.push, AGENTS.md), a server render of the listing's page.
+// On a busy CI runner that render took over expect's 5s (Nov 21, PR 420:
+// the request still open when the poll gave up, exactly at 5000ms).
+const ADDRESS_WAIT = 15_000
+
 // Desktop opens a listing in the list's own column, the map staying beside
 // it (ListingColumn); a phone opens it in a bottom sheet, the one Add and
 // Edit use (MobileSheet). Neither expands inline.
@@ -593,7 +599,7 @@ test('the editor is an address of its own: a reload, Back, Forward, and Back fro
 
   await openListingEditor(page, listing)
   await expect(editor).toBeVisible()
-  await expect.poll(editing).toBe(`${item.id}~listing`)
+  await expect.poll(editing, { timeout: ADDRESS_WAIT }).toBe(`${item.id}~listing`)
 
   // A reload is the editor, and Back from there is the listing.
   await page.reload()
@@ -638,7 +644,7 @@ test('Request removal from the bar is an address of its own: a reload, and Back 
   await button.scrollIntoViewIfNeeded()
   await button.click()
   await expect(removal).toBeVisible()
-  await expect.poll(editing).toBe(`${item.id}~removal`)
+  await expect.poll(editing, { timeout: ADDRESS_WAIT }).toBe(`${item.id}~removal`)
 
   await page.reload()
   await ready(page)
@@ -820,7 +826,7 @@ test('an eruv’s editor is an address of its own: a reload, Back and Forward', 
 
   await edit.click()
   await expect(editor).toBeVisible()
-  await expect.poll(editing).toBe(`${item}~listing`)
+  await expect.poll(editing, { timeout: ADDRESS_WAIT }).toBe(`${item}~listing`)
 
   await page.reload()
   await ready(page)

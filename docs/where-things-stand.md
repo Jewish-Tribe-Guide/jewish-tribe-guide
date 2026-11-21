@@ -948,8 +948,8 @@ For the user:
 4. Copy the Gmail script again from Newsletters into the guide's Gmail
    (live admin, Update the script, since Nov 21: a running script had
    no way to get the script again).
-   Then say whether an eruv email with no Authentication-Results header
-   should be refused outright.
+   Done Nov 21. An eruv email with no Authentication-Results header is
+   now refused too (the user, Nov 21).
 5. Check Database → Backups on live, and run the first live copy
    (`npm run backup -- --prod`, read-only).
 6. Sentry cron monitors: the plan has one (checked Nov 21), so set
@@ -1220,12 +1220,10 @@ Soon:
     raw message), and an eruv email is read only when DKIM, SPF or DMARC
     passed for the eruv's address's domain (`emailAuth.ts`); otherwise
     `unverified`, not read, reported to Sentry. Red 5/5. **For the user:**
-    copy the Gmail script again from Newsletters into the guide's Gmail.
-    Until then the old script sends no header, and an eruv email is read
-    as before, with a Sentry issue "the Gmail script sends no
-    Authentication-Results" each time. Once it's copied, say whether an
-    email with no header should be refused outright (one line in
-    `eruvEmailRun.ts`).
+    copy the Gmail script again from Newsletters into the guide's Gmail
+    (done Nov 21). An email with no header is refused too since Nov 21
+    (the user's call): `unverified`, not read, and Sentry says to copy
+    the script again. Red 1/1 against the old read-it-anyway.
   - Seen once in this branch's admin-write run, not reproduced (0 of 6
     alone): `home-preview-spot.spec.ts:33`, browser Forward after "← Back
     to editor" left the editor showing instead of the full-size preview.
@@ -1330,6 +1328,63 @@ Partial Prefetching before Next 17.
 
 Checked and not so: the nightly email does record a failed send, as a
 warning, not a failure.
+
+## The save survey (Nov 21; 1–5 fixed the same day, the rest open)
+
+Saves that make more than one write, through separate supabase-js calls
+with no transaction, and what a failure partway leaves. Only the
+`toggle_vote`, `confirm_*`, `mark_item`/`unmark_item`, `clear_item_gone`
+and `bump_daily_count` functions are atomic, and each covers one row.
+`approve_menu_dishes` (065) is defined and never called.
+
+Worst first. **1–5 are fixed** (Nov 21, on `claude/eruv-refuse-unproven`,
+each with tests that failed against the old code):
+
+- 1: a listing's reads and outside calls happen before the claim
+  (`prepareListing`), and a failed put-back goes to Sentry.
+- 2: the read stops the approval.
+- 3: once the change is on, a failed record write goes to Sentry and
+  the approval answers as done; a failed own Add/Edit/Archive is taken
+  back out of the queue (`approveOwn`).
+- 4: the listings change first, the category last, so saving again
+  finishes it.
+- 5: a failed take-down goes to Sentry, a tap on a warning with nothing
+  waiting files the removal, and Undo takes the warning down first.
+
+The list as found:
+
+1. **An approval can be left "approved" with nothing on the site.**
+   `approveNow` (`submissionStore.ts`) claims the submission, then
+   applies it (Google lookups, geocoding), then marks it reviewed. If the
+   function is killed or times out while applying, the catch that puts it
+   back to waiting never runs; its own write ignores its error too. The
+   change leaves the queue and never appears, and no screen reopens it.
+   Every approval goes through here (queue, admin add/edit/remove, found,
+   kosher, Google, a part at a time).
+2. **An edit's read of the listing ignores its error** (`applyListing`'s
+   update path). If that read fails, the update rebuilds `details` from
+   nothing and wipes the listing's own keys (googleFields, item dates,
+   confirmations).
+3. The admin's own add: if the final mark fails after the listing is in,
+   the admin sees "Could not add listing" and a retry adds it twice. If
+   the approval fails cleanly, the admin's add sits in the queue as a
+   visitor's suggestion, once per retry.
+4. Renaming a field's options: listings are updated one by one after the
+   category; a failure partway, then a reload, strands the rest on the
+   old name (they stop matching filters), with no way to finish it.
+5. "Not anymore" and its undo: a failed follow-up write can leave the
+   warning on a listing with nothing in the queue to clear it.
+6. Smaller, each fixable from the admin: new-category approval leaves an
+   empty category (retry makes "label-2"); new eruv leaves a bare one;
+   part-at-a-time leaves a stray copy; kosher "Bring it back" / archive
+   leave the finding waiting; deleting a category, form or community can
+   stop halfway (a retry finishes it); creating a community can stop
+   halfway (delete and make it again); a Tell-us message filed partly
+   sends no admin email; the hours/hospitals page swaps can leave the
+   old page read or the marker gone.
+7. Low: activity rows, job-run finishes, Google sync's resource update
+   ignoring its error (the same closure reported again the next night),
+   orphan uploads (the weekly sweep clears them).
 
 ## The speed and scale sweep (Nov 20, on `claude/bands-and-search`)
 
