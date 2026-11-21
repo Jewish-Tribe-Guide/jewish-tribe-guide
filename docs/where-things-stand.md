@@ -1149,8 +1149,8 @@ for that exact change, in the same conversation. Show the dry run first.
    Shtetl, Rita's, New York Bagel Bakery and Sababa Falafel (checked on
    live Nov 19): Shtetl is archived. Google says three of the four live
    Rita's and New York Bagel Bakery are closed temporarily (Rita's is
-   seasonal). Sababa Falafel has no Google place, so the nightly sync
-   skips it: setting one needs the id looked up, shown, and a yes.
+   seasonal). Sababa Falafel is marked Not on Google (since Oct 26,
+   checked on live Nov 21): nothing to do.
 3. **Check the menu reader's browser on the preview** (Oct 20): Admin →
    Main dishes → Insomnia Cookies → "Read again" should come back with
    cookies, brownies and ice cream within about 20 seconds. It's the one
