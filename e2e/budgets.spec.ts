@@ -193,7 +193,9 @@ test.describe('home screen weight', () => {
     if (isMobile) {
       // The page itself prefetches its own route; that's the sign this sees
       // prefetches at all, and the cards' would have come with it.
-      await expect.poll(() => prefetched.length, 'any prefetch at all').toBeGreaterThan(0)
+      // Next prefetches when the browser is idle, which a busy CI runner
+      // can leave past expect's 5s (Nov 20 and 21, this poll the failure).
+      await expect.poll(() => prefetched.length, { message: 'any prefetch at all', timeout: 15_000 }).toBeGreaterThan(0)
       await page.waitForTimeout(1_500)
       // From Friday to havdalah the phone's own Right now is the candles
       // card, whose Minyanim link goes to the same ?davening=1 page and
