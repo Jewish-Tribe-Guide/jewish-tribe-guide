@@ -2,6 +2,7 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { isPlaceKind, PLACE_KIND_INFO, placeKindFromSlug, type PlaceKind } from './placeKinds'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
+import { inOneStep } from './supabase/inOneStep'
 import { ERUV_WEBSITE_CREATOR } from './eruvWebsite'
 import { withAskWords } from './askWordStore'
 import { assertUsableSlug, slugify } from './routes'
@@ -424,6 +425,10 @@ export async function categoryDeleteCounts(community: string, id: string): Promi
 export async function deleteCategory(community: string, id: string): Promise<CategoryDeleteCounts> {
   const supabase = getAdminClient()
   const counts = await categoryDeleteCounts(community, id)
+  const eruv = !!(counts.eruvim || counts.watches)
+  if (await inOneStep('delete_category', { p_community: community, p_id: id, p_eruv: eruv, p_watch_creator: ERUV_WEBSITE_CREATOR }, 'Failed to delete category')) return counts
+
+  // Without migration 109: one table at a time.
 
   // Scoped by community: `resource.category` is a plain text column (not a
   // foreign key into the composite category key), so an unscoped delete here
@@ -435,7 +440,7 @@ export async function deleteCategory(community: string, id: string): Promise<Cat
     .eq('category', id)
   if (resErr) throw new Error(`Failed to delete the category's listings: ${resErr.message}`)
 
-  if (counts.eruvim || counts.watches) {
+  if (eruv) {
     const { error: watchErr } = await supabase.from('watch').delete().eq('community_id', community).eq('created_by', ERUV_WEBSITE_CREATOR)
     if (watchErr) throw new Error(`Failed to delete the eruvim's watches: ${watchErr.message}`)
     const { error: eruvErr } = await supabase.from('eruv').delete().eq('community_id', community)

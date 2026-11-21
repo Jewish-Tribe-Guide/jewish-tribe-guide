@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // next/cache is mocked because cacheTag/cacheLife need a Next.js request
 // context this plain Vitest process doesn't have — same pattern as
@@ -27,9 +27,14 @@ function chainable(result: unknown) {
   return builder
 }
 
+// Migration 109's functions, missing unless a test says otherwise, so the
+// tests above it cover the step-by-step delete a project without 109 runs.
+const mockRpc = vi.hoisted(() => vi.fn())
+const fnMissing = (fn: string) => ({ error: { message: `Could not find the function public.${fn}(…) in the schema cache` } })
+beforeEach(() => mockRpc.mockReset().mockImplementation(async (fn: string) => fnMissing(fn)))
 const mockFrom = vi.hoisted(() => vi.fn())
 vi.mock('./supabase/admin', () => ({
-  getAdminClient: () => ({ from: mockFrom }),
+  getAdminClient: () => ({ from: mockFrom, rpc: mockRpc }),
 }))
 
 const {
@@ -820,5 +825,23 @@ describe('the default location', () => {
     const [c] = await listCommunities()
     expect(c.mapCenter).toEqual({ lat: 39.95, lng: -75.16 })
     expect(c.mapCenterLabel).toBe('Center City')
+  })
+})
+
+describe('deleteCommunity — in one step, once 109 has run (Nov 21)', () => {
+  it('hands every table to delete_community, in order, and deletes nothing itself', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [philly, baltimore], error: null }))
+    mockRpc.mockResolvedValue({ error: null })
+    await deleteCommunity('baltimore')
+    expect(mockRpc).toHaveBeenCalledWith('delete_community', { p_slug: 'baltimore', p_tables: [...COMMUNITY_SCOPED_TABLES] })
+    // Only listCommunities() read a table.
+    expect(mockFrom).toHaveBeenCalledTimes(1)
+  })
+
+  it('a failure there throws, with no table touched', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [philly, baltimore], error: null }))
+    mockRpc.mockResolvedValue({ error: { message: 'boom' } })
+    await expect(deleteCommunity('baltimore')).rejects.toThrow('Failed to delete community: boom')
+    expect(mockFrom).toHaveBeenCalledTimes(1)
   })
 })

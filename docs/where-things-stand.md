@@ -1327,7 +1327,7 @@ Soon:
     doesn't name, or a value that isn't a placeholder. Red 3/3.
 
 Later or bigger: the two 2,000-line screens (map, category page);
-foreign keys and transactions for deletes and approvals; `details`
+foreign keys; `details`
 holding app state; an old-iOS floor
 decision; the parked Today
 features (keep or delete); `/inbox` per community; this file's size;
@@ -1378,6 +1378,16 @@ each with tests that failed against the old code):
   finishes it.
 - 5: a failed take-down goes to Sentry, a tap on a warning with nothing
   waiting files the removal, and Undo takes the warning down first.
+
+From 6, **deleting a category, a form or a community is one step** (Nov
+21, `claude/later-list`): migration 109 adds `delete_category`,
+`delete_form` and `delete_community`, each one transaction, and the
+stores call them (`src/lib/supabase/inOneStep.ts`), keeping the old
+step-by-step delete where 109 hasn't run. Checked on a fresh Postgres 17:
+a failure at the last delete leaves every earlier one undone. **For the
+user:** run 109, dev then live, any time. The rest of 6 and 7 stay open;
+approvals as a whole stay outside a transaction (Google lookups and
+geocoding can't run inside one), with 1–3 covering what that left.
 
 The list as found:
 

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // next/cache is mocked because cacheTag/cacheLife need a Next.js request
 // context this plain Vitest process doesn't have — same pattern as
@@ -27,9 +27,14 @@ function chainable(result: unknown) {
   return builder
 }
 
+// Migration 109's functions, missing unless a test says otherwise, so the
+// tests above it cover the step-by-step delete a project without 109 runs.
+const mockRpc = vi.hoisted(() => vi.fn())
+const fnMissing = (fn: string) => ({ error: { message: `Could not find the function public.${fn}(…) in the schema cache` } })
+beforeEach(() => mockRpc.mockReset().mockImplementation(async (fn: string) => fnMissing(fn)))
 const mockFrom = vi.hoisted(() => vi.fn())
 vi.mock('./supabase/admin', () => ({
-  getAdminClient: () => ({ from: mockFrom }),
+  getAdminClient: () => ({ from: mockFrom, rpc: mockRpc }),
 }))
 
 const {
@@ -674,5 +679,37 @@ describe('a kind before place_kind exists', () => {
   it('a kind’s own name is an address that says it', async () => {
     const { placeKindFromSlug, PLACE_KIND_INFO } = await import('./placeKinds')
     for (const kind of Object.keys(PLACE_KIND_INFO).filter((k) => k !== 'plain')) expect(placeKindFromSlug(kind)).toBe(kind)
+  })
+})
+
+describe('deleteCategory — in one step, once 109 has run (Nov 21)', () => {
+  function tables(deleted: string[], kind: string) {
+    mockFrom.mockImplementation((table: string) => {
+      const counts: Record<string, number> = { resource: 2, eruv: 4, watch: 3 }
+      const b = chainable(table === 'category' ? { data: { kind }, error: null } : { count: counts[table], data: null, error: null })
+      b.delete = vi.fn(() => {
+        deleted.push(table)
+        return b
+      })
+      return b
+    })
+  }
+
+  it('hands the whole delete to delete_category, the eruvim and watches included, and deletes nothing itself', async () => {
+    const deleted: string[] = []
+    tables(deleted, 'eruv')
+    mockRpc.mockResolvedValue({ error: null })
+    expect(await deleteCategory('philly', 'eruv-information')).toEqual({ listings: 2, eruvim: 4, watches: 3 })
+    expect(mockRpc).toHaveBeenCalledWith('delete_category', { p_community: 'philly', p_id: 'eruv-information', p_eruv: true, p_watch_creator: 'eruv website' })
+    expect(deleted).toEqual([])
+  })
+
+  it('a failure there throws and falls back to nothing: no table is touched', async () => {
+    const deleted: string[] = []
+    tables(deleted, 'listing')
+    mockRpc.mockResolvedValue({ error: { message: 'deadlock detected' } })
+    await expect(deleteCategory('philly', 'synagogue')).rejects.toThrow('Failed to delete category: deadlock detected')
+    expect(mockRpc).toHaveBeenCalledWith('delete_category', expect.objectContaining({ p_eruv: false }))
+    expect(deleted).toEqual([])
   })
 })
