@@ -936,9 +936,9 @@ For the user:
    should be refused outright.
 5. Check Database → Backups on live, and run the first live copy
    (`npm run backup -- --prod`, read-only).
-6. Sentry cron monitors: set `SENTRY_CRON_MONITORS=on` in Vercel's
-   Production once Sentry's plan is checked (it bills past a free
-   allowance).
+6. Sentry cron monitors: the plan has one (checked Nov 21), so set
+   `SENTRY_CRON_MONITORS=nightly-email` in Vercel's Production and
+   redeploy. The nightly email already tells of the other jobs.
 7. The next production build's log should say Node 24.
 8. A design call: on a phone, You's saved places and searches can only
    be removed by a swipe.
@@ -1014,8 +1014,10 @@ Fix first:
    and the nightly email counts a send that failed as a failed run (it was
    a warning). The heartbeat is Sentry's cron monitors
    (`src/lib/cronHeartbeat.ts`), one per job, **off until the user sets
-   `SENTRY_CRON_MONITORS=on`** in Vercel's production settings: Sentry
-   bills monitors past its free allowance, so check the plan first. Red
+   `SENTRY_CRON_MONITORS`** in Vercel's production settings. The plan
+   has one monitor (Nov 21), so the setting now names jobs too
+   (`on` is all of them): `nightly-email` is the one to watch, since
+   that email already tells of any other job that failed or didn't run. Red
    3/3 against the old code (the route guard, the job report, the email).
 5. **The community list caches its one-community fallback for days**
    after any Supabase error (checked, `listCommunities`). **Built
