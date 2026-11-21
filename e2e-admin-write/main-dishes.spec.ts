@@ -88,17 +88,20 @@ async function openPlace(page: Page, shows: string) {
   const open = page.getByTestId('place-open')
   await expect(async () => {
     await page.reload()
-    // Loaded within expect's 5s, or this try fails.
-    // Then whether the place is there yet, without starting over a load
-    // still under way (a 3s try restarted every load over 3s, forever).
+    // Loaded, then whether the place is there yet, without starting over a
+    // load still under way: a try that gave up on a slow load reloaded and
+    // threw it away. The screen waits on every job's read in one request
+    // (/api/admin/watches/jobs), which took over 5s under the full suite
+    // with the cache just emptied (Nov 21; 3s before Nov 17), so it gets
+    // its own 15s.
     const loading = page.getByRole('main').getByText('Loading…')
     await expect(loading.or(page.getByRole('heading', { name })).first()).toBeVisible()
-    await expect(loading).toHaveCount(0)
+    await expect(loading).toHaveCount(0, { timeout: 15_000 })
     await expect(page.getByRole('heading', { name })).toBeVisible({ timeout: 1_000 })
     // Saying its menu's part, once the menu's job has it too: before, it's a
     // place nothing reads.
     await expect(open).toContainText(shows, { timeout: 3_000 })
-  }).toPass({ timeout: 20_000 })
+  }).toPass({ timeout: 30_000 })
   return open
 }
 

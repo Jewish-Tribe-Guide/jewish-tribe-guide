@@ -349,6 +349,10 @@ With no choice made it's the first two categories with hours, as before
 
 Found and not fixed:
 
+- admin-write `main-dishes` "Use this" (local, full suite, Nov 21): fixed
+  Nov 21. The place screen's one jobs read took over expect's 5s and each
+  retry reloaded it away; the load now gets 15s (red on the old test with
+  that read slowed 8s).
 - e2e `listing-detail.spec.ts:537`: fixed Nov 21. A test race: it pressed
   the browser's Back as soon as Request removal showed, before the
   router had written its address, so Back left the listing. It now waits
@@ -1210,8 +1214,10 @@ for that exact change, in the same conversation. Show the dry run first.
      page now dates only after a kept reading found dishes on it. Their
      dates stop moving; the morning first read reads them.
    - Mike's, Bar Bombón and Mama's need a browser to draw their menu,
-     1 a night; Tasty Twisters' page is unchanged but its date is stuck at
-     Oct 22, cause not found yet.
+     1 a night. Tasty Twisters isn't stuck (checked on live Nov 21, read
+     only): its watch dates all six dishes each morning (07:02 that day);
+     Oct 22 is its menu's last AI read, which rightly stays while the page
+     doesn't change.
 
 ## Getting the branch live
 
