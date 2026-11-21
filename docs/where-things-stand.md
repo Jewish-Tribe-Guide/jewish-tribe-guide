@@ -537,10 +537,11 @@ Prefetching before Next 17 (tried Nov 21, below; not on).
 
 The user's calls on this list, Nov 21: Today stays parked, not deleted.
 `/inbox` stays as it is: it's for forms, there are none yet, and forms
-will get something better than `/inbox` when they come. The user
-believes What changed is on the live site; in code it is off
-(`features.whatChanged` is false on main), so the page and its link
-aren't there. Worth a look together: the user may mean the trust line.
+will get something better than `/inbox` when they come. What changed
+is on the live site, as the user said: an admin's tab or header link to
+it (`changesLinked`, Nov 15) turns the page on while `features.whatChanged`
+stays off. That switch now only holds back the home's own link and the
+admin's What changed tab. Nothing to do.
 
 Oldest iPhone (left to me, Nov 21): **iOS 16.4, so the iPhone 8 and X
 (2017) and every one since.** That's what Next 16 builds for (Safari
@@ -571,8 +572,8 @@ arrives on the click in about 0.4s. Next 17 turns it on for everyone, so
 it has to be done before that upgrade; the 7 e2e tests fail if it's
 flipped without the fix.
 
-Foreign keys (Nov 21, `claude/foreign-keys`): migration 113 written,
-**not run anywhere yet**. Every table's `community_id` points at
+Foreign keys (Nov 21, `claude/foreign-keys`): migration 113 **run on
+dev and live Nov 21** (the user). Every table's `community_id` points at
 `community` (deleting a community deletes its rows), a listing's category
 must exist (a category with listings can't be deleted; `delete_category`
 takes them first), and a listing's menu readings and watches, a form's
