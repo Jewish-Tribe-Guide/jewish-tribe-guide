@@ -10,6 +10,7 @@ const m = vi.hoisted(() => ({
   categoryDeleteCounts: vi.fn(),
   revalidatePublicContent: vi.fn(),
   clearCategoryFieldData: vi.fn(),
+  applyFieldOptionRenames: vi.fn(),
   filesInRow: vi.fn(),
   removeLaterIfUnused: vi.fn(),
 }))
@@ -20,7 +21,7 @@ vi.mock('@/lib/communityStore', () => ({
   resolveCommunity: m.resolveCommunity,
 }))
 vi.mock('@/lib/categoryStore', () => ({ updateCategory: m.updateCategory, deleteCategory: m.deleteCategory, categoryDeleteCounts: m.categoryDeleteCounts }))
-vi.mock('@/lib/resourceStore', () => ({ clearCategoryFieldData: m.clearCategoryFieldData, applyFieldOptionRenames: vi.fn() }))
+vi.mock('@/lib/resourceStore', () => ({ clearCategoryFieldData: m.clearCategoryFieldData, applyFieldOptionRenames: m.applyFieldOptionRenames }))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: m.revalidatePublicContent }))
 
 const { PATCH, DELETE } = await import('./route')
@@ -191,11 +192,31 @@ describe('PATCH /api/admin/categories/:id — a save that fails partway', () => 
     expect(m.revalidatePublicContent).toHaveBeenCalled()
   })
 
-  it('still drops it when the category saved and clearing a field’s data failed', async () => {
+  it('still drops it when clearing a field’s data failed partway', async () => {
     m.clearCategoryFieldData.mockRejectedValue(new Error('timeout'))
     expect((await patch({ hasPhone: false, clearFields: { phone: true } })).status).toBe(502)
-    expect(m.updateCategory).toHaveBeenCalled()
     expect(m.revalidatePublicContent).toHaveBeenCalled()
+  })
+
+  // Nov 21, the save survey: the category went first, so a rename that
+  // failed partway left listings on the old option, and after a reload
+  // nothing knew to finish it. The category waits for its listings now,
+  // so it still says what it said, and saving again finishes the job.
+  it('renames the listings before the category, and leaves the category as it was if they fail', async () => {
+    const renames = [{ fieldKey: 'denomination', oldValue: 'Litvish', newValue: 'Yeshivish' }]
+    m.applyFieldOptionRenames.mockRejectedValue(new Error('timeout'))
+    expect((await patch({ applyOptionRenames: renames })).status).toBe(502)
+    expect(m.updateCategory).not.toHaveBeenCalled()
+
+    m.applyFieldOptionRenames.mockResolvedValue({ updated: 3 })
+    expect(await (await patch({ applyOptionRenames: renames })).json()).toMatchObject({ ok: true, renamed: 3 })
+    expect(m.applyFieldOptionRenames.mock.invocationCallOrder[1]).toBeLessThan(m.updateCategory.mock.invocationCallOrder[0])
+  })
+
+  it('clears the listings’ data before the category drops the field', async () => {
+    m.clearCategoryFieldData.mockRejectedValue(new Error('timeout'))
+    expect((await patch({ hasPhone: false, clearFields: { phone: true } })).status).toBe(502)
+    expect(m.updateCategory).not.toHaveBeenCalled()
   })
 
   it('refuses a bad pin colour before writing anything, and leaves the cache', async () => {

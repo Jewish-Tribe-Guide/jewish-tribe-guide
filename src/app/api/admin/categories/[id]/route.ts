@@ -124,13 +124,13 @@ export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx:
 
   try {
     const before = await filesInRow('category', { community_id: community.slug, id })
-    const category = await updateCategory(community.slug, id, body)
-    if (!category) {
-      return Response.json({ ok: false, errors: ['Category not found.'] }, { status: 404 })
-    }
-    // A banner or card picture replaced: the old file goes, if nothing else
-    // uses it (storedFiles.ts).
-    removeLaterIfUnused(before, 'category')
+    // The listings first, the category last (Nov 21, the save survey). The
+    // other way, a failure partway left the category saying the new option
+    // and some listings the old, and once the page was reloaded nothing
+    // knew there was a rename to finish: they no longer matched its
+    // filters. Now the category still says what it said, so saving again,
+    // or making the rename again after a reload, finishes it (renaming and
+    // clearing a listing twice changes nothing).
     let cleared: number | undefined
     if (body.clearFields && (body.clearFields.address || body.clearFields.phone || body.clearFields.keys?.length)) {
       ;({ updated: cleared } = await clearCategoryFieldData(community.slug, id, {
@@ -143,6 +143,13 @@ export const PATCH = adminWrite(async (request: NextRequest, { community }, ctx:
     if (body.applyOptionRenames?.length) {
       ;({ updated: renamed } = await applyFieldOptionRenames(community.slug, id, body.applyOptionRenames))
     }
+    const category = await updateCategory(community.slug, id, body)
+    if (!category) {
+      return Response.json({ ok: false, errors: ['Category not found.'] }, { status: 404 })
+    }
+    // A banner or card picture replaced: the old file goes, if nothing else
+    // uses it (storedFiles.ts).
+    removeLaterIfUnused(before, 'category')
     return Response.json({ ok: true, category, cleared, renamed })
   } catch (err) {
     reportServerError('[admin/categories/:id] PATCH failed:', err)
