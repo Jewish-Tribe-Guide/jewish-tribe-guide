@@ -1101,7 +1101,14 @@ Soon:
     alone): `home-preview-spot.spec.ts:33`, browser Forward after "← Back
     to editor" left the editor showing instead of the full-size preview.
     Nothing here touches the admin screens; its trace was lost to the
-    rerun. Next time, read the trace before rerunning.
+    rerun. Next time, read the trace before rerunning. **Fixed Nov 20**
+    (`claude/health-cleanup`), after it failed on PRs 407 and 410 too: a
+    test race. "← Back to editor" shows the editor at once, and its step
+    back in history (`useScreenHistory` queues it) lands a moment later;
+    the test's Forward came before it, did nothing, and the step back
+    then closed the preview. The test now waits for the address at each
+    step. With the step back delayed 400ms in a scratch copy: the old
+    test red at the CI's line, the new one green.
 - Spend: no site-wide cap on the AI photo readers; Turnstile and rate
   limits fail open when their keys are missing. **Built Nov 20**: the
   two photo readers share a day of 300 reads (`PHOTO_READS_A_DAY` in
