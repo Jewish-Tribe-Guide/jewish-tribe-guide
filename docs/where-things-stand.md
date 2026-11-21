@@ -929,7 +929,8 @@ For the user:
    reported there, so they're probably set. Worth a look.
 2. Run migrations 103, 104 and 105: dev, then live. 067 (Today's
    settings) waits on live until Today comes back (decided Nov 21).
-3. Say whether to drop `site_settings.contribution_note` (a migration).
+3. Run migration 106 (drops the unused `site_settings.contribution_note`):
+   dev, then live.
 4. Copy the Gmail script again from Newsletters into the guide's Gmail.
    Then say whether an eruv email with no Authentication-Results header
    should be refused outright.
@@ -1117,10 +1118,10 @@ Soon:
   - **Decided Nov 21:** 067 waits on live until Today comes back. Run
     it on live in the same change that turns Today on in
     `src/lib/features.ts`, before that deploys.
-  - Not done: `site_settings.contribution_note` is still there on dev
-    and live (read Nov 20). Migration 033 was deleted with the feature
-    (Aug 27), but nothing dropped the column. Dropping it is a migration,
-    so it's the user's call. Rebuilding a fresh project from the folder (grants, and the
+  - `site_settings.contribution_note` was still there on dev and live
+    (read Nov 20): migration 033 was deleted with the feature (Aug 27),
+    but nothing dropped the column. Migration 106 drops it (written
+    Nov 21; nothing reads it). **For the user:** run 106, dev then live. Rebuilding a fresh project from the folder (grants, and the
     restore drill) is untouched.
 - Hidden communities' data through the public API routes. **Built Nov
   20**: the proxy now sees the public API routes too, and answers 404 to
