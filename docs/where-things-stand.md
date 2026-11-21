@@ -1352,7 +1352,7 @@ Redundant indexes: migration 108 drops ten one-column indexes a key or
 `resource_tag_resource_idx` and `vote_resource_idx`), each only if the
 covering index is really there. Checked on a fresh Postgres 17 after
 001–107: drops all ten, runs twice clean, keeps one whose cover is
-missing. **For the user:** run 108, dev then live, after 102.
+missing. Run on dev and live Nov 21 (recorded in `migration_ran`).
 
 Log retention, measured on live Nov 21 (read only): activity 447 rows,
 daily_count 709, job_run 142, question_reading 53, submission 1,385,
@@ -1432,8 +1432,8 @@ From 6, **deleting a category, a form or a community is one step** (Nov
 `delete_form` and `delete_community`, each one transaction, and the
 stores call them (`src/lib/supabase/inOneStep.ts`), keeping the old
 step-by-step delete where 109 hasn't run. Checked on a fresh Postgres 17:
-a failure at the last delete leaves every earlier one undone. **For the
-user:** run 109, dev then live, any time. The rest of 6 and 7 stay open;
+a failure at the last delete leaves every earlier one undone. Run on dev and
+live Nov 21 (recorded in `migration_ran`). The rest of 6 and 7 stay open;
 approvals as a whole stay outside a transaction (Google lookups and
 geocoding can't run inside one), with 1–3 covering what that left.
 
