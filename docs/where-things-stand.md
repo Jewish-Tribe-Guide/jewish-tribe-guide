@@ -193,7 +193,12 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     per-minyan view of a schedule change, Lower Merion's full calendar.
 72. The intake wizard's problems, parked while forms are hidden.
 73. A phone that drops the page in the background: taps do nothing
-    until it reloads (not measured).
+    until it reloads. Measured Nov 22 on a production build, phone-sized
+    Chromium, tapping a home tile after each: frozen 30s and resumed,
+    offline 10s and back, left and come Back, and a deploy in between
+    (chunks not yet loaded gone, pages from another build). Every tap
+    worked. So it doesn't reproduce in a browser; next is a real phone
+    (which screen, how long away, installed or in Safari).
 74. Done Nov 22: one Places load makes one jobs read (two before, its
     list's and the nav's To do count's). The same jobs asked for while a
     read of them is under way share it, until a save in the community.
