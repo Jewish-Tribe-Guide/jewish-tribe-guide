@@ -35,7 +35,8 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 6. The computer home's middle piece (neither option picked; W7l may
    have settled it) (?), and You and What changed as extra cells there.
 7. The "Right now" label on the computer home: may come back.
-8. What the What changed page leads with: an activity feed, or new places.
+8. Decided Nov 22: What changed is an activity feed, every change in
+    order (the user: "I like my way"). Already built that way.
 9. A "Recent changes" box on each listing.
 10. One contact email for every community?
 11. On a phone, saved places and searches on You come off only by swipe.
@@ -55,11 +56,14 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 19. Mekor's list against ours: PLNT Burger Jenkintown (IKC?), and Nothing
     Bundt Cakes, Cherry-K there and Keystone-K here.
 20. Boards 14–15: a ready-made field, fixed or local.
-21. "Can visitors upvote places?" (both sides now say Upvote) (?)
+21. Done: "Can visitors upvote places?" is built (a page's Questions in
+    the admin; checked Nov 22).
 22. Hospitals' Eruv field takes its choices from the Eruv page?
 23. A "Kept up to date" box (recommended, not drawn).
 24. UES Grocery's "Kosher" yes/no becomes Kosher Store?
-25. A "What makes it Shabbat friendly?" note for Hotels.
+25. Hotels' "What makes it Shabbat friendly?" (the user's yes, Nov 22):
+    on dev, asked after a Yes, shown under it in the Shabbos friendly
+    box. Live needs your yes (dry run ready).
 26. The rest of the field-by-field review.
 27. The "+" covers part of the third tile on the phone home.
 28. The drawings for asking for location when it helps.
@@ -86,14 +90,14 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     as its page.
 38. House of Kosher's menu link is still a PDF on live: set the catering
     menu (?).
-39. The newsletter Gmail script: re-paste Philly's, deploy it as a web
-    app, paste its link (Read now by email stays off until then).
+39. The newsletter Gmail script's link is saved on live (checked Nov 22).
+    Left: try Read now by email once.
 40. Vercel Production: check the Turnstile and Upstash keys; set
     SENTRY_CRON_MONITORS=nightly-email and redeploy; the next build's
     log should say Node 24.
 41. Live backups: check Database → Backups, and run the first live copy.
-42. Migrations 103 and 104 leave nothing to see: confirm you ran them on
-    both (?).
+42. Done: 103 is on live (the site's public key reads nothing, Nov 22).
+    104 can't be seen without a write; 105–113 ran after it.
 43. PostHog: check Session Replay's project settings.
 44. The first live morning after a deploy: each community's run shows
     in its own tab, and Vercel's log has no "run didn't start".
@@ -111,16 +115,18 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 ### Needs your yes, because it writes to live
 
 50. The Denomination/Nusach change (dry run ready).
-51. About and Privacy's new text.
+51. Done: live has About and Privacy's new text (since Nov 16).
 52. The shul watch's live data clean-up (look again first).
 53. Drop the old admin columns (tagline and the rest are still on live).
-54. Refuah watches and the hospital fields on live.
+54. Done: live has the hospital fields (same as dev) and 7 Refuah
+    watches (checked Nov 22).
 55. Migration 067, only when Today is turned on.
 
 ### Mine to build or fix (nobody waiting)
 
-56. Partial Prefetching: built on `claude/ensure-static`, in a PR
-    (Nov 21). On when it merges; every suite green.
+56. Done: Partial Prefetching is live (PR 427, deployed Nov 22). Live
+    answers 404 for a made-up category, listing, community and a shared
+    question in a community that doesn't exist.
 57. The search box, Open now and filters can drop from the address on
     a refresh (FindResourcesConnected).
 58. "See the whole page" in the editor leaves ?field=hours in the address.
@@ -410,24 +416,18 @@ With no choice made it's the first two categories with hours, as before
     change log is all test-suite churn (its newest 400 rows are on test
     listings), so the dot never lights on the preview without a real
     edit to a saved place; production's log is real.
-  - **What changed can be a tab while it's held back** (the user, Nov 15:
-    "add it to the tabs to see it and then take it off the tab in admin
-    with the ability to add it back"). Site › Home page › Phone › Tabs ›
-    Add a tab › What changed, or a header link on the Computer side; its
-    page (`/<community>/changes`) answers only while a tab or link has
-    it, and is a 404 again once it's taken off (`changesLinked`). The
-    switch in `features.ts` stays off; the admin's own What changed tab
-    (hiding a change) is still held back with it. Dev's page is empty
-    (its log is test churn); live's would show the real log, once this
-    ships and the user adds the tab there themselves. The user's view
-    (Nov 15): an activity feed is the first thing after testers' feedback;
-    my view was to lead with new places, closures, hechsher and minyan
-    changes and fold small edits into one line. Nothing decided.
-    **Fixed Nov 15:** the user added the tab on the preview and got "Page
-    not found". A settings save marks pages stale, and the first load
-    after it still gets the old copy (here, the 404) while a new one is
-    made; a reload showed it. The save now expires `/<community>/changes`
-    at once, so the next load is the page (`route.test.ts`, red without).
+  - **What changed is live** (Nov 21; the code switch is gone). It shows
+    wherever an admin adds it: Site › Home page › Phone › Tabs › Add a
+    tab › What changed, or a header link on the Computer side. Its page
+    (`/<community>/changes`) answers only while a tab or link has it
+    (`changesLinked`). On live, Philly links it (checked Nov 22). The
+    admin's own What changed screen (hiding a change) opens from a row
+    on Reports. The user's view (Nov 15): an activity feed is the first
+    thing after testers' feedback; my view was to lead with new places,
+    closures, hechsher and minyan changes and fold small edits into one
+    line. **Decided Nov 22: the feed** (the user: "I like my way"). The
+    page already is one: every change, newest first, by day, with each
+    night's run among them.
   - **What changed reads past deleted listings (Nov 15).** The log read
     took the newest 400 rows and the page then dropped any whose listing
     was gone; on dev the write suites' fixtures (4,307 rows in two weeks)
@@ -726,7 +726,7 @@ on every visitor's download (the home's JS budget is 400 KB), and React
 and Next aren't tested there. Revisit only if analytics show real visits
 from iOS 15 or older.
 
-Partial Prefetching (switched on Nov 21, `claude/ensure-static`):
+Partial Prefetching (live Nov 22, PR 427):
 `partialPrefetching: true` sends an address that wasn't prerendered its
 App Shell at once, before the page knows the address is real. That broke
 two things: a made-up address answered 200, not 404 (7 e2e tests), and a
@@ -1775,10 +1775,14 @@ after the deploy, dry run first, and needs its own go-ahead.
     - UES Grocery's "Kosher" yes or no (dev only) says less than Kosher
       Store (fully kosher, or some kosher items). Recommended: replace it
       with Kosher Store.
-    - Shabbat friendly (Hotel): recommended a "What makes it Shabbat
-      friendly?" note that comes with it when the answer is Yes, like the
-      kosher questions. Hotel's general Notes is separate. Waiting on the
-      user.
+    - Shabbat friendly (Hotel): a "What makes it Shabbat friendly?" note
+      that comes with a Yes, like the kosher questions (the user's yes,
+      Nov 22). On dev: `shabbatFriendlyNote`, a textarea with showIf on
+      `shabbatFriendly`, in the Shabbos friendly box after it; the listing
+      shows it under the tick with no label. Live waits on a yes. Found
+      building it: the box's Edit sheet asked a showIf question whatever
+      the answer (fixed, BoxEditSheet). The admin can't add such a
+      question to a field itself; only the kosher-style exceptions pair.
   - The rest of the fields: the user's, later.
 
 ## Small open decisions

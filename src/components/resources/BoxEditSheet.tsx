@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState, type ComponentProps } from 'react'
 import type { DirectoryResource } from '@/types'
-import type { CategoryConfig, CategoryField } from '@/lib/categories'
+import { fieldIsVisible, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { listingChanges } from '@/lib/listingDiff'
 import { boxChangeCount, mergeMinyanimBox, minyanimForBox, type MinyanBox } from '@/lib/minyanimBox'
@@ -221,7 +221,10 @@ export function BoxEditor({
       <Honeypot value={sender.honeypot} onChange={sender.setHoneypot} />
       {/* The shul's list says it itself, with the box's name once a minyan is open. */}
       {!minyanimField && <p className="-mt-1 text-[0.875rem] text-muted">{item.name}</p>}
-      {edit.fields.map((f) =>
+      {/* A question asked after an answer (showIf) goes with that answer,
+          as in the whole-listing editor: Hotels' "What makes it Shabbat
+          friendly?" only under a Yes (Nov 22). */}
+      {edit.fields.filter((f) => fieldIsVisible(f, details)).map((f) =>
         f === minyanimField && weekPosts.length > 1 ? (
           <div key={f.key} className="space-y-6">
             {openWeek === null && <p className="-mt-1 text-[0.875rem] text-muted">{item.name}</p>}

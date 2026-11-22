@@ -54,6 +54,22 @@ describe('BoxEditor', () => {
     fireEvent.click(within(sent).getByRole('button', { name: 'Edit something else here' }))
     expect(onEditElse).toHaveBeenCalled()
   })
+
+  // Nov 22: Hotels' "What makes it Shabbat friendly?" is asked only after a
+  // Yes. The whole-listing editor followed showIf; the box's sheet asked it
+  // under a No too.
+  it('asks a question that follows an answer only while that answer is given', () => {
+    const friendly: CategoryField = { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge' }
+    const why: CategoryField = { key: 'shabbatFriendlyNote', label: 'What makes it Shabbat friendly?', type: 'textarea', renderAs: 'row', showIf: { field: 'shabbatFriendly', equals: true } }
+    const hotel = makeCategory({ id: 'hotel', detailFields: [friendly, why] })
+    const wyndham = makeListing({ id: 'dfd0e534-d0b4-4a4c-aee5-adf7a73c6b17', name: 'Wyndham', shabbatFriendly: true })
+    renderWithProviders(<BoxEditor item={wyndham} category={hotel} edit={{ title: 'Shabbos friendly', fields: [friendly, why] }} onClose={vi.fn()} />)
+    expect(screen.getByLabelText('What makes it Shabbat friendly?')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'No' }))
+    expect(screen.queryByLabelText('What makes it Shabbat friendly?')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Yes' }))
+    expect(screen.getByLabelText('What makes it Shabbat friendly?')).toBeInTheDocument()
+  })
 })
 
 // A shul's usual box (Oct 10, canvas page "Minyan edit"): its minyanim as a
