@@ -107,8 +107,19 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 ### Needs your yes, because it writes to live
 
 50. The Denomination/Nusach change (dry run ready).
-52. The shul watch's live data clean-up (look again first).
-53. Drop the old admin columns (tagline and the rest are still on live).
+52. The shul watch's live data clean-up. Looked Nov 22 (read only): every
+    week still showing was posted Nov 19–20, before the new watch reached
+    live (PR 399, Nov 20 13:18 UTC), and all end by Nov 28; older weeks
+    are past and no longer show. Recommended: no write. Check that the
+    weeks for Nov 29 on come from the new watch, then close this.
+53. Drop the old admin columns. Read Nov 22: live still holds
+    site_settings' tagline and the six desktop_browse/davening/map
+    eyebrow and heading texts (1 row), category.card_text_color (14 of
+    16) and form.card_image_url (2 of 2, nothing reads it). Not one yes
+    but two: the code still names some (community cloning copies the
+    tagline), so a change stops that and deploys first, then the
+    migration that drops them is shown for the yes. Keep
+    category.card_image_url and desktop_map_image, which are in use.
 55. Migration 067, only when Today is turned on.
 
 ### Mine to build or fix (nobody waiting)
