@@ -119,8 +119,9 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 
 ### Mine to build or fix (nobody waiting)
 
-56. Partial Prefetching: built on `claude/ensure-static`, in a PR
-    (Nov 21). On when it merges; every suite green.
+56. Done: Partial Prefetching is live (PR 427, deployed Nov 22). Live
+    answers 404 for a made-up category, listing, community and a shared
+    question in a community that doesn't exist.
 57. The search box, Open now and filters can drop from the address on
     a refresh (FindResourcesConnected).
 58. "See the whole page" in the editor leaves ?field=hours in the address.
@@ -726,7 +727,7 @@ on every visitor's download (the home's JS budget is 400 KB), and React
 and Next aren't tested there. Revisit only if analytics show real visits
 from iOS 15 or older.
 
-Partial Prefetching (switched on Nov 21, `claude/ensure-static`):
+Partial Prefetching (live Nov 22, PR 427):
 `partialPrefetching: true` sends an address that wasn't prerendered its
 App Shell at once, before the page knows the address is real. That broke
 two things: a made-up address answered 200, not 404 (7 e2e tests), and a
