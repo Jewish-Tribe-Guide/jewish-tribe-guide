@@ -61,7 +61,9 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 22. Hospitals' Eruv field takes its choices from the Eruv page?
 23. A "Kept up to date" box (recommended, not drawn).
 24. UES Grocery's "Kosher" yes/no becomes Kosher Store?
-25. A "What makes it Shabbat friendly?" note for Hotels.
+25. Hotels' "What makes it Shabbat friendly?" (the user's yes, Nov 22):
+    on dev, asked after a Yes, shown under it in the Shabbos friendly
+    box. Live needs your yes (dry run ready).
 26. The rest of the field-by-field review.
 27. The "+" covers part of the third tile on the phone home.
 28. The drawings for asking for location when it helps.
@@ -1773,10 +1775,14 @@ after the deploy, dry run first, and needs its own go-ahead.
     - UES Grocery's "Kosher" yes or no (dev only) says less than Kosher
       Store (fully kosher, or some kosher items). Recommended: replace it
       with Kosher Store.
-    - Shabbat friendly (Hotel): recommended a "What makes it Shabbat
-      friendly?" note that comes with it when the answer is Yes, like the
-      kosher questions. Hotel's general Notes is separate. Waiting on the
-      user.
+    - Shabbat friendly (Hotel): a "What makes it Shabbat friendly?" note
+      that comes with a Yes, like the kosher questions (the user's yes,
+      Nov 22). On dev: `shabbatFriendlyNote`, a textarea with showIf on
+      `shabbatFriendly`, in the Shabbos friendly box after it; the listing
+      shows it under the tick with no label. Live waits on a yes. Found
+      building it: the box's Edit sheet asked a showIf question whatever
+      the answer (fixed, BoxEditSheet). The admin can't add such a
+      question to a field itself; only the kosher-style exceptions pair.
   - The rest of the fields: the user's, later.
 
 ## Small open decisions
