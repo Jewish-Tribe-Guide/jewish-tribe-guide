@@ -788,7 +788,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
               // desktop: only. The rows draw nothing on a phone, and their
               // margins collapsed through into 72px of empty space above
               // Right now (board K1c, Nov 11, the user: tighten it).
-              className={i === 0 ? 'desktop:mt-8 desktop:mb-12' : 'desktop:my-12'}
+              // Hidden by CSS too: until the page has measured the screen
+              // (isMobile starts false) a phone renders them, and painted
+              // the map, Suggest and Stay in the Loop cards over its tiles
+              // (the user, Nov 22; e2e/first-paint.spec.ts).
+              className={`hidden desktop:block ${i === 0 ? 'desktop:mt-8 desktop:mb-12' : 'desktop:my-12'}`}
             >
               {row.node}
             </div>

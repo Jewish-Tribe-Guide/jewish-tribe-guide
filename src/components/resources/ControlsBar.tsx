@@ -6,6 +6,7 @@ export default function ControlsBar({
   sentinelRef,
   barRef,
   hidden,
+  phoneHidden = false,
   headingInToolbar,
   heroOverlap,
   controlsStuck,
@@ -16,6 +17,8 @@ export default function ControlsBar({
   sentinelRef: RefObject<HTMLDivElement | null>
   barRef: RefObject<HTMLDivElement | null>
   hidden: boolean
+  /** Hidden on a phone by CSS: before the page has measured the screen. */
+  phoneHidden?: boolean
   headingInToolbar: boolean
   heroOverlap: boolean
   controlsStuck: boolean
@@ -101,7 +104,7 @@ export default function ControlsBar({
         // categories with no map): the heading's own padding is the space
         // above the list, as it is where the heading tops the list column.
         // A margin as well left a gap there and nowhere else (Oct 20).
-        className={`${headingInToolbar ? (heroOverlap && controlsStuck ? 'lg:mb-[48px]' : '') : 'mb-4'} space-y-2 ${hasMapColumn ? '' : 'lg:sticky lg:top-14 lg:z-30 lg:transition-all lg:duration-300'} ${
+        className={`${phoneHidden ? 'phone:hidden ' : ''}${headingInToolbar ? (heroOverlap && controlsStuck ? 'lg:mb-[48px]' : '') : 'mb-4'} space-y-2 ${hasMapColumn ? '' : 'lg:sticky lg:top-14 lg:z-30 lg:transition-all lg:duration-300'} ${
           hasMapColumn
             ? ''
             : controlsStuck

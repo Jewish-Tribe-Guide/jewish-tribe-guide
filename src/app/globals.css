@@ -12,6 +12,9 @@
  * as before. Keep in sync with useIsMobile.tsx's default query, which
  * implements the same rule for JS-driven layout decisions. */
 @custom-variant desktop (@media (min-width: 640px) and (min-height: 640px));
+/* Its opposite, for what only a phone draws before the page has measured
+   the screen (useMeasuredIsMobile). */
+@custom-variant phone (@media (max-width: 639px), (max-height: 639px));
 
 /* A control drawn smaller than a fingertip (a 32px chip, an 18px phone
  * number, the header's 30px Set location) still takes a 44px tap, the
@@ -531,3 +534,18 @@ body {
   font-weight: 600;
 }
 
+
+/* The map takes the whole of a phone's screen, header included, from the
+   first paint: the page carries [data-collapses-header], and this does
+   what SiteHeader's `collapsed` does once the page has measured the screen
+   (invisible, no height, not sticky; a popover inside can still show). */
+@media (max-width: 639px), (max-height: 639px) {
+  body:has([data-collapses-header]) header[data-site-header] {
+    position: static;
+    visibility: hidden;
+    height: 0;
+    padding-top: 0;
+    border-width: 0;
+    overflow: visible;
+  }
+}

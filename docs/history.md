@@ -8,6 +8,15 @@ that file.
 
 Taken off `where-things-stand.md` with their numbers, as they read there.
 
+- Done Nov 22 (not on the list): a phone no longer paints the computer's layout first
+    (the user: "it shows the desktop version for a brief moment"). Until
+    the page has measured the screen it assumed a computer: the home
+    page's map, Suggest and Stay in the Loop cards over the tiles, the
+    site's name where "‹ Food" goes, a listing's link showing the whole
+    list, the header over the map. CSS picks now, which knows the screen
+    from the first paint; a listing's link also starts open, on a
+    computer too.
+
 8. Decided Nov 22: What changed is an activity feed, every change in
     order (the user: "I like my way"). Already built that way.
 21. Done: "Can visitors upvote places?" is built (a page's Questions in

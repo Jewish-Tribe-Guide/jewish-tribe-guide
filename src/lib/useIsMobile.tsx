@@ -48,6 +48,26 @@ export function useIsMobile(query = '(max-width: 639px), (max-height: 639px)'): 
   return forced ?? isMobile
 }
 
+/** Whether the screen is a phone's, or null until it has been measured (the
+ *  server's render, and the client's until its first effect). While it's
+ *  null, a layout that differs between the two has to draw both and let
+ *  CSS (`desktop:`/`phone:`) pick, or a phone paints the computer's first
+ *  (the user, Nov 22). */
+export function useMeasuredIsMobile(query = '(max-width: 639px), (max-height: 639px)'): boolean | null {
+  const forced = useContext(ForcedViewportContext)
+  const [isMobile, setIsMobile] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    const mql = window.matchMedia(query)
+    const update = () => setIsMobile(mql.matches)
+    update()
+    mql.addEventListener('change', update)
+    return () => mql.removeEventListener('change', update)
+  }, [query])
+
+  return forced ?? isMobile
+}
+
 /** True only once this screen has been measured and is a computer's. Not
  *  `!useIsMobile()`, which is true on a phone too until the measuring: a
  *  phone's first render is the computer layout (Oct 16), and a link that

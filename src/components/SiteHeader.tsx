@@ -1,7 +1,8 @@
 'use client'
 
 import { FitTitle } from './FitTitle'
-import { type MouseEvent, useState } from 'react'
+import { type MouseEvent, type ReactNode, Suspense, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { storageThumbnailUrl } from '@/lib/imageHosts'
 import Link from 'next/link'
@@ -11,8 +12,10 @@ import HeaderNav from '@/components/HeaderNav'
 import { StarOfDavid } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useActiveCommunity } from '@/lib/communityContext'
-import { useHeaderCollapsed, useHeaderOverlaid, useScreenHeader, useScrollShowHide, useScrolledPastTop } from '@/lib/headerVisibility'
-import { useIsMobile } from '@/lib/useIsMobile'
+import { type ScreenHeaderState, useHeaderCollapsed, useHeaderOverlaid, useScreenHeader, useScrollShowHide, useScrolledPastTop } from '@/lib/headerVisibility'
+import { useCategoriesIfAny } from '@/lib/contentContext'
+import { screenHeaderFromPath } from '@/lib/screenHeaderFromPath'
+import { useMeasuredIsMobile } from '@/lib/useIsMobile'
 import { routes } from '@/lib/routes'
 import { isModifiedClick } from '@/lib/isModifiedClick'
 import type { SiteSettings } from '@/lib/siteSettings'
@@ -47,7 +50,8 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
   const switchable = previewSettings ? null : communities
 
   const collapsed = useHeaderCollapsed()
-  const isMobile = useIsMobile()
+  const measured = useMeasuredIsMobile()
+  const isMobile = measured ?? false
 
   // Desktop-only: Landing opts the home screen into a transparent header
   // over its photo hero (useHeaderOverlay) until the page scrolls past the
@@ -66,10 +70,8 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
   // Home, and the screen's own heading already says where you are, so this
   // only ever applies at mobile widths.
   const screenHeader = useScreenHeader()
-  const showScreenHeader = isMobile && !!screenHeader?.onBack
   // A tab's own page (no Back): its name where the site's would be, beside
   // the logo, on a phone. A computer keeps the site's name.
-  const tabTitle = isMobile && screenHeader && !screenHeader.onBack ? screenHeader.title : null
 
   // Hides the header while scrolling down — more room for what you're
   // reading — and brings it back the moment you scroll up, even slightly,
@@ -118,8 +120,152 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
           : 'desktop:bg-white desktop:border-b desktop:border-slate-200/80'
       }`
 
+  // The header's left end: a drill-down's "‹ {title}", or the logo and
+  // the site's name (a tab's name in its place on a phone).
+  const renderLeft = (mobile: boolean, sh: ScreenHeaderState) => {
+    const showScreenHeader = mobile && !!sh?.onBack
+    const tabTitle = mobile && sh && !sh.onBack ? sh.title : null
+    const screenHeader = sh
+    const isMobile = mobile
+    return showScreenHeader && screenHeader ? (
+            <button
+              onClick={screenHeader.onBack}
+              className="flex min-w-0 shrink items-center gap-2.5 cursor-pointer group text-left"
+            >
+              {/* Same h-9 w-9 footprint and gap-2.5 as the logo mark below, so
+                  the title lands at the exact x-position it does on the home
+                  screen — a visitor's eye doesn't have to re-find it after a
+                  back-navigation. Circular chip (border + white fill + shadow),
+                  not a bare icon: mirrors LocationControl's own pill on the
+                  opposite side of this row, so the two ends of the header read
+                  as a matched pair rather than one polished control and one
+                  plain glyph — the same "circular back button" treatment apps
+                  like WhatsApp use. */}
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 bg-white shadow-sm">
+                <svg
+                  className="h-5 w-5 text-primary"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </span>
+              <span className="min-w-0 flex-1">
+                {screenHeader.named && <span className="block truncate text-xs font-bold tracking-wide text-muted">{settings.name}</span>}
+                {screenHeader.named ? (
+                  <span className="block truncate text-lg font-bold leading-tight tracking-tight text-slate-900">{screenHeader.title}</span>
+                ) : (
+                  <FitTitle text={screenHeader.title} className="block truncate font-bold leading-tight tracking-tight text-slate-900" />
+                )}
+              </span>
+            </button>
+          ) : (() => {
+            const mark = settings.logoUrl?.trim() ? (
+              // next/image rather than a CSS background. Beyond the resizing and
+              // format negotiation, this also closes a small hole: the URL used
+              // to be interpolated straight into a style string, so an admin
+              // logo URL containing a ")" broke the rule, and the value was
+              // never escaped. Here it's an attribute, handled by React.
+              <span
+                className="block relative h-9 w-9 shrink-0 overflow-hidden rounded-xl desktop:h-11 desktop:w-11"
+                aria-hidden="true"
+              >
+                <LogoImage src={settings.logoUrl} />
+              </span>
+            ) : (
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white desktop:h-11 desktop:w-11">
+                <StarOfDavid className="h-5 w-5" />
+              </span>
+            )
+            // Tagline used to render as a second line here — dropped along
+            // with the header's own extra height (h-16 → h-14 below): it said
+            // roughly the same thing the hero's mission line says a few
+            // pixels of scroll later ("Guide for residents, visitors, and
+            // patients" next to the hero's own mission sentence), so the
+            // header carried the message twice before a visitor had read
+            // either in full. That was the tagline's only render site, so the
+            // setting itself is gone too.
+            const titleOf = (text: string, tab = false) => (
+              <FitTitle text={text} testId={tab ? 'header-tab-title' : undefined} className="min-w-0 flex-1 truncate font-bold leading-tight tracking-tight text-slate-900 group-hover:text-primary transition-colors desktop:text-2xl desktop:font-extrabold desktop:text-ink" />
+            )
+            const title = titleOf(settings.name)
+  
+            // A real <Link>, not a <button onClick> — is what makes cmd/ctrl/
+            // middle-click "open in new tab" work, which a click handler alone
+            // never supports regardless of what it navigates to. Still calls
+            // onGoHome() on a plain click rather than leaving it to Link's own
+            // href-driven navigation: goHome (useSiteNavigation) also resets
+            // Landing's local search/scroll state when the visitor is already
+            // home — a real behavior beyond the URL change that Link's default
+            // click handling doesn't know to do. preventDefault only for a
+            // plain click, so a modified one still falls through to the
+            // browser's native new-tab/new-window handling on the underlying
+            // <a> untouched.
+            const goHomeClick = (e: MouseEvent) => {
+              if (isModifiedClick(e)) return
+              e.preventDefault()
+              onGoHome()
+            }
+  
+            // One community: the header is exactly what it always was — the whole
+            // mark-plus-title block is a single "go home" link.
+            //
+            // On mobile, though, this block only ever renders on the home
+            // screen itself — every other screen swaps it for the back button
+            // above (showScreenHeader) or the header collapses entirely (the
+            // map) — so there's nowhere for "go home" to usefully go. Plain,
+            // non-interactive text there instead of a link to the page you're
+            // already on.
+            if (!switchable || switchable.length < 2) {
+              if (isMobile) {
+                return (
+                  <span className="flex min-w-0 shrink items-center gap-2.5">
+                    {mark}
+                    {tabTitle ? titleOf(tabTitle, true) : title}
+                  </span>
+                )
+              }
+              return (
+                <Link
+                  href={routes.home(community.slug)}
+                  onClick={goHomeClick}
+                  className="flex min-w-0 shrink items-center gap-2.5 cursor-pointer group text-left"
+                >
+                  {mark}
+                  {title}
+                </Link>
+              )
+            }
+  
+            // Several communities: the title becomes the switcher (it already
+            // names where you are), so "go home" moves onto the mark beside it.
+            // It keeps the community's name on a tab's page too: a tab's name
+            // there would hide which community this is.
+            // Split into two controls rather than one because a button can't
+            // nest inside a button.
+            return (
+              <div className="flex min-w-0 shrink items-center gap-2.5 group">
+                <Link href={routes.home(community.slug)} onClick={goHomeClick} aria-label="Home" className="contents cursor-pointer">
+                  {mark}
+                </Link>
+                <CommunitySwitcher
+                  communities={switchable}
+                  activeSlug={community?.slug ?? null}
+                  onSelect={setCommunity}
+                >
+                  {title}
+                </CommunitySwitcher>
+              </div>
+            )
+          })()
+  }
+
   return (
     <header
+      data-site-header
       className={className}
       // Named so the browser's View Transition (SlugScreen/Landing's
       // directional slide, see navTransitions.ts) treats this header as its
@@ -146,140 +292,26 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
       style={{ viewTransitionName: collapsed ? 'none' : 'site-header' }}
     >
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-14 desktop:h-[60px] flex items-center gap-3 desktop:gap-10">
-        {showScreenHeader && screenHeader ? (
-          <button
-            onClick={screenHeader.onBack}
-            className="flex min-w-0 shrink items-center gap-2.5 cursor-pointer group text-left"
-          >
-            {/* Same h-9 w-9 footprint and gap-2.5 as the logo mark below, so
-                the title lands at the exact x-position it does on the home
-                screen — a visitor's eye doesn't have to re-find it after a
-                back-navigation. Circular chip (border + white fill + shadow),
-                not a bare icon: mirrors LocationControl's own pill on the
-                opposite side of this row, so the two ends of the header read
-                as a matched pair rather than one polished control and one
-                plain glyph — the same "circular back button" treatment apps
-                like WhatsApp use. */}
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 bg-white shadow-sm">
-              <svg
-                className="h-5 w-5 text-primary"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-            </span>
-            <span className="min-w-0 flex-1">
-              {screenHeader.named && <span className="block truncate text-xs font-bold tracking-wide text-muted">{settings.name}</span>}
-              {screenHeader.named ? (
-                <span className="block truncate text-lg font-bold leading-tight tracking-tight text-slate-900">{screenHeader.title}</span>
+        {measured === null ? (
+          // Not measured yet (the server's render, and the client's until
+          // its first effect): both ends, and CSS picks. A phone's first
+          // paint was the computer's, the site's name where "‹ Food" goes
+          // (the user, Nov 22; e2e/first-paint.spec.ts).
+          <>
+            <div className="contents desktop:hidden">
+              {screenHeader ? (
+                renderLeft(true, screenHeader)
               ) : (
-                <FitTitle text={screenHeader.title} className="block truncate font-bold leading-tight tracking-tight text-slate-900" />
+                <Suspense fallback={renderLeft(true, null)}>
+                  <ScreenHeaderFromPath>{(sh) => renderLeft(true, sh)}</ScreenHeaderFromPath>
+                </Suspense>
               )}
-            </span>
-          </button>
-        ) : (() => {
-          const mark = settings.logoUrl?.trim() ? (
-            // next/image rather than a CSS background. Beyond the resizing and
-            // format negotiation, this also closes a small hole: the URL used
-            // to be interpolated straight into a style string, so an admin
-            // logo URL containing a ")" broke the rule, and the value was
-            // never escaped. Here it's an attribute, handled by React.
-            <span
-              className="block relative h-9 w-9 shrink-0 overflow-hidden rounded-xl desktop:h-11 desktop:w-11"
-              aria-hidden="true"
-            >
-              <LogoImage src={settings.logoUrl} />
-            </span>
-          ) : (
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white desktop:h-11 desktop:w-11">
-              <StarOfDavid className="h-5 w-5" />
-            </span>
-          )
-          // Tagline used to render as a second line here — dropped along
-          // with the header's own extra height (h-16 → h-14 below): it said
-          // roughly the same thing the hero's mission line says a few
-          // pixels of scroll later ("Guide for residents, visitors, and
-          // patients" next to the hero's own mission sentence), so the
-          // header carried the message twice before a visitor had read
-          // either in full. That was the tagline's only render site, so the
-          // setting itself is gone too.
-          const titleOf = (text: string, tab = false) => (
-            <FitTitle text={text} testId={tab ? 'header-tab-title' : undefined} className="min-w-0 flex-1 truncate font-bold leading-tight tracking-tight text-slate-900 group-hover:text-primary transition-colors desktop:text-2xl desktop:font-extrabold desktop:text-ink" />
-          )
-          const title = titleOf(settings.name)
-
-          // A real <Link>, not a <button onClick> — is what makes cmd/ctrl/
-          // middle-click "open in new tab" work, which a click handler alone
-          // never supports regardless of what it navigates to. Still calls
-          // onGoHome() on a plain click rather than leaving it to Link's own
-          // href-driven navigation: goHome (useSiteNavigation) also resets
-          // Landing's local search/scroll state when the visitor is already
-          // home — a real behavior beyond the URL change that Link's default
-          // click handling doesn't know to do. preventDefault only for a
-          // plain click, so a modified one still falls through to the
-          // browser's native new-tab/new-window handling on the underlying
-          // <a> untouched.
-          const goHomeClick = (e: MouseEvent) => {
-            if (isModifiedClick(e)) return
-            e.preventDefault()
-            onGoHome()
-          }
-
-          // One community: the header is exactly what it always was — the whole
-          // mark-plus-title block is a single "go home" link.
-          //
-          // On mobile, though, this block only ever renders on the home
-          // screen itself — every other screen swaps it for the back button
-          // above (showScreenHeader) or the header collapses entirely (the
-          // map) — so there's nowhere for "go home" to usefully go. Plain,
-          // non-interactive text there instead of a link to the page you're
-          // already on.
-          if (!switchable || switchable.length < 2) {
-            if (isMobile) {
-              return (
-                <span className="flex min-w-0 shrink items-center gap-2.5">
-                  {mark}
-                  {tabTitle ? titleOf(tabTitle, true) : title}
-                </span>
-              )
-            }
-            return (
-              <Link
-                href={routes.home(community.slug)}
-                onClick={goHomeClick}
-                className="flex min-w-0 shrink items-center gap-2.5 cursor-pointer group text-left"
-              >
-                {mark}
-                {title}
-              </Link>
-            )
-          }
-
-          // Several communities: the title becomes the switcher (it already
-          // names where you are), so "go home" moves onto the mark beside it.
-          // It keeps the community's name on a tab's page too: a tab's name
-          // there would hide which community this is.
-          // Split into two controls rather than one because a button can't
-          // nest inside a button.
-          return (
-            <div className="flex min-w-0 shrink items-center gap-2.5 group">
-              <Link href={routes.home(community.slug)} onClick={goHomeClick} aria-label="Home" className="contents cursor-pointer">
-                {mark}
-              </Link>
-              <CommunitySwitcher
-                communities={switchable}
-                activeSlug={community?.slug ?? null}
-                onSelect={setCommunity}
-              >
-                {title}
-              </CommunitySwitcher>
             </div>
-          )
-        })()}
+            <div className="hidden desktop:contents">{renderLeft(false, screenHeader)}</div>
+          </>
+        ) : (
+          renderLeft(isMobile, screenHeader)
+        )}
 
         {/* Categories/Map/More — see HeaderNav's own doc for why this
             replaces the old full-width tab row rather than sitting beside
@@ -336,4 +368,16 @@ function LogoImage({ src }: { src: string }) {
       onError={useThumb ? () => setFailedThumb(thumb) : undefined}
     />
   )
+}
+
+/** The screen's own header, guessed from the address, for the paint before
+ *  the screen has said it (useSetScreenHeader runs in an effect). Reads the
+ *  path, so it sits in its own Suspense boundary, as the tab bar does
+ *  (SiteChrome): where the path isn't known ahead, the fallback is the
+ *  logo and the site's name, as before. */
+function ScreenHeaderFromPath({ children }: { children: (sh: ScreenHeaderState) => ReactNode }) {
+  const pathname = usePathname()
+  const categories = useCategoriesIfAny()
+  const settings = useSiteSettings()
+  return children(screenHeaderFromPath(pathname, categories ?? [], settings.mobileTabs ?? null))
 }
