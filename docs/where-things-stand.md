@@ -111,14 +111,6 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     live (PR 399, Nov 20 13:18 UTC), and all end by Nov 28; older weeks
     are past and no longer show. Recommended: no write. Check that the
     weeks for Nov 29 on come from the new watch, then close this.
-53. Drop the old admin columns: the code that stops writing them is
-    built (Nov 22, this PR); after it deploys, migration 114
-    (`supabase/migrations/20240101000114_drop_unread_settings_columns.sql`)
-    goes on the test project, dev and live, live with the user's yes. It
-    drops site_settings' tagline and seven old heading columns,
-    community.tagline, category.card_text_color, and form's card text
-    colour and photo. Then delete taglineToWrite and its retry
-    (src/lib/siteSettingsStore.ts).
 55. Migration 067, only when Today is turned on.
 
 ### Mine to build or fix (nobody waiting)

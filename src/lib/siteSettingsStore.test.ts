@@ -40,7 +40,6 @@ afterEach(() => {
 const rawRow = {
   id: 'default',
   name: 'My Community',
-  tagline: 'Tagline',
   hero_title: 'Hero',
   mission: 'Mission',
   logo_url: 'https://example.com/logo.png',
@@ -210,47 +209,15 @@ describe('updateSiteSettings', () => {
     )
   })
 
-  // Nothing reads the tagline any more, but its column is NOT NULL, so a
-  // save writes back what the row holds rather than blanking it.
-  it('writes back the stored tagline, or an empty one for a first save', async () => {
-    async function taglineWritten(row: unknown, community: string) {
-      const write = chainable({ data: rawRow, error: null })
-      let call = 0
-      mockFrom.mockImplementation(() => (++call === 1 ? chainable({ data: row, error: null }) : write))
-      await updateSiteSettings(community, { heroTitle: 'New Hero' })
-      return (write.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0].tagline
-    }
-    expect(await taglineWritten(rawRow, 'philly')).toBe('Tagline')
-    mockResolveCommunity.mockResolvedValue({ slug: 'ues', isDefault: false, name: 'UES', mission: 'M' })
-    expect(await taglineWritten(null, 'ues')).toBe('')
-  })
-
-  // Migration 114 drops the column; the save has to work on both sides of
-  // it, since the code deploys first (a save that wrote it after the drop,
-  // or left it out before, would fail every time).
-  it('leaves the tagline out once the row no longer has one', async () => {
-    const dropped: Record<string, unknown> = { ...rawRow }
-    delete dropped.tagline
-    const write = chainable({ data: dropped, error: null })
+  // Migration 114 dropped the tagline column; a save that named it would
+  // fail every time.
+  it('never writes a tagline', async () => {
+    const write = chainable({ data: rawRow, error: null })
     let call = 0
-    mockFrom.mockImplementation(() => (++call === 1 ? chainable({ data: dropped, error: null }) : write))
+    mockFrom.mockImplementation(() => (++call === 1 ? chainable({ data: rawRow, error: null }) : write))
     await updateSiteSettings('philly', { heroTitle: 'New Hero' })
     expect((write.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0]).not.toHaveProperty('tagline')
   })
-
-  it('saves a community’s first row without the tagline once the column is gone', async () => {
-    mockResolveCommunity.mockResolvedValue({ slug: 'ues', isDefault: false, name: 'UES', mission: 'M' })
-    const refused = chainable({ data: null, error: { message: 'column "tagline" of relation "site_settings" does not exist' } })
-    const dropped: Record<string, unknown> = { ...rawRow }
-    delete dropped.tagline
-    const saved = chainable({ data: dropped, error: null })
-    let call = 0
-    mockFrom.mockImplementation(() => [chainable({ data: null, error: null }), refused, saved][call++])
-    await expect(updateSiteSettings('ues', { heroTitle: 'New Hero' })).resolves.toBeDefined()
-    expect((refused.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0].tagline).toBe('')
-    expect((saved.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0]).not.toHaveProperty('tagline')
-  })
-
 
   it('throws with the Supabase error message on failure', async () => {
     const readBuilder = chainable({ data: rawRow, error: null })
