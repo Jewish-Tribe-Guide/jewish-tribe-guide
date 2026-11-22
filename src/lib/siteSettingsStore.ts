@@ -25,10 +25,6 @@ const ROW_ID = 'default'
 type Row = {
   id: string
   name: string
-  /** Nothing reads it: the header line it was is gone. NOT NULL with no
-   *  default until migration 114 drops it, so a save writes back what the
-   *  row holds while it's there (taglineToWrite). Absent after 114. */
-  tagline?: string
   hero_title: string
   mission: string
   logo_url: string | null
@@ -192,7 +188,7 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
 // The fallback used to be a single module-level SITE_SETTINGS_DEFAULTS built
 // from community.config.ts (the bootstrap community) — fine while only one
 // community existed, but a second community with no site_settings row yet
-// would render Philadelphia's name/tagline/mission on its own domain until an
+// would render Philadelphia's name/mission on its own domain until an
 // admin saved something. Falls back to the resolved `community` row's own
 // branding instead, so an un-configured community reads as itself, empty,
 // rather than as someone else's site.
@@ -237,15 +233,6 @@ export async function getSiteSettings(community: string): Promise<SiteSettings> 
   return getSiteSettingsUncached(community)
 }
 
-/** The tagline to write back: what the row holds while the column exists
- *  (NOT NULL, no default), nothing once migration 114 has dropped it. With
- *  no row yet, '' unless told the column is gone. Delete once 114 has run
- *  everywhere, with the retry in updateSiteSettings. */
-export function taglineToWrite(row: Pick<Row, 'tagline'> | null, withTagline: boolean): { tagline?: string } {
-  if (row) return 'tagline' in row ? { tagline: row.tagline ?? '' } : {}
-  return withTagline ? { tagline: '' } : {}
-}
-
 // Merges the given fields into the current settings and upserts the single
 // row (creating it on first save). Only the provided keys change.
 export async function updateSiteSettings(
@@ -276,14 +263,13 @@ export async function updateSiteSettings(
     rightNow.right_now_categories = merged.rightNowCategories
   }
 
-  const save = (withTagline: boolean) => getAdminClient()
+  const { data, error } = await getAdminClient()
     .from('site_settings')
     .upsert(
       {
         id: ROW_ID,
         community_id: community,
         name: merged.name,
-        ...taglineToWrite(row, withTagline),
         hero_title: merged.heroTitle,
         mission: merged.mission,
         logo_url: merged.logoUrl,
@@ -308,12 +294,6 @@ export async function updateSiteSettings(
     )
     .select('*')
     .single()
-
-  // A community's first save has no row to tell whether the tagline column
-  // is still there (before migration 114 it must be written; after, it
-  // can't be), so it tries with it and, if the column is gone, without.
-  let { data, error } = await save(true)
-  if (error && !row && /tagline/.test(error.message)) ({ data, error } = await save(false))
 
   if (error) {
     if (Object.keys(today).length > 0 && /home_style|before_candle_items|today_hidden/.test(error.message)) {

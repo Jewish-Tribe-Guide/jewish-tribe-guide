@@ -8,6 +8,11 @@ that file.
 
 Taken off `where-things-stand.md` with their numbers, as they read there.
 
+- 53. Done Nov 22: the old admin columns are gone. Migration 114 dropped
+  site_settings' tagline and seven old heading columns, community.tagline,
+  category.card_text_color, and form's card colour and photo, on live and
+  dev (the user ran it after PR 430 deployed the code that stopped
+  writing them). The save's both-ways tagline code is gone too.
 - 50. Done Nov 22: the Denomination/Nusach change is on live (the user's
   yes). Three pages share one Denomination list, one choice; both
   Synagogues pages gained Nusach. Eight Ashkenazi shuls became Orthodox,
