@@ -414,26 +414,18 @@ With no choice made it's the first two categories with hours, as before
     change log is all test-suite churn (its newest 400 rows are on test
     listings), so the dot never lights on the preview without a real
     edit to a saved place; production's log is real.
-  - **What changed can be a tab while it's held back** (the user, Nov 15:
-    "add it to the tabs to see it and then take it off the tab in admin
-    with the ability to add it back"). Site › Home page › Phone › Tabs ›
-    Add a tab › What changed, or a header link on the Computer side; its
-    page (`/<community>/changes`) answers only while a tab or link has
-    it, and is a 404 again once it's taken off (`changesLinked`). The
-    switch in `features.ts` stays off; the admin's own What changed tab
-    (hiding a change) is still held back with it. Dev's page is empty
-    (its log is test churn); live's would show the real log, once this
-    ships and the user adds the tab there themselves. The user's view
-    (Nov 15): an activity feed is the first thing after testers' feedback;
-    my view was to lead with new places, closures, hechsher and minyan
-    changes and fold small edits into one line. **Decided Nov 22: the
-    feed** (the user: "I like my way"). The page already is one: every
-    change, newest first, by day, with each night's run among them.
-    **Fixed Nov 15:** the user added the tab on the preview and got "Page
-    not found". A settings save marks pages stale, and the first load
-    after it still gets the old copy (here, the 404) while a new one is
-    made; a reload showed it. The save now expires `/<community>/changes`
-    at once, so the next load is the page (`route.test.ts`, red without).
+  - **What changed is live** (Nov 21; the code switch is gone). It shows
+    wherever an admin adds it: Site › Home page › Phone › Tabs › Add a
+    tab › What changed, or a header link on the Computer side. Its page
+    (`/<community>/changes`) answers only while a tab or link has it
+    (`changesLinked`). On live, Philly links it (checked Nov 22). The
+    admin's own What changed screen (hiding a change) opens from a row
+    on Reports. The user's view (Nov 15): an activity feed is the first
+    thing after testers' feedback; my view was to lead with new places,
+    closures, hechsher and minyan changes and fold small edits into one
+    line. **Decided Nov 22: the feed** (the user: "I like my way"). The
+    page already is one: every change, newest first, by day, with each
+    night's run among them.
   - **What changed reads past deleted listings (Nov 15).** The log read
     took the newest 400 rows and the page then dropped any whose listing
     was gone; on dev the write suites' fixtures (4,307 rows in two weeks)
