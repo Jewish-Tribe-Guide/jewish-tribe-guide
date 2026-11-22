@@ -25,6 +25,18 @@ the feedback wording, 077 and 082, Sababa (Not on Google since Oct 26),
 Tasty Twisters, the Brodsky duplicate, the old shul items in the queue,
 Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 
+### To talk about (the user flagged these from the health rating, Nov 22)
+
+81. Category and listing pages download 390–396 KB of JavaScript on a
+    phone, the heaviest pages by a clear margin; a common rule of thumb
+    is about 300 KB.
+82. Complexity: watches, sources, schedules in parts, AI readers, several
+    communities, sheets and screens with their own addresses, and long
+    AGENTS.md sections on working around Next. It works and is tested,
+    but it's expensive to change and takes a lot of context to pick up.
+83. Security hardening isn't finished: the Content-Security-Policy only
+    reports, it doesn't block, and it still allows inline scripts.
+
 ### You decide (a design or product call)
 
 1. A phone version of "How it looks" (not drawn yet).
