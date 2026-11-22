@@ -39,6 +39,15 @@ async function resolveFromPath(slug: string) {
   return { community, communities }
 }
 
+// As the public [community] layout: every screen below is static output,
+// so a community added since the deploy is rendered whole on its first
+// request rather than sent a shell first. With Partial Prefetching on, both
+// other ways failed for such a community (Nov 21): reading the address
+// before a boundary bailed out of the prerender, and reading it inside one
+// cut the page's stream off (React #412). ensureStatic = false changed
+// neither.
+export const ensureStatic = 'navigation'
+
 /** Prerenders a page per community at build time — same reasoning as the
  *  public [community] layout's own generateStaticParams. */
 export async function generateStaticParams() {

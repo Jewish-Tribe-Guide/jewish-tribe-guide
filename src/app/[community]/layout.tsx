@@ -66,6 +66,14 @@ export async function generateMetadata(props: LayoutProps<'/[community]'>): Prom
   }
 }
 
+// Every screen below is static output, so a community, category or listing
+// added since the deploy is rendered whole on its first request (and kept)
+// before it's served, rather than served the App Shell first. With Partial
+// Prefetching on, that is what lets an address it doesn't know still answer
+// 404: notFound() runs before anything is sent. The build fails if a screen
+// below reads the request or uncached data.
+export const ensureStatic = 'navigation'
+
 /** Prerenders a page per community at build time. The list is small and
  *  changes when an admin adds a community, not per request. */
 export async function generateStaticParams() {

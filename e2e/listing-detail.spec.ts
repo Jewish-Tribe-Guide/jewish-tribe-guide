@@ -553,12 +553,17 @@ test('Request removal, beside Edit, is its own screen, and Back returns to the l
   const name = listing.getByRole('heading', { name: item.name, exact: true })
   // Its content loads after the sheet opens: count its buttons after that.
   await expect(name).toBeVisible()
+  const editing = () => new URL(page.url()).searchParams.get('editing')
 
   const openRemoval = async () => {
     const removal = listing.getByRole('button', { name: 'Request removal' })
     await removal.scrollIntoViewIfNeeded()
     await removal.click()
     await expect(page.getByRole('heading', { name: 'Request removal' })).toBeVisible()
+    // The screen shows at once; its history entry is written only when the
+    // router's navigation to it lands. A Back pressed before that left the
+    // listing instead (CI, Nov 21, PR 407).
+    await expect.poll(editing, { timeout: ADDRESS_WAIT }).toBe(`${item.id}~removal`)
   }
   // Offered wherever the listing can be edited (removal requests are on
   // for every category here).
@@ -570,6 +575,7 @@ test('Request removal, beside Edit, is its own screen, and Back returns to the l
   await page.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(name).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Request removal' })).toHaveCount(0)
+  await expect.poll(editing, { timeout: ADDRESS_WAIT }).toBeNull()
 
   // The browser's own Back (a phone's back swipe is the same thing).
   await openRemoval()

@@ -1,27 +1,12 @@
-'use client'
+import Screen from './Screen'
 
-import { Suspense, useEffect } from 'react'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { adminBase } from '@/lib/adminNav'
-import { placePath } from '@/lib/placeLink'
-
-// The page of a whole kind, gone since Oct 31. Emails already sent still link
-// here: one with ?place= goes to that place, the rest to To do, where it waits.
-export default function AdminWatchKindRedirect() {
-  return (
-    <Suspense fallback={null}>
-      <Redirect />
-    </Suspense>
-  )
+// The admin is static output (its layout's ensureStatic = 'navigation'), so
+// a screen with an id in its address names some ids to build ahead. One stand-in: old links' addresses are rendered on their first visit.
+// The screen itself is a Client Component and reads the id from the address.
+export function generateStaticParams() {
+  return [{ category: '_' }]
 }
 
-function Redirect() {
-  const router = useRouter()
-  const params = useParams<{ community: string }>()
-  const place = useSearchParams().get('place')
-  const base = adminBase(params.community)
-  useEffect(() => {
-    router.replace(place ? `${base}/watches/${placePath(place, 'todo')}` : base)
-  }, [router, base, place])
-  return null
+export default function Page() {
+  return <Screen />
 }
