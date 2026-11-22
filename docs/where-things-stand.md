@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 21, 2026.
+Last updated: Nov 22, 2026.
 
 Finished work moved out on Nov 21: every "Done …" section is in
 `docs/history.md`, in the order it was here. Look there for why something
@@ -16,7 +16,8 @@ was built the way it was; this file is what's open.
 Every open item in this file, gathered in one place and checked against
 live where live could say (read only, Nov 21). The sections below hold
 the detail. "(?)" means it couldn't be checked from here and may already
-be done. Cross an item off here when it's done.
+be done. When an item is done, move it to `docs/history.md`; the rest
+keep their numbers, so a number always means the same item.
 
 Checked and done, so not listed: migrations 095–099 and 105–113 (live has
 all but 067, parked with Today), Philly's live home rows and Right now,
@@ -35,8 +36,6 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 6. The computer home's middle piece (neither option picked; W7l may
    have settled it) (?), and You and What changed as extra cells there.
 7. The "Right now" label on the computer home: may come back.
-8. Decided Nov 22: What changed is an activity feed, every change in
-    order (the user: "I like my way"). Already built that way.
 9. A "Recent changes" box on each listing.
 10. One contact email for every community?
 11. On a phone, saved places and searches on You come off only by swipe.
@@ -56,15 +55,9 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 19. Mekor's list against ours: PLNT Burger Jenkintown (IKC?), and Nothing
     Bundt Cakes, Cherry-K there and Keystone-K here.
 20. Boards 14–15: a ready-made field, fixed or local.
-21. Done: "Can visitors upvote places?" is built (a page's Questions in
-    the admin; checked Nov 22).
 22. Hospitals' Eruv field takes its choices from the Eruv page?
 23. A "Kept up to date" box (recommended, not drawn).
 24. UES Grocery's "Kosher" yes/no becomes Kosher Store?
-25. Done Nov 22: Hotels' "What makes it Shabbat friendly?" is on dev
-    and live (the user's yes, after PR 428 deployed), asked after a Yes
-    and shown under it in the Shabbos friendly box. Live shows it after
-    its next deploy or any save in the live admin.
 26. The rest of the field-by-field review.
 27. The "+" covers part of the third tile on the phone home.
 28. The drawings for asking for location when it helps.
@@ -97,8 +90,6 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     SENTRY_CRON_MONITORS=nightly-email and redeploy; the next build's
     log should say Node 24.
 41. Live backups: check Database → Backups, and run the first live copy.
-42. Done: 103 is on live (the site's public key reads nothing, Nov 22).
-    104 can't be seen without a write; 105–113 ran after it.
 43. PostHog: check Session Replay's project settings.
 44. The first live morning after a deploy: each community's run shows
     in its own tab, and Vercel's log has no "run didn't start".
@@ -116,45 +107,13 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 ### Needs your yes, because it writes to live
 
 50. The Denomination/Nusach change (dry run ready).
-51. Done: live has About and Privacy's new text (since Nov 16).
 52. The shul watch's live data clean-up (look again first).
 53. Drop the old admin columns (tagline and the rest are still on live).
-54. Done: live has the hospital fields (same as dev) and 7 Refuah
-    watches (checked Nov 22).
 55. Migration 067, only when Today is turned on.
 
 ### Mine to build or fix (nobody waiting)
 
-56. Done: Partial Prefetching is live (PR 427, deployed Nov 22). Live
-    answers 404 for a made-up category, listing, community and a shared
-    question in a community that doesn't exist.
-57. Checked Nov 22, not reproduced: a search (`?q=pizza`) stayed in the
-    address through a refresh on coming back to the tab, opening a
-    listing and Back, and Activity and Back. Left as is.
-58. Checked Nov 22, not reproduced: the one failure (1 in 34 runs of
-    editor-screens) didn't come back in 55 more. A lead only.
-59. Stale (checked Nov 22): closing a listing opened from its own link
-    tells Next's router the category's address (Nov 17, 14d8c056), and
-    src/test/replaceStateMark.test.ts fails on a call that doesn't.
-60. Stale (checked Nov 22): the Add a listing picker closes on Escape
-    (Nov 16, 01caf0e7, with a test); so does the header's Categories menu
-    (tried on dev).
-61. Done Nov 22: the sheets' "Drag to resize" handles and the Nearby
-    sheet's work from a keyboard: Tab reaches them, Enter or Space does
-    what a tap does, the arrows open and lower them (tried on dev's Map
-    at phone size).
 62. Watches' days run on New York's clock (right for Philly and UES).
-63. Dropped Nov 22: on a Sunday that's Yom Tov, "last Shabbos" is still
-    true, and those keeping Yom Tov aren't on the site that day.
-64. Stale (checked Nov 22): a new place opens its own screen (board
-    L3NewPlace, built Nov 2), its hours under "Not on the listing yet",
-    not every day "Closed".
-65. Done Nov 22. A new community's admin opens straight to its To do
-    (walked on dev with a made-up community, since deleted; fixed by the
-    Nov 16 and 18 community-list expiry); the preview map opens on the
-    community's own centre (Nov 19, 60f1796b); and the nav's count now
-    follows a save anywhere in the admin: any admin write reads the setup
-    again (one small request, `onAdminWrite` in adminApi.ts).
 66. Done or settled Nov 22. Site's rows on a phone have their lines
     (board 21: what Home page holds, how many categories, which campaign
     is running). Stale: "Edit, then update" is gone (a change opens in
@@ -164,27 +123,6 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     senders (added beyond board 18b, both needed). Held for you: making a
     new newsletter key (not drawn; a new key stops the Gmail script until
     it's set up again).
-67. Done Nov 22: the starter Food page has today's Store Type; a partner
-    (a certificate's link) isn't a row of its own in a page's field list,
-    and moves with its field.
-    Found on the way, fixed: the admin's Home page preview (the site in
-    a frame) broke the report-only security policy on every opening;
-    `frame-src` now allows the site itself.
-68. Done Nov 22: the kosher watch, the hospital watches, the question
-    reader, "Ask"'s food/shul/hospital words and the map's pins go by a
-    page's kind, not its address, so a community whose Food page is
-    /eats or whose hospitals are /medical gets them too. Left on
-    addresses on purpose: the Mekor and Keystone runners (Philly's own
-    lists), and a new place the kosher watch finds still goes on
-    /restaurant.
-69. Stale (checked Nov 22): two posts covering one week was an Oct 31
-    note, fixed Nov 10 (e881f48c): a box's Edit, To do's included, opens
-    every post it shows a time from, and Edit listing's week row lists
-    them all and saves them into one.
-70. Done Nov 22: Read now tried on a computer (1280 wide, dev): Mekor's
-    Usual weekday times, "Reading its website…", then "just now" with
-    nothing changed. It sits on the row's source line, as on a phone; no
-    drawing of its own needed.
 71. Watch jobs agreed and not built (?): dishes split across menu pages,
     each kind's last 14 nights, no Read now on a Google-and-newsletter
     place, eruv status read more on Friday afternoons, a menu's monthly
@@ -199,14 +137,6 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     (chunks not yet loaded gone, pages from another build). Every tap
     worked. So it doesn't reproduce in a browser; next is a real phone
     (which screen, how long away, installed or in Safari).
-74. Done Nov 22: one Places load makes one jobs read (two before, its
-    list's and the nav's To do count's). The same jobs asked for while a
-    read of them is under way share it, until a save in the community.
-75. Done Nov 22: dev had six leftover test listings (five in Philly, from
-    before the write suites moved to their own community on Nov 20, and
-    one under a hidden category a cancelled run left); all deleted, with
-    that category. Today's suite deletes its listings with the category
-    it seeds.
 76. The moderation queue's "Bad Request" once; 25 old migrations that
     can't be told run; a slim search index for the home, later; log
     retention past ~50,000 rows a day.

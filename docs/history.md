@@ -4,6 +4,82 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## Done Nov 22: closed items from the open list
+
+Taken off `where-things-stand.md` with their numbers, as they read there.
+
+8. Decided Nov 22: What changed is an activity feed, every change in
+    order (the user: "I like my way"). Already built that way.
+21. Done: "Can visitors upvote places?" is built (a page's Questions in
+    the admin; checked Nov 22).
+25. Done Nov 22: Hotels' "What makes it Shabbat friendly?" is on dev
+    and live (the user's yes, after PR 428 deployed), asked after a Yes
+    and shown under it in the Shabbos friendly box. Live shows it after
+    its next deploy or any save in the live admin.
+42. Done: 103 is on live (the site's public key reads nothing, Nov 22).
+    104 can't be seen without a write; 105–113 ran after it.
+51. Done: live has About and Privacy's new text (since Nov 16).
+54. Done: live has the hospital fields (same as dev) and 7 Refuah
+    watches (checked Nov 22).
+56. Done: Partial Prefetching is live (PR 427, deployed Nov 22). Live
+    answers 404 for a made-up category, listing, community and a shared
+    question in a community that doesn't exist.
+57. Checked Nov 22, not reproduced: a search (`?q=pizza`) stayed in the
+    address through a refresh on coming back to the tab, opening a
+    listing and Back, and Activity and Back. Left as is.
+58. Checked Nov 22, not reproduced: the one failure (1 in 34 runs of
+    editor-screens) didn't come back in 55 more. A lead only.
+59. Stale (checked Nov 22): closing a listing opened from its own link
+    tells Next's router the category's address (Nov 17, 14d8c056), and
+    src/test/replaceStateMark.test.ts fails on a call that doesn't.
+60. Stale (checked Nov 22): the Add a listing picker closes on Escape
+    (Nov 16, 01caf0e7, with a test); so does the header's Categories menu
+    (tried on dev).
+61. Done Nov 22: the sheets' "Drag to resize" handles and the Nearby
+    sheet's work from a keyboard: Tab reaches them, Enter or Space does
+    what a tap does, the arrows open and lower them (tried on dev's Map
+    at phone size).
+63. Dropped Nov 22: on a Sunday that's Yom Tov, "last Shabbos" is still
+    true, and those keeping Yom Tov aren't on the site that day.
+64. Stale (checked Nov 22): a new place opens its own screen (board
+    L3NewPlace, built Nov 2), its hours under "Not on the listing yet",
+    not every day "Closed".
+65. Done Nov 22. A new community's admin opens straight to its To do
+    (walked on dev with a made-up community, since deleted; fixed by the
+    Nov 16 and 18 community-list expiry); the preview map opens on the
+    community's own centre (Nov 19, 60f1796b); and the nav's count now
+    follows a save anywhere in the admin: any admin write reads the setup
+    again (one small request, `onAdminWrite` in adminApi.ts).
+67. Done Nov 22: the starter Food page has today's Store Type; a partner
+    (a certificate's link) isn't a row of its own in a page's field list,
+    and moves with its field.
+    Found on the way, fixed: the admin's Home page preview (the site in
+    a frame) broke the report-only security policy on every opening;
+    `frame-src` now allows the site itself.
+68. Done Nov 22: the kosher watch, the hospital watches, the question
+    reader, "Ask"'s food/shul/hospital words and the map's pins go by a
+    page's kind, not its address, so a community whose Food page is
+    /eats or whose hospitals are /medical gets them too. Left on
+    addresses on purpose: the Mekor and Keystone runners (Philly's own
+    lists), and a new place the kosher watch finds still goes on
+    /restaurant.
+69. Stale (checked Nov 22): two posts covering one week was an Oct 31
+    note, fixed Nov 10 (e881f48c): a box's Edit, To do's included, opens
+    every post it shows a time from, and Edit listing's week row lists
+    them all and saves them into one.
+70. Done Nov 22: Read now tried on a computer (1280 wide, dev): Mekor's
+    Usual weekday times, "Reading its website…", then "just now" with
+    nothing changed. It sits on the row's source line, as on a phone; no
+    drawing of its own needed.
+74. Done Nov 22: one Places load makes one jobs read (two before, its
+    list's and the nav's To do count's). The same jobs asked for while a
+    read of them is under way share it, until a save in the community.
+75. Done Nov 22: dev had six leftover test listings (five in Philly, from
+    before the write suites moved to their own community on Nov 20, and
+    one under a hidden category a cancelled run left); all deleted, with
+    that category. Today's suite deletes its listings with the category
+    it seeds.
+
 ## Done Nov 9: the Eruv page is a category page, eruvs are only in Places
 
 The user, Nov 9: "a lot that doesn't need to be controlled by the admin."
