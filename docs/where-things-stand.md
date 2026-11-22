@@ -169,7 +169,10 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     note, fixed Nov 10 (e881f48c): a box's Edit, To do's included, opens
     every post it shows a time from, and Edit listing's week row lists
     them all and saves them into one.
-70. Read now never drawn or tried on a computer.
+70. Done Nov 22: Read now tried on a computer (1280 wide, dev): Mekor's
+    Usual weekday times, "Reading its website…", then "just now" with
+    nothing changed. It sits on the row's source line, as on a phone; no
+    drawing of its own needed.
 71. Watch jobs agreed and not built (?): dishes split across menu pages,
     each kind's last 14 nights, no Read now on a Google-and-newsletter
     place, eruv status read more on Friday afternoons, a menu's monthly
@@ -179,8 +182,14 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 72. The intake wizard's problems, parked while forms are hidden.
 73. A phone that drops the page in the background: taps do nothing
     until it reloads (not measured).
-74. One Places load makes two jobs reads.
-75. Dev's leftover test listing "E2E Admin Write 6eabdb10…".
+74. Done Nov 22: one Places load makes one jobs read (two before, its
+    list's and the nav's To do count's). The same jobs asked for while a
+    read of them is under way share it, until a save in the community.
+75. Done Nov 22: dev had six leftover test listings (five in Philly, from
+    before the write suites moved to their own community on Nov 20, and
+    one under a hidden category a cancelled run left); all deleted, with
+    that category. Today's suite deletes its listings with the category
+    it seeds.
 76. The moderation queue's "Bad Request" once; 25 old migrations that
     can't be told run; a slim search index for the home, later; log
     retention past ~50,000 rows a day.
