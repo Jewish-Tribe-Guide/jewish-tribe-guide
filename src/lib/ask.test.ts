@@ -188,6 +188,14 @@ describe('conceptCategories', () => {
   it('finds none when the community has no such category', () => {
     expect(conceptCategories('hotel', categories)).toEqual([])
   })
+
+  // Item 68 (Nov 22): by kind, so "Eateries" at /eats is food.
+  it('finds a category of the kind at any address and under any name', () => {
+    const eats = makeCategory({ id: 'eats', label: 'Place to Eat', pluralLabel: 'Places to Eat', placeKind: 'food' })
+    const medical = makeCategory({ id: 'medical', label: 'Medical Center', pluralLabel: 'Medical Centers', placeKind: 'hospitals' })
+    expect(conceptCategories('food', [eats, medical])).toEqual(['eats'])
+    expect(conceptCategories('hospital', [eats, medical])).toEqual(['medical'])
+  })
 })
 
 describe('termMatches', () => {

@@ -3,10 +3,10 @@ import { contactFields } from './contactRead'
 import { websiteKeyOf, type GooglePlace } from './googleJob'
 import { hoursJobCategories } from './hoursJob'
 import type { NightKindId } from './jobRuns'
-import { KOSHER_JOB_CATEGORIES } from './kosherJob'
+import { isKosherJobCategory } from './kosherJob'
 import { pageReadsFor } from './listingPageWatch'
 import type { LinkStanding } from './linkCheck'
-import { HOSPITAL_CATEGORY } from './refuahMatch'
+import { kindOf } from './placeKinds'
 import type { Watch } from './watches'
 import { MENU_CANT_READ_NOTE } from './watchJobs'
 
@@ -110,12 +110,12 @@ export function placeCoverage(listing: Listing, category: CategoryConfig, input:
   const mikvah = hoursJobCategories([category], 'hours').length > 0
   if (mikvah) add('hours', 'hours', on('hours') && reads(hours) ? ['website'] : [], true, pagesWhy('hours', hours))
   else if (category.detailFields.some((f) => f.key === 'hours' && f.type === 'hours') && filled(listing.hours)) add('hours', 'hours', google ? fromGoogle('hours') : ownSite ? ['website'] : [], false, googleWhy('hours'))
-  if (category.id === HOSPITAL_CATEGORY) {
+  if (kindOf(category) === 'hospitals') {
     const h = find(input.hospitals)
     const why = h?.notOnRefuah ? 'not on Refuah' : h?.watch && !h.watch.active ? STOPPED : h?.watch && !on('hospitals') ? JOB_OFF : undefined
     add('hospital', 'hospital contacts', on('hospitals') && h?.watch?.active && !h.notOnRefuah ? ['refuah'] : [], true, why)
   }
-  if (KOSHER_JOB_CATEGORIES.includes(category.id)) add('hechsher', 'hechsher', on('kosher') && find(input.kosher)?.on.length ? ['certifier'] : [], true)
+  if (isKosherJobCategory(category)) add('hechsher', 'hechsher', on('kosher') && find(input.kosher)?.on.length ? ['certifier'] : [], true)
   // No menu online (Ben & Jerry's, Nov 2) left To do and was nowhere on Places.
   // One that can't be read isn't checked either, though its watch runs
   // (the user, Nov 4), until its dishes are given by hand.

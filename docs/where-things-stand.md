@@ -169,8 +169,13 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     Found on the way, fixed: the admin's Home page preview (the site in
     a frame) broke the report-only security policy on every opening;
     `frame-src` now allows the site itself.
-68. Watches still going by address, not kind: the kosher watch, the
-    hospital watches and question reader, the map's pins.
+68. Done Nov 22: the kosher watch, the hospital watches, the question
+    reader, "Ask"'s food/shul/hospital words and the map's pins go by a
+    page's kind, not its address, so a community whose Food page is
+    /eats or whose hospitals are /medical gets them too. Left on
+    addresses on purpose: the Mekor and Keystone runners (Philly's own
+    lists), and a new place the kosher watch finds still goes on
+    /restaurant.
 69. Stale (checked Nov 22): two posts covering one week was an Oct 31
     note, fixed Nov 10 (e881f48c): a box's Edit, To do's included, opens
     every post it shows a time from, and Edit listing's week row lists

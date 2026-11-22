@@ -3,7 +3,8 @@ import { jobsOff } from '@/lib/jobOff'
 import { normalizeRow } from '@/lib/resourceStore'
 import { addWatch, listWatches, removeWatch } from '@/lib/watchStore'
 import { readRefuahNear } from '@/lib/refuahRun'
-import { HOSPITAL_CATEGORY, REFUAH_MATCH_CREATOR, matchRefuah, refuahWatchChanges, wantedRefuahWatches } from '@/lib/refuahMatch'
+import { isPlaceKind, kindOf } from '@/lib/placeKinds'
+import { REFUAH_MATCH_CREATOR, matchRefuah, refuahWatchChanges, wantedRefuahWatches } from '@/lib/refuahMatch'
 import type { ResourceRow } from '@/types'
 import { readAll } from '@/lib/readAll'
 
@@ -17,10 +18,23 @@ import { readAll } from '@/lib/readAll'
  *  run's log. `only`: that community's hospitals alone. */
 export async function syncRefuahWatches(fetcher: typeof fetch = fetch, only?: string): Promise<{ community: string; added: number; removed: number }[]> {
   const supabase = getAdminClient()
-  const { data: rows, error } = await readAll((from, to) => supabase.from('resource').select('*').eq('status', 'approved').eq('category', HOSPITAL_CATEGORY).order('community_id').order('id').range(from, to))
+  // Each community's hospitals pages, by kind, not address (item 68, Nov
+  // 22): another community's needn't be at /hospital.
+  const { data: categories, error: categoriesError } = await readAll((from, to) => supabase.from('category').select('id,community_id,place_kind').order('community_id').order('id').range(from, to))
+  if (categoriesError) throw new Error(`Couldn’t list the categories: ${categoriesError.message}`)
+  const pages = new Set<string>()
+  for (const c of (categories ?? []) as { id: string; community_id: string; place_kind?: string | null }[]) {
+    if (kindOf({ id: c.id, placeKind: isPlaceKind(c.place_kind) ? c.place_kind : undefined }) === 'hospitals') pages.add(`${c.community_id}|${c.id}`)
+  }
+  const ids = [...new Set([...pages].map((p) => p.slice(p.indexOf('|') + 1)))]
+  if (!ids.length) return []
+  const { data: rows, error } = await readAll((from, to) => supabase.from('resource').select('*').eq('status', 'approved').in('category', ids).order('community_id').order('id').range(from, to))
   if (error) throw new Error(`Couldn’t list the hospitals: ${error.message}`)
   const byCommunity = new Map<string, ResourceRow[]>()
-  for (const r of (rows ?? []) as ResourceRow[]) byCommunity.set(r.community_id, [...(byCommunity.get(r.community_id) ?? []), r])
+  for (const r of (rows ?? []) as ResourceRow[]) {
+    if (!pages.has(`${r.community_id}|${r.category}`)) continue
+    byCommunity.set(r.community_id, [...(byCommunity.get(r.community_id) ?? []), r])
+  }
 
   const out = []
   for (const [community, communityRows] of byCommunity) {

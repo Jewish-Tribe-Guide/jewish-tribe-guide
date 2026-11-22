@@ -5,10 +5,10 @@ import type { CheckedField } from '@/lib/googleJob'
 import { websiteKeyOf } from '@/lib/googleJob'
 import { itemWording } from '@/lib/itemMarks'
 import type { NightKindId } from '@/lib/jobRuns'
-import { KOSHER_JOB_CATEGORIES } from '@/lib/kosherJob'
+import { isKosherJobCategory } from '@/lib/kosherJob'
 import { jobPageReads } from '@/lib/listingPageWatch'
 import { keepsMenuLink } from '@/lib/menuLink'
-import { HOSPITAL_CATEGORY } from '@/lib/refuahMatch'
+import { kindOf } from '@/lib/placeKinds'
 import type { AddSource, Again, Change, Foot, Opened, ReadStep, Stop } from './openedPlaceBoxes'
 import { openedPlace } from './openedPlaceBoxes'
 import { websiteWatchOf } from '@/lib/eruvJob'
@@ -216,7 +216,7 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
   }
 
   function kosherRow(): RowSource | null {
-    if (!KOSHER_JOB_CATEGORIES.includes(category.id)) return null
+    if (!isKosherJobCategory(category)) return null
     if (off('kosher')) return nothing()
     const found = box('kosher')
     const give: GiveSource = { label: WHERE.keystone, email: false, run: { kind: 'keystone' } }
@@ -282,7 +282,7 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
     if (row.kind === 'items') return itemWording(row.fields[0]).noun === 'dish' ? dishesRow() : null
     if (row.kind === 'contact') return row.part === 'phone' ? keptField('phone') : null
     if (row.fields.some((f) => f.key === 'kosherCert')) return kosherRow()
-    if (row.fields.some((f) => f.type === 'contacts')) return category.id === HOSPITAL_CATEGORY ? hospitalRow(row) : null
+    if (row.fields.some((f) => f.type === 'contacts')) return kindOf(category) === 'hospitals' ? hospitalRow(row) : null
     if (row.fields.some((f) => f.type === 'hours')) return reads?.kind === 'hours' ? pagesRow('hours', null) : keptField('hours')
     if (row.fields.length !== 1) return null
     const f = row.fields[0]

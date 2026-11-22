@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     if (!today.ok) return Response.json({ ok: false, reason: 'busy' })
 
     const [categories, listings] = await Promise.all([listCategories(community.slug), listApprovedResources(community.slug)])
-    const places = readerPlaces(listings, community.slug)
+    const places = readerPlaces(listings, community.slug, categories)
     const vocab = readerVocabulary(categories, listings, [...new Set([...places.keys()])])
     const model = process.env.READER_MODEL || DEFAULT_READER_MODEL
     const controller = new AbortController()

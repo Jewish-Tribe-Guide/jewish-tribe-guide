@@ -51,6 +51,12 @@ describe('buildPin', () => {
     expect(svg).toMatch(/<svg[^>]*>.+<\/svg>$/)
   })
 
+  // Item 68 (Nov 22): by the category's kind, the key the map hands it.
+  it('draws the icon its glyph key names, not its address', () => {
+    buildPin(point({ filterId: 'medical' }), false, 'hospital')
+    expect(made[0]).toMatchObject({ glyphText: 'H' })
+  })
+
   it('draws a hospital’s "H" as text in white', () => {
     buildPin(point({ filterId: '__hospitals__' }), false)
 

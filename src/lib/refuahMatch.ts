@@ -26,9 +26,6 @@ export { REFUAH_MATCH_CREATOR }
  *  near. */
 export const MATCH_MILES = 0.2
 
-/** The category the guide's hospitals are in (as questionReader.ts). */
-export const HOSPITAL_CATEGORY = 'hospital'
-
 /** One of Refuah's hospitals, as its list gives it. */
 export type RefuahListed = { _id: string; name: string; formattedAddress?: string; latitude: number; longitude: number }
 

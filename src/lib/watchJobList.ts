@@ -3,9 +3,9 @@ import { dayInTimezone } from './isoDay'
 import { isCategorySyncEligible } from './categories'
 import { hoursJobCategories, ownSiteCategories } from './hoursJob'
 import type { NightKindId } from './jobRuns'
-import { KOSHER_JOB_CATEGORIES } from './kosherJob'
+import { isKosherJobCategory } from './kosherJob'
 import { NIGHT_KINDS, type KindFix, type NightKindView } from './nightKinds'
-import { HOSPITAL_CATEGORY } from './refuahMatch'
+import { kindOf } from './placeKinds'
 
 // ── Which jobs a community sees (the user, Oct 31) ──────────────────────────
 // One Watches page, for a new admin and an old one alike. A job with
@@ -40,9 +40,9 @@ function hasPlacesFor(id: NightKindId, categories: readonly Cat[]): boolean {
       return hoursJobCategories(places, 'hours').length > 0
     case 'kosher':
     case 'menus':
-      return places.some((c) => KOSHER_JOB_CATEGORIES.includes(c.id))
+      return places.some(isKosherJobCategory)
     case 'hospitals':
-      return places.some((c) => c.id === HOSPITAL_CATEGORY)
+      return places.some((c) => kindOf(c) === 'hospitals')
     case 'eruvs':
       return live.some((c) => c.kind === 'eruv')
     case 'sites':

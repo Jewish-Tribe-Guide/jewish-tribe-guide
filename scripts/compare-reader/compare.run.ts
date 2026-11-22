@@ -169,7 +169,7 @@ test('today’s search against the question reader', { timeout: 600_000 }, async
 
   // Places the reader may name, as the route gives them: everything our
   // own search knows (see readerPlaces).
-  const places = readerPlaces(listings, 'philly')
+  const places = readerPlaces(listings, 'philly', cats)
   const vocab = readerVocabulary(cats, listings, [...places.keys()])
   const answer = (asked: Asked, question: string) =>
     searchReading(listings, cats, asked, question, { coords: ME, now: NOW, places }).hits.map((h) => h.item.id)

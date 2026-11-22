@@ -8,6 +8,8 @@ import { haversineMiles } from '@/lib/geo'
 import { useCommunityPlace } from '@/lib/communityContext'
 import type { DirectoryResource } from '@/types'
 import { glyphSrcFor, glyphTextFor } from '@/lib/categoryIcons'
+import { useCategoriesIfAny } from '@/lib/contentContext'
+import { kindKeyById } from '@/lib/placeKinds'
 import { BookmarkIcon } from '@/components/icons'
 import { clearEruvim, drawEruvim, emphasizeEruvim, eruvDrawKey, type DrawnEruv, type MapEruv } from './eruvLayer'
 import MapUnavailable from './MapUnavailable'
@@ -316,7 +318,10 @@ export const USER_PULSE_STYLE =
 // bounce draws the eye the instant a new pin is picked — the one visual tie
 // between "what the sheet is showing" and "where that is on the map".
 // Exported for its test.
-export function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
+// `glyph`: the key its icon is found by, the category's kind's (placeKinds
+// .ts), so a community whose shuls aren't at /synagogue still gets the shul
+// pin (item 68, Nov 22), as CategoryGlyph does. Its own id without one.
+export function buildPin(p: MapPoint, isSelected: boolean, glyph: string | undefined = p.filterId): HTMLElement {
   if (!document.getElementById('jpc-pin-select-style')) {
     const style = document.createElement('style')
     style.id = 'jpc-pin-select-style'
@@ -332,11 +337,11 @@ export function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
   // Not PinElement's `glyph` or `.element`: both are deprecated, and Google
   // warned about them on every map load (Nov 18, review item 47). The pin
   // is an element itself.
-  const text = glyphTextFor(p.filterId)
+  const text = glyphTextFor(glyph)
   const pin = new google.maps.marker.PinElement({
     background: p.color,
     borderColor: '#ffffff',
-    ...(text ? { glyphText: text } : { glyphSrc: glyphSrcFor(p.filterId) }),
+    ...(text ? { glyphText: text } : { glyphSrc: glyphSrcFor(glyph) }),
     // Colors the "H"; the line icon's image is white already.
     glyphColor: '#ffffff',
     scale: isSelected ? 1.6 : 1,
@@ -509,6 +514,14 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   // selection-highlight effect below restyle just the one marker that
   // changed instead of rebuilding the whole marker set on every selection.
   const markersByIdRef = useRef(new Map<string, { marker: google.maps.marker.AdvancedMarkerElement; point: MapPoint }>())
+  // Each pin's icon by its category's kind (buildPin's `glyph`). A ref, as
+  // the effects below build pins long after the render that set it.
+  const categoriesNow = useCategoriesIfAny()
+  const categoriesRef = useRef(categoriesNow)
+  useEffect(() => {
+    categoriesRef.current = categoriesNow
+  }, [categoriesNow])
+  const pinFor = (p: MapPoint, selected: boolean) => buildPin(p, selected, p.filterId && kindKeyById(p.filterId, categoriesRef.current))
   // The `points` reference the marker-sync effect below last actually
   // rebuilt from — see that effect's own comment for why this exists.
   const syncedPointsRef = useRef<MapPoint[] | null>(null)
@@ -770,7 +783,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           if (!entry) continue
           entry.point = p
           if (!!prevPoints[i].pinned !== !!p.pinned) {
-            entry.marker.content = buildPin(p, p.id === selectedIdRef.current)
+            entry.marker.content = pinFor(p, p.id === selectedIdRef.current)
           }
         }
         return
@@ -788,7 +801,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
         map,
         position: { lat: p.lat, lng: p.lng },
         title: p.name,
-        content: buildPin(p, p.id === selectedIdRef.current),
+        content: pinFor(p, p.id === selectedIdRef.current),
         zIndex: markerZIndex(p, p.id === selectedIdRef.current),
       })
 
@@ -983,7 +996,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     if (prevId && prevId !== selectedId) {
       const prev = markersByIdRef.current.get(prevId)
       if (prev) {
-        prev.marker.content = buildPin(prev.point, false)
+        prev.marker.content = pinFor(prev.point, false)
         prev.marker.zIndex = markerZIndex(prev.point, false)
       }
     }
@@ -993,7 +1006,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     if (selectedId && (selectedId !== prevId || frameToken !== consumedFrameTokenRef.current)) {
       const current = markersByIdRef.current.get(selectedId)
       if (current) {
-        current.marker.content = buildPin(current.point, true)
+        current.marker.content = pinFor(current.point, true)
         current.marker.zIndex = markerZIndex(current.point, true)
         const shouldFrame = frameToken !== consumedFrameTokenRef.current
         consumedFrameTokenRef.current = frameToken

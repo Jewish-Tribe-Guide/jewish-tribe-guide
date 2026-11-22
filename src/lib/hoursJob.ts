@@ -4,7 +4,7 @@ import type { HoursPage } from './hoursPages'
 import type { JobCounts } from './watchJobs'
 import type { CategoryConfig } from './categories'
 import { contactFields, googleKeeps } from './contactRead'
-import { HOSPITAL_CATEGORY } from './refuahMatch'
+import { kindOf } from './placeKinds'
 
 // The hours job (the user, Oct 21): every place in a category with named
 // weekly hours (a mikvah's women's, men's and keilim hours) is read from
@@ -242,9 +242,9 @@ export function homePageReads(category: Pick<CategoryConfig, 'hasPhone' | 'detai
  *  mikvah's hours, a hospital's Refuah page), with a phone, an email or
  *  hours to read. Places only, not the site's other pages (the map,
  *  zmanim). */
-export function ownSiteCategories<C extends Pick<CategoryConfig, 'id' | 'kind' | 'hasPhone' | 'detailFields'>>(categories: readonly C[]): C[] {
+export function ownSiteCategories<C extends Pick<CategoryConfig, 'id' | 'kind' | 'hasPhone' | 'detailFields' | 'placeKind'>>(categories: readonly C[]): C[] {
   return categories.filter(
-    (c) => c.kind === 'listing' && c.id !== HOSPITAL_CATEGORY && pageReadsFor(c)?.kind !== 'times' && !hoursJobCategories([c], 'hours').length && homePageReads(c, {}).length > 0,
+    (c) => c.kind === 'listing' && kindOf(c) !== 'hospitals' && pageReadsFor(c)?.kind !== 'times' && !hoursJobCategories([c], 'hours').length && homePageReads(c, {}).length > 0,
   )
 }
 

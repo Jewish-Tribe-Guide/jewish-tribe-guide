@@ -2,6 +2,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import type { Tefillah } from '@/lib/davening'
 import type { DayKey } from '@/lib/hours'
 import { MILES_PER_MINUTE } from '@/lib/geo'
+import { kindOf, type PlaceKind } from '@/lib/placeKinds'
 
 // ── Understanding a question typed into search ───────────────────────────────
 // Search used to need every typed word to appear in a listing. That worked for
@@ -763,12 +764,26 @@ export function parseAsk(input: string): AskQuery {
   return { raw, terms, concepts, nearMe, openNow, openToday, openAt, best, eruv, times, meta, excluding, within: withinAsked, minyan, partial }
 }
 
-/** The categories a concept stands for in this community: those whose id or
- *  labels contain one of the concept's category words. */
+/** The kind of place a concept is, when it is one (placeKinds.ts). */
+const CONCEPT_KIND: Partial<Record<Concept, PlaceKind>> = {
+  food: 'food',
+  synagogue: 'shuls',
+  grocery: 'groceries',
+  hotel: 'hotels',
+  mikvah: 'mikvahs',
+  hospital: 'hospitals',
+}
+
+/** The categories a concept stands for in this community: those of its
+ *  kind, whatever their address or name ("Eateries" at /eats is food; item
+ *  68, Nov 22), and those whose id or labels contain one of its category
+ *  words. */
 export function conceptCategories(concept: Concept, categories: readonly CategoryConfig[]): string[] {
   const wanted = CONCEPTS[concept].category.map(fold)
+  const kind = CONCEPT_KIND[concept]
   return categories
     .filter((c) => {
+      if (kind && kindOf(c) === kind) return true
       const names = words(`${c.id} ${c.label} ${c.pluralLabel}`)
       return wanted.some((w) => names.includes(w))
     })

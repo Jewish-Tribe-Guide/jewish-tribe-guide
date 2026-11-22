@@ -3,9 +3,9 @@ import { contactFields } from '@/lib/contactRead'
 import { editorRows, rowSummary, type EditorRow, type EditorValues } from '@/lib/editorRows'
 import { websiteKeyOf, type CheckedField } from '@/lib/googleJob'
 import { itemWording } from '@/lib/itemMarks'
-import { KOSHER_JOB_CATEGORIES } from '@/lib/kosherJob'
+import { isKosherJobCategory } from '@/lib/kosherJob'
 import { jobPageReads } from '@/lib/listingPageWatch'
-import { HOSPITAL_CATEGORY } from '@/lib/refuahMatch'
+import { kindOf } from '@/lib/placeKinds'
 import { minyanimForBox } from '@/lib/minyanimBox'
 import { timeText } from '@/lib/minyanText'
 import { dateText, readSchedules, regularMinyanim, schedulesKey } from '@/lib/schedules'
@@ -197,8 +197,8 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     if (row.kind === 'audience') return pagesRow('hours', false)
     if (row.kind === 'items') return itemWording(row.fields[0]).noun === 'dish' ? menuRow() : null
     if (row.kind === 'contact') return row.part === 'phone' ? kept('phone') : null
-    if (row.fields.some((f) => f.key === 'kosherCert')) return KOSHER_JOB_CATEGORIES.includes(category.id) ? kosherRow() : null
-    if (row.fields.some((f) => f.type === 'contacts')) return category.id === HOSPITAL_CATEGORY ? refuahRow() : null
+    if (row.fields.some((f) => f.key === 'kosherCert')) return isKosherJobCategory(category) ? kosherRow() : null
+    if (row.fields.some((f) => f.type === 'contacts')) return kindOf(category) === 'hospitals' ? refuahRow() : null
     if (row.fields.some((f) => f.type === 'hours')) return pageReads?.kind === 'hours' ? pagesRow('hours', false) : kept('hours')
     if (row.fields.length !== 1) return null
     const f = row.fields[0]

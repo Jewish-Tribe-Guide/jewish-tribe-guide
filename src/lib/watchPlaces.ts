@@ -3,7 +3,7 @@ import { closureText, closureWaits, type GooglePlace } from './googleJob'
 import { hoursDidntLoad, hoursSection } from './hoursJob'
 import { dishJobStatus, didntLoad, hospitalSection, type DishPlace } from './watchJobs'
 import { eruvStanding, findingFor, websiteWatchOf, type EruvJobLoaded } from './eruvJob'
-import { KOSHER_JOB_CATEGORIES, kosherSection, type KosherPlace, type NewOnList } from './kosherJob'
+import { KOSHER_NEW_PLACE_CATEGORY, kosherSection, type KosherPlace, type NewOnList } from './kosherJob'
 import { dishProposal } from './dishProposal'
 import { watchHealth, type Watch } from './watches'
 import { linkBroken, type LinkStanding } from './linkCheck'
@@ -299,7 +299,7 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
     else {
       const isNew = f.operation === 'create' && !!f.from
       const pill = isNew ? `New on ${f.from}${f.at ? ` · ${dayText(f.at)}` : ''}` : '1 change'
-      loose.push({ id: f.id, name: f.name, category: KOSHER_JOB_CATEGORIES[0], state: 'waiting', pill, rank: isNew ? 'new' : 'changes', sources: [], listing: null })
+      loose.push({ id: f.id, name: f.name, category: KOSHER_NEW_PLACE_CATEGORY, state: 'waiting', pill, rank: isNew ? 'new' : 'changes', sources: [], listing: null })
     }
   }
 
@@ -319,7 +319,7 @@ export function watchKinds(jobs: WatchJobsIn, base: string, now: number): WatchK
     const lists = [...new Set(n.on.map((o) => o.list))]
     const at = n.findings?.map((f) => f.at).filter((x): x is string => !!x).sort()[0]
     const pill = `New on ${lists.map((l) => LIST_NAMES[l]).join(' and ')} list${lists.length > 1 ? 's' : ''}${at ? ` · ${dayText(at)}` : ''}`
-    put({ id: `new:${n.name}`, name: n.name, category: KOSHER_JOB_CATEGORIES[0], state: 'waiting', pill, rank: 'new', sources: lists, listing: null })
+    put({ id: `new:${n.name}`, name: n.name, category: KOSHER_NEW_PLACE_CATEGORY, state: 'waiting', pill, rank: 'new', sources: lists, listing: null })
   }
   loose.forEach(put)
 

@@ -40,7 +40,7 @@ const motel = place('hotel', 'Motel', 39.955, -75.165)
 const shul = place('synagogue', 'Mekor', 39.95, -75.17)
 const hup = place('hospital', 'Hospital of the University of Pennsylvania', 39.9496, -75.1936)
 const listings = [lateGrill, lunchGrill, dairy, shoprite, giant, sheraton, motel, shul, hup]
-const places = readerPlaces(listings, 'philly')
+const places = readerPlaces(listings, 'philly', [...categories, makeCategory({ id: 'hospital' })])
 const sixPm = placeTime(2026, 8, 24, 18, 0)
 const me = { lat: 39.95, lng: -75.17 }
 const asked = (reading: Reading, question = 'q'): Asked => ({ reading, own: ownConditions(question) })
@@ -241,7 +241,7 @@ describe('the AI adds to what our own search understood, and is only asked when 
   // listings' addresses, and the reader's places now too.
   const balaGrill = place('restaurant', 'Bala Grill', 40.0, -75.23, { t: ['Meat'], address: '1 Belmont Ave, Bala Cynwyd, PA 19004' })
   const more = [...listings, balaGrill]
-  const morePlaces = readerPlaces(more, 'philly')
+  const morePlaces = readerPlaces(more, 'philly', [...categories, makeCategory({ id: 'hospital' })])
   const today = (q: string) => searchAsk(more, categories, q, { now: sixPm, places: [] })
 
   it('the reader’s places are the ones our search knows: towns from addresses, and every listing', () => {

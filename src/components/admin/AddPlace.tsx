@@ -6,7 +6,7 @@ import { sectionFlags, type EditorRow, type EditorValues } from '@/lib/editorRow
 import { websiteKeyOf, type CheckedField } from '@/lib/googleJob'
 import { adminBase } from '@/lib/adminNav'
 import { samePage } from '@/lib/hoursJob'
-import { KOSHER_JOB_CATEGORIES } from '@/lib/kosherJob'
+import { isKosherJobCategory } from '@/lib/kosherJob'
 import { jobPageReads } from '@/lib/listingPageWatch'
 import { keepsMenuLink } from '@/lib/menuLink'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -82,7 +82,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   const api = useAdminApi(token)
   const post = <T,>(path: string, body: Record<string, unknown>) => api.post<T>(path, body)
   // On the kosher lists? From their kept copy, so as soon as it has a name.
-  const asksKosher = step === 'finish' && KOSHER_JOB_CATEGORIES.includes(category.id) && !!draft.name.trim()
+  const asksKosher = step === 'finish' && isKosherJobCategory(category) && !!draft.name.trim()
   // A mikvah's Women's, Men's and Keilim are each a row here, and only the ones
   // written in say the mikvah has them.
   const flags = JSON.stringify(sectionFlags(category, draft.details))

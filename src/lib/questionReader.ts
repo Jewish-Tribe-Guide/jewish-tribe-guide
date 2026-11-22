@@ -3,6 +3,7 @@ import { filterFields, keepsHours, type MapFilterState } from './mapFilters'
 import { neighborhoodsFor, townsFrom } from './places'
 import { itemName } from './itemNames'
 import type { LatLng } from './geo'
+import { idsOfKind } from './placeKinds'
 import type { DirectoryResource } from '@/types'
 
 // ── Reading a question into filters (decided Sep 30) ────────────────────────
@@ -68,11 +69,13 @@ export type ReaderPlace = {
  *  their initials ("HUP"), the towns in the listings' addresses, and every
  *  listing with a location ("near Trader Joe's"). Keyed lowercase; the
  *  first to claim a name keeps it. */
-export function readerPlaces(listings: readonly DirectoryResource[], communitySlug: string): Map<string, ReaderPlace> {
+export function readerPlaces(listings: readonly DirectoryResource[], communitySlug: string, categories: readonly CategoryConfig[]): Map<string, ReaderPlace> {
   const out = new Map<string, ReaderPlace>()
+  // By kind, not address: another community's hospitals needn't be at /hospital.
+  const hospitals = new Set(idsOfKind(categories, 'hospitals'))
   for (const p of neighborhoodsFor(communitySlug)) for (const n of [p.name, ...(p.aliases ?? [])]) out.set(n.toLowerCase(), { name: p.name, geo: p.geo, radius: p.radius })
   for (const h of listings) {
-    if (h.category !== 'hospital' || !h.geo) continue
+    if (!hospitals.has(h.category) || !h.geo) continue
     const place = { name: h.name, geo: h.geo as LatLng }
     out.set(h.name.toLowerCase(), place)
     // Initials, before any " - Main Building": the capitalised words' (HUP,

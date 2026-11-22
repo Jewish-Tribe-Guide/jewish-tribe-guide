@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const m = vi.hoisted(() => ({
   rows: [] as Record<string, unknown>[],
+  categories: [] as Record<string, unknown>[],
   listWatches: vi.fn(),
   addWatch: vi.fn(),
   removeWatch: vi.fn(),
@@ -9,11 +10,15 @@ const m = vi.hoisted(() => ({
 
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
-    from: () => {
+    from: (table: string) => {
+      let only: string[] | null = null
       const q = {
         select: () => q,
         eq: () => q,
-        range: () => q, order: () => q, then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: m.rows, error: null }).then(ok),
+        in: (_: string, values: string[]) => ((only = values), q),
+        range: () => q, order: () => q,
+        then: (ok: (v: unknown) => unknown) =>
+          Promise.resolve({ data: table === 'category' ? m.categories : m.rows.filter((r) => !only || only.includes(r.category as string)), error: null }).then(ok),
       }
       return q
     },
@@ -39,11 +44,22 @@ const refuah = (value: unknown, status = 'success') => vi.fn(async () => new Res
 beforeEach(() => {
   vi.clearAllMocks()
   m.rows = [row('pa', 'philly', { lat: 39.9451, lng: -75.1556 })]
+  m.categories = [{ id: 'hospital', community_id: 'philly', place_kind: 'hospitals' }]
   m.listWatches.mockResolvedValue({ watches: [], available: true })
   m.addWatch.mockImplementation(async () => ({ id: 'new' }))
 })
 
 describe('syncRefuahWatches', () => {
+  // Item 68 (Nov 22): by the category's kind, not its address.
+  it('finds a community’s hospitals on a hospitals page at any address, and only there', async () => {
+    m.categories = [
+      { id: 'medical', community_id: 'ues', place_kind: 'hospitals' },
+      { id: 'medical', community_id: 'philly', place_kind: 'plain' },
+    ]
+    m.rows = [{ ...row('ms', 'ues', { lat: 39.9451, lng: -75.1556 }), category: 'medical' }, { ...row('clinic', 'philly', { lat: 39.9451, lng: -75.1556 }), category: 'medical' }]
+    expect(await syncRefuahWatches(refuah([PA]))).toEqual([{ community: 'ues', added: 1, removed: 0 }])
+  })
+
   // Nov 18 review: Refuah was asked every night for a community that had
   // turned its hospitals job off.
   it('asks Refuah nothing for a community that turned hospitals off', async () => {
