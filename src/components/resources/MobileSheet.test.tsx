@@ -312,6 +312,27 @@ describe('MobileSheet', () => {
       expect(sheet.style.height).toBe(`${HALF_PX}px`)
     })
 
+    // Item 61 (Nov 22): the handle was a button a keyboard couldn't reach.
+    it('works from a keyboard: Tab reaches it, Enter toggles, the arrows open and lower it', async () => {
+      const user = userEvent.setup()
+      render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Edit listing" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = document.body.querySelector('[role="dialog"]') as HTMLElement
+      const handle = screen.getByRole('button', { name: 'Drag to resize' })
+      await user.tab()
+      expect(document.activeElement).toBe(handle)
+      await user.keyboard('{Enter}')
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
+      expect(handle.getAttribute('aria-expanded')).toBe('true')
+      await user.keyboard('{ArrowDown}')
+      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+      await user.keyboard('{ArrowUp}')
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
+    })
+
     // Regression coverage for the actual reason this exists: a plain
     // fixed-height sheet (what this was before) has no way to get more
     // room for a long form short of scrolling within it. Dragging the

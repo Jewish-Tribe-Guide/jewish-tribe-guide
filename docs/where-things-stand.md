@@ -132,10 +132,16 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     listing and Back, and Activity and Back. Left as is.
 58. Checked Nov 22, not reproduced: the one failure (1 in 34 runs of
     editor-screens) didn't come back in 55 more. A lead only.
-59. Closing a listing opened from its own link uses replaceState, which
-    a Next update can overwrite.
-60. The category picker has no Escape to close.
-61. The sheets' "Drag to resize" handles don't work from a keyboard.
+59. Stale (checked Nov 22): closing a listing opened from its own link
+    tells Next's router the category's address (Nov 17, 14d8c056), and
+    src/test/replaceStateMark.test.ts fails on a call that doesn't.
+60. Stale (checked Nov 22): the Add a listing picker closes on Escape
+    (Nov 16, 01caf0e7, with a test); so does the header's Categories menu
+    (tried on dev).
+61. Done Nov 22: the sheets' "Drag to resize" handles and the Nearby
+    sheet's work from a keyboard: Tab reaches them, Enter or Space does
+    what a tap does, the arrows open and lower them (tried on dev's Map
+    at phone size).
 62. Watches' days run on New York's clock (right for Philly and UES).
 63. Dropped Nov 22: on a Sunday that's Yom Tov, "last Shabbos" is still
     true, and those keeping Yom Tov aren't on the site that day.
@@ -551,8 +557,6 @@ Found and not fixed:
   made (a policy, an index, a data fix).
 - 5 moderate `npm audit` findings, all `glob`/`minimatch` in Sentry's
   build plugin, build time only; they wait on Sentry.
-- The sheets' "Drag to resize" handle and the Nearby sheet's still don't
-  work from a keyboard.
 - The readers that find a time inside running text (hours, calendar
   titles, the shul page and schedule readers, ask) weren't merged with
   the clock reader: they answer a different question.
@@ -674,10 +678,9 @@ Soon:
 - Focus in dialogs and sheets, drag handles keyboard can't use, search
   results silent to screen readers, swipe-only actions. **Built Nov 20,
   the first two of four** (`claude/health-a11y`):
-  - Not done: the sheet's "Drag to resize" handle and the Nearby sheet's
-    handle are buttons a keyboard can't reach or work (no tabindex, no
-    keys), so the Nearby list can't be opened up without a drag. The
-    category split and the map sidebar's handles already take arrow keys.
+  - Done Nov 22 (item 61): the sheet's "Drag to resize" handle and the
+    Nearby sheet's take Tab, Enter or Space, and the arrows, as the
+    category split and the map sidebar's handles already did.
   - **For the user:** on a phone, You's saved places and searches are
     removed only by a swipe (the bookmark is computer-only, on purpose by
     its comment). Each can still be unsaved where it was saved (a place's

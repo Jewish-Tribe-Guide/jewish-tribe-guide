@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent as KeyEvent, type ReactNode } from 'react'
 import NearbyList, { type NearbyEruv } from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
 import { useKeptListScroll } from './useKeptListScroll'
@@ -587,6 +587,19 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
         `${eruvim.length} ${eruvim.length === 1 ? 'eruv' : 'eruvim'}${points.length > 0 ? ` · ${points.length} place${points.length !== 1 ? 's' : ''}` : ''}`
       : `${points.length} place${points.length !== 1 ? 's' : ''}`
 
+  function onHandleKeyDown(e: KeyEvent) {
+    const order: Snap[] = ['peek', 'half', 'full']
+    const at = order.indexOf(snap)
+    const to =
+      e.key === 'ArrowUp' ? order[Math.min(at + 1, 2)]
+        : e.key === 'ArrowDown' ? order[Math.max(at - 1, 0)]
+          : e.key === 'Enter' || e.key === ' ' ? order[(at + 1) % 3]
+            : null
+    if (!to) return
+    e.preventDefault()
+    setSnap(to)
+  }
+
   return (
     // overflow-hidden: lowered, the list's element is squeezed to nothing
     // under the handle, but its bottom padding would still poke out below.
@@ -603,6 +616,11 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
+        // From a keyboard too (item 61, Nov 22): Enter or Space as a tap
+        // (peek, half, full, then back), the arrows one step up or down.
+        onKeyDown={onHandleKeyDown}
+        tabIndex={0}
+        aria-expanded={snap !== 'peek'}
         className="flex shrink-0 touch-none cursor-grab flex-col items-center gap-1.5 py-2.5 active:cursor-grabbing"
         // Lowered, the handle is the whole sheet: its line says what's in
         // it, and nothing of the list shows under that, cut off partway
