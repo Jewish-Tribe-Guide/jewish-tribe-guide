@@ -106,7 +106,6 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 
 ### Needs your yes, because it writes to live
 
-50. The Denomination/Nusach change (dry run ready).
 52. The shul watch's live data clean-up. Looked Nov 22 (read only): every
     week still showing was posted Nov 19–20, before the new watch reached
     live (PR 399, Nov 20 13:18 UTC), and all end by Nov 28; older weeks
@@ -184,8 +183,7 @@ Small open items from Nov 9:
 
 - "How it looks" isn't built for the phone (nothing sits beside a field
   there).
-- The Denomination/Nusach script is still a dry run (see "Waiting for a yes
-  to change the live site").
+- The Denomination/Nusach change is on live (Nov 22, the user's yes).
 
 **Nov 16, the user's notes after the release:**
 
@@ -1645,8 +1643,9 @@ Networking, Cemetery); no page sets Groups. On the drawing:
     rows, 3 pages (Philly Synagogues, Philly Schools, Washington
     Synagogues), 13 places, and the pending edit #1315 (South Philadelphia
     Shtiebel, which carries "Orthodox (Ashkenazi)"). Template and seed match
-    already. Waiting on: the user's go-ahead for `--prod --apply`, then a
-    revalidate.
+    already. Applied on live Nov 22 (the user's yes): 22 rows, and a re-run
+    finds nothing to do. Shows once live's cache is cleared (a deploy or
+    any live admin save).
   The ready ones ask nothing, so "required" goes for them: live, only
   Networking's Website is required among the five.
 - Each kind of field asks only its own questions (was a map board,

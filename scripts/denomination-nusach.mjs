@@ -43,6 +43,9 @@ const opts = (values) => values.map((v) => ({ value: v, label: v }))
 /** A page's fields with its Denomination field made the shared one, and
  *  Nusach after it on a shul page. How it shows (badge, filter, Other box,
  *  card) stays as the page had it. Null when there's nothing to change. */
+const sortKeys = (v) =>
+  Array.isArray(v) ? v.map(sortKeys) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])])) : v
+
 export function planFields(fields, shul) {
   const i = fields.findIndex(isDenomination)
   if (i < 0) return null
@@ -53,7 +56,9 @@ export function planFields(fields, shul) {
   if (shul && !fields.some((f) => f.key === 'nusach')) {
     next.splice(i + 1, 0, { key: 'nusach', label: 'Nusach', type: 'select', options: opts(NUSACHOT), renderAs: 'row', filterable: true, filterLabel: 'Nusach', multiSelect: false })
   }
-  return JSON.stringify(next) === JSON.stringify(fields) ? null : next
+  // Keys sorted first: the database hands JSON back with its keys in its own
+  // order ({label, value}), so a page already moved must still compare equal.
+  return JSON.stringify(sortKeys(next)) === JSON.stringify(sortKeys(fields)) ? null : next
 }
 
 /** A place's (or a pending submission's) details, moved to the shared
