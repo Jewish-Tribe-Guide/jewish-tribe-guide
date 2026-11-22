@@ -23,8 +23,8 @@ type FormRow = {
   steps: FormStep[]
   draft: FormContent | null
   icon: string | null
-  // card_image_url and card_text_color are still columns, but nothing reads
-  // them: the home's photo tile is gone.
+  // card_image_url and card_text_color went with the home's photo tile
+  // (dropped by migration 114).
   active: boolean
 }
 

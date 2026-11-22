@@ -25,11 +25,10 @@ const ROW_ID = 'default'
 type Row = {
   id: string
   name: string
-  /** Nothing reads this or the Browse, Davening and Map eyebrow/heading
-   *  columns below: the header line and those cards' titles are gone. The
-   *  columns stay rather than dropping data with a migration; `tagline` is
-   *  NOT NULL, so a save writes back whatever the row already holds. */
-  tagline: string
+  /** Nothing reads it: the header line it was is gone. NOT NULL with no
+   *  default until migration 114 drops it, so a save writes back what the
+   *  row holds while it's there (taglineToWrite). Absent after 114. */
+  tagline?: string
   hero_title: string
   mission: string
   logo_url: string | null
@@ -40,17 +39,8 @@ type Row = {
   mobile_tabs: unknown
   search_placeholder: string | null
   desktop_nav_items: unknown
-  desktop_browse_eyebrow: string | null
-  desktop_browse_heading: string | null
-  desktop_davening_eyebrow: string | null
-  desktop_davening_heading: string | null
-  desktop_map_eyebrow: string | null
-  desktop_map_heading: string | null
   desktop_subscribe_eyebrow: string | null
   desktop_subscribe_heading: string | null
-  /** Unread since board G5b (Nov 11): the Shabbat card lost its heading.
-   *  The column stays; nothing writes it. */
-  desktop_jewish_times_heading?: string | null
   desktop_hero_headline: string | null
   desktop_hero_subhead: string | null
   desktop_hero_image: unknown
@@ -247,6 +237,15 @@ export async function getSiteSettings(community: string): Promise<SiteSettings> 
   return getSiteSettingsUncached(community)
 }
 
+/** The tagline to write back: what the row holds while the column exists
+ *  (NOT NULL, no default), nothing once migration 114 has dropped it. With
+ *  no row yet, '' unless told the column is gone. Delete once 114 has run
+ *  everywhere, with the retry in updateSiteSettings. */
+export function taglineToWrite(row: Pick<Row, 'tagline'> | null, withTagline: boolean): { tagline?: string } {
+  if (row) return 'tagline' in row ? { tagline: row.tagline ?? '' } : {}
+  return withTagline ? { tagline: '' } : {}
+}
+
 // Merges the given fields into the current settings and upserts the single
 // row (creating it on first save). Only the provided keys change.
 export async function updateSiteSettings(
@@ -277,14 +276,14 @@ export async function updateSiteSettings(
     rightNow.right_now_categories = merged.rightNowCategories
   }
 
-  const { data, error } = await getAdminClient()
+  const save = (withTagline: boolean) => getAdminClient()
     .from('site_settings')
     .upsert(
       {
         id: ROW_ID,
         community_id: community,
         name: merged.name,
-        tagline: row?.tagline ?? '',
+        ...taglineToWrite(row, withTagline),
         hero_title: merged.heroTitle,
         mission: merged.mission,
         logo_url: merged.logoUrl,
@@ -309,6 +308,12 @@ export async function updateSiteSettings(
     )
     .select('*')
     .single()
+
+  // A community's first save has no row to tell whether the tagline column
+  // is still there (before migration 114 it must be written; after, it
+  // can't be), so it tries with it and, if the column is gone, without.
+  let { data, error } = await save(true)
+  if (error && !row && /tagline/.test(error.message)) ({ data, error } = await save(false))
 
   if (error) {
     if (Object.keys(today).length > 0 && /home_style|before_candle_items|today_hidden/.test(error.message)) {

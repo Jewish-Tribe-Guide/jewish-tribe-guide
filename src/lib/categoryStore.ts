@@ -40,8 +40,8 @@ type CategoryRow = {
   external_link_label: string | null
   external_link_url: string | null
   card_image_url: string | null
-  // card_text_color is still a column, but nothing reads it: the home's
-  // photo tile it coloured is gone.
+  // card_text_color went with the home's photo tile it coloured (dropped
+  // by migration 114).
   card_band_image_url: string | null
   pin_color: string | null
   icon_image_url: string | null
