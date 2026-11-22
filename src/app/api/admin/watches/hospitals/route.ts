@@ -11,8 +11,8 @@ import { normalizeWatchUrl, type Watch } from '@/lib/watches'
 import { UUID } from '@/lib/itemMarkRoutes'
 import { refuahHospitalId } from '@/lib/refuahWatch'
 import { readRefuahNear } from '@/lib/refuahRun'
+import { idsOfKind } from '@/lib/placeKinds'
 import {
-  HOSPITAL_CATEGORY,
   REFUAH_MATCH_CREATOR,
   REFUAH_NOT_LISTED_CREATOR,
   REFUAH_STOPPED_CREATOR,
@@ -108,8 +108,12 @@ function lineFor(h: DirectoryResource, watch: Watch | null, record: RefuahListed
   return 'Matched to Refuah by map position.'
 }
 
+/** The community's hospitals: its places in a category of the hospitals
+ *  kind, whatever that page's address (item 68, Nov 22). */
 async function hospitalsIn(community: string): Promise<DirectoryResource[]> {
-  return (await listApprovedResources(community)).filter((l) => l.category === HOSPITAL_CATEGORY)
+  const [categories, listings] = await Promise.all([listCategories(community), listApprovedResources(community)])
+  const ids = new Set(idsOfKind(categories, 'hospitals'))
+  return listings.filter((l) => ids.has(l.category))
 }
 
 export const GET = adminRead(async (request: Request, { community }) => {
@@ -118,7 +122,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     if (itemId !== null) {
       if (!UUID.test(itemId)) return Response.json({ ok: false, errors: ['Invalid request.'] }, { status: 400 })
       const item = (await hospitalsIn(community.slug)).find((h) => h.id === itemId)
-      const category = item && (await listCategories(community.slug)).find((c) => c.id === HOSPITAL_CATEGORY)
+      const category = item && (await listCategories(community.slug)).find((c) => c.id === item.category)
       if (!item || !category) return Response.json({ ok: false, errors: ['That hospital isn’t in this guide.'] }, { status: 404 })
       return Response.json({ ok: true, item, category })
     }
@@ -135,7 +139,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     // What Refuah has that a listing doesn't, waiting here to compare, and
     // when each hospital's last one was decided (watchFindings.ts).
     const categories = hospitals.length ? await listCategories(community.slug) : []
-    const category = categories.find((c) => c.id === HOSPITAL_CATEGORY)
+    const categoryOf = (h: DirectoryResource) => categories.find((c) => c.id === h.category)
     const { findings, decided } = hospitals.length ? await jobFindings(community.slug, 'hospitals', categories) : { findings: [], decided: new Map() }
 
     return Response.json({
@@ -159,7 +163,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
             nearby: nearestRefuah(h.geo, refuah).map((r) => ({ ...asRefuah(r), miles: r.miles })),
             findings: findings.filter((f) => f.targetId === h.id),
             decided: decided.get(h.id) ?? null,
-            boxes: listedBoxes(h, category),
+            boxes: listedBoxes(h, categoryOf(h)),
           }
         })
         .sort((a, b) => a.name.localeCompare(b.name)),

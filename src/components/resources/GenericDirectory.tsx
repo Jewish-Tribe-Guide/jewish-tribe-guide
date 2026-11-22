@@ -22,7 +22,7 @@ import { candlesToday, isVouchedFor } from '@/lib/listingRow'
 import { useZmanim } from '@/lib/useZmanim'
 import MinyanimView from './MinyanimView'
 import { AddButton } from '@/components/AddButton'
-import { useIsMobile } from '@/lib/useIsMobile'
+import { useIsMobile, useMeasuredIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
 import { readMinyanimSearch } from '@/lib/minyanimSearch'
@@ -163,7 +163,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // (Oct 6: "not seeing the add button"), for adding anything; the listing
   // itself is Suggest an edit's, which opens the box about it
   // (ListingEditBar, via TellAboutContext).
-  const [openDialogItemId, setOpenDialogItemId] = useState<string | null>(null)
+  // A listing's own link starts open, so its page is what's first painted;
+  // its row opening it after the page loaded painted the whole list first
+  // (the user, Nov 22; e2e/first-paint.spec.ts).
+  const [openDialogItemId, setOpenDialogItemId] = useState<string | null>(linkedItemId)
   // Drives the "Open now" filter below. Without it the filter answers for the
   // moment the page rendered, so a list narrowed to what's open at 4pm still
   // shows those places at 10pm. Null until the page has hydrated (see
@@ -627,6 +630,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const hostedId = openDialogItemId && (!isMobile || openDialogItemId === pagedItemId) ? openDialogItemId : null
   const columnItem = hostedId ? (items.find((i) => i.id === hostedId) ?? null) : null
   const phonePage = isMobile && !!columnItem
+  // Before the page has measured the screen (isMobile starts false), a
+  // listing's own link draws both its pages and CSS picks: a phone's
+  // first paint was the computer's column under the list's photo and
+  // search (the user, Nov 22; e2e/first-paint.spec.ts).
+  const measuredMobile = useMeasuredIsMobile()
+  const linkedUnmeasured = measuredMobile === null && !!columnItem && columnItem.id === pagedItemId
+  const phonePageHidden = linkedUnmeasured ? 'phone:hidden' : ''
   // Another listing in its place: the one being read closes, the other
   // opens (its closed group too), and the page comes back up to the top of
   // the column if it had scrolled past it.
@@ -784,11 +794,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           edge, in the gap under the header (32px on a phone: -mt-8). Its
           title is the header's. */}
       {tilePhoto && !phonePage && (
-        <div className="relative -mt-8 mb-3 bleed-x h-[120px] overflow-hidden desktop:hidden" data-testid="category-phone-picture">
+        <div className={`relative -mt-8 mb-3 bleed-x h-[120px] overflow-hidden desktop:hidden ${phonePageHidden}`} data-testid="category-phone-picture">
           <Image src={tilePhoto} alt="" fill sizes="100vw" className="object-cover object-[center_55%]" {...photoProps(tilePhoto)} />
         </div>
       )}
-      {addressPrompt && !anchorLabel && !phonePage && <DistanceNote className="desktop:hidden pb-3" />}
+      {addressPrompt && !anchorLabel && !phonePage && <DistanceNote className={`desktop:hidden pb-3 ${phonePageHidden}`} />}
       <CategoryBandFrame
         color={bandColor}
         imageUrl={tilePhoto}
@@ -822,6 +832,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         sentinelRef={controlsSentinelRef}
         barRef={controlsRef}
         hidden={phonePage}
+        phoneHidden={linkedUnmeasured}
         headingInToolbar={headingInToolbar}
         heroOverlap={heroOverlap}
         controlsStuck={controlsStuck}
@@ -863,38 +874,50 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           {/* Each shul's next minyan, for the listing's status and the
               shuls near it, as the list has. */}
           <NextMinyans enabled={hasMinyanim} items={items}>
-          <ListingColumn
-            phone={phonePage}
-            item={columnItem}
-            category={category}
-            color={bandColor}
-            place={rowPlaces.get(columnItem.id) ?? null}
-            found={foundOn(columnItem)}
-            upvote={
-              upvotes ? (
-                <UpvoteButton
-                  name={columnItem.name}
-                  resourceId={columnItem.id}
-                  count={liveCount(columnItem)}
-                  onCountChange={(c) => setVoteCounts((prev) => ({ ...prev, [columnItem.id]: c }))}
-                />
-              ) : undefined
-            }
-            onward={{
-              items: filtered,
-              place: (i) => rowPlaces.get(i.id) ?? null,
-              onOpen: (other) => switchListing(columnItem.id, other.id),
-              seeAll: { label: onwardSource.allLabel, onClick: () => closeColumn(columnItem.id) },
-            }}
-            // "‹ All 71 places", across from "2 of 71": the title is on the
-            // photo right above it, so "‹ Food" said it twice (Nov 15).
-            backLabel={minyanimView ? minyanimTitle : `All ${shownItems.length} ${shownItems.length === 1 ? 'place' : 'places'}`}
-            onBack={() => closeColumn(columnItem.id)}
-            position={{ index: Math.max(0, shownIndex.get(columnItem.id) ?? 0), total: shownItems.length }}
-            onStep={(direction) => navigateFromCard(columnItem.id, direction)}
-            alone={!mapBeside}
-            onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
-          />
+          {(() => {
+            const column = (phone: boolean) => (
+              <ListingColumn
+                phone={phone}
+                item={columnItem}
+                category={category}
+                color={bandColor}
+                place={rowPlaces.get(columnItem.id) ?? null}
+                found={foundOn(columnItem)}
+                upvote={
+                  upvotes ? (
+                    <UpvoteButton
+                      name={columnItem.name}
+                      resourceId={columnItem.id}
+                      count={liveCount(columnItem)}
+                      onCountChange={(c) => setVoteCounts((prev) => ({ ...prev, [columnItem.id]: c }))}
+                    />
+                  ) : undefined
+                }
+                onward={{
+                  items: filtered,
+                  place: (i) => rowPlaces.get(i.id) ?? null,
+                  onOpen: (other) => switchListing(columnItem.id, other.id),
+                  seeAll: { label: onwardSource.allLabel, onClick: () => closeColumn(columnItem.id) },
+                }}
+                // "‹ All 71 places", across from "2 of 71": the title is on the
+                // photo right above it, so "‹ Food" said it twice (Nov 15).
+                backLabel={minyanimView ? minyanimTitle : `All ${shownItems.length} ${shownItems.length === 1 ? 'place' : 'places'}`}
+                onBack={() => closeColumn(columnItem.id)}
+                position={{ index: Math.max(0, shownIndex.get(columnItem.id) ?? 0), total: shownItems.length }}
+                onStep={(direction) => navigateFromCard(columnItem.id, direction)}
+                alone={!mapBeside}
+                onShowMap={hasMapColumn && mapHidden ? () => setMapHidden(false) : undefined}
+              />
+            )
+            return linkedUnmeasured ? (
+              <>
+                <div className="desktop:hidden">{column(true)}</div>
+                <div className="hidden desktop:block">{column(false)}</div>
+              </>
+            ) : (
+              column(phonePage)
+            )
+          })()}
           </NextMinyans>
         </div>
       )}

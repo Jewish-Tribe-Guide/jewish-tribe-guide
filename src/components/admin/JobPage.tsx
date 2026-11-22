@@ -9,7 +9,7 @@ import { hoursJobCategories } from '@/lib/hoursJob'
 import type { NightKindId } from '@/lib/jobRuns'
 import { NIGHT_KINDS, type KindNight, type NightKindView, type TrackedSource } from '@/lib/nightKinds'
 import { pageFrom, placePath } from '@/lib/placeLink'
-import { HOSPITAL_CATEGORY } from '@/lib/refuahMatch'
+import { kindOf } from '@/lib/placeKinds'
 import { JOB_STEPS } from '@/lib/watchJobList'
 import { AdminBack, AdminBox, AdminRow, adminInputClass } from './AdminUI'
 import { useAdminApi } from './useAdminApi'
@@ -60,7 +60,7 @@ function AddToJob({ kind, token, onDone }: { kind: NightKindId; token: string; o
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const categories = jobs.categories ?? []
-  const ids = new Set((kind === 'hospitals' ? categories.filter((c) => c.id === HOSPITAL_CATEGORY) : hoursJobCategories(categories, kind === 'times' ? 'times' : 'hours')).map((c) => c.id))
+  const ids = new Set((kind === 'hospitals' ? categories.filter((c) => kindOf(c) === 'hospitals') : hoursJobCategories(categories, kind === 'times' ? 'times' : 'hours')).map((c) => c.id))
   const places = (jobs.places ?? []).filter((p) => p.status === 'approved' && ids.has(p.category)).sort((a, b) => a.name.localeCompare(b.name))
 
   async function send() {

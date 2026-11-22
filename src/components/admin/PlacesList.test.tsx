@@ -190,7 +190,7 @@ describe('Places', () => {
   })
 
   describe('Checked by', () => {
-    const shul = makeCategory({ id: 'food', label: 'Shul', pluralLabel: 'Shuls', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
+    const shul = makeCategory({ id: 'food', placeKind: 'shuls', label: 'Shul', pluralLabel: 'Shuls', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
     const shuls = [place('Alpha'), place('Bravo'), place('Charlie')]
     const everyJob = (times: unknown[]): [string, Record<string, unknown>][] => [
       ['hours?counts&job=times', { name: 'Shul times', places: times }],

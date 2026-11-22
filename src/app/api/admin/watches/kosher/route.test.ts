@@ -107,7 +107,8 @@ beforeEach(() => {
   m.readKeystoneList.mockResolvedValue({ entries: [judahEntry] })
   m.readMekorList.mockResolvedValue({ error: 'Mekor Habracha’s list answered 503' })
   m.jobFindings.mockResolvedValue({ findings: [], decided: new Map() })
-  m.listCategories.mockResolvedValue([])
+  // The Food page the lists are checked against (by kind, item 68).
+  m.listCategories.mockResolvedValue([makeCategory({ id: 'restaurant' }), makeCategory({ id: 'grocery' })])
   m.single = {}
   m.submitListingUpdate.mockResolvedValue({ id: 'filed' })
   m.submitListingDelete.mockResolvedValue({ id: 'filed' })
@@ -220,7 +221,7 @@ describe('GET /api/admin/watches/kosher', () => {
     expect(body.others).toEqual([stray])
     // Judah, Holy Bagel and the stray one.
     expect(body.counts.toCheck).toBe(3)
-    expect(m.jobFindings).toHaveBeenCalledWith('philly', 'kosher', [])
+    expect(m.jobFindings).toHaveBeenCalledWith('philly', 'kosher', [expect.objectContaining({ id: 'restaurant' }), expect.objectContaining({ id: 'grocery' })])
   })
 
   it('a paused list isn’t read, and a list with no watch is offered', async () => {

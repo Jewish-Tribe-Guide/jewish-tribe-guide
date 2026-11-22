@@ -142,7 +142,7 @@ export const CATEGORY_TEMPLATES: CategoryTemplate[] = [
     id: 'restaurant',
     label: 'Food Establishment',
     description:
-      'Type (Restaurant/Bakery/Ice Cream), Hours, a Kosher Certification multi-select, and a Menu link.',
+      'Store Type (Restaurant, Bakery, Catering…), Hours, a Kosher Certification multi-select, and a Menu link.',
     pluralLabel: 'Food Establishments',
     icon: '🍽️',
     categoryDescription: 'Kosher and nearby dining options',
@@ -153,11 +153,15 @@ export const CATEGORY_TEMPLATES: CategoryTemplate[] = [
       {
         key: 'foodType',
         type: 'select',
-        label: 'Type',
+        label: 'Store Type',
+        help: 'Pick "Scheduled Deliveries" if this business is based outside the area but coordinates bulk orders and delivery here.',
         options: [
           { label: 'Restaurant', value: 'Restaurant' },
-          { label: 'Bakery & Cafe', value: 'Bakery & Cafe' },
-          { label: 'Ice Cream', value: 'Ice Cream' },
+          { label: 'Bakery', value: 'Bakery' },
+          { label: 'Ice Cream & Treats', value: 'Ice Cream & Treats' },
+          { label: 'Catering', value: 'Catering' },
+          { label: 'Scheduled Deliveries', value: 'Scheduled Deliveries' },
+          { label: 'Food Truck', value: 'Food Truck' },
         ],
         renderAs: 'badge',
         filterable: true,

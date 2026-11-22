@@ -75,3 +75,15 @@ export function kindKeyById(id: string, categories: readonly { id: string; place
   const category = categories?.find((c) => c.id === id)
   return category ? kindKey(category) : id
 }
+
+/** A category's kind: the one saved, else the one its address implies. */
+export function kindOf(category: { id: string; placeKind?: PlaceKind }): PlaceKind {
+  return category.placeKind ?? placeKindFromSlug(category.id)
+}
+
+/** The ids of `categories` of `kind`. What a watch or reader keyed to a
+ *  kind (the kosher list on food, Refuah on hospitals) covers in any
+ *  community, whatever its pages' addresses (item 68, Nov 22). */
+export function idsOfKind(categories: readonly { id: string; placeKind?: PlaceKind }[], kind: PlaceKind): string[] {
+  return categories.filter((c) => kindOf(c) === kind).map((c) => c.id)
+}

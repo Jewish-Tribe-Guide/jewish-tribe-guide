@@ -146,7 +146,7 @@ export function useCollapseHeader(collapse: boolean): void {
  *  No `onBack`: a tab's own page (You, Activity, Browse; the user, Nov 16).
  *  The header keeps the logo and shows the page's name in place of the
  *  site's, with no Back: a chevron is what says a page is a step down. */
-type ScreenHeaderState = { title: string; onBack?: () => void; named?: boolean } | null
+export type ScreenHeaderState = { title: string; onBack?: () => void; named?: boolean } | null
 
 const ScreenHeaderContext = createContext<{
   screenHeader: ScreenHeaderState

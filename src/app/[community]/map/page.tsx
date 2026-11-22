@@ -28,6 +28,10 @@ export default async function MapPage(props: PageProps<'/[community]/map'>) {
 
   return (
     <ListingsProvider listings={listings}>
+      {/* Takes the header away on a phone from the first paint, by CSS
+          (globals.css): MapScreen's useCollapseHeader waits for the page to
+          measure the screen (the user, Nov 22; e2e/first-paint.spec.ts). */}
+      <span data-collapses-header hidden />
       <Suspense fallback={<main className="flex flex-1 flex-col" />}>
         <MapScreen />
       </Suspense>

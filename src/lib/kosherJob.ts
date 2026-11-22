@@ -1,3 +1,4 @@
+import { kindOf, type PlaceKind } from './placeKinds'
 import { selectValues } from './categories'
 import {
   KEYSTONE_CERT,
@@ -115,9 +116,16 @@ function mekorLine(f: Exclude<MekorFinding, { kind: 'new' }>): string {
 }
 
 /** The places the page checks: Food (the user, Oct 22: "We only need to
- *  check Food, not grocery stores"). Groceries are still matched with the
- *  lists, so one on a list isn't a new place. */
-export const KOSHER_JOB_CATEGORIES = ['restaurant']
+ *  check Food, not grocery stores"), by the category's kind, not its
+ *  address (item 68, Nov 22). Groceries are still matched with the lists,
+ *  so one on a list isn't a new place. */
+export function isKosherJobCategory(category: { id: string; placeKind?: PlaceKind }): boolean {
+  return kindOf(category) === 'food'
+}
+
+/** Where the kosher lists' runners file a new place (keystoneRun.ts,
+ *  mekorRun.ts): Philly's Food page, the only one they run for. */
+export const KOSHER_NEW_PLACE_CATEGORY = 'restaurant'
 
 export type KosherInput = {
   /** The food places, live and archived (Mekor's read says an archived
@@ -131,9 +139,12 @@ export type KosherInput = {
    *  place that says KCL and isn't on it. */
   kcl?: KclEntry[] | null
   filed?: Partial<Record<KosherList, Filed>>
+  /** The community's Food pages (isKosherJobCategory); without them, the
+   *  ones whose address says Food. */
+  food?: readonly string[]
 }
 
-export function kosherPlaces({ listings, keystone, mekor, kcl = null, filed = {} }: KosherInput): { places: KosherPlace[]; newPlaces: NewOnList[] } {
+export function kosherPlaces({ listings, keystone, mekor, kcl = null, filed = {}, food }: KosherInput): { places: KosherPlace[]; newPlaces: NewOnList[] } {
   const live = listings.filter((l) => l.status === 'approved')
   const on = new Map<string, OnList[]>(live.map((l) => [l.id, []]))
   const differences = new Map<string, Difference[]>(live.map((l) => [l.id, []]))
@@ -192,7 +203,7 @@ export function kosherPlaces({ listings, keystone, mekor, kcl = null, filed = {}
 
   return {
     places: live
-      .filter((l) => KOSHER_JOB_CATEGORIES.includes(l.category))
+      .filter((l) => (food ? food.includes(l.category) : isKosherJobCategory({ id: l.category })))
       .map((l) => ({
         id: l.id,
         name: l.name,

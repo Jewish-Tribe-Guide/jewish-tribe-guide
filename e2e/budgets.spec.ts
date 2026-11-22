@@ -198,14 +198,17 @@ test.describe('home screen weight', () => {
       // the week. Decided before waiting for prefetches: the waits below
       // timed out in CI on Nov 20 and 21 (both inside that window) for a
       // test that was going to skip anyway.
-      // The page itself prefetches its own route; that's the sign this sees
-      // prefetches at all, and the cards' would have come with it.
-      // Next prefetches when the browser is idle, which a busy CI runner
-      // can leave past expect's 5s.
-      const ownLink = () => page.getByTestId('right-now').locator('a[href*="davening=1"]').count()
-      await expect.poll(async () => prefetched.length > 0 || (await ownLink()) > 0, { message: 'any prefetch at all', timeout: 15_000 }).toBe(true)
-      test.skip((await ownLink()) > 0, 'the phone shows its own Minyanim link today (Friday to havdalah)')
-      await page.waitForTimeout(1_500)
+      // This used to wait for "any prefetch at all" first, taking the
+      // header's home link prefetching its own page as the sign. That link
+      // only existed because a phone painted the computer's header first; a
+      // phone's header has none since that flash was fixed (Nov 22), and no
+      // link on a phone's home prefetches, so there is nothing to wait for.
+      // The computer half below is the positive control. Next prefetches
+      // when the browser is idle, which a busy CI runner can put off, so
+      // this gives it a few seconds after the page is up.
+      await page.waitForTimeout(4_000)
+      const ownLink = await page.getByTestId('right-now').locator('a[href*="davening=1"]').count()
+      test.skip(ownLink > 0, 'the phone shows its own Minyanim link today (Friday to havdalah)')
       expect(fromCards(), 'the Next minyan card’s link, on a phone').toEqual([])
     } else {
       // The positive control: on a computer the card is real, and its link

@@ -116,6 +116,27 @@ describe('useWatchJobsAndReload', () => {
   })
 })
 
+describe('two reads of the same jobs at once (item 74)', () => {
+  it('share one request, and a save in between starts a fresh one', async () => {
+    answering()
+    const { fetchJobs } = await import('./fetchJobs')
+    const { adminApi } = await import('@/lib/adminApi')
+    const api = adminApi('t', 'philly')
+    const first = fetchJobs(api, ALL_JOBS, true)
+    const second = fetchJobs(adminApi('t', 'philly'), ALL_JOBS, true)
+    expect(pending).toHaveLength(1)
+    // A save: what's read after it must not be the answer from before it.
+    vi.mocked(fetchJson).mockImplementationOnce(() => Promise.resolve({ ok: true }))
+    await api.post('/api/admin/places', {})
+    const third = fetchJobs(api, ALL_JOBS, true)
+    expect(pending).toHaveLength(2)
+    pending[0].answer({ ok: true, jobs: { links: { links: [] } } })
+    pending[1].answer({ ok: true, jobs: {} })
+    expect(await first).toBe(await second)
+    expect(await third).not.toBe(await first)
+  })
+})
+
 describe('a screen with its own read', () => {
   it('asks for no job until its own data is in, so that read never waits behind them', async () => {
     answering()

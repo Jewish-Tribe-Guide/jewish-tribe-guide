@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 21, 2026.
+Last updated: Nov 22, 2026.
 
 Finished work moved out on Nov 21: every "Done …" section is in
 `docs/history.md`, in the order it was here. Look there for why something
@@ -16,7 +16,8 @@ was built the way it was; this file is what's open.
 Every open item in this file, gathered in one place and checked against
 live where live could say (read only, Nov 21). The sections below hold
 the detail. "(?)" means it couldn't be checked from here and may already
-be done. Cross an item off here when it's done.
+be done. When an item is done, move it to `docs/history.md`; the rest
+keep their numbers, so a number always means the same item.
 
 Checked and done, so not listed: migrations 095–099 and 105–113 (live has
 all but 067, parked with Today), Philly's live home rows and Right now,
@@ -35,8 +36,6 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 6. The computer home's middle piece (neither option picked; W7l may
    have settled it) (?), and You and What changed as extra cells there.
 7. The "Right now" label on the computer home: may come back.
-8. Decided Nov 22: What changed is an activity feed, every change in
-    order (the user: "I like my way"). Already built that way.
 9. A "Recent changes" box on each listing.
 10. One contact email for every community?
 11. On a phone, saved places and searches on You come off only by swipe.
@@ -56,14 +55,9 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 19. Mekor's list against ours: PLNT Burger Jenkintown (IKC?), and Nothing
     Bundt Cakes, Cherry-K there and Keystone-K here.
 20. Boards 14–15: a ready-made field, fixed or local.
-21. Done: "Can visitors upvote places?" is built (a page's Questions in
-    the admin; checked Nov 22).
 22. Hospitals' Eruv field takes its choices from the Eruv page?
 23. A "Kept up to date" box (recommended, not drawn).
 24. UES Grocery's "Kosher" yes/no becomes Kosher Store?
-25. Hotels' "What makes it Shabbat friendly?" (the user's yes, Nov 22):
-    on dev, asked after a Yes, shown under it in the Shabbos friendly
-    box. Live needs your yes (dry run ready).
 26. The rest of the field-by-field review.
 27. The "+" covers part of the third tile on the phone home.
 28. The drawings for asking for location when it helps.
@@ -96,8 +90,6 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     SENTRY_CRON_MONITORS=nightly-email and redeploy; the next build's
     log should say Node 24.
 41. Live backups: check Database → Backups, and run the first live copy.
-42. Done: 103 is on live (the site's public key reads nothing, Nov 22).
-    104 can't be seen without a write; 105–113 ran after it.
 43. PostHog: check Session Replay's project settings.
 44. The first live morning after a deploy: each community's run shows
     in its own tab, and Vercel's log has no "run didn't start".
@@ -115,42 +107,22 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 ### Needs your yes, because it writes to live
 
 50. The Denomination/Nusach change (dry run ready).
-51. Done: live has About and Privacy's new text (since Nov 16).
 52. The shul watch's live data clean-up (look again first).
 53. Drop the old admin columns (tagline and the rest are still on live).
-54. Done: live has the hospital fields (same as dev) and 7 Refuah
-    watches (checked Nov 22).
 55. Migration 067, only when Today is turned on.
 
 ### Mine to build or fix (nobody waiting)
 
-56. Done: Partial Prefetching is live (PR 427, deployed Nov 22). Live
-    answers 404 for a made-up category, listing, community and a shared
-    question in a community that doesn't exist.
-57. The search box, Open now and filters can drop from the address on
-    a refresh (FindResourcesConnected).
-58. "See the whole page" in the editor leaves ?field=hours in the address.
-59. Closing a listing opened from its own link uses replaceState, which
-    a Next update can overwrite.
-60. The category picker has no Escape to close.
-61. The sheets' "Drag to resize" handles don't work from a keyboard.
 62. Watches' days run on New York's clock (right for Philly and UES).
-63. A Shabbos followed by Yom Tov on Sunday shows "last Shabbos".
-64. A new place with no hours shows every day "Closed" on the deciding
-    screen; a new place still opens the old review (board 4).
-65. Right after a community is made, its admin says "Not found." once; a
-    category's preview map opens on Philadelphia; the nav count updates
-    only when To do is opened.
-66. Admin not as drawn: shul emails' unlinked-sender row and "Stopped
-    checking"; making a new key; on a phone, rows without their line,
-    the card row's chevron, Edit, then update not in a bar.
-67. The starter Food page still has the old Type; the partner shows as a
-    row of its own in a page's field list.
-68. Watches still going by address, not kind: the kosher watch, the
-    hospital watches and question reader, the map's pins.
-69. Two posts covering one week: the row edits the winner, but To do's
-    week Edit still edits a post whole.
-70. Read now never drawn or tried on a computer.
+66. Done or settled Nov 22. Site's rows on a phone have their lines
+    (board 21: what Home page holds, how many categories, which campaign
+    is running). Stale: "Edit, then update" is gone (a change opens in
+    the editor, its answers in a bar pinned over the tabs on a phone).
+    Kept on purpose: a home-page card row's chevron (it opens in place,
+    and a row that opens has one); "Stopped checking" and the unlinked
+    senders (added beyond board 18b, both needed). Held for you: making a
+    new newsletter key (not drawn; a new key stops the Gmail script until
+    it's set up again).
 71. Watch jobs agreed and not built (?): dishes split across menu pages,
     each kind's last 14 nights, no Read now on a Google-and-newsletter
     place, eruv status read more on Friday afternoons, a menu's monthly
@@ -159,9 +131,12 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     per-minyan view of a schedule change, Lower Merion's full calendar.
 72. The intake wizard's problems, parked while forms are hidden.
 73. A phone that drops the page in the background: taps do nothing
-    until it reloads (not measured).
-74. One Places load makes two jobs reads.
-75. Dev's leftover test listing "E2E Admin Write 6eabdb10…".
+    until it reloads. Measured Nov 22 on a production build, phone-sized
+    Chromium, tapping a home tile after each: frozen 30s and resumed,
+    offline 10s and back, left and come Back, and a deploy in between
+    (chunks not yet loaded gone, pages from another build). Every tap
+    worked. So it doesn't reproduce in a browser; next is a real phone
+    (which screen, how long away, installed or in Safari).
 76. The moderation queue's "Bad Request" once; 25 old migrations that
     can't be told run; a slim search index for the home, later; log
     retention past ~50,000 rows a day.
@@ -523,8 +498,6 @@ Found and not fixed:
   made (a policy, an index, a data fix).
 - 5 moderate `npm audit` findings, all `glob`/`minimatch` in Sentry's
   build plugin, build time only; they wait on Sentry.
-- The sheets' "Drag to resize" handle and the Nearby sheet's still don't
-  work from a keyboard.
 - The readers that find a time inside running text (hours, calendar
   titles, the shul page and schedule readers, ask) weren't merged with
   the clock reader: they answer a different question.
@@ -646,10 +619,9 @@ Soon:
 - Focus in dialogs and sheets, drag handles keyboard can't use, search
   results silent to screen readers, swipe-only actions. **Built Nov 20,
   the first two of four** (`claude/health-a11y`):
-  - Not done: the sheet's "Drag to resize" handle and the Nearby sheet's
-    handle are buttons a keyboard can't reach or work (no tabindex, no
-    keys), so the Nearby list can't be opened up without a drag. The
-    category split and the map sidebar's handles already take arrow keys.
+  - Done Nov 22 (item 61): the sheet's "Drag to resize" handle and the
+    Nearby sheet's take Tab, Enter or Space, and the arrows, as the
+    category split and the map sidebar's handles already did.
   - **For the user:** on a phone, You's saved places and searches are
     removed only by a swipe (the bookmark is computer-only, on purpose by
     its comment). Each can still be unsaved where it was saved (a place's
@@ -1748,8 +1720,8 @@ after the deploy, dry run first, and needs its own go-ahead.
     (src/data/categories.js, categoryTemplates.ts). Only dev's Riverton test
     page had it, nothing filled in. Removed there Nov 8 (dev only). Live's
     Cemetery has a different "Type" (Cemetery / Funeral Home), all 5 places
-    use it: it stays. The starter Food page still carries the old Type; not
-    changed.
+    use it: it stays. The starter Food page carried the old Type until Nov 22;
+    it has today's Store Type now.
   - BUILT Nov 9 (the user: "I like your recommendations in general"):
     - Each ready-made field's "What this is" lists "Kept up to date by",
       each source saying what a place needs for it (reworded Nov 9 after
@@ -1769,8 +1741,8 @@ after the deploy, dry run first, and needs its own go-ahead.
       certificate", "WhatsApp group"); on puts it right after its field,
       off takes it off (Save still asks if places lose an answer). On the
       Add list a partner isn't its own row; it comes with its field unless
-      switched off. Not done: the page's own field list still shows the
-      partner as a row of its own.
+      switched off. The page's own field list shows it with its field,
+      not as a row of its own (Nov 22).
   - Answered, not built (the user's questions, Nov 9):
     - UES Grocery's "Kosher" yes or no (dev only) says less than Kosher
       Store (fully kosher, or some kosher items). Recommended: replace it
@@ -1929,10 +1901,8 @@ brief, one round of drawings, then the build in pieces.
    community couldn't finish it: only Keystone-K and Mekor lists can be
    read, and Watches has no way to add one. It comes back if "add a kosher
    agency's list" is ever built (each agency's list needs its own reader).
-   Still open, small: right after a community is made, its admin shows
-   "Not found." once (a reload fixes it); a category's preview map opens on
-   Philadelphia for any community; the nav's count updates when To do is
-   opened, not when a step is saved elsewhere.
+   The three small leftovers (a new community's admin saying "Not found."
+   once, the preview map on Philadelphia, the nav count) are done: item 65.
    Not as drawn: the kosher lists step (above).
 14. **Newsletters set up from the console: BUILT Oct 29** (drawings 18
    and 18b). Watches → Newsletters (the Newsletters line on What's tracked
@@ -1949,8 +1919,8 @@ brief, one round of drawings, then the build in pieces.
    newsletters can't be set up yet, and everything else works as before.
    `NEWSLETTER_SECRET` still works for every community, so Philly's script
    carries on unchanged; a community's own key works for it alone.
-   Not as drawn: the unlinked-sender row and the "Stopped checking" line.
-   Not built: making a new key (if one leaks, delete the row and open the
+   Beyond the drawing, kept: the unlinked-sender row and the "Stopped
+   checking" line. Not built: making a new key (if one leaks, delete the row and open the
    page again).
 15. **The admin on a phone: BUILT Oct 29** (boards 19 to 21c, drawn after
    the user's phone notes: "more phone oriented… the back chevron", "editing
@@ -1978,9 +1948,9 @@ brief, one round of drawings, then the build in pieces.
      place count over it (21b). The home page's cards move with up and
      down on each row (21c), and Preview opens the page full size with
      what isn't saved. Save bars sit over the phone's tabs.
-   Not as drawn: Site's list rows have no line under them; a home-page card
-   row keeps its open chevron (it opens in place); in Edit, then update the
-   button is under the list, not in a bar, and doesn't count the changes.
+   Not as drawn: a home-page card row keeps its open chevron (it opens in
+   place). Site's rows got their lines Nov 22; "Edit, then update" was
+   folded into the change's own editor screen (Nov 2).
    Not drawn, fixed in passing: the Category pages list's buttons go under
    the name on a phone (it was squeezed to one word a line); its look is
    otherwise the old cards.

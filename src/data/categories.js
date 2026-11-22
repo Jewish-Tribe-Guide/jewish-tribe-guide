@@ -51,12 +51,16 @@ export const categories = [
     fields: [
       {
         key: 'foodType',
-        label: 'Type',
+        label: 'Store Type',
+        help: 'Pick "Scheduled Deliveries" if this business is based outside the area but coordinates bulk orders and delivery here.',
         type: 'select',
         options: [
           { value: 'Restaurant', label: 'Restaurant' },
-          { value: 'Bakery & Cafe', label: 'Bakery & Cafe' },
-          { value: 'Ice Cream', label: 'Ice Cream' },
+          { value: 'Bakery', label: 'Bakery' },
+          { value: 'Ice Cream & Treats', label: 'Ice Cream & Treats' },
+          { value: 'Catering', label: 'Catering' },
+          { value: 'Scheduled Deliveries', label: 'Scheduled Deliveries' },
+          { value: 'Food Truck', label: 'Food Truck' },
         ],
         renderAs: 'badge',
         filterable: true,

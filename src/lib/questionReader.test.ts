@@ -139,11 +139,18 @@ describe('questionKey — one question, however it’s typed', () => {
 })
 
 describe('readerPlaces — the places a question can name', () => {
+  // Item 68 (Nov 22): by the category's kind, not its address, so another
+  // community's hospitals page needn't be at /hospital.
+  it('knows the hospitals of a hospitals page at any address', () => {
+    const medical = makeCategory({ id: 'medical', placeKind: 'hospitals' })
+    const at = readerPlaces([makeListing({ id: 'm1', category: 'medical', name: 'Mount Sinai Hospital', geo: { lat: 40.79, lng: -73.95 } })], 'ues', [medical])
+    expect(at.get('msh')?.name).toBe('Mount Sinai Hospital')
+  })
   const hospitals = [
     makeListing({ id: 'h1', category: 'hospital', name: 'Hospital of the University of Pennsylvania', geo: { lat: 39.9496, lng: -75.1936 } }),
     makeListing({ id: 'h2', category: 'hospital', name: "Children's Hospital of Philadelphia - Main Building", geo: { lat: 39.948, lng: -75.194 } }),
   ]
-  const places = readerPlaces(hospitals, 'philly')
+  const places = readerPlaces(hospitals, 'philly', [makeCategory({ id: 'hospital' })])
   it('knows a hospital by its name and by the initials people use', () => {
     expect(places.get('hup')?.name).toBe('Hospital of the University of Pennsylvania')
     expect(places.get('chop')?.name).toBe("Children's Hospital of Philadelphia - Main Building")
@@ -165,7 +172,7 @@ describe('answering from a reading — its items, and how far', () => {
     expect(readingItemsOn(listings[0], [])).toEqual([])
   })
 
-  const places = readerPlaces([makeListing({ id: 'h1', category: 'hospital', name: 'Hospital of the University of Pennsylvania', geo: { lat: 39.9496, lng: -75.1936 } })], 'philly')
+  const places = readerPlaces([makeListing({ id: 'h1', category: 'hospital', name: 'Hospital of the University of Pennsylvania', geo: { lat: 39.9496, lng: -75.1936 } })], 'philly', [makeCategory({ id: 'hospital' })])
   const me = { lat: 39.95, lng: -75.17 }
   const reach = (r: Partial<Parameters<typeof readingReach>[0]>, from: typeof me | null = me) => readingReach({ categories: [], ...r }, places, from)
 

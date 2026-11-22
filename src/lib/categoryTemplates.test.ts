@@ -25,6 +25,16 @@ describe('starter categories', () => {
       expect(offenders).toEqual([])
     })
 
+    // Item 67: the starter Food page had an old copy of Store Type, called
+    // "Type" with Restaurant / Bakery & Cafe / Ice Cream (removed from a
+    // dev page Nov 8, left here). A new community starts from today's.
+    it(`${name}: Food's Store Type is today's`, () => {
+      const food = list.find((c) => c.id === 'restaurant')!
+      const type = (food.fields ?? food.detailFields ?? []).find((f) => f.key === 'foodType')!
+      expect(type.label).toBe('Store Type')
+      expect(type.options?.map((o) => o.value)).toEqual(['Restaurant', 'Bakery', 'Ice Cream & Treats', 'Catering', 'Scheduled Deliveries', 'Food Truck'])
+    })
+
     // The user, Nov 9: Dietary options goes. No real page used it.
     it(`${name}: no Dietary options`, () => {
       const dietary = list.flatMap((c) => (c.fields ?? c.detailFields ?? []).filter((f) => /^dietary options$/i.test(f.label)).map((f) => `${c.id}.${f.key}`))

@@ -47,7 +47,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   m.pending = []
   m.jobFindings.mockResolvedValue({ findings: [], decided: new Map() })
-  m.listCategories.mockResolvedValue([])
+  // The hospitals page (by kind, item 68).
+  m.listCategories.mockResolvedValue([makeCategory({ id: 'hospital' })])
   m.getAdminUserForCommunity.mockResolvedValue({ email: 'me@x.co' })
   m.listApprovedResources.mockResolvedValue([
     makeListing({ id: PA_ID, category: 'hospital', name: 'Pennsylvania Hospital', geo: { lat: 39.9451, lng: -75.1556 } }),

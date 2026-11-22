@@ -3,7 +3,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import type { EnrichedSubmission } from '@/types'
 import { parseOkJson } from './fetchJson'
-import { adminApi, type AdminApi } from './adminApi'
+import { adminApi, onAdminWrite, type AdminApi } from './adminApi'
 import { unmatchedPlaces, type TodoResponse, type TodoUnmatched } from './todo'
 import { todoPlaceCount } from './todoPlaces'
 import { setupLeft, type SetupState } from './setup'
@@ -150,6 +150,29 @@ export async function reloadTodo(token: string, community: string, email?: strin
   await jobsLoad
 }
 
+// A save elsewhere in the admin can tick off a setup step (a logo on Home
+// page, a second admin on Team, a category's first place), and the nav's
+// count takes those in; it used to change only once To do was opened again
+// (Nov 22). Only the setup is read again, one small request, once the
+// saves have stopped for a moment.
+export const SETUP_RECHECK_MS = 800
+let setupRecheck: ReturnType<typeof setTimeout> | null = null
+
+onAdminWrite((community, token) => {
+  if (!state.data || !state.key.startsWith(`${community}|`)) return
+  if (setupRecheck) clearTimeout(setupRecheck)
+  setupRecheck = setTimeout(async () => {
+    setupRecheck = null
+    const key = state.key
+    try {
+      const { setup } = await get<{ setup: SetupState }>(adminApi(token, community), '/api/admin/setup', 'Failed to load the setup.')
+      if (state.key === key) updateTodo((d) => ({ ...d, setup }))
+    } catch {
+      // The count stays as it was; To do reads it again when it opens.
+    }
+  }, SETUP_RECHECK_MS)
+})
+
 /** Changes the loaded copy after a decision, so the page and the count
  *  follow it without loading again. */
 export function updateTodo(change: (d: TodoData) => TodoData) {
@@ -176,4 +199,6 @@ export function useTodoCount(token: string, community: string): number | null {
 export function resetTodo() {
   state = { key: '', data: null, error: null }
   inFlight = null
+  if (setupRecheck) clearTimeout(setupRecheck)
+  setupRecheck = null
 }

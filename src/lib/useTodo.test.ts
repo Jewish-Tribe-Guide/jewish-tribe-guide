@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { resetTodo, useTodo, useTodoCount } from './useTodo'
+import { adminApi } from './adminApi'
 
 // Asked for again at once, not every 6s, so the test needn't wait.
 vi.mock('@/components/admin/useWatchJobs', async (orig) => ({ ...(await orig<typeof import('@/components/admin/useWatchJobs')>()), MENU_READING_POLL_MS: 20 }))
@@ -47,6 +48,50 @@ describe('useTodoCount', () => {
     answer(null)
     const failed = renderHook(() => useTodoCount('tok', 'philly'))
     await waitFor(() => expect(failed.result.current).toBe(1))
+  })
+})
+
+// Item 65 (Oct 29 walk-through): the nav's count changed only when To do
+// was opened, so saving a logo on Home page left "To do · 3" standing.
+describe('a save elsewhere in the admin', () => {
+  it('ticks off a setup step in the count without opening To do', async () => {
+    let setup = { logo: false, admins: 2, categories: 1, places: 1, heroWords: true }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const body = url.includes('/api/admin/setup')
+          ? { ok: true, setup }
+          : { ok: true, submissions: [], responses: [], places: [] }
+        return new Response(JSON.stringify(body), { status: 200 })
+      }),
+    )
+    const { result } = renderHook(() => useTodoCount('tok', 'newtown'))
+    await waitFor(() => expect(result.current).toBe(1))
+
+    setup = { ...setup, logo: true }
+    await adminApi('tok', 'newtown').send('PATCH', '/api/admin/site-settings', { logo: 'x' })
+    await waitFor(() => expect(result.current).toBe(0), { timeout: 3000 })
+  })
+
+  it('leaves another community’s count alone, and a read', async () => {
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        calls.push(url)
+        const body = url.includes('/api/admin/setup')
+          ? { ok: true, setup: { logo: false, admins: 2, categories: 1, places: 1, heroWords: true } }
+          : { ok: true, submissions: [], responses: [], places: [] }
+        return new Response(JSON.stringify(body), { status: 200 })
+      }),
+    )
+    const { result } = renderHook(() => useTodoCount('tok', 'newtown'))
+    await waitFor(() => expect(result.current).toBe(1))
+    const before = calls.filter((u) => u.includes('/setup')).length
+    await adminApi('tok', 'philly').send('PATCH', '/api/admin/site-settings', {})
+    await adminApi('tok', 'newtown').get('/api/admin/site-settings')
+    await new Promise((r) => setTimeout(r, 1200))
+    expect(calls.filter((u) => u.includes('/setup')).length).toBe(before)
   })
 })
 

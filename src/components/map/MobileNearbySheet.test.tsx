@@ -146,6 +146,20 @@ describe('MobileNearbySheet', () => {
     expect(screen.getByRole('button', { name: /Expand nearby list$/ })).toBeInTheDocument()
   })
 
+  // Item 61 (Nov 22): the handle was a button a keyboard couldn't reach,
+  // so the Nearby list couldn't be opened without a drag.
+  it('opens and lowers from a keyboard', async () => {
+    const user = userEvent.setup()
+    render(<MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />)
+    const handle = screen.getByRole('button', { name: /Expand nearby list$/ })
+    await user.tab()
+    expect(document.activeElement).toBe(handle)
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('button', { name: 'Drag to resize nearby list' }).getAttribute('aria-expanded')).toBe('true')
+    await user.keyboard('{ArrowUp}{ArrowDown}{ArrowDown}')
+    expect(screen.getByRole('button', { name: /Expand nearby list$/ }).getAttribute('aria-expanded')).toBe('false')
+  })
+
   it('for comparison: the same drag, released instead of cancelled, does commit a snap-point change', () => {
     const { container } = render(
       <MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,

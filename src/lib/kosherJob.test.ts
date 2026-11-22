@@ -63,6 +63,14 @@ const cherry = listing({
 const cherryEntry = keystone({ slug: 'cherry-grill', name: 'Cherry Grill', certification: 'Meat – Glatt', levels: ['Meat'] })
 
 describe('kosherPlaces', () => {
+  // Item 68 (Nov 22): the community's Food pages by kind, so one at /eats
+  // is checked and a plain page at /restaurant isn't.
+  it('checks the places on the Food pages it is given, whatever their address', () => {
+    const atEats = { ...cherry, category: 'eats' }
+    expect(kosherPlaces({ listings: [atEats], keystone: [cherryEntry], mekor: null, food: ['eats'] }).places).toHaveLength(1)
+    expect(kosherPlaces({ listings: [cherry], keystone: [cherryEntry], mekor: null, food: ['eats'] }).places).toHaveLength(0)
+  })
+
   it('a place a list agrees with is checked, and says what the list says', () => {
     const { places } = kosherPlaces({ listings: [cherry], keystone: [cherryEntry], mekor: null })
     expect(places).toHaveLength(1)

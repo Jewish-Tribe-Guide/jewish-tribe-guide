@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent as KeyEvent, type ReactNode } from 'react'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 import BodyPortal from '@/components/BodyPortal'
 import BackIconButton from '@/components/BackIconButton'
@@ -430,6 +430,15 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
     else setSnap(resolved)
   }
 
+  /** The handle's tap and drags, from a keyboard: Enter or Space toggles
+   *  as a tap does, ArrowUp opens it full, ArrowDown back to half. */
+  function onHandleKeyDown(e: KeyEvent) {
+    const to = e.key === 'ArrowUp' ? 'full' : e.key === 'ArrowDown' ? 'half' : e.key === 'Enter' || e.key === ' ' ? (snap === 'half' ? 'full' : 'half') : null
+    if (!to) return
+    e.preventDefault()
+    setSnap(to)
+  }
+
   // Same reasoning as MobileNearbySheet's own onPointerCancel: the browser
   // took the touch over mid-gesture (most commonly an edge swipe recognized
   // as back-navigation) — drop the drag without resolving it into a snap
@@ -607,8 +616,13 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
               onPointerMove={onHandlePointerMove}
               onPointerUp={onHandlePointerUp}
               onPointerCancel={onHandlePointerCancel}
+              onKeyDown={onHandleKeyDown}
               className="flex shrink-0 touch-none cursor-grab justify-center py-2 active:cursor-grabbing"
               role="button"
+              // From a keyboard too (item 61, Nov 22): Enter or Space as a
+              // tap, the arrows up and down.
+              tabIndex={0}
+              aria-expanded={snap === 'full'}
               aria-label="Drag to resize"
             >
               <span className="h-1 w-9 rounded-full bg-slate-300" aria-hidden="true" />

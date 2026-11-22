@@ -102,7 +102,10 @@ export function buildCsp(env: CspEnv = {}): string {
       posthogDomain,
       sentryIngest,
     ]),
-    'frame-src': ['https://challenges.cloudflare.com'],
+    // The site itself: the admin's Home page shows the page as it will
+    // look in a frame (`?preview=1`), and each opening of it was reported
+    // as a violation (Nov 22). Then Cloudflare's Turnstile challenge.
+    'frame-src': ["'self'", 'https://challenges.cloudflare.com'],
     // posthog-js and Sentry run recorders/compression in blob: workers.
     'worker-src': ["'self'", 'blob:'],
     'manifest-src': ["'self'"],
