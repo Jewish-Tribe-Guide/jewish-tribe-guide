@@ -55,7 +55,8 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 19. Mekor's list against ours: PLNT Burger Jenkintown (IKC?), and Nothing
     Bundt Cakes, Cherry-K there and Keystone-K here.
 20. Boards 14–15: a ready-made field, fixed or local.
-21. "Can visitors upvote places?" (both sides now say Upvote) (?)
+21. Done: "Can visitors upvote places?" is built (a page's Questions in
+    the admin; checked Nov 22).
 22. Hospitals' Eruv field takes its choices from the Eruv page?
 23. A "Kept up to date" box (recommended, not drawn).
 24. UES Grocery's "Kosher" yes/no becomes Kosher Store?
@@ -86,14 +87,14 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     as its page.
 38. House of Kosher's menu link is still a PDF on live: set the catering
     menu (?).
-39. The newsletter Gmail script: re-paste Philly's, deploy it as a web
-    app, paste its link (Read now by email stays off until then).
+39. The newsletter Gmail script's link is saved on live (checked Nov 22).
+    Left: try Read now by email once.
 40. Vercel Production: check the Turnstile and Upstash keys; set
     SENTRY_CRON_MONITORS=nightly-email and redeploy; the next build's
     log should say Node 24.
 41. Live backups: check Database → Backups, and run the first live copy.
-42. Migrations 103 and 104 leave nothing to see: confirm you ran them on
-    both (?).
+42. Done: 103 is on live (the site's public key reads nothing, Nov 22).
+    104 can't be seen without a write; 105–113 ran after it.
 43. PostHog: check Session Replay's project settings.
 44. The first live morning after a deploy: each community's run shows
     in its own tab, and Vercel's log has no "run didn't start".
@@ -111,10 +112,11 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 ### Needs your yes, because it writes to live
 
 50. The Denomination/Nusach change (dry run ready).
-51. About and Privacy's new text.
+51. Done: live has About and Privacy's new text (since Nov 16).
 52. The shul watch's live data clean-up (look again first).
 53. Drop the old admin columns (tagline and the rest are still on live).
-54. Refuah watches and the hospital fields on live.
+54. Done: live has the hospital fields (same as dev) and 7 Refuah
+    watches (checked Nov 22).
 55. Migration 067, only when Today is turned on.
 
 ### Mine to build or fix (nobody waiting)
