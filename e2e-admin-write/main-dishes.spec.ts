@@ -171,7 +171,10 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
 
   // And the listing says so.
   await page.goto(`/${WRITE_SUITE_COMMUNITY}/${c.id}/${id}`)
-  const dishes = page.getByTestId('listing-items')
+  // Visible only: until the page has measured the screen, the listing is
+  // drawn for a phone and a computer both, one hidden by CSS (the first
+  // paint, Nov 22), and a strict-mode match on both fails at once.
+  const dishes = page.getByTestId('listing-items').filter({ visible: true })
   await expect(dishes).toContainText('Main dishes · 3', { timeout: 20_000 })
   await expect(dishes.getByRole('link', { name: 'Full menu' })).toHaveAttribute('href', sourceUrl)
 })
