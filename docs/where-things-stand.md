@@ -127,29 +127,48 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 56. Done: Partial Prefetching is live (PR 427, deployed Nov 22). Live
     answers 404 for a made-up category, listing, community and a shared
     question in a community that doesn't exist.
-57. The search box, Open now and filters can drop from the address on
-    a refresh (FindResourcesConnected).
-58. "See the whole page" in the editor leaves ?field=hours in the address.
+57. Checked Nov 22, not reproduced: a search (`?q=pizza`) stayed in the
+    address through a refresh on coming back to the tab, opening a
+    listing and Back, and Activity and Back. Left as is.
+58. Checked Nov 22, not reproduced: the one failure (1 in 34 runs of
+    editor-screens) didn't come back in 55 more. A lead only.
 59. Closing a listing opened from its own link uses replaceState, which
     a Next update can overwrite.
 60. The category picker has no Escape to close.
 61. The sheets' "Drag to resize" handles don't work from a keyboard.
 62. Watches' days run on New York's clock (right for Philly and UES).
-63. A Shabbos followed by Yom Tov on Sunday shows "last Shabbos".
-64. A new place with no hours shows every day "Closed" on the deciding
-    screen; a new place still opens the old review (board 4).
-65. Right after a community is made, its admin says "Not found." once; a
-    category's preview map opens on Philadelphia; the nav count updates
-    only when To do is opened.
-66. Admin not as drawn: shul emails' unlinked-sender row and "Stopped
-    checking"; making a new key; on a phone, rows without their line,
-    the card row's chevron, Edit, then update not in a bar.
-67. The starter Food page still has the old Type; the partner shows as a
-    row of its own in a page's field list.
+63. Dropped Nov 22: on a Sunday that's Yom Tov, "last Shabbos" is still
+    true, and those keeping Yom Tov aren't on the site that day.
+64. Stale (checked Nov 22): a new place opens its own screen (board
+    L3NewPlace, built Nov 2), its hours under "Not on the listing yet",
+    not every day "Closed".
+65. Done Nov 22. A new community's admin opens straight to its To do
+    (walked on dev with a made-up community, since deleted; fixed by the
+    Nov 16 and 18 community-list expiry); the preview map opens on the
+    community's own centre (Nov 19, 60f1796b); and the nav's count now
+    follows a save anywhere in the admin: any admin write reads the setup
+    again (one small request, `onAdminWrite` in adminApi.ts).
+66. Done or settled Nov 22. Site's rows on a phone have their lines
+    (board 21: what Home page holds, how many categories, which campaign
+    is running). Stale: "Edit, then update" is gone (a change opens in
+    the editor, its answers in a bar pinned over the tabs on a phone).
+    Kept on purpose: a home-page card row's chevron (it opens in place,
+    and a row that opens has one); "Stopped checking" and the unlinked
+    senders (added beyond board 18b, both needed). Held for you: making a
+    new newsletter key (not drawn; a new key stops the Gmail script until
+    it's set up again).
+67. Done Nov 22: the starter Food page has today's Store Type; a partner
+    (a certificate's link) isn't a row of its own in a page's field list,
+    and moves with its field.
+    Found on the way, fixed: the admin's Home page preview (the site in
+    a frame) broke the report-only security policy on every opening;
+    `frame-src` now allows the site itself.
 68. Watches still going by address, not kind: the kosher watch, the
     hospital watches and question reader, the map's pins.
-69. Two posts covering one week: the row edits the winner, but To do's
-    week Edit still edits a post whole.
+69. Stale (checked Nov 22): two posts covering one week was an Oct 31
+    note, fixed Nov 10 (e881f48c): a box's Edit, To do's included, opens
+    every post it shows a time from, and Edit listing's week row lists
+    them all and saves them into one.
 70. Read now never drawn or tried on a computer.
 71. Watch jobs agreed and not built (?): dishes split across menu pages,
     each kind's last 14 nights, no Read now on a Google-and-newsletter
@@ -1748,8 +1767,8 @@ after the deploy, dry run first, and needs its own go-ahead.
     (src/data/categories.js, categoryTemplates.ts). Only dev's Riverton test
     page had it, nothing filled in. Removed there Nov 8 (dev only). Live's
     Cemetery has a different "Type" (Cemetery / Funeral Home), all 5 places
-    use it: it stays. The starter Food page still carries the old Type; not
-    changed.
+    use it: it stays. The starter Food page carried the old Type until Nov 22;
+    it has today's Store Type now.
   - BUILT Nov 9 (the user: "I like your recommendations in general"):
     - Each ready-made field's "What this is" lists "Kept up to date by",
       each source saying what a place needs for it (reworded Nov 9 after
@@ -1769,8 +1788,8 @@ after the deploy, dry run first, and needs its own go-ahead.
       certificate", "WhatsApp group"); on puts it right after its field,
       off takes it off (Save still asks if places lose an answer). On the
       Add list a partner isn't its own row; it comes with its field unless
-      switched off. Not done: the page's own field list still shows the
-      partner as a row of its own.
+      switched off. The page's own field list shows it with its field,
+      not as a row of its own (Nov 22).
   - Answered, not built (the user's questions, Nov 9):
     - UES Grocery's "Kosher" yes or no (dev only) says less than Kosher
       Store (fully kosher, or some kosher items). Recommended: replace it
@@ -1929,10 +1948,8 @@ brief, one round of drawings, then the build in pieces.
    community couldn't finish it: only Keystone-K and Mekor lists can be
    read, and Watches has no way to add one. It comes back if "add a kosher
    agency's list" is ever built (each agency's list needs its own reader).
-   Still open, small: right after a community is made, its admin shows
-   "Not found." once (a reload fixes it); a category's preview map opens on
-   Philadelphia for any community; the nav's count updates when To do is
-   opened, not when a step is saved elsewhere.
+   The three small leftovers (a new community's admin saying "Not found."
+   once, the preview map on Philadelphia, the nav count) are done: item 65.
    Not as drawn: the kosher lists step (above).
 14. **Newsletters set up from the console: BUILT Oct 29** (drawings 18
    and 18b). Watches → Newsletters (the Newsletters line on What's tracked
@@ -1949,8 +1966,8 @@ brief, one round of drawings, then the build in pieces.
    newsletters can't be set up yet, and everything else works as before.
    `NEWSLETTER_SECRET` still works for every community, so Philly's script
    carries on unchanged; a community's own key works for it alone.
-   Not as drawn: the unlinked-sender row and the "Stopped checking" line.
-   Not built: making a new key (if one leaks, delete the row and open the
+   Beyond the drawing, kept: the unlinked-sender row and the "Stopped
+   checking" line. Not built: making a new key (if one leaks, delete the row and open the
    page again).
 15. **The admin on a phone: BUILT Oct 29** (boards 19 to 21c, drawn after
    the user's phone notes: "more phone oriented… the back chevron", "editing
@@ -1978,9 +1995,9 @@ brief, one round of drawings, then the build in pieces.
      place count over it (21b). The home page's cards move with up and
      down on each row (21c), and Preview opens the page full size with
      what isn't saved. Save bars sit over the phone's tabs.
-   Not as drawn: Site's list rows have no line under them; a home-page card
-   row keeps its open chevron (it opens in place); in Edit, then update the
-   button is under the list, not in a bar, and doesn't count the changes.
+   Not as drawn: a home-page card row keeps its open chevron (it opens in
+   place). Site's rows got their lines Nov 22; "Edit, then update" was
+   folded into the change's own editor screen (Nov 2).
    Not drawn, fixed in passing: the Category pages list's buttons go under
    the name on a phone (it was squeezed to one word a line); its look is
    otherwise the old cards.

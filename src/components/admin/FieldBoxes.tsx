@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { CategoryField } from '@/lib/categories'
 import { boxOf, boxRenames, fieldItems, fieldLine, itemKey, orderProblem, readOrder, rowsOfBox, type FieldBox, type FieldItem, type FieldPage } from '@/lib/fieldBoxes'
 import type { ListingParts } from '@/lib/listingParts'
+import { partnerOf } from '@/lib/fieldPartners'
 import { Chevron, GoChevron } from './AdminUI'
 import DragList, { addListButton, PLUS, RowName, useBarToggle, X, type DragRow } from './DragList'
 
@@ -71,8 +72,20 @@ export default function FieldBoxes({
   // Folded boxes, by id: just their name bar in the list.
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set())
   const barToggle = useBarToggle()
-  const items = boxes.flatMap((box) => (folded.has(box.id) ? [{ box }] : fieldItems([box])))
   const all = fieldItems(boxes)
+  const byKey = new Map<string, CategoryField>([...page.fields, ...(page.hiddenFields ?? [])].map((f) => [f.key, f]))
+  // A partner right after its field (a certificate's link after Kosher
+  // Certification) comes with it: switched on that field's screen, not a
+  // row of its own, and put back beside it whenever the order is read
+  // (item 67, Nov 22).
+  const partners = partnersAfter(all, page.fields)
+  const withPartners = (list: readonly FieldItem[]): FieldItem[] =>
+    list.flatMap((i) => ('field' in i && partners.has(i.field) ? [i, { field: partners.get(i.field)! }] : [i]))
+  const comesAlong = new Set(partners.values())
+  const items = boxes
+    .flatMap((box) => (folded.has(box.id) ? [{ box }] : fieldItems([box])))
+    .filter((i) => !('field' in i && comesAlong.has(i.field)))
+  const full = withPartners(items)
   const fold = (id: string, on: boolean) =>
     setFolded((f) => {
       const next = new Set(f)
@@ -80,7 +93,6 @@ export default function FieldBoxes({
       else next.delete(id)
       return next
     })
-  const byKey = new Map<string, CategoryField>([...page.fields, ...(page.hiddenFields ?? [])].map((f) => [f.key, f]))
   const hidden = new Set((page.hiddenFields ?? []).map((f) => f.key))
   const list = useRef<HTMLDivElement>(null)
   // A field landing in a folded box opens it, so it can be seen landing
@@ -99,7 +111,7 @@ export default function FieldBoxes({
     const key = itemKey(item)
     const owner = 'box' in item ? item.box.id : boxOf(shown, key)
     // The box a lifted field is over, when it isn't the one it came from.
-    const no = refused && orderProblem(items, refused, page)
+    const no = refused && orderProblem(full, withPartners(refused), page)
     const turnedDown = no?.at === owner
     const over = !turnedDown && dragKey?.startsWith('field:') && boxOf(shown, dragKey) === owner && boxOf(items, dragKey) !== owner
     const edge = turnedDown ? 'border-red-400 bg-red-50' : over ? 'border-primary bg-blue-50' : 'border-slate-200'
@@ -122,10 +134,10 @@ export default function FieldBoxes({
         nameOf={(i) => ('box' in i ? i.box.title || 'New box' : 'field' in i ? byKey.get(i.field)?.label || 'New field' : 'basic' in i ? (i.basic === 'address' ? 'Address' : 'Phone') : '')}
         // From the keyboard, a step that changes nothing (the phone above
         // the address, which always come first) is passed over.
-        canMove={(next, via) => orderProblem(items, next, page) === null && (via === 'pointer' || changes(readOrder(items, next, parts, page), parts))}
+        canMove={(next, via) => orderProblem(full, withPartners(next), page) === null && (via === 'pointer' || changes(readOrder(full, withPartners(next), parts, page), parts))}
         carries={(i, all) => ('box' in i ? rowsOfBox(all, i.box.id) : [])}
         onReorder={(next) => {
-          const read = readOrder(items, next, parts, page)
+          const read = readOrder(full, withPartners(next), parts, page)
           onChange(read.parts, read.order)
         }}
         slot={slot}
@@ -227,6 +239,20 @@ export default function FieldBoxes({
       </DragList>
     </div>
   )
+}
+
+/** Each field's partner, by the field's key, where the partner is the row
+ *  right after it in the same box. */
+function partnersAfter(all: readonly FieldItem[], fields: readonly CategoryField[]): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const f of fields) {
+    const p = partnerOf(fields, f)
+    if (!p) continue
+    const at = all.findIndex((i) => 'field' in i && i.field === f.key)
+    const next = all[at + 1]
+    if (at >= 0 && next && 'field' in next && next.field === p.key) out.set(f.key, p.key)
+  }
+  return out
 }
 
 /** A field's tags on its row (E1b): Filter, Under the name. Nothing else

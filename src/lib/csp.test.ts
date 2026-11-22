@@ -57,8 +57,9 @@ describe('buildCsp', () => {
     expect(directive(csp, 'connect-src')).not.toContain('https:')
   })
 
-  it('frames only Cloudflare (the Turnstile challenge)', () => {
-    expect(directive(csp, 'frame-src')).toEqual(['https://challenges.cloudflare.com'])
+  // The admin's Home page frames the site for its preview (Nov 22).
+  it('frames only the site itself and Cloudflare (the Turnstile challenge)', () => {
+    expect(directive(csp, 'frame-src')).toEqual(["'self'", 'https://challenges.cloudflare.com'])
   })
 
   it('permits eval and the hot-reload websocket only for `next dev`, never otherwise', () => {

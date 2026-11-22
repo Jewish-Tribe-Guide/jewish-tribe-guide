@@ -36,6 +36,23 @@ export type AdminApi = {
 
 const DEFAULT_FAILURE = 'Could not do that.'
 
+// A save anywhere in a community's admin, for what shows a count of what's
+// left (the nav's To do count takes in the setup steps, which are saved on
+// Home page, Team and Categories, not on To do; Nov 22).
+type Written = (community: string, token: string) => void
+const written = new Set<Written>()
+
+/** Called after each write that succeeded, with its community and token. */
+export function onAdminWrite(listener: Written): () => void {
+  written.add(listener)
+  return () => void written.delete(listener)
+}
+
+function tellWritten(community: string | null, method: Method | undefined, ok: boolean, token: string) {
+  if (!ok || community === null || !method || method === 'GET') return
+  for (const l of written) l(community, token)
+}
+
 /** `token`: the token, or how to read the latest one. A screen keeps one
  *  api across Supabase's hourly new token (useAdminApi), so a load keyed on
  *  the api doesn't run again and put the saved values back over a draft. */
@@ -54,11 +71,18 @@ export function adminApi(tokenOf: string | (() => string), community: string | n
       ...(init.signal ? { signal: init.signal } : {}),
     }
   }
-  const request = (path: string, init?: { method?: Method; body?: unknown; signal?: AbortSignal }) => fetch(url(path), initOf(init))
+  const request = async (path: string, init?: { method?: Method; body?: unknown; signal?: AbortSignal }) => {
+    const res = await fetch(url(path), initOf(init))
+    tellWritten(community, init?.method, res.ok, current())
+    return res
+  }
   // Through fetchJson, as every call was before, so its tests' mocks of it
   // still see each request.
-  const send = <T,>(method: Method, path: string, body?: unknown, fallback = DEFAULT_FAILURE) =>
-    fetchJson<T>(url(path), initOf({ method, body }), fallback)
+  const send = async <T,>(method: Method, path: string, body?: unknown, fallback = DEFAULT_FAILURE) => {
+    const result = await fetchJson<T>(url(path), initOf({ method, body }), fallback)
+    tellWritten(community, method, true, current())
+    return result
+  }
   return {
     get token() {
       return current()
