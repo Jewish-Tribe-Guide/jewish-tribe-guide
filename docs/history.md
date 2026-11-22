@@ -8,6 +8,13 @@ that file.
 
 Taken off `where-things-stand.md` with their numbers, as they read there.
 
+- 50. Done Nov 22: the Denomination/Nusach change is on live (the user's
+  yes). Three pages share one Denomination list, one choice; both
+  Synagogues pages gained Nusach. Eight Ashkenazi shuls became Orthodox,
+  Mikveh Israel Orthodox with Nusach Sephardi, four schools' key `d`
+  became `denomination`, and six waiting suggestions were rewritten to
+  match. The script's re-run check now ignores the database's key order
+  (it listed the three pages again after the write).
 - Done Nov 22 (not on the list): a phone no longer paints the computer's layout first
     (the user: "it shows the desktop version for a brief moment"). Until
     the page has measured the screen it assumed a computer: the home

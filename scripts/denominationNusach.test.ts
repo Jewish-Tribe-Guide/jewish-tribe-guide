@@ -20,6 +20,16 @@ const philly = [
 ]
 
 describe('planFields', () => {
+  // The database hands back JSON with its keys in its own order, so a page
+  // already moved over must still read as done (the live re-run, Nov 22).
+  it('finds nothing to do on a page already moved, whatever order its keys come back in', () => {
+    const done = planFields(philly, true)!
+    const reverse = (v: unknown): unknown =>
+      Array.isArray(v) ? v.map(reverse) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).reverse().map(([k, x]) => [k, reverse(x)])) : v
+    const reordered = reverse(done) as typeof done
+    expect(planFields(reordered, true)).toBeNull()
+  })
+
   it('gives a shul page the shared list, one choice, and Nusach right after it', () => {
     const next = planFields(philly, true)!
     expect(next.map((f) => f.key)).toEqual(['photo', 'denomination', 'nusach', 'minyanim'])
