@@ -35,7 +35,8 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 6. The computer home's middle piece (neither option picked; W7l may
    have settled it) (?), and You and What changed as extra cells there.
 7. The "Right now" label on the computer home: may come back.
-8. What the What changed page leads with: an activity feed, or new places.
+8. Decided Nov 22: What changed is an activity feed, every change in
+    order (the user: "I like my way"). Already built that way.
 9. A "Recent changes" box on each listing.
 10. One contact email for every community?
 11. On a phone, saved places and searches on You come off only by swipe.
@@ -425,7 +426,9 @@ With no choice made it's the first two categories with hours, as before
     ships and the user adds the tab there themselves. The user's view
     (Nov 15): an activity feed is the first thing after testers' feedback;
     my view was to lead with new places, closures, hechsher and minyan
-    changes and fold small edits into one line. Nothing decided.
+    changes and fold small edits into one line. **Decided Nov 22: the
+    feed** (the user: "I like my way"). The page already is one: every
+    change, newest first, by day, with each night's run among them.
     **Fixed Nov 15:** the user added the tab on the preview and got "Page
     not found". A settings save marks pages stale, and the first load
     after it still gets the old copy (here, the 404) while a new one is
