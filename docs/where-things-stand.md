@@ -61,9 +61,10 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 22. Hospitals' Eruv field takes its choices from the Eruv page?
 23. A "Kept up to date" box (recommended, not drawn).
 24. UES Grocery's "Kosher" yes/no becomes Kosher Store?
-25. Hotels' "What makes it Shabbat friendly?" (the user's yes, Nov 22):
-    on dev, asked after a Yes, shown under it in the Shabbos friendly
-    box. Live needs your yes (dry run ready).
+25. Done Nov 22: Hotels' "What makes it Shabbat friendly?" is on dev
+    and live (the user's yes, after PR 428 deployed), asked after a Yes
+    and shown under it in the Shabbos friendly box. Live shows it after
+    its next deploy or any save in the live admin.
 26. The rest of the field-by-field review.
 27. The "+" covers part of the third tile on the phone home.
 28. The drawings for asking for location when it helps.
