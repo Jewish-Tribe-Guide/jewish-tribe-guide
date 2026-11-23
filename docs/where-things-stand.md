@@ -84,6 +84,14 @@ old number can still be looked up. When an item is done, move it to
     CI's own jobs already crowd the one we share: the sign-in check took
     3–4s there (Nov 23), and admin tests now allow 20s for it. If
     admin-write still fails on slow saves, this is the next step.
+    Checked Nov 23: all 112 migrations build a fresh Postgres whose
+    tables match the test project's exactly (321 columns, 16 functions),
+    so the schema isn't the obstacle. What a database per CI job still
+    needs: real sign-in (the admin tests mint magic links, so the
+    Supabase CLI's local stack, not bare Postgres), and the test
+    project's rows put into it (`scripts/backup.mjs` then
+    `restore.mjs`, or a saved copy). Costs no money (public repo);
+    adds about 1–2 minutes a job.
 
 ### You decide
 
