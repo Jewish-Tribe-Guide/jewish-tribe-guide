@@ -6,9 +6,13 @@ import type { DirectoryResource } from '@/types'
 import AddressInput from '@/components/intake/AddressInput'
 import BackIconButton from '@/components/BackIconButton'
 import ActionDialog from './ActionDialog'
-import ListingEditor, { type EditorStep } from './ListingEditor'
+import type { EditorStep } from './ListingEditor'
 import MobileSheet from './MobileSheet'
 import { useListingDraft } from './useListingDraft'
+import dynamic from 'next/dynamic'
+
+// Loaded once Add reaches the listing, not with every category page (Nov 22).
+const ListingEditor = dynamic(() => import('./ListingEditor'), { loading: () => null })
 
 type Props = {
   category: CategoryConfig

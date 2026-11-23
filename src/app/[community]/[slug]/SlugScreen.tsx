@@ -5,14 +5,19 @@ import { useSearchParams } from 'next/navigation'
 import type { DirectoryResource } from '@/types'
 import FindResources from '@/components/FindResources'
 import FindResourcesConnected from '@/components/FindResourcesConnected'
-import SupportWizard from '@/components/wizard/SupportWizard'
-import VolunteerWizard from '@/components/wizard/VolunteerWizard'
-import GenericFormWizard from '@/components/wizard/GenericFormWizard'
 import { useLocation } from '@/lib/locationContext'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { isIOSWebKit, useNavTransitionProps } from '@/lib/navTransitions'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
+import dynamic from 'next/dynamic'
+
+// A form's page shares this route with every category, so its wizard is
+// loaded only on a form's own page (it still renders on the server there).
+// It was in every category page's first download (Nov 22).
+const SupportWizard = dynamic(() => import('@/components/wizard/SupportWizard'))
+const VolunteerWizard = dynamic(() => import('@/components/wizard/VolunteerWizard'))
+const GenericFormWizard = dynamic(() => import('@/components/wizard/GenericFormWizard'))
 
 // The client half of the [slug] route. The server has already decided whether
 // this slug is a category or a form (and 404'd if it was neither), so this only

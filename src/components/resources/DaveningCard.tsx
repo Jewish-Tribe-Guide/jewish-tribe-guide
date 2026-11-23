@@ -15,8 +15,7 @@ import { THIS_WEEK_SECTION } from '@/lib/boxDates'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { useContributions } from '@/lib/communityContext'
 import { ChevronRightIcon, PlusIcon } from '@/components/icons'
-import AddScheduleBox from './AddScheduleBox'
-import UpdateTimesBox from './UpdateTimesBox'
+import dynamic from 'next/dynamic'
 import { TellAboutContext } from './tellAbout'
 import DaveningTimes from './DaveningTimes'
 import { Card } from './listingParts'
@@ -25,6 +24,12 @@ import { SignUpBox, SignUpMark } from './SignUp'
 import { JoinLink } from './JoinLink'
 import { useTappedMinyan } from './TappedMinyan'
 import type { MinyanBox } from '@/lib/minyanimBox'
+
+// Loaded when a schedule is being added, not with the page (Nov 22).
+const AddScheduleBox = dynamic(() => import('./AddScheduleBox'), { loading: () => null })
+
+// Loaded when "Update their times" is opened, not with the page (Nov 22).
+const UpdateTimesBox = dynamic(() => import('./UpdateTimesBox'), { loading: () => null })
 
 /** A shul's main thing (agreed Oct 6): its usual times as two boxes, “Usual
  *  weekday times” (one small table, today marked) and “Usual Shabbos times”

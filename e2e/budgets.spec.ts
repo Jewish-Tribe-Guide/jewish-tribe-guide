@@ -155,9 +155,14 @@ test.describe('home screen weight', () => {
   // Measured Nov 18: a category page and a listing's page 398 KB, the map
   // 353 KB (the phone's within 5 KB), with Sentry out of the first download.
   // The same headroom as the home's ceiling.
+  // Nov 22: the editing screens (Edit, Add, Update their times, Add a
+  // minyan, a schedule, the form wizards) load when opened, not with the
+  // page: a category page and a listing's page 346 KB, the map 331 KB. The
+  // two pages' ceiling came down to 380, below the 390-396 the editor in
+  // the first download measured, so that can't creep back.
   for (const [name, ceiling, path] of [
-    ['a category page', 470, async (request: import('@playwright/test').APIRequestContext, community: string) => `/${community}/${(await largestCategory(request, community)).category.id}`],
-    ['a listing’s own page', 470, async (request: import('@playwright/test').APIRequestContext, community: string) => {
+    ['a category page', 380, async (request: import('@playwright/test').APIRequestContext, community: string) => `/${community}/${(await largestCategory(request, community)).category.id}`],
+    ['a listing’s own page', 380, async (request: import('@playwright/test').APIRequestContext, community: string) => {
       const { category } = await largestCategory(request, community)
       const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
       const item = ((await res.json()) as { resources: { id: string }[] }).resources[0]!

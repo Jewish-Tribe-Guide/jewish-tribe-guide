@@ -27,9 +27,13 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 
 ### To talk about (the user flagged these from the health rating, Nov 22)
 
-81. Category and listing pages download 390–396 KB of JavaScript on a
-    phone, the heaviest pages by a clear margin; a common rule of thumb
-    is about 300 KB.
+81. Page weight. Nov 22: the editing screens (Edit, Add, Update their
+    times, Add a minyan, a schedule, the form wizards) load when opened,
+    not with the page: a category page and a listing's page went from
+    390-396 KB to 340-346 KB, the map from 352 to 331 KB; their ceiling
+    is 380 now. Still above the ~300 KB rule of thumb: what's left is
+    Next and React themselves (~190 KB) and the listing's own code; the
+    next step would be measured, not guessed.
 82. Complexity: watches, sources, schedules in parts, AI readers, several
     communities, sheets and screens with their own addresses, and long
     AGENTS.md sections on working around Next. It works and is tested,

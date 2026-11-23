@@ -4,7 +4,8 @@ import { useCommunityPlace } from '@/lib/communityContext'
 import { useEffect, useRef, useState } from 'react'
 import ResourceLoader from '@/components/resources/ResourceLoader'
 import ListingAdd from '@/components/resources/ListingAdd'
-import ListingEditor, { type EditorStep } from '@/components/resources/ListingEditor'
+import dynamic from 'next/dynamic'
+import type { EditorStep } from '@/components/resources/ListingEditor'
 import ActionDialog from '@/components/resources/ActionDialog'
 import MobileSheet from '@/components/resources/MobileSheet'
 import EruvInfo from '@/components/resources/EruvInfo'
@@ -19,6 +20,10 @@ import { getCategoryColor } from '@/lib/categoryColor'
 import { useIsMobile } from '@/lib/useIsMobile'
 import type { ParamsOpts } from '@/components/resources/GenericDirectory'
 import { parseTappedMinyan } from '@/components/resources/TappedMinyan'
+
+// Loaded when Edit is opened, not with the page: it was ~55 KB of every
+// category page's first download (Nov 22), for a screen few visitors open.
+const ListingEditor = dynamic(() => import('@/components/resources/ListingEditor'), { loading: () => null })
 
 // A pending add/edit action on a listing within the current category.
 type ListingAction =
