@@ -13,7 +13,7 @@ data back is in `docs/backups.md`.
 | The nightly email itself doesn't run | Sentry cron monitor `job-nightly-email` | Email from Sentry |
 | A visitor hits an error | Sentry | `npm run sentry:check`; Sentry's own alert emails |
 | Sentry is over its quota and dropping errors | `npm run sentry:check` fails with "dropped N event(s)" | Only when someone runs it |
-| The database is lost or damaged | Supabase's backups, and our own copy (`npm run backup -- --prod`) | — |
+| The database is lost or damaged | Supabase's daily backups (7 days), and our own weekly copy with the photos | A notification on this Mac if the weekly copy fails |
 | The certificate expires | Vercel renews it (Let's Encrypt; good to Jan 5, 2027 when checked) | — |
 | The domain expires | Namecheap, registered to Jul 24, 2027 | Namecheap's renewal emails |
 
@@ -46,8 +46,19 @@ Nothing left here.
 
 ## Habits
 
-- **Weekly:** `npm run backup -- --prod` (read only, a couple of
-  minutes). The only live copy so far is Nov 21.
+- **Weekly, by itself:** this Mac copies live every Sunday at 10:00
+  (`scripts/weekly-backup.sh`, read only; asleep then, it runs on wake).
+  Each run adds a line to `backups/weekly.log`, and a failure shows a
+  notification. About 18 MB a copy, all kept. Installed Nov 22 and run
+  once by launchd that night. To install on another Mac, or after moving
+  the repo (the plist holds its path):
+
+  ```bash
+  cp scripts/weekly-backup.plist ~/Library/LaunchAgents/com.jewishtribeguide.weekly-backup.plist && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.jewishtribeguide.weekly-backup.plist
+  ```
+
+  Glance at `backups/weekly.log` once a month: a Mac that's off for weeks
+  makes no copies, and nothing else will say so.
 - **Before calling work done:** `npm run sentry:check`.
 - **When a community is made visible:** add an UptimeRobot monitor for
   `/<slug>`.

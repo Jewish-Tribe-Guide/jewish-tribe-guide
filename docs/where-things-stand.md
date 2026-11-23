@@ -141,8 +141,6 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     and Upstash keys checked Nov 22: set.) (SENTRY_CRON_MONITORS is set: the
     monitor checked in from live on Nov 22.) The whole owner's list is
     in `docs/operations.md`.
-41. Live backups: Supabase keeps 7 days (checked Nov 22). Left: run
-    our own copy weekly (`docs/operations.md`); the last was Nov 21.
 43. PostHog: check Session Replay's project settings.
 45. On the preview: the listing's small map tile, the default-location
     map and picker, the menu reader's browser; then review the menu
