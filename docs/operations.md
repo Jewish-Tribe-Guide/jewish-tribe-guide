@@ -38,8 +38,15 @@ the Turnstile keys are set for Production and the Upstash ones for
 Production and Preview; UptimeRobot is green and its emails arrive.
 
 
-1. **Namecheap.** Check auto-renew is on for phillyjewishguide.com.
-2. **Sentry → Alerts.** Check a new issue sends an email to someone.
+1. **Namecheap.** phillyjewishguide.com is registered at Namecheap, but
+   not in the jewishtribeguide account (its Domain List was empty, Nov
+   22). Find the account that holds it, check auto-renew and the card,
+   and ideally push it to the jewishtribeguide account.
+2. **Sentry's alert emails.** Two alert rules email on a new issue
+   (Monitors → Alerts; checked Nov 22), and both fired for the false
+   nightly-email timeout that morning. Left: confirm that email arrived.
+   The plan allows one user, and Sentry deactivated another member, so
+   only the signed-in account's email gets them.
 
 ## Habits
 
