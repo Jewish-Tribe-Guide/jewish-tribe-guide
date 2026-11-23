@@ -93,6 +93,30 @@ describe('the whole-listing editor’s rows', () => {
     expect([rowChanged(call, item, v), rowChanged(contact, item, v)]).toEqual([true, false])
   })
 
+  // The rule (Oct 11): a week of hours is a row of its own right after its
+  // box, wherever the box is. Until Nov 23 only Contact's were; in an
+  // admin's own box they were edited inside that box's row.
+  it('hours in an admin’s own box have their own row, right after that box', () => {
+    const shop = {
+      ...HOSPITAL,
+      listingParts: { ...(HOSPITAL.listingParts ?? {}), boxes: [{ title: 'Gift shop', fields: ['shop_hours', 'shop_note'] }, { title: 'Pharmacy', fields: ['rx_hours'] }] },
+      detailFields: [
+        ...HOSPITAL.detailFields,
+        { key: 'shop_hours', type: 'hours' as const, label: 'Shop hours', renderAs: 'row' as const },
+        { key: 'shop_note', type: 'text' as const, label: 'Note', renderAs: 'row' as const },
+        { key: 'rx_hours', type: 'hours' as const, label: 'Pharmacy hours', renderAs: 'row' as const },
+      ],
+    }
+    const rows = editorRows(shop, {})
+    const at = (title: string) => titles(rows).indexOf(title)
+    expect(keys(rows, 'box:Gift shop')).toEqual(['shop_note'])
+    expect(at('Shop hours')).toBe(at('Gift shop') + 1)
+    // A box of just a week of hours is that week's row, by the box's name.
+    expect(rows.find((r) => r.title === 'Pharmacy')!.fields.map((f) => f.key)).toEqual(['rx_hours'])
+    expect(rows.filter((r) => r.fields.some((f) => f.type === 'hours')).every(opensInPlace)).toBe(true)
+    expect(new Set(rows.map((r) => r.id)).size).toBe(rows.length)
+  })
+
   it('a hospital: the admin’s boxes in order, Shabbos where the admin put it', () => {
     expect(titles(editorRows(HOSPITAL, {}))).toEqual(['Name', 'Who to call', 'Kosher food', 'This Shabbos', 'Rides', 'Address, phone, website and links', 'Hours'])
     expect(keys(editorRows(HOSPITAL, {}), 'box:Kosher food')).toEqual(['pantry', 'food_packages'])
@@ -164,8 +188,8 @@ describe('what a row says', () => {
       'Shacharis 7 AM',
       'Shacharis 8 AM',
       'Mincha 1:30 PM',
-      'Maariv 8 PM',
       'Mincha & Maariv 10 min before sunset',
+      'Maariv 8 PM',
     ])
   })
   it('a shul’s Shabbos times in the order of Shabbos', () => {

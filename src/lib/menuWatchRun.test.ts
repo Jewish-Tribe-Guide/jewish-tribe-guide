@@ -413,6 +413,50 @@ describe('a menu drawn by a script', () => {
     expect(second.render).not.toHaveBeenCalled()
   })
 
+  // Nov 23: a drawn page comes out changed every time, so it always needs
+  // an AI read, and drawing takes seconds. The quick menus beside it spent
+  // the reads while it drew, it was skipped, and the night's one draw went
+  // with it. Oldest first, the same menu won the draw the next night and
+  // lost again: Shlomo's, LUHV Deli and Center City Pretzel unread for 5–7
+  // days. A menu now takes its read before it may draw.
+  it('takes its AI read before drawing, so the menus beside it can’t spend it while it draws', async () => {
+    const OTHER = 'https://other.example/menu'
+    const otherPage = { ...page, url: OTHER }
+    m.readMenuPage.mockImplementation(async (url: string, opts: { render?: ((u: string) => Promise<unknown>) | null }) =>
+      url === OTHER ? otherPage : (await opts.render?.(URL_)) ? page : null,
+    )
+    const budget = { ...newMenuReadBudget(), aiReads: 0, menuReads: 1 }
+    let other: unknown
+    const drawing = {
+      render: vi.fn(async () => {
+        // Another changed menu, read while this one draws.
+        other = await runMenuWatch({ ...watch, url: OTHER, pageHash: 'old' }, budget, { apiKey: 'k', renderer: null })
+        return drawnPage
+      }),
+      close: vi.fn(async () => {}),
+    }
+    expect(await runMenuWatch({ ...watch, pageHash: 'old' }, budget, { apiKey: 'k', renderer: drawing })).toMatchObject({ ok: true, filed: 1 })
+    expect(other).toEqual({ ok: true, filed: 0, skipped: true })
+    expect(budget).toMatchObject({ menuReads: 0, renders: 0 })
+  })
+
+  it('doesn’t draw with no read left to read it, and keeps the draw for a menu that has one', async () => {
+    m.readMenuPage.mockImplementation(nearlyEmpty)
+    const budget = { ...newMenuReadBudget(), aiReads: 0, menuReads: 0 }
+    const drawn = renderer()
+    expect(await runMenuWatch({ ...watch, pageHash: 'old' }, budget, { apiKey: 'k', renderer: drawn })).toEqual({ ok: true, filed: 0, skipped: true })
+    expect(drawn.render).not.toHaveBeenCalled()
+    expect(budget.renders).toBe(1)
+  })
+
+  it('gives the read back when the drawn menu didn’t need it', async () => {
+    m.readMenuPage.mockImplementation(nearlyEmpty)
+    const budget = newMenuReadBudget()
+    // The first read sets the baseline: nothing for the AI to read.
+    expect(await runMenuWatch(watch, budget, { apiKey: 'k', renderer: renderer() })).toEqual({ ok: true, filed: 0, pageHash: menuHash(page) })
+    expect(budget).toMatchObject({ menuReads: MENU_READS_PER_RUN, aiReads: newMenuReadBudget().aiReads, renders: 0 })
+  })
+
   it('a browser that won’t start leaves the menu unread, not failing: it’s ours, so not the place’s broken check in To do', async () => {
     m.readMenuPage.mockImplementation(async (_url: string, opts: { render?: Render | null; trouble?: (t: Trouble) => void }) => (await opts.render?.(URL_, opts.trouble)) ?? null)
     const noBrowser = () => ({ render: vi.fn(async (_u: string, trouble?: (t: Trouble) => void) => (trouble?.({ why: 'no_browser' }), null)), close: vi.fn(async () => {}) })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { SpecialSchedule } from './schedules'
-import { partKey, partLines, partSize, partsFromRead, partsGiven, readPartSource, rebasePart, splitParts, withPart } from './timesParts'
+import { isHomePage, pageOfNote, partKey, partLines, partSize, partsFromRead, partsGiven, readPartSource, rebasePart, scheduleTakesPart, splitParts, withPart } from './timesParts'
 
 const K = 'minyanim'
 const SK = 'minyanim_schedules'
@@ -151,5 +151,26 @@ describe('partsGiven and partsFromRead', () => {
       { part: 'week', size: 1 },
     ])
     expect(partsFromRead([])).toEqual([])
+  })
+})
+
+describe('a home page and the shul’s schedule page (Nov 23)', () => {
+  it('knows a home page', () => {
+    expect(['https://soi.example/', 'https://soi.example', 'https://soi.example/index.html'].map(isHomePage)).toEqual([true, true, true])
+    expect(['https://soi.example/tefillot', 'https://soi.example/?p=12', null, 'not a url'].map(isHomePage)).toEqual([false, false, false, false])
+  })
+
+  it('leaves a usual part to another page that gives it, never this week’s', () => {
+    const others = [{ url: 'https://soi.example/tefillot', parts: [{ part: 'shabbos' as const, size: 6 }, { part: 'week' as const, size: 3 }] }]
+    expect(scheduleTakesPart('https://soi.example/', 'shabbos', others)).toBe('https://soi.example/tefillot')
+    expect(scheduleTakesPart('https://soi.example/', 'weekday', others)).toBeNull()
+    expect(scheduleTakesPart('https://soi.example/', 'week', others)).toBeNull()
+    expect(scheduleTakesPart('https://soi.example/tefillot', 'shabbos', [{ url: 'https://soi.example/', parts: [{ part: 'shabbos', size: 9 }] }])).toBeNull()
+  })
+
+  it('reads the page off a finding’s note', () => {
+    expect(pageOfNote('From their website, changed Oct 19: https://soi.example/')).toBe('https://soi.example/')
+    expect(pageOfNote('pasted by a person')).toBeNull()
+    expect(pageOfNote(undefined)).toBeNull()
   })
 })

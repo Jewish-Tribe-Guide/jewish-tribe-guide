@@ -13,8 +13,14 @@
  * implements the same rule for JS-driven layout decisions. */
 @custom-variant desktop (@media (min-width: 640px) and (min-height: 640px));
 /* Its opposite, for what only a phone draws before the page has measured
-   the screen (useMeasuredIsMobile). */
-@custom-variant phone (@media (max-width: 639px), (max-height: 639px));
+   the screen (useMeasuredIsMobile). In the block form: the short form
+   splits its query at the comma, and the dev server then wrote
+   `.phone:hidden (max-height: 639px)` and failed to build (Nov 23). */
+@custom-variant phone {
+  @media (max-width: 639px), (max-height: 639px) {
+    @slot;
+  }
+}
 
 /* A control drawn smaller than a fingertip (a 32px chip, an 18px phone
  * number, the header's 30px Set location) still takes a 44px tap, the

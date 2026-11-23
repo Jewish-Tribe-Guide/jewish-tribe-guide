@@ -204,3 +204,30 @@ export function partsFromRead(lines: readonly string[]): PartGiven[] {
     }),
   )
 }
+
+/** A site's home page: its root, with no query. */
+export function isHomePage(url: string | null | undefined): boolean {
+  if (!url) return false
+  try {
+    const u = new URL(url)
+    return /^\/?(index\.\w+)?$/.test(u.pathname) && !u.search
+  } catch {
+    return false
+  }
+}
+
+/** The shul's own schedule page that gives a usual part, when the page
+ *  read is its home page: the home page leaves that part to it. A home
+ *  page's box of usual times is a summary, and Sons of Israel's was out of
+ *  date (Nov 23), so the two filed each other's undoing every night. This
+ *  week's schedule isn't held back: it is weighed by date, not by page. */
+export function scheduleTakesPart(url: string, part: TimesPart, others: readonly { url: string; parts: readonly PartGiven[] }[]): string | null {
+  if (part === 'week' || !isHomePage(url)) return null
+  return others.find((o) => !isHomePage(o.url) && o.parts.some((p) => p.part === part))?.url ?? null
+}
+
+/** The page a watch's finding was read from, as its source's note ends
+ *  ("From their website, changed Oct 19: https://…"). */
+export function pageOfNote(note: unknown): string | null {
+  return typeof note === 'string' ? (note.match(/(https?:\/\/\S+)\s*$/)?.[1] ?? null) : null
+}

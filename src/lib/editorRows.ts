@@ -211,7 +211,9 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
     const isBig = (f: CategoryField) => f.type === 'minyanim' || f.key === items?.key || (f.type === 'contacts' && box.kind !== 'admin')
     const big = inBox.filter(isBig)
     const contactBox = box.id === 'contact'
-    const hoursOut = contactBox ? inBox.filter((f) => f.type === 'hours' && !f.audienceKey) : []
+    // A week of hours is a row of its own after its box, Contact's or an
+    // admin's (the rule, Oct 11; an admin's box until Nov 23 kept its own).
+    const hoursOut = contactBox || box.kind === 'admin' ? inBox.filter((f) => f.type === 'hours' && !f.audienceKey) : []
     // What Contact edits with the address and phone: links and short
     // lines, and a long text put there; anything else is a row of its own.
     const small = inBox.filter(
@@ -242,7 +244,15 @@ export function editorRows(category: CategoryConfig, details: Record<string, unk
       else rows.push({ id: `box:${f.key}`, title: alone ? box.title : f.label, kind: 'fields', fields: [f] })
     }
     // A place with a section per audience shows its hours in those.
-    if (audienceFlags.size === 0) for (const f of hoursOut) rows.push({ id: hoursOut.length > 1 ? `hours:${f.key}` : 'hours', title: hoursOut.length > 1 ? f.label : 'Hours', kind: 'fields', fields: take([f]) })
+    if (audienceFlags.size === 0) {
+      for (const f of hoursOut) {
+        if (!contactBox) {
+          // An admin's box of just the hours is their row, by the box's name.
+          const only = small.length === 0 && basics.length === 0 && big.length === 0 && hoursOut.length === 1
+          rows.push({ id: `hours:${f.key}`, title: only ? box.title : f.label, kind: 'fields', fields: take([f]) })
+        } else rows.push({ id: hoursOut.length > 1 ? `hours:${f.key}` : 'hours', title: hoursOut.length > 1 ? f.label : 'Hours', kind: 'fields', fields: take([f]) })
+      }
+    }
   }
   // A section with no box of its own: its fields have no row of their own.
   for (const flagKey of audienceFlags) if (!rows.some((r) => r.flag === flagKey)) rows.push(...audienceRow(flagKey))

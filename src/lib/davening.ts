@@ -49,8 +49,9 @@ export const TEFILLAH_ORDER: Tefillah[] = [
   'kabbalas_shabbos',
   'shabbos_mussaf',
   'mincha',
-  'maariv',
+  // Mincha/Maariv before a later Maariv: the order of the day (Nov 23).
   'mincha_maariv',
+  'maariv',
   'other',
 ]
 

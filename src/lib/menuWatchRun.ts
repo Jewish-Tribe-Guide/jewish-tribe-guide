@@ -152,7 +152,46 @@ export async function menuOnPage(watch: Pick<Watch, 'communityId' | 'url' | 'res
 export async function runMenuWatch(
   watch: Pick<Watch, 'communityId' | 'url' | 'resourceId' | 'pageHash'>,
   budget?: MenuReadBudget,
-  opts: { fetchImpl?: typeof fetch; apiKey?: string | undefined; full?: boolean; renderer?: ReturnType<typeof pageRenderer> | null } = {},
+  opts: MenuWatchOpts = {},
+): Promise<WatchOutcome> {
+  const held: HeldRead = { from: null }
+  try {
+    return await readMenuWatch(watch, budget, opts, held)
+  } finally {
+    // Held for a drawn page that turned out not to need it: back for another.
+    if (budget && held.from === 'menu') budget.menuReads = (budget.menuReads ?? 0) + 1
+    if (budget && held.from === 'run') budget.aiReads++
+  }
+}
+
+type MenuWatchOpts = { fetchImpl?: typeof fetch; apiKey?: string | undefined; full?: boolean; renderer?: ReturnType<typeof pageRenderer> | null }
+
+/** The AI read a menu took before drawing its page, and from where, until
+ *  it's spent (null). A drawn page comes out changed every time, so it
+ *  always needs one, and drawing takes seconds: taken after, the quick
+ *  menus beside it had spent the reads meanwhile, it was skipped, and the
+ *  night's one draw was wasted on it. Oldest first, the same menu won the
+ *  draw the next night and lost again (Shlomo's, LUHV Deli and Center City
+ *  Pretzel, unread for 5–7 days by Nov 23). */
+type HeldRead = { from: 'menu' | 'run' | null }
+
+function holdMenuRead(budget: MenuReadBudget): HeldRead['from'] {
+  if ((budget.menuReads ?? 0) > 0) {
+    budget.menuReads!--
+    return 'menu'
+  }
+  if (budget.aiReads > 0) {
+    budget.aiReads--
+    return 'run'
+  }
+  return null
+}
+
+async function readMenuWatch(
+  watch: Pick<Watch, 'communityId' | 'url' | 'resourceId' | 'pageHash'>,
+  budget: MenuReadBudget | undefined,
+  opts: MenuWatchOpts,
+  held: HeldRead,
 ): Promise<WatchOutcome> {
   if (!watch.resourceId) return { ok: false, error: 'This menu watch isn’t tied to a listing' }
   const row = await getResourceRowById(watch.resourceId, watch.communityId)
@@ -173,6 +212,12 @@ export async function runMenuWatch(
       ? async (url, trouble) => {
           if (budget && !opts.full) {
             if ((budget.renders ?? 0) <= 0) {
+              undrawn = true
+              return null
+            }
+            // No read left to read it: the draw is kept for a menu with one.
+            held.from ??= holdMenuRead(budget)
+            if (!held.from) {
               undrawn = true
               return null
             }
@@ -251,7 +296,10 @@ export async function runMenuWatch(
     if (!opts.full) return { ok: true, filed: 0 }
     return { ok: true, filed: 0, check: { what: 'dishes', from: checkFrom(source), result: 'nothing', read: [], differences: [], queue: null, note: 'The AI isn’t set up here, so the menu wasn’t read.' } }
   }
-  if (budget && !opts.full && !takeMenuReads(budget, 1)) return { ok: true, filed: 0, skipped: true }
+  if (budget && !opts.full) {
+    if (held.from) held.from = null
+    else if (!takeMenuReads(budget, 1)) return { ok: true, filed: 0, skipped: true }
+  }
   // A dish any branch on this page lists is asked about, and isn't news
   // to the first branch; one missing is said on the branch that lists it.
   const ownListed = listedDishes(listing, category)

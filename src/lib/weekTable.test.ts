@@ -231,3 +231,12 @@ describe('times written one way', () => {
     expect(noteText('')).toBeNull()
   })
 })
+
+// The user, Nov 23: a 9pm Maariv was shown before Mincha/Maariv. The
+// evening goes in the order of the day.
+describe('Mincha/Maariv between Mincha and a later Maariv', () => {
+  it('in the weekday table’s columns', () => {
+    const t = weekdayTable([m({ tefillah: 'maariv', days: ['mon'], time: '9:00pm' }), m({ tefillah: 'mincha_maariv', days: ['mon'], time: '4:30pm' }), m({ tefillah: 'mincha', days: ['mon'], time: '1:30pm' })], null)
+    expect(t?.columns).toEqual(['mincha', 'mincha_maariv', 'maariv'])
+  })
+})
