@@ -139,8 +139,14 @@ describe('this week’s grid', () => {
     expect(g.rows.map((r) => [r.date, ...r.cells.map((c) => c.map((x) => x.text).join(', '))])).toEqual([
       ['2026-11-16', '7, 8 AM', '7:45 PM'],
       ['2026-11-17', '6:45 AM, 1 PM', ''],
-      ['2026-11-18', '', ''],
     ])
+  })
+
+  // The user, Nov 23, on Rodeph Shalom's week: one Thursday Shacharis and
+  // five rows of dashes. Only the days with a minyan.
+  it('a day with no minyan has no row', () => {
+    const g = weekGrid([day('2026-11-22', []), day('2026-11-23', []), day('2026-11-26', [m({ time: '8:10am' })], 'Thanksgiving'), day('2026-11-27', [])])!
+    expect(g.rows.map((r) => r.date)).toEqual(['2026-11-26'])
   })
 
   it('marks a note once, however many days carry it, and keeps a day’s name', () => {

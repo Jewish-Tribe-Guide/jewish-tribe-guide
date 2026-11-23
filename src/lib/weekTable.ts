@@ -252,8 +252,10 @@ export type WeekGrid = {
 
 const MARKS = ['†', '‡', '§', '¶']
 
-/** `days`: a week's dates, each with its minyanim on that date. Null when
- *  none has any. */
+/** `days`: a week's dates, each with its minyanim on that date. A row
+ *  only for a date with a minyan (the user, Nov 23: one Thursday
+ *  Shacharis drew five rows of dashes); the box's dates say the week. Null
+ *  when none has any. */
 /** "7, 8 AM", as the usual table runs clock times together (joinTimes): a
  *  plain time drops its AM or PM when the next one in the cell says it. */
 function sharedMeridiem<C extends { text: string; mark?: string; signUp?: boolean }>(cell: C, i: number, cells: readonly C[]): C {
@@ -279,7 +281,7 @@ export function weekGrid(days: readonly { date: string; occasion?: string | null
     notes.push({ mark, text })
     return mark
   }
-  const rows = days.map((d) => ({
+  const rows = days.filter((d) => d.rows.length > 0).map((d) => ({
     date: d.date,
     occasion: d.occasion ?? null,
     cells: columns.map((t) =>

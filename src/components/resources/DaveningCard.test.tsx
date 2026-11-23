@@ -536,10 +536,9 @@ describe('this week’s schedule (Oct 6)', () => {
       }
       showTue([whole])
       expect(screen.getByTestId('davening-this-week-dates')).toHaveTextContent(/^Oct 4–9$/)
-      // Sunday to Friday, a dash on each day with nothing (board 5e).
-      expect([...screen.getByTestId('davening-this-week-days').querySelectorAll('tbody tr')].map((r) => r.textContent)).toEqual([
-        'SunOct 4–', 'MonOct 5–', 'TueOct 6Today–', 'WedOct 7–', 'ThuOct 88:10 AM', 'FriOct 9–',
-      ])
+      // Only the day with a minyan (the user, Nov 23, changing board 5e's
+      // dash on each day with nothing); the dates above still say the week.
+      expect([...screen.getByTestId('davening-this-week-days').querySelectorAll('tbody tr')].map((r) => r.textContent)).toEqual(['ThuOct 88:10 AM'])
     })
 
     // BZBI: a pasted week to Thursday. The user, Oct 27: this week is
