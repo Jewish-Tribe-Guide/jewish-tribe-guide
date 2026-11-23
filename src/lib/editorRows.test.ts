@@ -188,8 +188,8 @@ describe('what a row says', () => {
       'Shacharis 7 AM',
       'Shacharis 8 AM',
       'Mincha 1:30 PM',
-      'Maariv 8 PM',
       'Mincha & Maariv 10 min before sunset',
+      'Maariv 8 PM',
     ])
   })
   it('a shul’s Shabbos times in the order of Shabbos', () => {

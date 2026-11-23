@@ -240,7 +240,7 @@ describe('what a full read found', () => {
       { ...row('fri', 'mincha_maariv', 'At Candle Lighting'), season: 'winter' as const },
       { ...row('sun', 'maariv', '6:30 PM'), notes: 'Winter only' },
     ]
-    expect(timesReadLines(rows)).toEqual(['Maariv Sun 6:30 PM · Winter', 'Mincha & Maariv Fri 7:00 PM · Summer', 'Mincha & Maariv Fri At Candle Lighting · Winter'])
+    expect(timesReadLines(rows)).toEqual(['Mincha & Maariv Fri 7:00 PM · Summer', 'Maariv Sun 6:30 PM · Winter', 'Mincha & Maariv Fri At Candle Lighting · Winter'])
   })
 
   it('gives the hours the page gives', () => {

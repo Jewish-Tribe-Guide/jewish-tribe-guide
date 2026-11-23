@@ -2274,6 +2274,15 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   and the night's one draw lost with it, the same menu every night.
   It now takes its read before it may draw (`menuWatchRun.ts`). The
   rest of the watches were fine: 123 of 129 read in the last three days.
+- Nov 23 (the user: a 9pm Maariv shown before Mincha/Maariv): the
+  evening now goes Mincha, Mincha & Maariv, Maariv everywhere a shul's
+  times are ordered (the listing's weekday columns, the box editor, Add
+  a minyan, the watch's lines), one change to `TEFILLAH_ORDER`.
+- Nov 23: `npm run dev` answered 500 on every page since Nov 22's phone
+  layout (db64ea0d): Tailwind split the `phone` variant's query at its
+  comma. The production build happened to be right. Now in the block
+  form, and `src/test/customVariants.test.ts` fails on a short form with
+  a comma.
 - Nov 23, Sons of Israel's usual Shabbos times kept flipping: its home
   page's box of usual times (a summary: Sephardic 9:00, where the
   Schedule of Tefillot says 8:30) and the Tefillot page each filed a
