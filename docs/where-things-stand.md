@@ -199,7 +199,6 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
 
 ### Waiting on others
 
-78. 5 moderate npm audit findings, in Sentry's build plugin.
 79. Sons of Israel's newsletter has sent nothing.
 80. Penn Presbyterian and Pennsylvania Hospital are empty on Refuah.
 

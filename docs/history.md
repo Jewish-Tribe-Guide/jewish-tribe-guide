@@ -2261,6 +2261,10 @@ simpler ("it really shouldn't be that complicated").
 
 Taken off `where-things-stand.md` with their numbers, as they read there.
 
+- 78. Done Nov 22: the 5 moderate npm audit findings went with Sentry 11
+  (npm audit: 0). The four waiting major upgrades (Sentry 11, eslint 10,
+  jsdom 31, unpdf 2) went in together on `claude/dep-upgrades`.
+
 - 53. Done Nov 22: the old admin columns are gone. Migration 114 dropped
   site_settings' tagline and seven old heading columns, community.tagline,
   category.card_text_color, and form's card colour and photo, on live and
