@@ -38,8 +38,30 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     communities, sheets and screens with their own addresses, and long
     AGENTS.md sections on working around Next. It works and is tested,
     but it's expensive to change and takes a lot of context to pick up.
-83. Security hardening isn't finished: the Content-Security-Policy only
-    reports, it doesn't block, and it still allows inline scripts.
+    Measured Nov 22: 138k lines of code (110k of tests). Shul schedules
+    and watches are the biggest area: 10k lines in 46 files in `src/lib`
+    alone. Then ask/search (5.3k), the AI readers (2.6k), submissions
+    (2k). Most changed in 60 days: GenericDirectory (104 commits, 1,116
+    lines), ListingView (78, 1,551), Landing (72), ResourceMapView (59),
+    CategoryEditor (54). My recommendation: no rewrite. (a) After the
+    Nov 28 shul check, review the shul schedule and watch code as one
+    piece (read → compare → propose) and cut what the Nov 19 rules made
+    unneeded. (b) Split GenericDirectory and ListingView the next time
+    work lands in them, not as a project of its own. (c) Trim this file
+    (2,400+ lines; you wanted that Nov 21): finished sections to
+    `docs/history.md`. Your call which, if any.
+83. Security hardening. Nov 22: the policy now allows what Google Maps
+    really loads (its fonts, its legend, WebAssembly; JavaScript eval
+    stays blocked). Every map visit broke it dozens of times, and by Nov
+    13 that had used up Sentry's monthly quota, so Sentry has dropped
+    every event since, real errors too, while `sentry:check` said ✓. It
+    now says when Sentry is dropping events, and lists CSP reports.
+    Sentry keeps dropping until the quota resets (about Nov 30). Then:
+    watch the reports for two weeks; if only known noise (the admin's
+    eval, browser extensions) comes in, switch the header to enforce,
+    which is a one-word change in `next.config.ts`. Inline scripts stay
+    allowed: closing that needs a per-request nonce, which would stop the
+    pages being prerendered and cached. Not worth that for this site.
 
 ### You decide (a design or product call)
 

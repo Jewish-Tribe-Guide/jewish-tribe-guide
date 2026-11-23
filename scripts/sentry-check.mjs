@@ -22,34 +22,71 @@ if (!ORG || !PROJECT || !TOKEN) {
   process.exit(0)
 }
 
-const url = new URL(`https://sentry.io/api/0/organizations/${ORG}/issues/`)
-url.searchParams.set('query', 'is:unresolved environment:production')
-url.searchParams.set('statsPeriod', '14d')
-url.searchParams.set('limit', '25')
-url.searchParams.set('project', PROJECT)
+const headers = { Authorization: `Bearer ${TOKEN}` }
 
-const res = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } })
-
-if (!res.ok) {
-  const body = await res.text()
-  console.log(`\n  ✗ Sentry API request failed (${res.status}): ${body}\n`)
-  // A broken/expired token shouldn't silently look like "no issues" —
-  // fail loud rather than let real errors go unnoticed.
-  process.exit(1)
+async function get(path, params) {
+  const url = new URL(`https://sentry.io/api/0/organizations/${ORG}/${path}`)
+  for (const [k, v] of params) url.searchParams.append(k, v)
+  const res = await fetch(url, { headers })
+  if (!res.ok) {
+    // A broken/expired token shouldn't silently look like "no issues" —
+    // fail loud rather than let real errors go unnoticed.
+    console.log(`\n  ✗ Sentry API request failed (${res.status}): ${await res.text()}\n`)
+    process.exit(1)
+  }
+  return res.json()
 }
 
-const issues = await res.json()
+// "No errors" means nothing if Sentry is throwing them away. From Nov 13 to
+// Nov 22 it dropped every event, real errors included, because the map's
+// CSP reports had used up the month's quota — and this script said ✓.
+const stats = await get('stats_v2/', [
+  ['field', 'sum(quantity)'],
+  ['groupBy', 'outcome'],
+  ['category', 'error'],
+  ['statsPeriod', '3d'],
+  ['interval', '1d'],
+])
+const dropped = (stats.groups ?? [])
+  .filter((g) => g.by.outcome === 'rate_limited')
+  .reduce((n, g) => n + (g.totals['sum(quantity)'] ?? 0), 0)
+if (dropped > 0) {
+  console.log(`\n  ✗ Sentry dropped ${dropped} event(s) over the quota in the last 3 days.`)
+  console.log('    Errors sent meanwhile were never recorded, so the list below is not the whole story.')
+  console.log('    See Stats in Sentry for what is using the quota.\n')
+}
+
+const query = (q) => [
+  ['query', q],
+  ['statsPeriod', '14d'],
+  ['limit', '25'],
+  ['project', PROJECT],
+]
+const issues = await get('issues/', query('is:unresolved environment:production'))
+// CSP violation reports come from the browser with no environment, so the
+// query above never returns them.
+const csp = await get('issues/', query('is:unresolved event.type:csp'))
+
+function list(items) {
+  for (const issue of items) {
+    const seen = issue.count === '1' ? '1 event' : `${issue.count} events`
+    console.log(`  ${issue.shortId}  ${issue.title}`)
+    console.log(`    ${seen} · last seen ${new Date(issue.lastSeen).toLocaleString()}`)
+    console.log(`    ${issue.permalink}\n`)
+  }
+}
 
 if (issues.length === 0) {
   console.log('\n  ✓ No unresolved production errors in Sentry.\n')
-  process.exit(0)
+} else {
+  console.log(`\n  ⚠ ${issues.length} unresolved production error(s) in Sentry:\n`)
+  list(issues)
 }
-
-console.log(`\n  ⚠ ${issues.length} unresolved production error(s) in Sentry:\n`)
-for (const issue of issues) {
-  const seen = issue.count === '1' ? '1 event' : `${issue.count} events`
-  console.log(`  ${issue.shortId}  ${issue.title}`)
-  console.log(`    ${seen} · last seen ${new Date(issue.lastSeen).toLocaleString()}`)
-  console.log(`    ${issue.permalink}\n`)
+if (csp.length > 0) {
+  console.log(`  ⚠ ${csp.length} Content-Security-Policy report(s) in the last 14 days (src/lib/csp.ts):\n`)
+  list(csp)
 }
-console.log('  Investigate and fix what you can alongside the current change — see AGENTS.md.\n')
+if (issues.length > 0 || csp.length > 0) {
+  console.log('  Investigate and fix what you can alongside the current change — see AGENTS.md.\n')
+}
+process.exit(dropped > 0 ? 1 : 0)

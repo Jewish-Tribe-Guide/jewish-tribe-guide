@@ -495,3 +495,14 @@ npm run sentry:check   # read-only — lists unresolved production errors
 Needs `SENTRY_API_TOKEN` in `.env.local` — a separate, read-only personal auth token (org:read, project:read, event:read; see `.env.example`), distinct from `SENTRY_AUTH_TOKEN` which is build-only and can't read issues. Without it the script just skips itself, so it's safe to run unconditionally.
 
 Sentry only reports from the real Vercel production deployment (`VERCEL_ENV === 'production'`) — `npm run dev`, a local `npm run build && npm run start`, and every suite above run against the exact same DSN in `.env.local` but never report anything, so an unresolved issue here is a real visitor, not local noise. If that ever stops being true — a "ReferenceError: X is not defined" for an `X` that plainly exists in current source, or an event tagged `environment: development` or a `localhost` URL — the gate in `src/instrumentation.ts`/`src/instrumentation-client.ts` regressed; fix that before chasing the phantom bug.
+
+**A ✓ from `sentry:check` means nothing while Sentry is over its quota.** The
+plan's monthly error quota is shared with CSP violation reports, and from
+Nov 13 to Nov 22 the map's reports (dozens of Google font loads per visit)
+had used it up, so Sentry dropped every event, real errors included, while
+this script said "No unresolved production errors". It now checks Sentry's
+own stats first and exits 1 with "dropped N event(s)" when that is happening,
+and lists CSP reports separately (they carry no environment, so the
+production query never showed them). A new CSP report is either a host
+`src/lib/csp.ts` should allow or something to block; fix it there, because
+a noisy one eats the quota again.

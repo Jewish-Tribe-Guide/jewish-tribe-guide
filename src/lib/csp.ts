@@ -79,15 +79,18 @@ export function buildCsp(env: CspEnv = {}): string {
       "'self'",
       "'unsafe-inline'", // see the note above
       env.dev ? "'unsafe-eval'" : null,
+      // Google Maps compiles WebAssembly. This allows that and not JS eval().
+      "'wasm-unsafe-eval'",
       'https://maps.googleapis.com',
       'https://challenges.cloudflare.com',
       posthog,
       posthogDomain,
     ]),
     // Tailwind and next/font emit inline styles.
-    'style-src': ["'self'", "'unsafe-inline'"],
+    // Google Maps adds its own stylesheet and fonts to the page.
+    'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
     'img-src': ["'self'", 'data:', 'blob:', 'https:'],
-    'font-src': ["'self'", 'data:'],
+    'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
     'connect-src': uniq([
       "'self'",
       supabase,
@@ -96,6 +99,9 @@ export function buildCsp(env: CspEnv = {}): string {
       'https://maps.googleapis.com',
       // Where Find the place's suggestions come from.
       'https://places.googleapis.com',
+      // Google Maps: its map legend, and data: reads from its blob: worker.
+      'https://www.gstatic.com',
+      'data:',
       'https://nominatim.openstreetmap.org',
       env.dev ? 'ws://localhost:*' : null,
       posthog,
