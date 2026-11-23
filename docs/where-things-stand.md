@@ -30,7 +30,12 @@ old number can still be looked up. When an item is done, move it to
     as one piece (read → compare → propose) and cut what the Nov 19
     rules made unneeded (this also answers 31, "patches on patches?").
     No rewrite. GenericDirectory and ListingView get split the next time
-    work lands in them, not as a project.
+    work lands in them, not as a project. One case to settle in it: a
+    shul whose usual times are on two pages that disagree (Sons of
+    Israel, Nov 23: its home page and its Schedule of Tefillot), so each
+    files a change undoing the other. The rule says one regular-schedule
+    page; nothing picks one yet. Fixed by hand for now; the user to stop
+    reading the home page in Places.
 83. **About Nov 30:** Sentry's quota resets, so `sentry:check` should go
     green and real errors show again. Then two weeks of policy reports;
     if only known noise, switch the security policy to enforce (one
