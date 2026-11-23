@@ -36,14 +36,13 @@ data back is in `docs/backups.md`.
 Done Nov 22: Supabase keeps 7 days of daily backups (`docs/backups.md`);
 the Turnstile keys are set for Production and the Upstash ones for
 Production and Preview; UptimeRobot is green and its emails arrive; the domain's auto-renew is
-on at Namecheap (held in an account other than jewishtribeguide).
+on at Namecheap (held in an account other than jewishtribeguide); and
+Sentry's two alert rules email on a new issue, and their email arrived
+(the false nightly-email timeout, 4:47 AM Nov 22). Sentry's plan allows
+one user, so only the signed-in account gets them.
 
 
-1. **Sentry's alert emails.** Two alert rules email on a new issue
-   (Monitors → Alerts; checked Nov 22), and both fired for the false
-   nightly-email timeout that morning. Left: confirm that email arrived.
-   The plan allows one user, and Sentry deactivated another member, so
-   only the signed-in account's email gets them.
+Nothing left here.
 
 ## Habits
 
