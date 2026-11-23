@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { clampShare, splitColumns, useListMapSplit } from './useListMapSplit'
+import { styleValue } from '@/test/styleValue'
 
 afterEach(() => {
   cleanup()
@@ -51,13 +52,13 @@ describe('useListMapSplit', () => {
   it('starts half and half, and dragging the line moves it and is remembered', () => {
     render(<Split />)
     expect(handle()).toHaveAttribute('aria-valuenow', '50')
-    expect(columns()).toBe(splitColumns(0.5))
+    expect(columns()).toBe(styleValue('grid-template-columns', splitColumns(0.5)))
 
     // The line's middle to 700px along a 1120px grid starting at 100px:
     // (700 - 100 - 16) / 1088 of the width.
     fireEvent.pointerDown(handle(), { button: 0, clientX: 660, pointerId: 1 })
     fireEvent.pointerMove(handle(), { clientX: 700, pointerId: 1 })
-    expect(columns()).toBe(splitColumns(584 / 1088))
+    expect(columns()).toBe(styleValue('grid-template-columns', splitColumns(584 / 1088)))
     fireEvent.pointerUp(handle(), { clientX: 700, pointerId: 1 })
     expect(handle()).toHaveAttribute('aria-valuenow', '54')
     expect(localStorage.getItem('jpc:list-share')).toBe('0.537')
@@ -80,7 +81,7 @@ describe('useListMapSplit', () => {
     fireEvent.pointerDown(handle(), { button: 0, clientX: 660, pointerId: 1 })
     fireEvent.pointerMove(handle(), { clientX: 800, pointerId: 1 })
     fireEvent.pointerCancel(handle(), { pointerId: 1 })
-    expect(columns()).toBe(splitColumns(0.5))
+    expect(columns()).toBe(styleValue('grid-template-columns', splitColumns(0.5)))
     expect(localStorage.getItem('jpc:list-share')).toBeNull()
   })
 
@@ -98,7 +99,7 @@ describe('useListMapSplit', () => {
     fireEvent.keyDown(handle(), { key: 'ArrowRight' })
     fireEvent.doubleClick(handle())
     expect(handle()).toHaveAttribute('aria-valuenow', '50')
-    expect(columns()).toBe(splitColumns(0.5))
+    expect(columns()).toBe(styleValue('grid-template-columns', splitColumns(0.5)))
   })
 
   // The grid starts at 100px and is 1120 wide: the map is at its smallest
@@ -121,7 +122,7 @@ describe('useListMapSplit', () => {
       expect(onHideMap).toHaveBeenCalledTimes(1)
       expect(grid()).not.toHaveAttribute('data-snap')
       expect(localStorage.getItem('jpc:list-share')).toBe('0.55')
-      expect(columns()).toBe(splitColumns(0.55))
+      expect(columns()).toBe(styleValue('grid-template-columns', splitColumns(0.55)))
     })
 
     it('takes a clear push: just past the map’s smallest only resizes', () => {

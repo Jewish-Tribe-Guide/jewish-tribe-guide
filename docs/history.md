@@ -2261,6 +2261,9 @@ simpler ("it really shouldn't be that complicated").
 
 Taken off `where-things-stand.md` with their numbers, as they read there.
 
+- 78. Done Nov 22: the 5 moderate npm audit findings went with Sentry 11
+  (npm audit: 0). The four waiting major upgrades (Sentry 11, eslint 10,
+  jsdom 31, unpdf 2) went in together on `claude/dep-upgrades`.
 - 41. Done Nov 22: Supabase keeps 7 days of daily backups (the user
   checked), and our own copy, photos included, now runs weekly on this
   Mac by itself (`scripts/weekly-backup.sh`, `docs/operations.md`).

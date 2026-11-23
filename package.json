@@ -33,7 +33,7 @@
     "test:all": "vitest run && playwright test"
   },
   "dependencies": {
-    "@sentry/nextjs": "^10.72.0",
+    "@sentry/nextjs": "11.14.0",
     "@sparticuz/chromium": "153.0.0",
     "@supabase/supabase-js": "^2.119.2",
     "@upstash/ratelimit": "^2.2.1",
@@ -48,7 +48,7 @@
     "resend": "^6.39.0",
     "sharp": "^0.35.4",
     "tz-lookup": "^6.1.25",
-    "unpdf": "1.9.1"
+    "unpdf": "2.2.1"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
@@ -65,9 +65,9 @@
     "@types/tz-lookup": "^6.1.2",
     "@vitejs/plugin-react": "^6.3.0",
     "@vitest/coverage-v8": "^5.1.1",
-    "eslint": "^9",
+    "eslint": "^10.15.0",
     "eslint-config-next": "16.4.6",
-    "jsdom": "^30.0.1",
+    "jsdom": "31.0.1",
     "knip": "6.47.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",

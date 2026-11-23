@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { lazy, Suspense, useState } from 'react'
 import MobileSheet from './MobileSheet'
+import { styleValue } from '@/test/styleValue'
 
 afterEach(cleanup)
 
@@ -156,7 +157,7 @@ describe('MobileSheet', () => {
         </MobileSheet>,
       )
       const sheet = () => document.body.querySelector('[role="dialog"]') as HTMLElement | null
-      expect(sheet()?.style.transform).toBe('translateY(0)')
+      expect(sheet()?.style.transform).toBe(styleValue('transform', 'translateY(0)'))
 
       rerender(
         <MobileSheet isOpen={false} onClose={vi.fn()} title="Edit listing">
