@@ -2274,6 +2274,12 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   and the night's one draw lost with it, the same menu every night.
   It now takes its read before it may draw (`menuWatchRun.ts`). The
   rest of the watches were fine: 123 of 129 read in the last three days.
+- Nov 23 (the user's yes, changing board 5e): a shul's This week box
+  has a row only for a day with a minyan. Rodeph Shalom's one Thursday
+  Zoom Shacharis had drawn five rows of dashes. The box's dates still say
+  the whole week, Sunday to Friday, and Today is tinted only when today
+  has a minyan. A week whose minyan days have all gone by shows no box,
+  as a week with every day gone by already did.
 - Nov 23 (the user: a 9pm Maariv shown before Mincha/Maariv): the
   evening now goes Mincha, Mincha & Maariv, Maariv everywhere a shul's
   times are ordered (the listing's weekday columns, the box editor, Add
