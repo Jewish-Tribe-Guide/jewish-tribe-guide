@@ -1,6 +1,6 @@
 // Kosher Certification lets people type a hechsher in, so a choice called
 // "Other Kosher" is a second Other (the user, Nov 9,
-// docs/where-things-stand.md). Takes it off every Kosher Certification
+// docs/history.md). Takes it off every Kosher Certification
 // field that has a typed-in Other. A place or pending submission that
 // picked it keeps it, shown as typed in; the run lists them.
 //

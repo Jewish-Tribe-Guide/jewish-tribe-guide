@@ -28,7 +28,7 @@ const CARRIES_MARK = /replaceState\(\s*(?:(?:window\.)?history\.state|\{\s*\.\.\
 // The public site's two query-string syncs: written to change the address
 // with no re-render at all, which taking the mark off would give up (Next
 // would move its router, and useSearchParams readers re-render). Left as
-// they were by the admin review (Nov 18); see docs/where-things-stand.md.
+// they were by the admin review (Nov 18); see docs/history.md.
 // What that cost (a refresh on coming back wrote the router's older address
 // over theirs) is answered where the refresh is: RefreshContentOnReturn puts
 // their address back once the refresh lands, mark and all, so the router

@@ -157,7 +157,7 @@ export function submitterDetails(
 
 /** The keys the site keeps for itself, moving out of `details` into the
  *  listing's own `state` column (migration 110, Nov 21; the plan is in
- *  docs/where-things-stand.md). The app's own keys above, less the two a
+ *  docs/history.md). The app's own keys above, less the two a
  *  person may write (`googleDescription` where configured, `menuUrl`), plus
  *  `googleFields`, which the sync and the editor work out rather than
  *  anyone authoring it. Must match `site_state_keys()` in migration 110:

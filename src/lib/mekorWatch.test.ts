@@ -132,7 +132,7 @@ describe('certsIn', () => {
   })
 })
 
-// The comparison done by hand on Oct 18 (docs/where-things-stand.md, 6a) is
+// The comparison done by hand on Oct 18 (docs/history.md, 6a) is
 // what the first run should file.
 describe('compareMekor on the Oct 18 list and guide', () => {
   const findings = compareMekor(entries, guide, keystonePending)
