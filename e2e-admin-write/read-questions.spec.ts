@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 import { changedByTests } from '../e2e/suiteRows'
 import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
+import { TEST_PROJECT_TIMEOUT } from '../e2e/helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives the AI's readings on the Searches page for real: its readings are
@@ -99,8 +100,9 @@ test('a word a reading proposes is taught, reaches the site, and is untaught', a
   const proposal = row.getByTestId('todo-word')
   await expect(proposal).toContainText(`“${word}” means ${c.plural_label} · ${f.filterLabel ?? f.label}: ${option.label}`)
   await proposal.getByRole('button', { name: 'Teach' }).click()
-  // Taught, the search is off the list.
-  await expect(row).not.toBeVisible()
+  // Taught, the search is off the list: once the save and the list's
+  // reading again come back (3.7-5s each in CI on Nov 23).
+  await expect(row).not.toBeVisible({ timeout: TEST_PROJECT_TIMEOUT })
 
   const stored = async () => (await supabase.from('question_word').select('category_id, field_key, value, from_question, taught_by').eq('community_id', WRITE_SUITE_COMMUNITY).eq('word', word)).data
   await expect.poll(stored).toEqual([{ category_id: c.id, field_key: f.key, value: option.value, from_question: word, taught_by: expect.any(String) }])
@@ -115,7 +117,7 @@ test('a word a reading proposes is taught, reaches the site, and is untaught', a
   await page.getByRole('button', { name: /Taught words/ }).click()
   const taught = page.getByTestId('taught-word').filter({ hasText: `“${word}”` })
   await taught.getByRole('button', { name: 'Unteach' }).click()
-  await expect(taught).not.toBeVisible()
+  await expect(taught).not.toBeVisible({ timeout: TEST_PROJECT_TIMEOUT })
   await expect.poll(async () => (await stored())?.length).toBe(0)
   await expect.poll(taughtOnSite, { timeout: 30_000 }).toBe(false)
 })

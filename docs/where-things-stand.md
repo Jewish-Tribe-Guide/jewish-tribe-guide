@@ -81,6 +81,9 @@ old number can still be looked up. When an item is done, move it to
     Nov 16 and Nov 22 fixes; home taps 400–456ms (target 200ms).
 4.  **When traffic grows:** a test database of its own, apart from dev's
     (the user, Nov 22: waiting is fine until then).
+    CI's own jobs already crowd the one we share: the sign-in check took
+    3–4s there (Nov 23), and admin tests now allow 20s for it. If
+    admin-write still fails on slow saves, this is the next step.
 
 ### You decide
 

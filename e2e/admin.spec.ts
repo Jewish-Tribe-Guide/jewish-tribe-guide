@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { changedByTests } from './suiteRows'
+import { openAdmin } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Real, signed-in admin console coverage — the gap every other e2e test
@@ -33,7 +34,7 @@ test.describe('admin console', () => {
     // superadmin console (src/app/admin/page.tsx), a different page with no
     // moderation queue on it at all. See next.config.ts's own note on why
     // /admin no longer redirects here.
-    await page.goto('/philly/admin')
+    await openAdmin(page, '/philly/admin')
 
     await expect(page.getByText(/^Signed in as /)).toBeVisible()
     // The magic-link login form's own submit button — its absence is the
@@ -45,7 +46,7 @@ test.describe('admin console', () => {
   })
 
   test('the moderation queue loads to either real submissions or the empty state, not stuck loading', async ({ page }) => {
-    await page.goto('/philly/admin')
+    await openAdmin(page, '/philly/admin')
 
     await expect(page.getByText('Loading submissions…')).not.toBeVisible({ timeout: 10_000 })
     // To do: "Nothing to do", or a row per place with something waiting.
@@ -60,7 +61,7 @@ test.describe('admin console', () => {
     const listingCategory = (body.categories as { id: string; kind: string; pluralLabel: string }[]).find((c) => c.kind === 'listing' && !changedByTests(c))
     test.skip(!listingCategory, 'no listing-kind category configured')
 
-    await page.goto('/philly/admin/categories')
+    await openAdmin(page, '/philly/admin/categories')
 
     // .first(): a row also shows its own raw id in small print (e.g.
     // "childcare" under "Childcare"), which Playwright's default
@@ -74,7 +75,7 @@ test.describe('admin console', () => {
     const listingCategory = (body.categories as { id: string; kind: string; pluralLabel: string }[]).find((c) => c.kind === 'listing' && !changedByTests(c))
     test.skip(!listingCategory, 'no listing-kind category configured')
 
-    await page.goto('/philly/admin/categories')
+    await openAdmin(page, '/philly/admin/categories')
     // One row per page, the whole row a button that opens it (board 1).
     await page.getByRole('button', { name: listingCategory!.pluralLabel }).first().click()
 
@@ -94,7 +95,7 @@ test.describe('admin console', () => {
     const res = await request.get('/api/site-settings')
     const settings = (await res.json()).settings as { name: string; searchPlaceholder: string }
 
-    await page.goto('/philly/admin/home')
+    await openAdmin(page, '/philly/admin/home')
     await expect(page.getByRole('heading', { name: 'Top of the page' })).toBeVisible()
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue(settings.name)
     await expect(page.getByLabel('Words in the search box')).toHaveValue(settings.searchPlaceholder)
@@ -102,7 +103,7 @@ test.describe('admin console', () => {
   })
 
   test('the Home page shows the computer’s header, and the phone’s tabs on Phone', async ({ page }) => {
-    await page.goto('/philly/admin/home')
+    await openAdmin(page, '/philly/admin/home')
     await expect(page.getByRole('heading', { name: 'Header', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Tabs', exact: true })).toHaveCount(0)
     await page.getByRole('group', { name: 'Show the page on' }).getByRole('button', { name: 'Phone' }).click()
@@ -121,13 +122,13 @@ test.describe('admin console', () => {
   // Site itself is a page now, its screens as rows (board 21), no longer a
   // redirect to Home page.
   test('Site opens its list of screens', async ({ page }) => {
-    await page.goto('/philly/admin/site')
+    await openAdmin(page, '/philly/admin/site')
     await expect(page).toHaveURL(/\/philly\/admin\/site$/)
     await expect(page.getByRole('main').getByRole('link', { name: 'View the site' })).toBeVisible()
   })
 
   test('Reports loads real numbers, not stuck loading', async ({ page }) => {
-    await page.goto('/philly/admin/metrics')
+    await openAdmin(page, '/philly/admin/metrics')
 
     // Every box renders even with nothing counted or decided yet.
     await expect(page.getByRole('heading', { name: 'Listing views' })).toBeVisible({ timeout: 10_000 })
@@ -137,7 +138,7 @@ test.describe('admin console', () => {
   })
 
   test('the Home page tab shows the home page beside it, on a computer or a phone', async ({ page }) => {
-    await page.goto('/philly/admin/home')
+    await openAdmin(page, '/philly/admin/home')
     const preview = page.getByRole('complementary', { name: 'Preview' })
 
     // The preview is a real iframe of the site — its own frame, not this
