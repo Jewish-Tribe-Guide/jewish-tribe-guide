@@ -24,6 +24,10 @@ looks. Weigh new work against that: does it keep facts right and
 sourced, and does it work for a community neither of us knows, with no
 hand-fixing by Claude or the site owner?
 
+For now the focus is Philly (the user, Nov 23). One person from another
+community is interested; theirs is the natural city for 86 when it
+comes, not a reason to hurry it.
+
 What stands between today and that, in order: the watches staying calm
 (52), a shul watch whose behaviour is predictable on websites it has
 never seen (82), then a rehearsal with a real second city (86).
