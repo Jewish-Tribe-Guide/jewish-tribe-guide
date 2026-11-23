@@ -15,6 +15,7 @@ import { ForcedViewport } from '@/lib/useIsMobile'
 import { ScreenHeaderProvider, useScreenHeader } from '@/lib/headerVisibility'
 import { useNextMinyan as useNextMinyanInColumn } from './nextMinyans'
 import GenericDirectory from './GenericDirectory'
+import { styleValue } from '@/test/styleValue'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -2009,7 +2010,7 @@ describe('GenericDirectory — the map beside the list', () => {
     const line = screen.getByRole('separator', { name: 'Resize the list and the map' })
     expect(line.previousElementSibling).toContainElement(screen.getByText('Alpha Grill'))
     expect(line.nextElementSibling).toContainElement(screen.getByTestId('map-stand-in'))
-    expect(line.parentElement!.style.gridTemplateColumns).toBe('clamp(420px, calc((100% - 32px) * 0.5), calc(100% - 392px)) 32px minmax(360px, 1fr)')
+    expect(line.parentElement!.style.gridTemplateColumns).toBe(styleValue('grid-template-columns', 'clamp(420px, calc((100% - 32px) * 0.5), calc(100% - 392px)) 32px minmax(360px, 1fr)'))
     // Dragged all the way over, the map hides, as Hide map does.
     line.parentElement!.getBoundingClientRect = () => ({ left: 0, width: 1120, top: 0, height: 700, right: 1120, bottom: 700, x: 0, y: 0, toJSON: () => ({}) })
     fireEvent.pointerDown(line, { button: 0, clientX: 560, pointerId: 1 })
