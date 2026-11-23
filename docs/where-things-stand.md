@@ -137,13 +137,11 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     menu (?).
 39. The newsletter Gmail script's link is saved on live (checked Nov 22).
     Left: try Read now by email once.
-40. Vercel Production: check the Turnstile and Upstash keys; set
-    SENTRY_CRON_MONITORS=nightly-email and redeploy; the next build's
-    log should say Node 24.
-41. Live backups: check Database → Backups, and run the first live copy.
+40. The next production build's log should say Node 24. (Turnstile
+    and Upstash keys checked Nov 22: set.) (SENTRY_CRON_MONITORS is set: the
+    monitor checked in from live on Nov 22.) The whole owner's list is
+    in `docs/operations.md`.
 43. PostHog: check Session Replay's project settings.
-44. The first live morning after a deploy: each community's run shows
-    in its own tab, and Vercel's log has no "run didn't start".
 45. On the preview: the listing's small map tile, the default-location
     map and picker, the menu reader's browser; then review the menu
     reads.

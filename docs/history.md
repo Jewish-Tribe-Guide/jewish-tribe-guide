@@ -2264,6 +2264,13 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
 - 78. Done Nov 22: the 5 moderate npm audit findings went with Sentry 11
   (npm audit: 0). The four waiting major upgrades (Sentry 11, eslint 10,
   jsdom 31, unpdf 2) went in together on `claude/dep-upgrades`.
+- 41. Done Nov 22: Supabase keeps 7 days of daily backups (the user
+  checked), and our own copy, photos included, now runs weekly on this
+  Mac by itself (`scripts/weekly-backup.sh`, `docs/operations.md`).
+
+- 44. Done Nov 22: each community's watches run shows on its own
+  (`job_run` on live has philly and washington rows since Nov 21), and
+  every nightly job ran on each of the last four mornings.
 
 - 53. Done Nov 22: the old admin columns are gone. Migration 114 dropped
   site_settings' tagline and seven old heading columns, community.tagline,

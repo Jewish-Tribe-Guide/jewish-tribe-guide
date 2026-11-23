@@ -478,6 +478,12 @@ These were all real gaps at one point and are named in old commit history / memo
 
 **If you close a gap like this, update this section in the same commit** — this file is read as authoritative instructions, so a stale "still missing" claim here is actively worse than no claim at all.
 
+# Running the site
+
+`docs/operations.md` lists what watches the live site (uptime, the nightly
+email, Sentry's cron monitor, backups) and the owner's short checklist.
+Update it when a watch is added or changes.
+
 # Speed
 
 `docs/speed-targets.md` holds the targets (≤0.1s to a visible response, ≤1s to
