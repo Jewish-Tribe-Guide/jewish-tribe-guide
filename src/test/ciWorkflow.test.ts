@@ -55,7 +55,7 @@ function jobsRunningPlaywright(): Array<{ job: string; script: string; hasContai
     const job = block.match(/^([\w-]+):/)![1]
     for (const m of block.matchAll(/npm run (test:[\w-]+)/g)) {
       if (testDirFor(m[1])) {
-        out.push({ job, script: m[1], hasContainer: /\n\s*container:\s*\S/.test(block) || /npx playwright install --with-deps chromium/.test(block) })
+        out.push({ job, script: m[1], hasContainer: /\n\s*container:\s*\S/.test(block) || /docker run[\s\S]*?mcr\.microsoft\.com\/playwright:v/.test(block) })
       }
     }
   }
@@ -78,7 +78,7 @@ describe('CI runs every browser-driving suite where a browser exists', () => {
         expect(
           hasContainer,
           `${dir} has a test taking the \`page\` fixture, so job "${job}" needs the ` +
-            `Playwright container image (or, on a bare runner, \`npx playwright install --with-deps chromium\`) — ` +
+            `Playwright container image (as the job's container, or run with \`docker run … mcr.microsoft.com/playwright:v…\`) — ` +
             `without it CI fails with "Executable doesn't exist".`,
         ).toBe(true)
       } else {

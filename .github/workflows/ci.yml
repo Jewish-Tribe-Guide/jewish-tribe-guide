@@ -195,8 +195,7 @@ jobs:
     # (.github/actions/own-test-database). Nothing else touches it, so it
     # neither queues behind another run nor shares the test project's
     # sign-in with the other jobs (3-4s a check there, Nov 23). The test
-    # project is only read, for the copy. A bare runner, for Docker; the
-    # browser is installed instead of coming with the Playwright image.
+    # project is only read, for the copy. A bare runner, for Docker.
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -209,8 +208,13 @@ jobs:
         with:
           test-supabase-url: ${{ secrets.TEST_SUPABASE_URL }}
           test-supabase-service-role-key: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:admin-write
+      # In the Playwright image the other jobs use, on the runner's network
+      # so it reaches the local Supabase. Installing the browser here
+      # instead took 4m46s on Nov 23, 4 minutes of it a slow Ubuntu mirror.
+      - run: >-
+          docker run --rm --network host --ipc host -v "$PWD:/work" -w /work
+          -e CI -e TEST_SUPABASE_URL -e TEST_SUPABASE_ANON_KEY -e TEST_SUPABASE_SERVICE_ROLE_KEY
+          mcr.microsoft.com/playwright:v1.63.0-noble npm run test:admin-write
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
