@@ -128,6 +128,23 @@ otherwise, rather than risk writing to the real database — the guard is in eac
 `playwright.*.config.ts` for the three Playwright suites, and in
 `src/test/integrationEnv.ts` for `test:integration`.
 
+**Moving to a database per job (Nov 23).** CI's `admin-write` no longer
+uses the shared test project: it starts Supabase on its own runner from
+`supabase/migrations` and copies the test project's rows into it
+(`.github/actions/own-test-database`), so it needs no queue and no row
+claims against the other jobs. The other suites still share the project and
+move over one at a time (tracker item 4). To run a suite the same way
+locally (needs Docker and about 3 GB):
+
+```bash
+npx supabase@3.1.0 start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+```
+
+then copy the rows as the action does (`backup.mjs --no-files`,
+`restore.mjs … --replace --skip-broken-links`, `reset-sequences.sql`), and
+run the suite with `TEST_SUPABASE_*` set from `npx supabase@3.1.0 status -o
+env`. `npx supabase@3.1.0 stop --no-backup` removes it.
+
 ### A wait can never outlast the test budget above it (closed)
 
 This section used to say `cache-roundtrip`'s `/about` test failed "roughly one

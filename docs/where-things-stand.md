@@ -79,19 +79,19 @@ old number can still be looked up. When an item is done, move it to
     Speed Insights with your sign-in), after two weeks on today's code.
     Last read: iPhone category pages slow to draw and tap, before the
     Nov 16 and Nov 22 fixes; home taps 400–456ms (target 200ms).
-4.  **When traffic grows:** a test database of its own, apart from dev's
-    (the user, Nov 22: waiting is fine until then).
-    CI's own jobs already crowd the one we share: the sign-in check took
-    3–4s there (Nov 23), and admin tests now allow 20s for it. If
-    admin-write still fails on slow saves, this is the next step.
-    Checked Nov 23: all 112 migrations build a fresh Postgres whose
-    tables match the test project's exactly (321 columns, 16 functions),
-    so the schema isn't the obstacle. What a database per CI job still
-    needs: real sign-in (the admin tests mint magic links, so the
-    Supabase CLI's local stack, not bare Postgres), and the test
-    project's rows put into it (`scripts/backup.mjs` then
-    `restore.mjs`, or a saved copy). Costs no money (public repo);
-    adds about 1–2 minutes a job.
+4.  **A test database per CI job** (started Nov 23; the user: best
+    practice, not just green PRs). `admin-write` runs on its own:
+    Supabase started on the runner from the migrations, filled with a
+    copy of the test project's rows (`.github/actions/own-test-database`).
+    Locally 58 passed in 1.5 minutes against 2.0 on the shared one.
+    Next, one PR each: `cache-roundtrip`, `form-roundtrip`,
+    `integration`, then e2e's build and shards. Once all are over, the
+    sharing workarounds can go: row claims (`e2e/suiteRows.ts`), the
+    `test-db-*` queues, the hidden `e2e-writes` community, and the 20s
+    `TEST_PROJECT_TIMEOUT`. Later, best practice would also replace the
+    copy with a seed kept in the repo (public content only), so CI
+    doesn't depend on the test project's state at all. Costs no money
+    (public repo); about 1–2 minutes a job.
 
 ### You decide
 

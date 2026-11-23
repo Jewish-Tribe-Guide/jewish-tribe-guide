@@ -2337,6 +2337,19 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   suite's leftover categories ("Timing …", "Integration Test …"), already
   claimed or gone. Approve (15s) and Main dishes' locator were already
   fixed one by one.
+- Nov 23, admin-write got a database of its own in CI, the standard
+  way (Supabase's CLI on the runner), not one shared with every other
+  job, dev and the previews. All 112 migrations built it; the test
+  project's rows were copied in, leaving out 64 that point at nothing
+  (13 categories of long-deleted test communities, and what hangs off
+  them: `restore.mjs --skip-broken-links`). Two things the move found:
+  a restored copy keeps its ids but not its id counters, so the next
+  `activity` row collided with a copied one (`reset-sequences.sql`, now
+  in `docs/backups.md`'s restore steps too); and Main dishes' "Use this"
+  test waited for "Main dishes · 3", true before the save as well, so
+  it passed on a page the cache still served from before and failed on
+  the menu link (it now waits for the added dish: failed once in two
+  full runs before, 4 of 4 after).
 - 84. Done Nov 23 (the user's yes): the menu watches of four sites that
   refuse the reader were turned off on live: 20th Street Pizza, Stephen's
   Cafe and Authentic Kosher Chinese (Cloudflare's "prove you're a person"

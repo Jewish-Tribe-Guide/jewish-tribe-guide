@@ -84,7 +84,9 @@ time (`AGENTS.md`).
      link makes one on first sign-in, and who is an admin is in the
      `community` rows, which are.
 
-After any restore, run `POST /api/admin/revalidate` (or redeploy). A write
+After any restore, run `scripts/reset-sequences.sql` in the new project's SQL
+editor (the rows keep their ids, and until then the next new `activity` row
+collides with a copied one; found Nov 23), then `POST /api/admin/revalidate` (or redeploy). A write
 straight to the database skips the cache refresh every admin save does, so
 the site would keep showing the old copy for up to a day.
 
