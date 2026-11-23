@@ -1,5 +1,5 @@
 // One Denomination list on every page, and Nusach for shuls (agreed Nov 5,
-// docs/where-things-stand.md, "Denomination gets one list").
+// docs/history.md, "Denomination gets one list").
 //
 // Four Denomination fields differed: Philly Synagogues ("Orthodox
 // (Ashkenazi)", "Orthodox (Sephardic)", Other, one choice), Philly Schools

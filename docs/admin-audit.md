@@ -2,7 +2,7 @@
 
 Every field and control in the admin console, traced to where the public site
 uses it. Read-only: nothing was changed. This is the starting point for the
-admin redesign (see `docs/where-things-stand.md`, "Planned: the admin
+admin redesign (see `docs/history.md`, "Planned: the admin
 redesign"). Line numbers are as of commit `08e7ee81`.
 
 **Verdicts used below**

@@ -62,6 +62,17 @@ describe('buildCsp', () => {
     expect(directive(csp, 'frame-src')).toEqual(["'self'", 'https://challenges.cloudflare.com'])
   })
 
+  // Every map load on the live site broke these, dozens of fonts at a time:
+  // 4,577 font reports by Nov 13 used up Sentry's monthly quota, and from
+  // then on it dropped every event, real errors included (Nov 22).
+  it('allows what Google Maps’ own code loads: its fonts, its legend, its WebAssembly', () => {
+    expect(directive(csp, 'style-src')).toContain('https://fonts.googleapis.com')
+    expect(directive(csp, 'font-src')).toContain('https://fonts.gstatic.com')
+    expect(directive(csp, 'connect-src')).toEqual(expect.arrayContaining(['https://www.gstatic.com', 'data:']))
+    // WebAssembly only: JavaScript eval stays blocked.
+    expect(directive(csp, 'script-src')).toContain("'wasm-unsafe-eval'")
+  })
+
   it('permits eval and the hot-reload websocket only for `next dev`, never otherwise', () => {
     expect(directive(csp, 'script-src')).not.toContain("'unsafe-eval'")
     expect(directive(csp, 'connect-src').some((v) => v.startsWith('ws://'))).toBe(false)

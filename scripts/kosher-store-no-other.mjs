@@ -1,5 +1,5 @@
 // Kosher Store's choices are set, and "Other" isn't one (the user, Nov 8,
-// docs/where-things-stand.md). Takes the "Other" choice off every Kosher
+// docs/history.md). Takes the "Other" choice off every Kosher
 // Store field. No place has ever picked it (checked Nov 8, dev and live);
 // if one has, or a pending submission has, the run stops before writing.
 //

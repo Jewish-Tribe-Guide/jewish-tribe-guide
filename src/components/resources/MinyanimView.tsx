@@ -17,14 +17,19 @@ import { dayKeysFor, useMinyanSchedule } from '@/lib/useMinyanSchedule'
 import { dateText, type DateFacts, type DayPosting } from '@/lib/schedules'
 import { ChevronRightIcon } from '@/components/icons'
 import { dayIndexFor, readMinyanimSearch, shulMatches, tefillosLabel } from '@/lib/minyanimSearch'
-import AddMinyanSheet from './AddMinyanSheet'
+import dynamic from 'next/dynamic'
 import ListHeading from './ListHeading'
-import AddScheduleBox from './AddScheduleBox'
 import { pointerHover } from '@/lib/pointerHover'
 import { SignUpMark } from './SignUp'
 import { tappedMinyanParam } from './TappedMinyan'
 import { shortDate } from './listingParts'
 import { usualCheckedAt } from '@/lib/usualChecked'
+
+// Loaded when a schedule is being added, not with the page (Nov 22).
+const AddScheduleBox = dynamic(() => import('./AddScheduleBox'), { loading: () => null })
+
+// Loaded when Add a minyan is opened, not with the page (Nov 22).
+const AddMinyanSheet = dynamic(() => import('./AddMinyanSheet'), { loading: () => null })
 
 // ── The Synagogues page's Minyanim view (step 4, agreed Oct 1) ───────────────
 // The same page's shuls, as every minyan by time, for a day picked from the
