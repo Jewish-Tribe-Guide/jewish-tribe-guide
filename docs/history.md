@@ -2261,6 +2261,13 @@ simpler ("it really shouldn't be that complicated").
 
 Taken off `where-things-stand.md` with their numbers, as they read there.
 
+- Nov 23, the watches checked hard: the three menus unread for 5–7
+  days (Shlomo's, LUHV Deli, Center City Pretzel) are the ones drawn in
+  a browser. A drawn page comes out changed every time, so it needs an
+  AI read, and the quick menus spent the reads while it drew: skipped,
+  and the night's one draw lost with it, the same menu every night.
+  It now takes its read before it may draw (`menuWatchRun.ts`). The
+  rest of the watches were fine: 123 of 129 read in the last three days.
 - 78. Done Nov 22: the 5 moderate npm audit findings went with Sentry 11
   (npm audit: 0). The four waiting major upgrades (Sentry 11, eslint 10,
   jsdom 31, unpdf 2) went in together on `claude/dep-upgrades`.
