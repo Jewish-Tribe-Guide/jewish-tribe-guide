@@ -2261,6 +2261,10 @@ simpler ("it really shouldn't be that complicated").
 
 Taken off `where-things-stand.md` with their numbers, as they read there.
 
+- 44. Done Nov 22: each community's watches run shows on its own
+  (`job_run` on live has philly and washington rows since Nov 21), and
+  every nightly job ran on each of the last four mornings.
+
 - 53. Done Nov 22: the old admin columns are gone. Migration 114 dropped
   site_settings' tagline and seven old heading columns, community.tagline,
   category.card_text_color, and form's card colour and photo, on live and
