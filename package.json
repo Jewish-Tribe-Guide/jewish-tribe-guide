@@ -33,7 +33,7 @@
     "test:all": "vitest run && playwright test"
   },
   "dependencies": {
-    "@sentry/nextjs": "^10.72.0",
+    "@sentry/nextjs": "11.14.0",
     "@sparticuz/chromium": "153.0.0",
     "@supabase/supabase-js": "^2.119.2",
     "@upstash/ratelimit": "^2.2.1",
