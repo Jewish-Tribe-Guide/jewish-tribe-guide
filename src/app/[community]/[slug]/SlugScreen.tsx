@@ -15,9 +15,9 @@ import dynamic from 'next/dynamic'
 // A form's page shares this route with every category, so its wizard is
 // loaded only on a form's own page (it still renders on the server there).
 // It was in every category page's first download (Nov 22).
-const SupportWizard = dynamic(() => import('@/components/wizard/SupportWizard'))
-const VolunteerWizard = dynamic(() => import('@/components/wizard/VolunteerWizard'))
-const GenericFormWizard = dynamic(() => import('@/components/wizard/GenericFormWizard'))
+const SupportWizard = dynamic(() => import('@/components/wizard/SupportWizard'), { loading: () => null })
+const VolunteerWizard = dynamic(() => import('@/components/wizard/VolunteerWizard'), { loading: () => null })
+const GenericFormWizard = dynamic(() => import('@/components/wizard/GenericFormWizard'), { loading: () => null })
 
 // The client half of the [slug] route. The server has already decided whether
 // this slug is a category or a form (and 404'd if it was neither), so this only
