@@ -33,17 +33,13 @@ data back is in `docs/backups.md`.
 
 ## Only you can do these (a few minutes each)
 
-1. **Supabase → live project → Database → Backups.** Note the plan, how
-   many days of backups are listed, and whether Point in Time Recovery is
-   on. If no backups are listed, our own copy is the only one. Tell
-   Claude, so `docs/backups.md` can say it.
-2. **Vercel → Production environment variables.** Check the Turnstile
-   secret and the two Upstash ones are set. Without them, contributions
-   and the AI readers refuse on live, on purpose.
-3. **Namecheap.** Check auto-renew is on for phillyjewishguide.com.
-4. **UptimeRobot.** Check the monitor is still green, and that its
-   emails reach an inbox someone reads.
-5. **Sentry → Alerts.** Check a new issue sends an email to someone.
+Done Nov 22: Supabase keeps 7 days of daily backups (`docs/backups.md`);
+the Turnstile keys are set for Production and the Upstash ones for
+Production and Preview; UptimeRobot is green and its emails arrive.
+
+
+1. **Namecheap.** Check auto-renew is on for phillyjewishguide.com.
+2. **Sentry → Alerts.** Check a new issue sends an email to someone.
 
 ## Habits
 
