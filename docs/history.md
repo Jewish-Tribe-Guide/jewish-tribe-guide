@@ -2287,6 +2287,9 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   left alone: the home page really does say "Friday Night… Summer:
   7:00pm" and "Weekday Mincha, approximately 15 minutes before shkiah",
   so the reading was a fair one of a vague page.
+  Its home-page watch was then stopped on live (the user's yes), as
+  Places → Stop reading does: it read as changed every night (the page
+  shows the date), an AI read each time.
 - 84. Done Nov 23 (the user's yes): the menu watches of four sites that
   refuse the reader were turned off on live: 20th Street Pizza, Stephen's
   Cafe and Authentic Kosher Chinese (Cloudflare's "prove you're a person"
