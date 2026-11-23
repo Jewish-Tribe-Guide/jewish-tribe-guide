@@ -48,7 +48,7 @@
     "resend": "^6.39.0",
     "sharp": "^0.35.4",
     "tz-lookup": "^6.1.25",
-    "unpdf": "1.9.1"
+    "unpdf": "2.2.1"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
