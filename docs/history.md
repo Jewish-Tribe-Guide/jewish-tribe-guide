@@ -2261,6 +2261,12 @@ simpler ("it really shouldn't be that complicated").
 
 Taken off `where-things-stand.md` with their numbers, as they read there.
 
+- 48. Done Nov 23 (the user: "Washington is a test, delete it", then a
+  yes to the dry run): Washington deleted from live with the site's own
+  `delete_community`: the community, its one category (Synagogues, no
+  listings), one watch marker and 3 nightly run records. Live has Philly
+  alone (171 listings, untouched). Last night's backup still has it.
+  Item 13 (the installed app is Philly's for every community) went with it.
 - Nov 23, the watches checked hard: the three menus unread for 5–7
   days (Shlomo's, LUHV Deli, Center City Pretzel) are the ones drawn in
   a browser. A drawn page comes out changed every time, so it needs an

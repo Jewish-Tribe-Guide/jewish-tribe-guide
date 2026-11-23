@@ -49,10 +49,6 @@ old number can still be looked up. When an item is done, move it to
     links) to live? Live's tiles for those have none of their own.
 28. The drawings for asking for location when it helps (the hospital
     location boards, branch `claude/eager-nash-317067`): look, or let go.
-48. Washington (on live, hidden, empty: one category, no listings): keep
-    for a real launch, or delete? If kept, it needs Map, Candle Lighting
-    and Eruv rows, an uptime check once visible, and its own app name
-    and icon (today every community's installed app is Philly's, 13).
 73. A phone that throws the page away in the background might ignore
     taps until it reloads: a gap noted Nov 16, never seen; every way of
     causing it in a browser worked fine (Nov 22). Only if you see it:
