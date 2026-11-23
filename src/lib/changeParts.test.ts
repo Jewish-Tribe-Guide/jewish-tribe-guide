@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { newListingFacts, visitorChanges } from './changeParts'
+import { datesSaid, newListingFacts, shortParts, visitorChanges } from './changeParts'
 import type { CategoryConfig, CategoryField } from './categories'
 import type { DirectoryResource } from '@/types'
 
@@ -73,20 +73,26 @@ describe('what an edit changed, said for visitors', () => {
     expect(edit({ dishes: ['Steak', 'Falafel'] }, { dishes: ['Falafel', 'Shawarma'] })).toEqual([{ key: 'dishes', label: 'Main dishes', value: 'added Shawarma; taken off Steak' }])
   })
 
-  it('minyanim one by one, named the way the shul’s page names them', () => {
+  // The user, Nov 23: one Sons of Israel edit was eleven lines.
+  it('a shul’s usual times: the box that changed, by name, never minyan by minyan', () => {
     const shacharis = { id: 'm1', days: ['sat'], time: '10:30am', tefillah: 'shacharis' }
-    const mincha = { id: 'm2', days: ['mon', 'tue', 'wed', 'thu', 'fri'], time: '1:30pm', tefillah: 'mincha' }
+    const mincha = { id: 'm2', days: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri'], time: '1:30pm', tefillah: 'mincha' }
     const sunday = { id: 'm3', days: ['sun'], time: '8:00am', tefillah: 'shacharis' }
-    const kabbalas = { id: 'm4', days: ['fri'], time: '15 min before Sunset', tefillah: 'kabbalas_shabbos' }
-    const parts = edit({ minyanim: [shacharis, sunday, kabbalas] }, { minyanim: [{ ...shacharis, time: '10:45am' }, sunday, { ...kabbalas, time: 'At Sunset' }, mincha] })
-    expect(parts.map((p) => `${p.label ? `${p.label} ` : ''}${p.value}`)).toEqual(['Shabbos Shacharis 10:45 AM', 'Kabbalas Shabbos At Sunset', 'New: Weekday Mincha 1:30 PM'])
-    expect(edit({ minyanim: [shacharis, sunday] }, { minyanim: [shacharis] }).map((p) => `${p.label} ${p.value}`)).toEqual(['No longer listed: Sunday Shacharis 8 AM'])
+    const said = (before: object[], after: object[]) => edit({ minyanim: before }, { minyanim: after }).map((p) => p.value)
+    expect(said([shacharis, sunday], [{ ...shacharis, time: '10:45am' }, { ...sunday, time: '7:30am' }])).toEqual(['Usual weekday times updated', 'Usual Shabbos times updated'])
+    expect(said([shacharis, sunday], [shacharis])).toEqual(['Usual weekday times updated'])
+    // Mincha Sunday to Friday: Friday's is Shabbos's.
+    expect(said([shacharis, mincha], [shacharis, { ...mincha, notes: 'Friday only in summer' }])).toEqual(['Usual weekday times updated', 'Usual Shabbos times updated'])
+    expect(said([shacharis], [{ ...shacharis, days: ['sat', 'yom_tov'] }])).toEqual(['Usual times updated'])
+    expect(edit({ minyanim: [shacharis] }, { minyanim: [{ ...shacharis, time: '11:00am' }] })[0]).toEqual({ key: 'minyanim:shabbos', label: '', value: 'Usual Shabbos times updated', quiet: true })
   })
 
-  it('a minyan’s note only when the note is what changed', () => {
-    const m = { id: 'm1', days: ['sat'], time: '10:45am', tefillah: 'shacharis', notes: 'Ends at 12:15pm' }
-    expect(edit({ minyanim: [m] }, { minyanim: [{ ...m, notes: 'Ends at 12:30pm' }] })[0].value).toBe('Shabbos Shacharis 10:45 AM · Ends at 12:30pm')
-    expect(edit({ minyanim: [m] }, { minyanim: [{ ...m, time: '11:00am' }] })[0].value).toBe('Shabbos Shacharis 11 AM')
+  it('a week: once, by its dates, posted or updated; weeks left as they were not said', () => {
+    const wk = (id: string, from: string, to: string, time: string) => ({ id, name: 'Times for this week', kind: 'week', mode: 'replace', from, to, minyanim: [{ id: `${id}t`, tefillah: 'shacharis', on: [from], time }] })
+    const old = wk('a', '2026-10-22', '2026-10-24', '7:00am')
+    const before = { minyanim_schedules: [old, wk('b', '2026-11-15', '2026-11-20', '7:00am')] }
+    const after = { minyanim_schedules: [old, wk('b', '2026-11-15', '2026-11-20', '7:15am'), wk('c', '2026-11-22', '2026-11-27', '7:00am'), wk('d', '2026-11-22', '2026-11-27', '9:00am'), wk('e', '2026-11-30', '2026-12-04', '7:00am')] }
+    expect(edit(before, after).map((p) => p.value)).toEqual(['Times for Nov 15–20 updated', 'Times for Nov 22–27 posted', 'Times for Nov 30 – Dec 4 posted'])
   })
 
   it('nothing at all when nothing changed', () => {
@@ -109,5 +115,15 @@ describe('a new place’s facts', () => {
     expect(facts).toHaveLength(1)
     expect(facts[0]).toMatchObject({ key: 'facts', quiet: true })
     expect(facts[0].value.split(' · ')).toEqual(expect.arrayContaining(['Vegan Dine In', 'Parve']))
+  })
+})
+
+describe('said short, as Activity shows it', () => {
+  it('a one-day date, and a field it doesn’t know named by its own label', () => {
+    expect(datesSaid('2026-11-27', '2026-11-27')).toBe('Nov 27')
+    expect(shortParts([{ key: 'x', label: 'Delivery', value: 'a'.repeat(81) }, { key: 'y', label: 'Phone', value: '215' }], [])).toEqual([
+      { key: 'x', label: '', value: 'Delivery updated', quiet: true },
+      { key: 'y', label: 'Phone', value: '215' },
+    ])
   })
 })

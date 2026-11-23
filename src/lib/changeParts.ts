@@ -1,8 +1,9 @@
 import { fieldIsVisible, type CategoryConfig, type CategoryField } from './categories'
 import { listingChanges, changedHoursDays } from './listingDiff'
 import { dayLabel, fmt12, formatHoursSummary, isStructuredHours, type DayHours } from './hours'
-import { formatDays, isMinyanim, joinText, parseTimeToMinutes, SEASON_LABELS, signUpText, TEFILLAH_LABELS, type Minyan } from './davening'
-import { readSchedules, schedulesKey } from './schedules'
+import { isMinyanim, type Minyan } from './davening'
+import { readSchedules, schedulesKey, type SpecialSchedule } from './schedules'
+import { minyanimForBox } from './minyanimBox'
 import { listingFacts, listingKind } from './listingView'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 
@@ -13,7 +14,9 @@ import type { DirectoryResource, ResourceSubmission } from '@/types'
 //    ones are");
 //  - text a person wrote (What isn't kosher?, delivery details) in full;
 //    Google's description only named;
-//  - a minyan by its day and tefillah, the way the shul's page names it.
+//  - a shul's times by the box that changed ("Usual Shabbos times
+//    updated") and the week posted, never minyan by minyan (the user, Nov
+//    23: one Sons of Israel edit was eleven lines).
 // Which fields changed is listingChanges' call, the same rule the editor and
 // the moderation queue use, so formatting never counts as a change here
 // either. Saved as text: a later rename of a field leaves a past change
@@ -28,49 +31,44 @@ type Proposed = Pick<ResourceSubmission, 'name' | 'address' | 'phone' | 'details
 /** "7:00 PM" → "7 PM"; "6:30 PM" stays (as on the category rows). */
 const shortTime = (hhmm: string) => fmt12(hhmm).replace(':00 ', ' ')
 
-/** A stored minyan time ("7:00am", "19:30") as the site says it ("7 AM");
- *  a rule ("15 min before Sunset") as written. */
-function minyanTime(time: string): string {
-  const minutes = parseTimeToMinutes(time)
-  if (!Number.isFinite(minutes)) return time.trim()
-  return shortTime(`${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`)
-}
+const plainMinyan = (m: Minyan) => JSON.stringify(Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined && v !== '').sort(([a], [b]) => a.localeCompare(b))))
+const sameRows = (a: readonly Minyan[], b: readonly Minyan[]) => JSON.stringify(a.map(plainMinyan).sort()) === JSON.stringify(b.map(plainMinyan).sort())
 
-/** "Shabbos Shacharis", "Weekday Mincha", "Sunday Shacharis", "Mon, Thu
- *  Shacharis". */
-function minyanName(m: Minyan): string {
-  const days = [...m.days].sort().join(',')
-  const when =
-    days === 'sat' ? 'Shabbos'
-    : days === 'fri,mon,thu,tue,wed' ? 'Weekday'
-    : m.days.length === 1 && m.days[0] !== 'sat' ? formatDays(m.days).replace(/^(Sun|Mon|Tue|Wed|Thu|Fri)$/, (d) => ({ Sun: 'Sunday', Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday' })[d]!)
-    : formatDays(m.days)
-  // Kabbalas Shabbos and Shabbos Mussaf say Shabbos themselves.
-  const tefillah = TEFILLAH_LABELS[m.tefillah]
-  return when && !(when === 'Shabbos' && tefillah.startsWith('Shabbos')) && !(when === 'Friday' && m.tefillah === 'kabbalas_shabbos') ? `${when} ${tefillah}` : tefillah
-}
-
-function minyanLine(m: Minyan, withNotes: boolean): string {
-  return [`${minyanName(m)} ${minyanTime(m.time)}`, m.season && SEASON_LABELS[m.season], m.signUp && signUpText(m.signUp), m.joinLink && joinText(m.joinLink), withNotes && m.notes?.trim()].filter(Boolean).join(' · ')
-}
-
-/** Each minyan added, changed or taken off, matched by its id. */
+/** The usual boxes that changed, by name: "Usual weekday times updated".
+ *  A change to neither box (Yom Tov days on a row) is the times'. */
 function minyanParts(key: string, before: unknown, after: unknown): ChangePart[] {
   const b = isMinyanim(before) ? before : []
   const a = isMinyanim(after) ? after : []
-  const id = (m: Minyan, i: number) => m.id ?? `#${i}`
-  const was = new Map(b.map((m, i) => [id(m, i), m]))
-  const now = new Map(a.map((m, i) => [id(m, i), m]))
-  const parts: ChangePart[] = []
-  a.forEach((m, i) => {
-    const old = was.get(id(m, i))
-    if (!old) parts.push({ key, label: 'New:', value: minyanLine(m, true) })
-    else if (JSON.stringify(old) !== JSON.stringify(m)) parts.push({ key, label: '', value: minyanLine(m, (old.notes ?? '') !== (m.notes ?? '')) })
-  })
-  b.forEach((m, i) => {
-    if (!now.has(id(m, i))) parts.push({ key, label: 'No longer listed:', value: minyanLine(m, false) })
-  })
-  return parts
+  const boxes = (['weekday', 'shabbos'] as const).filter((box) => !sameRows(minyanimForBox(b, box), minyanimForBox(a, box)))
+  if (boxes.length === 0) return sameRows(b, a) ? [] : [{ key, label: '', value: 'Usual times updated', quiet: true }]
+  return boxes.map((box) => ({ key: `${key}:${box}`, label: '', value: box === 'weekday' ? 'Usual weekday times updated' : 'Usual Shabbos times updated', quiet: true }))
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+/** "Nov 22–28", "Nov 30 – Dec 5", "Nov 27". */
+export function datesSaid(from: string, to: string): string {
+  const day = (iso: string) => ({ m: MONTHS[Number(iso.slice(5, 7)) - 1], d: Number(iso.slice(8, 10)) })
+  const f = day(from)
+  const t = day(to)
+  if (from === to || !to) return `${f.m} ${f.d}`
+  return f.m === t.m ? `${f.m} ${f.d}–${t.d}` : `${f.m} ${f.d} – ${t.m} ${t.d}`
+}
+
+/** The weeks a save posted or changed, once each by their dates (a week's
+ *  Shabbos and weekdays are two schedules with one name). Weeks it left as
+ *  they were, or took off, aren't said. */
+function weekParts(key: string, before: unknown, after: unknown): ChangePart[] {
+  const plain = (x: SpecialSchedule) => JSON.stringify({ ...x, id: undefined, postedAt: undefined })
+  const was = new Map(readSchedules(before).map((x) => [x.id, plain(x)]))
+  const said = new Map<string, ChangePart>()
+  for (const x of readSchedules(after)) {
+    const old = was.get(x.id)
+    if (old === plain(x)) continue
+    const dates = x.from && x.to ? datesSaid(x.from, x.to) : x.name
+    const value = `Times for ${dates} ${old === undefined ? 'posted' : 'updated'}`
+    if (![...said.values()].some((p) => p.value.startsWith(`Times for ${dates} `))) said.set(dates, { key, label: '', value, quiet: true })
+  }
+  return [...said.values()]
 }
 
 function hoursParts(field: CategoryField, before: unknown, after: unknown): ChangePart[] {
@@ -122,8 +120,7 @@ export function visitorChanges(existing: DirectoryResource | null | undefined, p
     }
     const scheduled = fields.find((f) => f.type === 'minyanim' && schedulesKey(f.key) === change.key)
     if (scheduled) {
-      const had = new Set(readSchedules(change.before).map((s) => s.id))
-      for (const s of readSchedules(change.after)) parts.push({ key: change.key, label: had.has(s.id) ? '' : 'New:', value: `${s.name} times` })
+      parts.push(...weekParts(change.key, change.before, change.after))
       continue
     }
     const field = byKey.get(change.key)
@@ -172,4 +169,49 @@ export function newListingFacts(item: DirectoryResource, category: CategoryConfi
   const tagline = category.detailFields.find((f) => f.type === 'text' && f.showInHeader && f.headerMaxLength != null)
   const facts = [tagline ? String(item[tagline.key] ?? '').trim() : '', listingKind(item, category), ...listingFacts(item, category)].filter(Boolean)
   return facts.length ? [{ key: 'facts', label: '', value: [...new Set(facts)].join(' · '), quiet: true }] : []
+}
+
+/** Past this many letters a value is a paragraph, not an answer. */
+export const LONG_VALUE = 80
+
+/** What a change says, short, as Activity shows it (the user, Nov 23:
+ *  "pretty wordy"): a line for each thing that changed. A short fact keeps
+ *  its value ("Phone (215) 917-0209"); a field changed in several places
+ *  (hours a day at a time) or at length (a note) is only named ("Hours
+ *  updated"). Shown, not saved, so it shortens entries saved before too:
+ *  their minyanim one by one become "Usual times updated", and a week's
+ *  lines (once every week the shul had, changed or not) only the weeks
+ *  posted. */
+export function shortParts(parts: readonly ChangePart[], fields: readonly CategoryField[]): ChangePart[] {
+  const groups = new Map<string, ChangePart[]>()
+  for (const p of parts) groups.set(p.key, [...(groups.get(p.key) ?? []), p])
+  const out: ChangePart[] = []
+  for (const [key, group] of groups) {
+    const field = fields.find((f) => f.key === key)
+    const weeksOf = fields.find((f) => f.type === 'minyanim' && schedulesKey(f.key) === key)
+    const values = [...new Set(group.map((p) => p.value))]
+    // Said short when it was saved.
+    if (group.every((p) => p.quiet)) {
+      out.push(...values.map((value) => group.find((p) => p.value === value)!))
+      continue
+    }
+    if (weeksOf) {
+      // Saved before Nov 23: "Times for Nov 22 – Nov 28 times", every week
+      // the shul had, "New:" on the ones posted.
+      const posted = [...new Set(group.filter((p) => p.label === 'New:').map((p) => p.value.replace(/ times$/, '')))]
+      out.push(...(posted.length ? posted.map((v) => ({ key, label: '', value: `${/^times for /i.test(v) ? v : `${v} times`} posted`, quiet: true })) : [{ key, label: '', value: 'Week’s times updated', quiet: true }]))
+      continue
+    }
+    if (field?.type === 'minyanim') {
+      out.push({ key, label: '', value: 'Usual times updated', quiet: true })
+      continue
+    }
+    if (values.length > 1 || values[0].length > LONG_VALUE) {
+      const label = field?.label ?? group[0].label
+      out.push({ key, label: '', value: `${label || 'Details'} updated`, quiet: true })
+      continue
+    }
+    out.push(group[0])
+  }
+  return out
 }

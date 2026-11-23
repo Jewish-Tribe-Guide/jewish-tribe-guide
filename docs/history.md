@@ -2274,6 +2274,17 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   and the night's one draw lost with it, the same menu every night.
   It now takes its read before it may draw (`menuWatchRun.ts`). The
   rest of the watches were fine: 123 of 129 read in the last three days.
+- Nov 23 (the user: Activity is "pretty wordy" for davening times; yes
+  to one line per thing, for every kind of place): a short fact keeps its
+  value ("Phone (215) 917-0209"); a field changed in several places or at
+  length is only named ("Hours updated", "Women’s Notes updated"). A
+  shul's edit now saves the box that changed ("Usual Shabbos times
+  updated") and the weeks posted, once each by their dates, instead of
+  every minyan and every week the shul had (Sons of Israel's was eleven
+  lines, Lower Merion's named five weeks for one). Shortened when shown
+  (`shortParts`), so entries saved before shrink too: their minyanim read
+  "Usual times updated", since they never said which box. Changes the
+  Oct 2 agreement that text a person wrote is said in full in Activity.
 - Nov 23 (the user's yes, changing board 5e): a shul's This week box
   has a row only for a day with a minyan. Rodeph Shalom's one Thursday
   Zoom Shacharis had drawn five rows of dashes. The box's dates still say

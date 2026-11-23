@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState, type ReactNode } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
-import type { ChangePart } from '@/lib/changeParts'
+import { shortParts, type ChangePart } from '@/lib/changeParts'
 import type { Change } from '@/lib/whatChanged'
 import { changeSentence, fitParts } from '@/lib/whatChanged'
 import { getCategoryColor } from '@/lib/categoryColor'
@@ -130,7 +130,7 @@ export default function ChangeRow({
           <span className="mt-0.5 block text-[0.8125rem] text-slate-500">
             {category?.label ?? change.listing.category} · {when}
           </span>
-          <Parts parts={change.parts} fit={fit} />
+          <Parts parts={change.kind === 'added' ? change.parts : shortParts(change.parts, category?.detailFields ?? [])} fit={fit} />
         </span>
         {linked ? <ChevronRightIcon className="mt-2.5 h-4 w-4 shrink-0 text-slate-400" /> : end && <span className="shrink-0 self-center">{end}</span>}
       </div>

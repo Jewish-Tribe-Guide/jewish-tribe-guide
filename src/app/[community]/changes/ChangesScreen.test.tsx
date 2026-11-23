@@ -19,7 +19,11 @@ vi.mock('next/navigation', () => ({
 
 // The What changed page at Friday Oct 2, 2026, 1:30 PM in New York (the test
 // community's time zone), from the log as the server hands it over.
-const categories = [makeCategory({ id: 'grocery', label: 'Grocery' }), makeCategory({ id: 'restaurant', label: 'Food' })]
+const categories = [
+  makeCategory({ id: 'grocery', label: 'Grocery', detailFields: [{ key: 'hours', label: 'Hours', type: 'hours' }] }),
+  makeCategory({ id: 'restaurant', label: 'Food' }),
+  makeCategory({ id: 'synagogue', label: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Davening Times (Minyanim)', type: 'minyanim' }] }),
+]
 let id = 1
 const row = (createdAt: string, over: Partial<ChangeLogRow> = {}): ChangeLogRow => ({
   id: id++,
@@ -121,20 +125,45 @@ describe('the What changed page', () => {
     expect(screen.getByTestId('changes-box').querySelectorAll('[data-testid=changes-day]')).toHaveLength(3)
   })
 
-  it('under each edit, everything it changed, one to a line, in full', () => {
+  // The user, Nov 23: "pretty wordy". A short fact keeps its value; a
+  // field changed in several places or at length is only named.
+  it('under each edit, a line for each thing it changed: short facts in full, the rest named', () => {
     const note = 'Alcoholic beverages are NOT under supervision; list of approved alcoholic beverages available at restaurant upon request.'
     show([
       row('2026-10-01T22:00:00Z', {
         changes: [
+          { key: 'phone', label: 'Phone', value: '(215) 917-0209' },
           { key: 'hours', label: 'Hours', value: 'Sunday 11 AM – 10 PM' },
+          { key: 'hours', label: 'Hours', value: 'Monday 11 AM – 8 PM' },
           { key: 'kosherNote', label: 'What isn’t kosher?', value: note },
           { key: 'photo', label: '', value: 'New photo', quiet: true },
         ],
       }),
     ])
     const lines = [...screen.getByTestId('change-parts').children].map((c) => c.textContent)
-    expect(lines).toEqual(['Hours Sunday 11 AM – 10 PM', `What isn’t kosher? ${note}`, 'New photo'])
+    expect(lines).toEqual(['Phone (215) 917-0209', 'Hours updated', 'What isn’t kosher? updated', 'New photo'])
     expect(screen.queryByRole('button', { name: /more/ })).not.toBeInTheDocument()
+  })
+
+  // As live saved them on Nov 23: Sons of Israel's usual times a minyan a
+  // line, and Lower Merion's every week, with only one of them new.
+  it('a shul’s times saved before: one line for its usual times, one for the week posted', () => {
+    const shul = { id: '55555555-eeee', name: 'Sons of Israel', category: 'synagogue', status: 'approved' }
+    show([
+      row('2026-10-01T22:00:00Z', {
+        listing: shul,
+        changes: [
+          { key: 'minyanim', label: '', value: 'Shabbos Shacharis 8:30 AM' },
+          { key: 'minyanim', label: 'New:', value: 'Shabbos Shacharis 9 AM · Main sanctuary minyan' },
+          { key: 'minyanim', label: 'No longer listed:', value: 'Kabbalas Shabbos 7 PM · Summer only' },
+          { key: 'minyanim_schedules', label: '', value: 'Times for Oct 22 – Oct 24 times' },
+          { key: 'minyanim_schedules', label: 'New:', value: 'Times for Nov 22 – Nov 28 times' },
+          { key: 'minyanim_schedules', label: 'New:', value: 'Times for Nov 22 – Nov 28 times' },
+        ],
+      }),
+    ])
+    const lines = [...screen.getByTestId('change-parts').children].map((c) => c.textContent)
+    expect(lines).toEqual(['Usual times updated', 'Times for Nov 22 – Nov 28 posted'])
   })
 
   it('a place taken out of the guide says so, and has no link (its page is gone)', () => {
