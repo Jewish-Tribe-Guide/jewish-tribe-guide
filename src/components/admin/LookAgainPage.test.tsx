@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -45,7 +45,16 @@ async function renderPage(lookAgain: Record<string, unknown> | null, answer: Rec
   await act(() => new Promise((r) => setTimeout(r, 0)))
 }
 
+// The page reads the clock: Shlomo's next try (a month after Oct 24) was
+// "Nov 23" until that day, then "Tonight", and the test failed (Nov 23).
+// Only the date is faked, so the page's timers still run.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-10T17:00:00Z'))
+})
+
 afterEach(() => {
+  vi.useRealTimers()
   posts.length = 0
   cleanup()
   vi.mocked(fetchJson).mockReset()
