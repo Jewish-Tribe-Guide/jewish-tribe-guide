@@ -35,14 +35,11 @@ data back is in `docs/backups.md`.
 
 Done Nov 22: Supabase keeps 7 days of daily backups (`docs/backups.md`);
 the Turnstile keys are set for Production and the Upstash ones for
-Production and Preview; UptimeRobot is green and its emails arrive.
+Production and Preview; UptimeRobot is green and its emails arrive; the domain's auto-renew is
+on at Namecheap (held in an account other than jewishtribeguide).
 
 
-1. **Namecheap.** phillyjewishguide.com is registered at Namecheap, but
-   not in the jewishtribeguide account (its Domain List was empty, Nov
-   22). Find the account that holds it, check auto-renew and the card,
-   and ideally push it to the jewishtribeguide account.
-2. **Sentry's alert emails.** Two alert rules email on a new issue
+1. **Sentry's alert emails.** Two alert rules email on a new issue
    (Monitors → Alerts; checked Nov 22), and both fired for the false
    nightly-email timeout that morning. Left: confirm that email arrived.
    The plan allows one user, and Sentry deactivated another member, so
