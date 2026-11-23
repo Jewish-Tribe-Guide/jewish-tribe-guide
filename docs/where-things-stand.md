@@ -13,6 +13,25 @@ behind the open list followed it, so this file is the open list and what's
 decided. Look there for why something
 was built the way it was; this file is what's open.
 
+## Where this is going (the user, Nov 23)
+
+The goal is accuracy and trust: that is what makes the site work. As
+Philly adopts it, the plan is to open it to other communities, and for
+a new community's admin to start simply: paste in its shuls, grocery
+stores, restaurants and the rest, and the site does everything else. The
+admin needs only the To do page, plus any changes to how their site
+looks. Weigh new work against that: does it keep facts right and
+sourced, and does it work for a community neither of us knows, with no
+hand-fixing by Claude or the site owner?
+
+For now the focus is Philly (the user, Nov 23). One person from another
+community is interested; theirs is the natural city for 86 when it
+comes, not a reason to hurry it.
+
+What stands between today and that, in order: the watches staying calm
+(52), a shul watch whose behaviour is predictable on websites it has
+never seen (82), then a rehearsal with a real second city (86).
+
 ## Everything open (thinned with the user, Nov 23)
 
 On Nov 23 the user and Claude went through the list and kept only what
@@ -36,6 +55,21 @@ old number can still be looked up. When an item is done, move it to
     replaces what the home page has waiting. Sons of Israel's home page
     and Schedule of Tefillot had each filed the other's undoing. The
     review can fold this into the "one regular-schedule page" pick.
+    The bar for it (Nov 23): behaviour that's predictable on a website
+    it has never seen, even if it catches a little less, since every
+    special case so far was learned from one Philly shul's site.
+86. **After 82: rehearse a second city before inviting anyone.** Pick a
+    real one (Teaneck, Baltimore), paste its real lists into a hidden
+    community, and let it run two weeks with no hand-fixing. Count what
+    lands in To do, what's wrong and what it costs. Things it will show:
+    - sources that are Philly-only today (Keystone-K's and Mekor's
+      lists, Refuah, the eruv) need to be something an admin chooses or
+      adds, not code written for each city;
+    - a new admin's first weeks are the noisiest, for the person least
+      able to judge them, so start calm: read everything in once and
+      confirm it as a batch, then only real changes;
+    - the nightly AI reads for 30 shuls and 50 restaurants should be a
+      known, small monthly cost before anyone is invited.
 83. **About Nov 30:** Sentry's quota resets, so `sentry:check` should go
     green and real errors show again. Then two weeks of policy reports;
     if only known noise, switch the security policy to enforce (one
