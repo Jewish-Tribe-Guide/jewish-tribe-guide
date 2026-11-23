@@ -33,11 +33,22 @@ export function monitored(job: JobId, setting = process.env.SENTRY_CRON_MONITORS
 export function cronHeartbeat<T>(job: JobId, fn: () => Promise<T>): Promise<T> {
   const spec = NIGHTLY_JOBS.find((j) => j.id === job)
   if (!monitored(job) || !spec) return fn()
-  return Sentry.withMonitor(`job-${job}`, fn, {
+  const run = Sentry.withMonitor(`job-${job}`, fn, {
     schedule: { type: 'crontab', value: spec.cron },
     timezone: 'Etc/UTC',
     // Late after half an hour; stopped after its own limit and a minute.
     checkinMargin: 30,
     maxRuntime: Math.ceil(spec.limitSeconds / 60) + 1,
   })
+  // The closing check-in is only queued when the job ends. Vercel freezes
+  // the function once it returns, so without this it was never sent, and
+  // Sentry marked a run that worked as timed out (Nov 22).
+  const sent = () => Sentry.flush(5000).catch(() => false)
+  return Promise.resolve(run).then(
+    async (value) => (await sent(), value),
+    async (err) => {
+      await sent()
+      throw err
+    },
+  )
 }

@@ -35,6 +35,12 @@ In the live project's dashboard, **Database → Backups**:
 
 Then tell Claude what you found, so this file can say it.
 
+**Checked Nov 22 (the user):** daily backups, "physical", taken around
+08:37 UTC, going back 7 days (Nov 16–22 listed). Point in Time Recovery
+not checked; it's a paid add-on, and a day's loss at most is fine for
+this site. Like every Supabase backup, they don't hold Storage files, so
+our own copy is still the only copy of the photos.
+
 ## Getting things back
 
 Any restore to live is a write to production: Claude asks first, every
