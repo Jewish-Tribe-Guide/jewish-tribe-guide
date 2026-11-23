@@ -2274,6 +2274,19 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   and the night's one draw lost with it, the same menu every night.
   It now takes its read before it may draw (`menuWatchRun.ts`). The
   rest of the watches were fine: 123 of 129 read in the last three days.
+- Nov 23, Sons of Israel's usual Shabbos times kept flipping: its home
+  page's box of usual times (a summary: Sephardic 9:00, where the
+  Schedule of Tefillot says 8:30) and the Tefillot page each filed a
+  change undoing the other, and an approved one only set the other off
+  again. Now a home page leaves a usual part to another of the shul's
+  pages that gives it, and that page replaces anything the home page has
+  waiting, whatever its size. This week's schedule isn't held back (it
+  goes by date, not page). On live only Sons of Israel has a home page
+  and another page both giving usual times; Society Hill's two pages
+  split Shabbos and weekdays and are untouched. The reader's prompt was
+  left alone: the home page really does say "Friday Night… Summer:
+  7:00pm" and "Weekday Mincha, approximately 15 minutes before shkiah",
+  so the reading was a fair one of a vague page.
 - 84. Done Nov 23 (the user's yes): the menu watches of four sites that
   refuse the reader were turned off on live: 20th Street Pizza, Stephen's
   Cafe and Authentic Kosher Chinese (Cloudflare's "prove you're a person"

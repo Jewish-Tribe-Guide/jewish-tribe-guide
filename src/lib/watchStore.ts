@@ -1,6 +1,7 @@
 import { getAdminClient } from './supabase/admin'
 import { saySchemaMissing, schemaMissing } from './supabase/schemaMissing'
 import type { SourceRead } from './shulTimes'
+import type { PartGiven } from './timesParts'
 import { withoutListRead, type ListRead, type Watch, type WatchCheck, type WatchKind } from './watches'
 import { readAll } from '@/lib/readAll'
 
@@ -124,6 +125,12 @@ export async function listWatches(community: string): Promise<{ watches: Watch[]
 export async function otherShulReads(community: string, resourceId: string, exceptUrl: string): Promise<SourceRead[]> {
   const { watches } = await listWatches(community)
   return watches.filter((w) => w.active && w.resourceId === resourceId && w.url !== exceptUrl).flatMap((w) => w.lastCheck?.shulReads ?? [])
+}
+
+/** The shul's other pages, and the parts of its times each last gave. */
+export async function otherShulPages(community: string, resourceId: string, exceptUrl: string): Promise<{ url: string; parts: PartGiven[] }[]> {
+  const { watches } = await listWatches(community)
+  return watches.filter((w) => w.active && w.resourceId === resourceId && w.url !== exceptUrl).map((w) => ({ url: w.url, parts: w.lastCheck?.parts ?? [] }))
 }
 
 /** Each watch's kosher list read, kept on it by its last run

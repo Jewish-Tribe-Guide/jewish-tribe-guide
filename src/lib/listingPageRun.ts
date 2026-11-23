@@ -29,12 +29,12 @@ import { dateText, readSchedules, schedulesKey, type SpecialSchedule } from '@/l
 import { buildCatalog, readMessage } from '@/lib/messageReader'
 import { fieldsEdit, readFieldChanges } from '@/lib/fieldChanges'
 import { replacePendingSuggestion, submitListingUpdate } from '@/lib/submissionStore'
-import { TIMES_PART_LABELS, partKey, partLines, partSize, readPartSource, splitParts, type PartGiven, type PartReading, type PartSource } from '@/lib/timesParts'
+import { TIMES_PART_LABELS, isHomePage, pageOfNote, partKey, partLines, partSize, readPartSource, scheduleTakesPart, splitParts, type PartGiven, type PartReading, type PartSource } from '@/lib/timesParts'
 import { hoursSections, readSectionSource, splitSections, type HoursSection, type SectionSource } from '@/lib/hoursSections'
 import { CONTACT_SECTION, contactBoxName, contactFields, googleKeeps, pageContacts, readContacts, type ContactField, type ContactReading, type PageContacts } from '@/lib/contactRead'
 import { confirmFromSource } from '@/lib/sourceConfirm'
 import { readShulPage } from '@/lib/shulPageRead'
-import { otherShulReads } from '@/lib/watchStore'
+import { otherShulPages, otherShulReads } from '@/lib/watchStore'
 import type { SourceRead } from '@/lib/shulTimes'
 import { withMinyanLinks } from '@/lib/minyanLinks'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
@@ -526,8 +526,8 @@ async function readAndFile(
   if (source.calendarEmpty && !reading.read.length) reading = { ...reading, note: [reading.note, calendarEmptyNote(source.calendarEmpty)].filter(Boolean).join(' ') }
   const { proposal } = reading
   const shulReads = reading.shulReads
-  const check = (queue: WatchCheck['queue']) => ({
-    ...pageCheck(reads.kind, checkFrom(source, { pictures: !!source.pictures?.length }), reading.read, { differences: proposal?.lines ?? [], queue, note: reading.note, unread: reading.unread, parts: reading.parts }),
+  const check = (queue: WatchCheck['queue'], also?: string) => ({
+    ...pageCheck(reads.kind, checkFrom(source, { pictures: !!source.pictures?.length }), reading.read, { differences: proposal?.lines ?? [], queue, note: [reading.note, also].filter(Boolean).join(' ') || undefined, unread: reading.unread, parts: reading.parts }),
     ...(shulReads?.length ? { shulReads } : {}),
   })
   if (!proposal || opts.compareOnly) return { ok: true, filed: 0, pageHash, check: check(null) }
@@ -538,12 +538,18 @@ async function readAndFile(
       ? splitParts({ ...proposal.submission.details, [timesKey]: listing[timesKey] ?? null, [sk]: listing[sk] ?? null }, proposal.submission.details, timesKey)
       : []
   if (parts.length) {
-    if (blocked) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting') }
-    const { queue, filed } = await fileParts(watch, listing, proposal, parts, waitingNow, source.text, { now: opts.now, seen: changed ? 'changed' : 'read', timezone: opts.where.timezone })
+    // A home page leaves a usual part to the shul's own schedule page.
+    const pages = isHomePage(watch.url) && listing.id ? await otherShulPages(watch.communityId, listing.id, watch.url) : []
+    const leftTo = parts.flatMap((p) => { const to = scheduleTakesPart(watch.url, p.part, pages); return to ? [{ part: p.part, to }] : [] })
+    const left = leftTo.length ? leftTo.map((l) => `${TIMES_PART_LABELS[l.part]} are left to ${l.to}.`).join(' ') : undefined
+    const toFile = parts.filter((p) => !leftTo.some((l) => l.part === p.part))
+    if (!toFile.length) return { ok: true, filed: 0, pageHash, check: check(null, left) }
+    if (blocked) return { ok: true, filed: 0, ...(watch.pageHash ? {} : { pageHash }), check: check('waiting', left) }
+    const { queue, filed } = await fileParts(watch, listing, proposal, toFile, waitingNow, source.text, { now: opts.now, seen: changed ? 'changed' : 'read', timezone: opts.where.timezone })
     // Read, so its fingerprint is kept even with a part waiting: once
     // nothing waits it's read again (stoodBehind), and keeping the old one
     // read it with the AI every night till then (Nov 18 review).
-    return { ok: true, filed: filed.length, pageHash, check: check(queue) }
+    return { ok: true, filed: filed.length, pageHash, check: check(queue, left) }
   }
   // A mikvah's hours: filed as the sections they change, each on its own.
   const sections = reads.kind === 'hours' ? splitSections(hoursSections(category, reads.keys), listing, proposal.submission.details) : []
@@ -576,8 +582,9 @@ async function readAndFile(
  *  those"). A part already waiting as read here is left waiting; one
  *  filed before isn't filed again; one waiting from another page is
  *  replaced only by a page that gives more of it (Sons of Israel's
- *  Tefillot page, beside its home page's few lines). `filed`: what each
- *  part filed, for the email. */
+ *  Tefillot page, beside its home page's few lines), or by any page but
+ *  the home page when the home page filed it. `filed`: what each part
+ *  filed, for the email. */
 async function fileParts(
   watch: Pick<Watch, 'communityId' | 'url'>,
   listing: DirectoryResource,
@@ -615,7 +622,8 @@ async function fileParts(
     const what = `${TIMES_PART_LABELS[p.part]}: ${lines.join('; ')}`
     const there = same[0]
     if (there) {
-      if (p.size <= partSize(partOf(there)!, detailsOf(there)) || !(await replacePendingSuggestion(watch.communityId, there.id, payload, note))) {
+      const overHome = !isHomePage(watch.url) && isHomePage(pageOfNote((there.payload as { source?: { note?: unknown } } | null)?.source?.note))
+      if ((!overHome && p.size <= partSize(partOf(there)!, detailsOf(there))) || !(await replacePendingSuggestion(watch.communityId, there.id, payload, note))) {
         outcomes.push('waiting')
         continue
       }

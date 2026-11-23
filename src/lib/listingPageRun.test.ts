@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   readShulWeek: vi.fn(),
   fetchDatesInfo: vi.fn(),
   otherShulReads: vi.fn(),
+  otherShulPages: vi.fn(),
   left: [] as string[],
   readMessage: vi.fn(),
   submitListingUpdate: vi.fn(),
@@ -83,7 +84,7 @@ vi.mock('@/lib/heldElsewhere', () => ({ leaveOutHeldElsewhere: async (times: unk
 // Zmanim and the days' names: none needed, and none fetched.
 vi.mock('@/lib/dateZmanim', () => ({ fetchDatesInfo: m.fetchDatesInfo }))
 // No other page of the shul's has been read, unless a test says.
-vi.mock('@/lib/watchStore', () => ({ otherShulReads: m.otherShulReads }))
+vi.mock('@/lib/watchStore', () => ({ otherShulReads: m.otherShulReads, otherShulPages: m.otherShulPages }))
 vi.mock('@/lib/messageReader', async (orig) => ({ ...(await orig<typeof import('./messageReader')>()), readMessage: m.readMessage }))
 vi.mock('@/lib/submissionStore', () => ({ submitListingUpdate: m.submitListingUpdate, replacePendingSuggestion: m.replacePendingSuggestion }))
 vi.mock('@/lib/email', () => ({}))
@@ -190,6 +191,7 @@ beforeEach(() => {
   m.resolveCommunity.mockResolvedValue(PHILLY)
   m.fetchDatesInfo.mockResolvedValue({ zmanim: {}, names: {} })
   m.otherShulReads.mockResolvedValue([])
+  m.otherShulPages.mockResolvedValue([])
 })
 
 describe('runListingPageWatch: a shul’s page of times', () => {
@@ -521,6 +523,47 @@ describe('runListingPageWatch: a shul’s page of times', () => {
       const [community, id, payload] = m.replacePendingSuggestion.mock.calls[0]
       expect([community, id, payload.source.part.part, payload.details.minyanim.length]).toEqual(['philly', 'p1', 'shabbos', 3])
       expect(m.submitListingUpdate.mock.calls.map(([, , p]) => p.source.part.part)).toEqual(['weekday'])
+    })
+
+    // The user, Nov 23, on Sons of Israel: its home page's box of usual
+    // times (a summary, out of date) and its Tefillot page each filed the
+    // other's undoing, night after night. A shul's own schedule page is
+    // where its usual times come from (docs/how-we-work.md).
+    describe('the home page and the shul’s schedule page', () => {
+      const HOME = 'https://lms.example/'
+      const home = { ...changed, url: HOME }
+      const fromHome = (rows: object[]) => {
+        const p = shabbosPart(rows)
+        return { ...p, payload: { ...p.payload, source: { ...p.payload.source, note: `From their website, changed Oct 19: ${HOME}` } } }
+      }
+
+      it('the home page doesn’t file a usual part another of its pages gives', async () => {
+        m.otherShulPages.mockResolvedValue([{ url: URL_, parts: [{ part: 'shabbos', size: 6 }] }])
+        shabbosRead(sat('n', '9:00am'))
+        const o = await runListingPageWatch(home, undefined, { apiKey: 'k', now: NOW })
+        expect(m.submitListingUpdate.mock.calls.map(([, , p]) => p.source.part.part)).toEqual(['weekday'])
+        expect(o).toMatchObject({ filed: 1, check: { note: expect.stringContaining(URL_) } })
+      })
+
+      it('it still files a part no other page gives', async () => {
+        m.otherShulPages.mockResolvedValue([{ url: URL_, parts: [{ part: 'week', size: 6 }] }])
+        shabbosRead(sat('n', '9:00am'))
+        expect(await runListingPageWatch(home, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ filed: 2 })
+      })
+
+      it('another page that isn’t the home page doesn’t hold one back', async () => {
+        m.otherShulPages.mockResolvedValue([{ url: 'https://lms.example/shabbat', parts: [{ part: 'shabbos', size: 6 }] }])
+        shabbosRead(sat('n', '9:00am'))
+        expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ filed: 2 })
+      })
+
+      it('the schedule page replaces what the home page has waiting, whatever its size', async () => {
+        m.pending = [fromHome([{ id: 'a', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }, { id: 'b', tefillah: 'mincha', days: ['sat'], time: '5:00pm' }])]
+        m.replacePendingSuggestion.mockResolvedValue(true)
+        shabbosRead(sat('n', '8:30am'))
+        expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ filed: 2 })
+        expect(m.replacePendingSuggestion.mock.calls.map(([, id]) => id)).toEqual(['p1'])
+      })
     })
 
     it('the same part waiting as read here is left as it is', async () => {
