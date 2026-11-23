@@ -195,13 +195,6 @@ Jewish Medical Resources (not on live), PR 411, CI runs colliding.
     server stalls, offline.spec:109, category-open, todo-scroll, the
     phone prefetch budget, slow test-database spells.
 
-84. Four restaurant sites refuse the menu reader (403) and show as not
-    working every night: 20th Street Pizza, Stephen's Cafe and
-    Authentic Kosher Chinese now send Cloudflare's "prove you're a
-    person" page; Ben & Jerry's opens from a home connection but refuses
-    the site's servers. Turning their menu watches off on live is
-    waiting on your yes (dry run shown Nov 23).
-
 ### Waiting on others
 
 79. Sons of Israel's newsletter has sent nothing.

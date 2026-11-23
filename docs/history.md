@@ -2268,6 +2268,12 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   and the night's one draw lost with it, the same menu every night.
   It now takes its read before it may draw (`menuWatchRun.ts`). The
   rest of the watches were fine: 123 of 129 read in the last three days.
+- 84. Done Nov 23 (the user's yes): the menu watches of four sites that
+  refuse the reader were turned off on live: 20th Street Pizza, Stephen's
+  Cafe and Authentic Kosher Chinese (Cloudflare's "prove you're a person"
+  page) and Ben & Jerry's (refuses the site's servers). Kept in the list,
+  so the menu-link sync doesn't add them back; a changed menu link gets a
+  fresh watch. No active watch failing after.
 - 78. Done Nov 22: the 5 moderate npm audit findings went with Sentry 11
   (npm audit: 0). The four waiting major upgrades (Sentry 11, eslint 10,
   jsdom 31, unpdf 2) went in together on `claude/dep-upgrades`.
