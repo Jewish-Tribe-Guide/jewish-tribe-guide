@@ -2316,6 +2316,13 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   Its home-page watch was then stopped on live (the user's yes), as
   Places → Stop reading does: it read as changed every night (the page
   shows the date), an AI read each time.
+- Nov 23, a To do unit test failed CI on three unrelated PRs ("says which
+  one of how many is open"): its two new places were each dated "now",
+  and To do sorts newest first, so when the clock ticked between making
+  them the second sorted above the first and the opened one read "2 of 2".
+  The app was right. The test fixture now has a fixed date. Caught by
+  logging the screen at the failure (1 run in ~25 under coverage, 3 at
+  once); a clock ticking 1ms per submission failed it every time.
 - 84. Done Nov 23 (the user's yes): the menu watches of four sites that
   refuse the reader were turned off on live: 20th Street Pizza, Stephen's
   Cafe and Authentic Kosher Chinese (Cloudflare's "prove you're a person"

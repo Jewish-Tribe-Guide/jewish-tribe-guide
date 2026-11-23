@@ -45,7 +45,10 @@ function submission(overrides: Partial<EnrichedSubmission> = {}): EnrichedSubmis
     note: null,
     status: 'pending',
     submitted_by: { name: 'Jane Doe' },
-    created_at: new Date().toISOString(),
+    // A fixed time, not now: To do sorts newest first, so two made in one
+    // line came out in either order depending on whether the clock ticked
+    // between them ("1 of 2" read "2 of 2" on a busy CI runner, Nov 23).
+    created_at: '2026-11-20T12:00:00Z',
     reviewed_at: null,
     reviewed_by: null,
     case_number: 1,
