@@ -1,0 +1,862 @@
+[
+ {
+  "id": "support",
+  "title": "Patient & Family Support",
+  "submit_label": "Send request",
+  "success_title": "Request sent",
+  "success_message": "A community representative will reach out to you shortly to coordinate.",
+  "steps": [
+   {
+    "id": "needs",
+    "hint": "Tap all that apply.",
+    "kind": "multi",
+    "options": [
+     {
+      "icon": "🍽️",
+      "label": "Meals",
+      "value": "meals"
+     },
+     {
+      "icon": "🚗",
+      "label": "A ride",
+      "value": "transportation"
+     },
+     {
+      "icon": "🏠",
+      "label": "A place to stay",
+      "value": "familyHousing"
+     },
+     {
+      "icon": "🤝",
+      "label": "Someone to visit",
+      "value": "visitors"
+     },
+     {
+      "icon": "✨",
+      "label": "Something else",
+      "value": "other"
+     }
+    ],
+    "question": "What do you need?"
+   },
+   {
+    "id": "name",
+    "kind": "text",
+    "section": "👋 Your details",
+    "question": "What’s your name?",
+    "placeholder": "Your full name"
+   },
+   {
+    "id": "contact",
+    "kind": "contact",
+    "section": "👋 Your details",
+    "question": "How can we reach you?"
+   },
+   {
+    "id": "preferredContact",
+    "kind": "single",
+    "when": [
+     {
+      "op": "notEmpty",
+      "field": "phone"
+     },
+     {
+      "op": "empty",
+      "field": "email"
+     }
+    ],
+    "options": [
+     {
+      "label": "Call me",
+      "value": "phone"
+     },
+     {
+      "label": "Text me",
+      "value": "text"
+     }
+    ],
+    "section": "👋 Your details",
+    "question": "How should we reach you?"
+   },
+   {
+    "id": "preferredContact",
+    "kind": "single",
+    "when": [
+     {
+      "op": "notEmpty",
+      "field": "phone"
+     },
+     {
+      "op": "notEmpty",
+      "field": "email"
+     }
+    ],
+    "options": [
+     {
+      "label": "Call me",
+      "value": "phone"
+     },
+     {
+      "label": "Text me",
+      "value": "text"
+     },
+     {
+      "label": "Email me",
+      "value": "email"
+     }
+    ],
+    "section": "👋 Your details",
+    "question": "How should we reach you?"
+   },
+   {
+    "id": "hospital_room",
+    "kind": "text",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "meals"
+     }
+    ],
+    "section": "🍽️ Meals",
+    "question": "Which hospital and room?",
+    "placeholder": "e.g. Jefferson, room 412"
+   },
+   {
+    "id": "meals_which",
+    "kind": "multi",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "meals"
+     }
+    ],
+    "options": [
+     {
+      "label": "Breakfast",
+      "value": "breakfast"
+     },
+     {
+      "label": "Lunch",
+      "value": "lunch"
+     },
+     {
+      "label": "Dinner",
+      "value": "dinner"
+     },
+     {
+      "label": "Shabbat / Yom Tov",
+      "value": "shabbatYomTov"
+     }
+    ],
+    "section": "🍽️ Meals",
+    "question": "Which meals?"
+   },
+   {
+    "id": "meals_dietary",
+    "kind": "multi",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "meals"
+     }
+    ],
+    "options": [
+     {
+      "label": "Standard Kosher",
+      "value": "standardKosher"
+     },
+     {
+      "label": "Glatt Kosher",
+      "value": "glattKosher"
+     },
+     {
+      "label": "Cholov Yisroel",
+      "value": "cholovYisroel"
+     },
+     {
+      "label": "Vegetarian",
+      "value": "vegetarian"
+     },
+     {
+      "label": "Vegan",
+      "value": "vegan"
+     },
+     {
+      "label": "Allergies (note below)",
+      "value": "allergies"
+     }
+    ],
+    "section": "🍽️ Meals",
+    "optional": true,
+    "question": "Any dietary needs?"
+   },
+   {
+    "id": "meals_count",
+    "kind": "number",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "meals"
+     }
+    ],
+    "section": "🍽️ Meals",
+    "question": "How many people are we feeding?",
+    "placeholder": "e.g. 4"
+   },
+   {
+    "id": "meals_notes",
+    "kind": "textarea",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "meals"
+     }
+    ],
+    "section": "🍽️ Meals",
+    "optional": true,
+    "question": "Anything else about the meals?",
+    "placeholder": "Allergies, hechsher preferences, special requests…"
+   },
+   {
+    "id": "ride_pickup",
+    "kind": "text",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "transportation"
+     }
+    ],
+    "section": "🚗 Ride",
+    "question": "Where is the pickup location?",
+    "placeholder": "Pickup address"
+   },
+   {
+    "id": "ride_dropoff",
+    "kind": "text",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "transportation"
+     }
+    ],
+    "section": "🚗 Ride",
+    "question": "Where’s the dropoff location?",
+    "placeholder": "Destination"
+   },
+   {
+    "id": "ride_when",
+    "kind": "text",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "transportation"
+     }
+    ],
+    "section": "🚗 Ride",
+    "question": "When do you need the ride?",
+    "placeholder": "Day and time — e.g. Tuesday at 9am"
+   },
+   {
+    "id": "ride_passengers",
+    "kind": "number",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "transportation"
+     }
+    ],
+    "section": "🚗 Ride",
+    "optional": true,
+    "question": "How many passengers?",
+    "placeholder": "e.g. 2"
+   },
+   {
+    "id": "ride_notes",
+    "kind": "textarea",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "transportation"
+     }
+    ],
+    "section": "🚗 Ride",
+    "optional": true,
+    "question": "Anything else about the ride?",
+    "placeholder": "Optional"
+   },
+   {
+    "id": "stay_dates",
+    "kind": "text",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "familyHousing"
+     }
+    ],
+    "section": "🏠 Place to stay",
+    "question": "When would you arrive and leave?",
+    "placeholder": "e.g. Thursday night through Sunday"
+   },
+   {
+    "id": "stay_distance",
+    "kind": "text",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "familyHousing"
+     }
+    ],
+    "section": "🏠 Place to stay",
+    "optional": true,
+    "question": "How close to the hospital do you need to be?",
+    "placeholder": "e.g. walking distance, or within 10 minutes"
+   },
+   {
+    "id": "stay_accessibility",
+    "kind": "text",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "familyHousing"
+     }
+    ],
+    "section": "🏠 Place to stay",
+    "optional": true,
+    "question": "Any accessibility needs?",
+    "placeholder": "e.g. no stairs, wheelchair accessible"
+   },
+   {
+    "id": "stay_location_pref",
+    "kind": "text",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "familyHousing"
+     }
+    ],
+    "section": "🏠 Place to stay",
+    "optional": true,
+    "question": "Any preference on where you stay?",
+    "placeholder": "e.g. a family home, women’s only, near a shul"
+   },
+   {
+    "id": "stay_notes",
+    "kind": "textarea",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "familyHousing"
+     }
+    ],
+    "section": "🏠 Place to stay",
+    "optional": true,
+    "question": "Anything else about the place to stay?",
+    "placeholder": "Optional"
+   },
+   {
+    "id": "hospital_room",
+    "kind": "text",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "visitors"
+     },
+     {
+      "op": "notIncludes",
+      "field": "needs",
+      "value": "meals"
+     }
+    ],
+    "section": "🤝 Visit",
+    "question": "Which hospital and room?",
+    "placeholder": "e.g. Jefferson, room 412"
+   },
+   {
+    "id": "visit_type",
+    "kind": "multi",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "visitors"
+     }
+    ],
+    "options": [
+     {
+      "label": "A friendly visit",
+      "value": "friendlyVisit"
+     },
+     {
+      "label": "Spiritual support",
+      "value": "spiritualSupport"
+     },
+     {
+      "label": "Jewish chaplain",
+      "value": "chaplainVisit"
+     },
+     {
+      "label": "Learning partner",
+      "value": "learningPartner"
+     },
+     {
+      "label": "Minyan help",
+      "value": "minyanAssistance"
+     }
+    ],
+    "section": "🤝 Visit",
+    "question": "What kind of visit?"
+   },
+   {
+    "id": "visit_time",
+    "kind": "multi",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "visitors"
+     }
+    ],
+    "options": [
+     {
+      "label": "Morning",
+      "value": "morning"
+     },
+     {
+      "label": "Afternoon",
+      "value": "afternoon"
+     },
+     {
+      "label": "Evening",
+      "value": "evening"
+     }
+    ],
+    "section": "🤝 Visit",
+    "optional": true,
+    "question": "What time of day?"
+   },
+   {
+    "id": "visit_frequency",
+    "kind": "single",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "visitors"
+     }
+    ],
+    "options": [
+     {
+      "label": "One time",
+      "value": "oneTime"
+     },
+     {
+      "label": "Daily",
+      "value": "daily"
+     },
+     {
+      "label": "A few times a week",
+      "value": "severalPerWeek"
+     },
+     {
+      "label": "Flexible",
+      "value": "flexible"
+     }
+    ],
+    "section": "🤝 Visit",
+    "optional": true,
+    "question": "How often?"
+   },
+   {
+    "id": "otherNeed",
+    "kind": "textarea",
+    "when": [
+     {
+      "op": "includes",
+      "field": "needs",
+      "value": "other"
+     }
+    ],
+    "section": "✨ Something else",
+    "question": "What else can we help with?",
+    "placeholder": "Tell us what you need…"
+   },
+   {
+    "id": "additionalInfo",
+    "kind": "textarea",
+    "optional": true,
+    "question": "Anything else we should know?",
+    "placeholder": "Optional"
+   }
+  ],
+  "draft": null,
+  "updated_at": "2026-10-29T15:31:58.466+00:00",
+  "icon": null,
+  "community_id": "philly",
+  "active": false
+ },
+ {
+  "id": "volunteer",
+  "title": "Volunteer for Patients",
+  "submit_label": "Sign me up",
+  "success_title": "Thank you",
+  "success_message": "We’ve added you to our volunteer list and will reach out when there’s a need that matches what you can offer.",
+  "steps": [
+   {
+    "id": "waysToHelp",
+    "hint": "Tap all that apply.",
+    "kind": "multi",
+    "options": [
+     {
+      "icon": "🍲",
+      "label": "Cook or deliver meals",
+      "value": "meals"
+     },
+     {
+      "icon": "🫂",
+      "label": "Visit patients",
+      "value": "visiting"
+     },
+     {
+      "icon": "🚙",
+      "label": "Give rides",
+      "value": "transportation"
+     },
+     {
+      "icon": "🛏️",
+      "label": "Host a family",
+      "value": "housing"
+     },
+     {
+      "icon": "❤️",
+      "label": "Something else",
+      "value": "other"
+     }
+    ],
+    "question": "How would you like to help?"
+   },
+   {
+    "id": "name",
+    "kind": "text",
+    "section": "👋 Your details",
+    "question": "What’s your name?",
+    "placeholder": "Your full name"
+   },
+   {
+    "id": "contact",
+    "kind": "contact",
+    "section": "👋 Your details",
+    "question": "How can we reach you?"
+   },
+   {
+    "id": "preferredContact",
+    "kind": "single",
+    "when": [
+     {
+      "op": "notEmpty",
+      "field": "phone"
+     },
+     {
+      "op": "empty",
+      "field": "email"
+     }
+    ],
+    "options": [
+     {
+      "label": "Call me",
+      "value": "phone"
+     },
+     {
+      "label": "Text me",
+      "value": "text"
+     }
+    ],
+    "section": "👋 Your details",
+    "question": "How should we reach you?"
+   },
+   {
+    "id": "preferredContact",
+    "kind": "single",
+    "when": [
+     {
+      "op": "notEmpty",
+      "field": "phone"
+     },
+     {
+      "op": "notEmpty",
+      "field": "email"
+     }
+    ],
+    "options": [
+     {
+      "label": "Call me",
+      "value": "phone"
+     },
+     {
+      "label": "Text me",
+      "value": "text"
+     },
+     {
+      "label": "Email me",
+      "value": "email"
+     }
+    ],
+    "section": "👋 Your details",
+    "question": "How should we reach you?"
+   },
+   {
+    "id": "meals_kosher",
+    "kind": "text",
+    "when": [
+     {
+      "op": "includes",
+      "field": "waysToHelp",
+      "value": "meals"
+     }
+    ],
+    "section": "🍲 Cooking meals",
+    "question": "What kosher standard do you keep?",
+    "placeholder": "e.g. Glatt, Chalav Yisrael, OU…"
+   },
+   {
+    "id": "visit_days",
+    "kind": "multi",
+    "when": [
+     {
+      "op": "includes",
+      "field": "waysToHelp",
+      "value": "visiting"
+     }
+    ],
+    "options": [
+     {
+      "label": "Sunday",
+      "value": "sunday"
+     },
+     {
+      "label": "Monday",
+      "value": "monday"
+     },
+     {
+      "label": "Tuesday",
+      "value": "tuesday"
+     },
+     {
+      "label": "Wednesday",
+      "value": "wednesday"
+     },
+     {
+      "label": "Thursday",
+      "value": "thursday"
+     },
+     {
+      "label": "Friday",
+      "value": "friday"
+     },
+     {
+      "label": "Saturday (Shabbat)",
+      "value": "saturday"
+     }
+    ],
+    "section": "🫂 Visiting patients",
+    "question": "Which days can you visit?"
+   },
+   {
+    "id": "visit_time",
+    "kind": "multi",
+    "when": [
+     {
+      "op": "includes",
+      "field": "waysToHelp",
+      "value": "visiting"
+     }
+    ],
+    "options": [
+     {
+      "label": "Morning",
+      "value": "morning"
+     },
+     {
+      "label": "Afternoon",
+      "value": "afternoon"
+     },
+     {
+      "label": "Evening",
+      "value": "evening"
+     }
+    ],
+    "section": "🫂 Visiting patients",
+    "question": "What time of day?"
+   },
+   {
+    "id": "visit_gender",
+    "hint": "We ask so we can pair you with patients appropriately.",
+    "kind": "single",
+    "when": [
+     {
+      "op": "includes",
+      "field": "waysToHelp",
+      "value": "visiting"
+     }
+    ],
+    "options": [
+     {
+      "label": "Male",
+      "value": "male"
+     },
+     {
+      "label": "Female",
+      "value": "female"
+     },
+     {
+      "label": "Prefer not to say",
+      "value": "preferNotToSay"
+     }
+    ],
+    "section": "🫂 Visiting patients",
+    "question": "What’s your gender?"
+   },
+   {
+    "id": "visit_age",
+    "hint": "Also helps us pair you appropriately.",
+    "kind": "single",
+    "when": [
+     {
+      "op": "includes",
+      "field": "waysToHelp",
+      "value": "visiting"
+     }
+    ],
+    "options": [
+     {
+      "label": "Under 18",
+      "value": "under18"
+     },
+     {
+      "label": "18–30",
+      "value": "18to30"
+     },
+     {
+      "label": "31–50",
+      "value": "31to50"
+     },
+     {
+      "label": "51–65",
+      "value": "51to65"
+     },
+     {
+      "label": "65+",
+      "value": "65plus"
+     }
+    ],
+    "section": "🫂 Visiting patients",
+    "question": "What’s your age group?"
+   },
+   {
+    "id": "ride_passengers",
+    "kind": "number",
+    "when": [
+     {
+      "op": "includes",
+      "field": "waysToHelp",
+      "value": "transportation"
+     }
+    ],
+    "section": "🚙 Giving rides",
+    "question": "How many passengers can you take?",
+    "placeholder": "e.g. 3"
+   },
+   {
+    "id": "host_rooms",
+    "kind": "number",
+    "when": [
+     {
+      "op": "includes",
+      "field": "waysToHelp",
+      "value": "housing"
+     }
+    ],
+    "section": "🛏️ Hosting a family",
+    "question": "How many rooms do you have for guests?",
+    "placeholder": "e.g. 2"
+   },
+   {
+    "id": "host_beds",
+    "kind": "number",
+    "when": [
+     {
+      "op": "includes",
+      "field": "waysToHelp",
+      "value": "housing"
+     }
+    ],
+    "section": "🛏️ Hosting a family",
+    "question": "How many total beds do you have?",
+    "placeholder": "e.g. 3"
+   },
+   {
+    "id": "host_address",
+    "kind": "text",
+    "when": [
+     {
+      "op": "includes",
+      "field": "waysToHelp",
+      "value": "housing"
+     }
+    ],
+    "section": "🛏️ Hosting a family",
+    "question": "What’s your address?",
+    "placeholder": "Street, city, zip"
+   },
+   {
+    "id": "waysToHelpOther",
+    "kind": "textarea",
+    "when": [
+     {
+      "op": "includes",
+      "field": "waysToHelp",
+      "value": "other"
+     }
+    ],
+    "section": "❤️ Something else",
+    "question": "How else would you like to help?",
+    "placeholder": "Tell us…"
+   },
+   {
+    "id": "areas",
+    "hint": "Tap all that apply.",
+    "kind": "multi",
+    "question": "Where can you help?",
+    "optionsSource": "hospitals"
+   },
+   {
+    "id": "notes",
+    "hint": "Languages you speak, experience, anything else.",
+    "kind": "textarea",
+    "optional": true,
+    "question": "Anything else you’d like us to know?",
+    "placeholder": "Optional"
+   }
+  ],
+  "draft": null,
+  "updated_at": "2026-07-21T19:47:28.213+00:00",
+  "icon": null,
+  "community_id": "philly",
+  "active": false
+ }
+]

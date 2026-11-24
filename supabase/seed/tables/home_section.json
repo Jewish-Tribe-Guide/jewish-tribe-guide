@@ -1,0 +1,144 @@
+[
+ {
+  "id": "browse",
+  "title": "Categories and Search Card",
+  "sort_order": 800,
+  "card_ids": [],
+  "created_at": "2026-09-08T18:16:27.981859+00:00",
+  "community_id": "philly",
+  "kind": "browse",
+  "width": "full",
+  "shares_row": false
+ },
+ {
+  "id": "family-resources",
+  "title": "Family Resources",
+  "sort_order": 400,
+  "card_ids": [
+   "childcare",
+   "school",
+   "cemetery"
+  ],
+  "created_at": "2026-07-21T20:17:49.938662+00:00",
+  "community_id": "philly",
+  "kind": "section",
+  "width": "full",
+  "shares_row": false
+ },
+ {
+  "id": "food-establishments",
+  "title": "Food and Hospitality",
+  "sort_order": 200,
+  "card_ids": [
+   "restaurant",
+   "grocery",
+   "hotel"
+  ],
+  "created_at": "2026-07-21T20:18:09.375601+00:00",
+  "community_id": "philly",
+  "kind": "section",
+  "width": "full",
+  "shares_row": false
+ },
+ {
+  "id": "get-connected",
+  "title": "Get Involved",
+  "sort_order": 600,
+  "card_ids": [
+   "whatsapp",
+   "young-professional",
+   "volunteer"
+  ],
+  "created_at": "2026-07-21T20:18:30.087984+00:00",
+  "community_id": "philly",
+  "kind": "section",
+  "width": "full",
+  "shares_row": false
+ },
+ {
+  "id": "jewish-institutions-and-information",
+  "title": "Jewish Institutions and Information",
+  "sort_order": 300,
+  "card_ids": [
+   "synagogue",
+   "zmanim",
+   "mikvah",
+   "eruv"
+  ],
+  "created_at": "2026-07-21T20:17:36.683065+00:00",
+  "community_id": "philly",
+  "kind": "section",
+  "width": "full",
+  "shares_row": false
+ },
+ {
+  "id": "map",
+  "title": "Map Card",
+  "sort_order": 1000,
+  "card_ids": [],
+  "created_at": "2026-11-11T20:22:14.893051+00:00",
+  "community_id": "philly",
+  "kind": "map",
+  "width": "full",
+  "shares_row": false
+ },
+ {
+  "id": "medical-resources",
+  "title": "Medical Resources",
+  "sort_order": 500,
+  "card_ids": [
+   "medical",
+   "support",
+   "hospital"
+  ],
+  "created_at": "2026-07-21T20:18:17.990198+00:00",
+  "community_id": "philly",
+  "kind": "section",
+  "width": "full",
+  "shares_row": false
+ },
+ {
+  "id": "rightNow",
+  "title": "Right Now Card",
+  "sort_order": 900,
+  "card_ids": [],
+  "created_at": "2026-11-15T09:02:40.738419+00:00",
+  "community_id": "philly",
+  "kind": "rightNow",
+  "width": "full",
+  "shares_row": false
+ },
+ {
+  "id": "subscribe",
+  "title": "Email Signup Card",
+  "sort_order": 1200,
+  "card_ids": [],
+  "created_at": "2026-09-08T18:16:27.981859+00:00",
+  "community_id": "philly",
+  "kind": "subscribe",
+  "width": "half",
+  "shares_row": true
+ },
+ {
+  "id": "suggest",
+  "title": "Suggest a Listing Card",
+  "sort_order": 1100,
+  "card_ids": [],
+  "created_at": "2026-11-05T00:54:18.672297+00:00",
+  "community_id": "philly",
+  "kind": "suggest",
+  "width": "full",
+  "shares_row": false
+ },
+ {
+  "id": "zmanim",
+  "title": "Prayer & Shabbat Times",
+  "sort_order": 100,
+  "card_ids": [],
+  "created_at": "2026-08-18T18:06:58.935003+00:00",
+  "community_id": "philly",
+  "kind": "zmanim",
+  "width": "full",
+  "shares_row": false
+ }
+]

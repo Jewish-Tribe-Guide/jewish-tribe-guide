@@ -2350,6 +2350,16 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   it passed on a page the cache still served from before and failed on
   the menu link (it now waits for the added dish: failed once in two
   full runs before, 4 of 4 after).
+- Nov 23, cache-roundtrip moved too, and both jobs now start from a
+  seed committed in the repo (`supabase/seed`) instead of a copy of the
+  test project: PR 441's admin-write copied the integration suite's
+  half-made "Integration Test" category mid-run and failed on it. The
+  seed is the three communities' public content (159 listings, 17
+  categories, pages, forms, eruvs, watches, settings), every email
+  replaced by a made-up one, submitters and preview tokens emptied, test
+  leftovers dropped (`scripts/make-test-seed.mjs`). The jobs no longer
+  get the test project's keys at all, and `ciWorkflow.test.ts` holds
+  them to that.
 - 84. Done Nov 23 (the user's yes): the menu watches of four sites that
   refuse the reader were turned off on live: 20th Street Pizza, Stephen's
   Cafe and Authentic Kosher Chinese (Cloudflare's "prove you're a person"

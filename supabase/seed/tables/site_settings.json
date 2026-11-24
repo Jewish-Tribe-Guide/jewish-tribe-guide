@@ -1,0 +1,119 @@
+[
+ {
+  "id": "default",
+  "name": "Philly Jewish Guide",
+  "hero_title": "Your Guide to Jewish Philadelphia",
+  "mission": "Community maintained. Every listing can be added, corrected, or removed here, after admin approval",
+  "updated_at": "2026-11-20T18:27:21.126+00:00",
+  "feedback_enabled": true,
+  "feedback_button_label": "Have general feedback about the site? Send a note",
+  "feedback_heading": "Feedback",
+  "feedback_success_message": "We read every note. If you left an email, we’ll write back.",
+  "logo_url": "https://lzkulpwawxneelhwvych.supabase.co/storage/v1/object/public/site-assets/logo/1787885895090-ex1f6j.webp",
+  "featured_card_ids": [],
+  "mobile_tabs": [
+   {
+    "id": "categories",
+    "label": "Home",
+    "target": "categories"
+   },
+   {
+    "id": "map",
+    "label": "Map",
+    "target": "map"
+   },
+   {
+    "id": "you",
+    "label": "You",
+    "target": "you"
+   },
+   {
+    "id": "tab_hqikclp",
+    "label": "Activity",
+    "target": "changes"
+   }
+  ],
+  "community_id": "philly",
+  "search_placeholder": "Ask: challah, pizza open now",
+  "desktop_nav_items": [
+   {
+    "id": "categories",
+    "kind": "categories-menu",
+    "label": "Categories"
+   },
+   {
+    "id": "map",
+    "kind": "link",
+    "label": "Map",
+    "target": "map"
+   },
+   {
+    "id": "you",
+    "kind": "link",
+    "label": "You",
+    "target": "you"
+   },
+   {
+    "id": "nav_qk2xr6j",
+    "kind": "more-menu",
+    "items": [
+     {
+      "id": "nav_ibewigg",
+      "kind": "link",
+      "label": "What changed",
+      "target": "changes"
+     }
+    ],
+    "label": "Activity"
+   },
+   {
+    "id": "more",
+    "kind": "more-menu",
+    "items": [
+     {
+      "id": "about",
+      "kind": "link",
+      "label": "About",
+      "target": "about"
+     },
+     {
+      "id": "feedback",
+      "kind": "link",
+      "label": "Feedback",
+      "target": "feedback"
+     },
+     {
+      "id": "privacy",
+      "kind": "link",
+      "label": "Privacy",
+      "target": "privacy"
+     }
+    ],
+    "label": "More"
+   }
+  ],
+  "desktop_hero_headline": "Your Guide to Jewish Philadelphia",
+  "desktop_hero_subhead": "",
+  "desktop_hero_image": {
+   "alt": "",
+   "url": "https://lzkulpwawxneelhwvych.supabase.co/storage/v1/object/public/site-assets/hero/1789440803179-mpg2g8.jpeg"
+  },
+  "desktop_accent_color": "#b45309",
+  "desktop_listings_eyebrow": "Community Run",
+  "desktop_listings_heading": "Kept by the Community",
+  "desktop_subscribe_eyebrow": "Email Updates",
+  "desktop_subscribe_heading": "Stay in the Loop",
+  "home_style": "today",
+  "before_candle_items": null,
+  "today_hidden": null,
+  "desktop_map_image": {
+   "alt": "Street map of Philadelphia",
+   "url": "https://lzkulpwawxneelhwvych.supabase.co/storage/v1/object/public/site-assets/map/philly-osm-1794438709662.jpg",
+   "credit": "© OpenStreetMap contributors"
+  },
+  "right_now_categories": [
+   "restaurant",
+   "grocery"
+  ]
+ }
+]

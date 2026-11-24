@@ -1,7 +1,7 @@
 name: A test database of the job's own
 description: >
   Starts Supabase on this runner (database, sign-in and API), built from
-  supabase/migrations, fills it with a copy of the test project's rows, and
+  supabase/migrations, loads the tests' starting data (supabase/seed), and
   points TEST_SUPABASE_* at it for the rest of the job.
 
 # Why (Nov 23): every suite used to share one hosted test project, with dev,
@@ -11,16 +11,12 @@ description: >
 # database per job is what Supabase's CLI is for: nothing else touches it,
 # and it is thrown away with the runner.
 #
-# The test project is only READ here (scripts/backup.mjs, rows only), so the
-# job's writes never reach it. Rows that point at nothing (its test
-# leftovers) are left out: a fresh database's foreign keys refuse them.
-# Needs Docker, so the job runs on a bare runner, not in a container.
-
-inputs:
-  test-supabase-url:
-    required: true
-  test-supabase-service-role-key:
-    required: true
+# The starting data is a file in the repo, the same for every job, not a
+# copy of the test project: a copy taken while other jobs wrote to it caught
+# the integration suite's half-made page (PR 441, Nov 23). It holds only
+# public content, scrubbed (scripts/make-test-seed.mjs). The test server adds
+# `e2e-writes` and its fixtures itself. Needs Docker, so the job runs on a
+# bare runner, not in a container.
 
 runs:
   using: composite
@@ -31,18 +27,10 @@ runs:
       run: npx -y supabase@3.1.0 start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
 
     - shell: bash
-      env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ inputs.test-supabase-url }}
-        SUPABASE_SERVICE_ROLE_KEY: ${{ inputs.test-supabase-service-role-key }}
-      run: node scripts/backup.mjs --no-files
-
-    - shell: bash
       run: |
         eval "$(npx -y supabase@3.1.0 status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
-        RESTORE_URL="$API_URL" RESTORE_KEY="$SERVICE_ROLE_KEY" \
-          node scripts/restore.mjs "$(ls -d backups/dev-* | head -1)" --no-files --replace --skip-broken-links
-        rm -rf backups
-        # The copy keeps its ids; move the id counters past them.
+        RESTORE_URL="$API_URL" RESTORE_KEY="$SERVICE_ROLE_KEY" node scripts/restore.mjs supabase/seed --no-files --replace
+        # The seed keeps its ids; move the id counters past them.
         docker exec -i supabase_db_jewish-patient-connect psql -q -U postgres -v ON_ERROR_STOP=1 < scripts/reset-sequences.sql
         {
           echo "TEST_SUPABASE_URL=$API_URL"
