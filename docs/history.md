@@ -4,6 +4,17 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## The Watches tab's reads (Nov 24)
+
+Sentry had the Watches tab's combined read at 2.2s p75 and its screens at
+1.0–1.6s, against the proposed ≤ 1s. It waited on the database five times
+in a row; now twice. Every job's places come from one read of the
+community's listings, started beside its categories, and its findings
+start at once and take the places they name from that read
+(`docs/speed-targets.md` has the detail). `watchJobPlaces.test.ts` drives
+the jobs and the hours and sites routes on the committed seed: 4 of its 5
+tests failed against the old code.
+
 ## Checks that tell someone (Nov 24)
 
 The user, Nov 24: "we should be making sure our CI and tests are testing

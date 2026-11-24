@@ -14,13 +14,13 @@ vi.mock('@/lib/watchRunner', () => ({ runAndRecord: m.runAndRecord }))
 vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     from: (table: string) => {
-      let only: string[] | null = null
+      const among: Record<string, unknown[]> = {}
       const q = {
         select: () => q,
         eq: () => q,
-        in: (_col: string, vals: string[]) => ((only = vals), q),
+        in: (col: string, vals: unknown[]) => ((among[col] = vals), q),
         range: () => q, order: () => q, then: (ok: (v: unknown) => unknown) =>
-          Promise.resolve({ data: table === 'community' ? m.communities : m.rows.filter((r) => !only || only.includes(r.category as string)), error: null }).then(ok),
+          Promise.resolve({ data: table === 'community' ? m.communities : m.rows.filter((r) => Object.entries(among).every(([col, vals]) => vals.includes(r[col]))), error: null }).then(ok),
       }
       return q
     },

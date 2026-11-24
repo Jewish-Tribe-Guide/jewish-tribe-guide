@@ -1,7 +1,7 @@
 import { isIP } from 'node:net'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { listCategoriesUncached } from '@/lib/categoryStore'
-import { normalizeRow } from '@/lib/resourceStore'
+import { approvedIn, listResourcesForAdmin, normalizeRow } from '@/lib/resourceStore'
 import { addWatch, listWatches, removeWatch, updateWatch } from '@/lib/watchStore'
 import { dnsLookup, isPrivateAddress, type Lookup } from '@/lib/menuReader'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
@@ -10,8 +10,6 @@ import { jobsOff } from './jobOff'
 import { routes } from '@/lib/routes'
 import { answerOf, checkedRecord, isLinkCheck, LINK_CHECK_CREATOR, linkCheckUrl, linksToCheck, standingOf, type LinkAnswer, type LinkStanding, type ListingLink } from '@/lib/linkCheck'
 import type { Watch } from '@/lib/watches'
-import type { ResourceRow } from '@/types'
-import { readAll } from '@/lib/readAll'
 
 // The weekly link check (linkCheck.ts): opens each link a listing shows
 // and keeps how it answered. Run by /api/cron/check-links, and for one
@@ -90,20 +88,10 @@ type PlacedLink = ListingLink & { place: string; category: string; href: string 
 
 /** A community's links to check, and their records. */
 async function communityLinks(community: string): Promise<{ links: PlacedLink[]; records: Watch[]; available: boolean }> {
-  const categories = (await listCategoriesUncached(community)).filter((c) => c.kind === 'listing')
-  const { watches, available } = await listWatches(community)
+  const [all, { watches, available }, rows] = await Promise.all([listCategoriesUncached(community), listWatches(community), listResourcesForAdmin(community)])
+  const categories = all.filter((c) => c.kind === 'listing')
   if (!categories.length || !available) return { links: [], records: [], available }
-  const { data, error } = await readAll((from, to) => getAdminClient()
-    .from('resource')
-    .select('*')
-    .eq('community_id', community)
-    .eq('status', 'approved')
-    .in(
-      'category',
-      categories.map((c) => c.id),
-    ).order('id').range(from, to))
-  if (error) throw new Error(`Couldn’t list the places: ${error.message}`)
-  const links = ((data ?? []) as ResourceRow[]).flatMap((row) => {
+  const links = approvedIn(rows, categories).flatMap((row) => {
     const category = categories.find((c) => c.id === row.category)
     if (!category) return []
     const p = normalizeRow(row)

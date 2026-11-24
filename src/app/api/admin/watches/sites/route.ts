@@ -4,6 +4,7 @@ import { jobFindings } from '@/lib/watchFindingStore'
 import { listWatches } from '@/lib/watchStore'
 import { isListingPageWatch } from '@/lib/listingPageWatch'
 import { sitePlaces } from '@/lib/hoursJobRun'
+import { listResourcesForAdmin } from '@/lib/resourceStore'
 import { listingSlug } from '@/lib/listingSlug'
 import { routes } from '@/lib/routes'
 
@@ -17,8 +18,14 @@ import { routes } from '@/lib/routes'
 
 export const GET = adminRead(async (request: Request, { community }) => {
   try {
-    const [{ watches }, { categories, places }] = await Promise.all([listWatches(community.slug), sitePlaces(community.slug)])
-    const { findings, decided } = places.length ? await jobFindings(community.slug, 'sites', categories) : { findings: [], decided: new Map() }
+    const listings = listResourcesForAdmin(community.slug)
+    const placesRead = sitePlaces(community.slug, listings)
+    const [{ watches }, { places }, filed] = await Promise.all([
+      listWatches(community.slug),
+      placesRead,
+      jobFindings(community.slug, 'sites', placesRead.then((p) => p.categories), listings),
+    ])
+    const { findings, decided } = places.length ? filed : { findings: [], decided: new Map() }
     const rows = places.map((p) => ({
       id: p.id,
       name: p.name,

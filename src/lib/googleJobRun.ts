@@ -25,7 +25,7 @@ import {
   type GooglePlace,
 } from './googleJob'
 import type { ResourceSubmission } from '@/types'
-import { readAll } from '@/lib/readAll'
+import { approvedIn, listResourcesForAdmin } from '@/lib/resourceStore'
 import { patchListing } from './listingPatch'
 
 // ── The Watches tab's Google page, on the server (googleJob.ts) ─────────────
@@ -236,14 +236,10 @@ const COLUMNS = 'id,name,category,phone,address,anchor_id,distance,details,creat
 
 /** Every listing the sync covers: in a category with an address. */
 export async function loadGoogleJob(community: string, now = Date.now()): Promise<GooglePlace[]> {
-  const [categories, { data, error }, { watches }] = await Promise.all([
-    listCategoriesUncached(community),
-    readAll((from, to) => getAdminClient().from('resource').select(COLUMNS).eq('community_id', community).eq('status', 'approved').order('id').range(from, to)),
-    listWatches(community),
-  ])
-  if (error) throw new Error(`Failed to load listings: ${error.message}`)
-  const byId = new Map(categories.filter(isCategorySyncEligible).map((c) => [c.id, c]))
-  const rows = ((data ?? []) as Row[]).filter((r) => byId.has(r.category))
+  const [categories, all, { watches }] = await Promise.all([listCategoriesUncached(community), listResourcesForAdmin(community), listWatches(community)])
+  const eligible = categories.filter(isCategorySyncEligible)
+  const byId = new Map(eligible.map((c) => [c.id, c]))
+  const rows: Row[] = approvedIn(all, eligible)
   const names = new Map<string, number>()
   for (const r of rows) names.set(r.name.trim().toLowerCase(), (names.get(r.name.trim().toLowerCase()) ?? 0) + 1)
   return rows.map((r) => placeOf(r, byId.get(r.category)!, watches, now, community, (names.get(r.name.trim().toLowerCase()) ?? 0) > 1 ? streetOf(r.address) : null))

@@ -16,7 +16,7 @@ import { isKosherJobCategory, kosherCounts, kosherPlaces, type Filed, type Koshe
 import { listingSlug } from '@/lib/listingSlug'
 import { routes } from '@/lib/routes'
 import { UUID } from '@/lib/itemMarkRoutes'
-import { listApprovedResources, restoreResource } from '@/lib/resourceStore'
+import { listApprovedResources, listResourcesForAdmin, restoreResource } from '@/lib/resourceStore'
 import { runWalkRoutesAfterChange } from '@/lib/walkRouteJob'
 import { after } from 'next/server'
 import { approveOwn, approveSubmission, rejectSubmission, submitListingDelete, submitListingUpdate } from '@/lib/submissionStore'
@@ -104,22 +104,21 @@ export const GET = adminRead(async (request: Request, { community }) => {
       if (error) throw new Error(error.message)
       return (data ?? []) as Submission[]
     }
-    const [{ watches, available }, listReads, listingRows, keystoneFiled, mekorFiled, kclFiled, [categories, { findings, decided }]] = await Promise.all([
+    const kosherCategoriesRead = listCategories(slug)
+    const listings = listResourcesForAdmin(slug)
+    const [{ watches, available }, listReads, everyListing, keystoneFiled, mekorFiled, kclFiled, [categories, { findings, decided }]] = await Promise.all([
       listWatches(slug),
       getListReads(slug),
-      readAll((from, to) => supabase
-        .from('resource')
-        .select('id,category,name,address,phone,anchor_id,distance,details,status')
-        .eq('community_id', slug)
-        .in('status', ['approved', 'archived'])
-        .in('category', CATEGORIES).order('id').range(from, to)),
+      // The one read every Watches job shares (approvedIn's comment).
+      listings,
       filedBy(KEYSTONE_WATCH_NAME),
       filedBy(MEKOR_WATCH_NAME),
       filedBy(KCL_WATCH_NAME),
       // What they filed, waiting here to compare (watchFindings.ts).
-      listCategories(slug).then(async (categories) => [categories, await jobFindings(slug, 'kosher', categories)] as const),
+      Promise.all([kosherCategoriesRead, jobFindings(slug, 'kosher', kosherCategoriesRead, listings)]),
     ])
-    if (listingRows.error) throw new Error(listingRows.error.message)
+    const kosherCategories = new Set<string>(CATEGORIES)
+    const listingRows = everyListing.filter((r) => kosherCategories.has(r.category))
 
     const watchOf = (list: KosherList) => watches.find(LISTS.find((l) => l.list === list)!.is) ?? null
     const keystoneWatch = watchOf('keystone')
@@ -139,7 +138,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     ])
 
     const { places, newPlaces } = kosherPlaces({
-      listings: (listingRows.data ?? []) as GuideListing[],
+      listings: listingRows as GuideListing[],
       food: categories.filter(isKosherJobCategory).map((c) => c.id),
       keystone: keystone && 'entries' in keystone ? keystone.entries : null,
       mekor: mekor && 'entries' in mekor ? mekor.entries : null,
@@ -179,7 +178,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
     // Each Kosher box as the listing has it, and as each finding would make it.
     const food = categories.filter(isKosherJobCategory)
     const boxKeys = new Map(food.map((c) => [c.id, kosherBoxKeys(c)]))
-    const details = new Map((listingRows.data ?? []).map((l) => [l.id as string, (l.details ?? {}) as Record<string, unknown>]))
+    const details = new Map(listingRows.map((l) => [l.id, (l.details ?? {}) as Record<string, unknown>]))
     const sent = new Map([...keystoneFiled, ...mekorFiled, ...kclFiled].flatMap((s) => (s.id ? [[s.id, s.payload] as const] : [])))
     const withValues = (f: Finding): Finding & { address?: string; category?: string } => {
       const payload = sent.get(f.id)

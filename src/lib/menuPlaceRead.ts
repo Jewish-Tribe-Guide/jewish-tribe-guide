@@ -3,7 +3,7 @@ import { withinOrLate } from './lateWork'
 import { listCategoriesUncached } from '@/lib/categoryStore'
 import { jobsOff } from '@/lib/jobOff'
 import { listWatches } from '@/lib/watchStore'
-import { normalizeRow } from '@/lib/resourceStore'
+import { approvedIn, listResourcesForAdmin, normalizeRow } from '@/lib/resourceStore'
 import { itemsField } from '@/lib/listingView'
 import { itemMarks, itemWording } from '@/lib/itemMarks'
 import { findMenus, readMenuPage, readMenus, unreadMenuNote, menuPages, type Trouble } from '@/lib/menuReader'
@@ -14,7 +14,6 @@ import { listedDishes, newDishes } from '@/lib/menuWatch'
 import { pageRenderer } from '@/lib/renderPage'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import type { DirectoryResource, ResourceRow } from '@/types'
-import { readAll } from '@/lib/readAll'
 
 // A food place's own menu, read by the AI and kept as its reading
 // (menu_reading) for the Main dishes page: by that page's "Read now", and
@@ -133,22 +132,11 @@ export const FIRST_READS_END_MS = 270_000
 
 /** A community's food places never read (needsFirstRead), by name. */
 async function unreadMenus(slug: string): Promise<{ l: DirectoryResource; kind: DishKind }[]> {
-  const kinds = dishKinds(await listCategoriesUncached(slug))
-  if (!kinds.length) return []
-  const { readings, available } = await listMenuReadings(slug)
-  if (!available) return []
-  const { data: rows, error } = await readAll((from, to) => getAdminClient()
-    .from('resource')
-    .select('*')
-    .eq('community_id', slug)
-    .eq('status', 'approved')
-    .in(
-      'category',
-      kinds.map((k) => k.category.id),
-    ).order('id').range(from, to))
-  if (error) throw new Error(`Couldn’t list the food places: ${error.message}`)
+  const [categories, { readings, available }, rows] = await Promise.all([listCategoriesUncached(slug), listMenuReadings(slug), listResourcesForAdmin(slug)])
+  const kinds = dishKinds(categories)
+  if (!kinds.length || !available) return []
   const read = new Set(readings.map((r) => r.resourceId))
-  return ((rows ?? []) as ResourceRow[])
+  return approvedIn(rows, kinds.map((k) => k.category))
     .map(normalizeRow)
     .flatMap((l) => {
       const kind = kinds.find((k) => k.category.id === l.category)

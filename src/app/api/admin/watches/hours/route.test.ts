@@ -18,6 +18,8 @@ vi.mock('@/lib/rateLimit', () => ({ enforceRateLimit: async () => null }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly', timezone: 'America/New_York' }) }))
 vi.mock('@/lib/hoursJobRun', async (real) => ({ ...(await real<typeof import('@/lib/hoursJobRun')>()), hoursJobPlaces: m.hoursJobPlaces, searchHoursPages: m.searchHoursPages }))
+// The read the places and the findings share (approvedIn's comment).
+vi.mock('@/lib/resourceStore', async (real) => ({ ...(await real<typeof import('@/lib/resourceStore')>()), listResourcesForAdmin: async () => [] }))
 vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches, addWatch: m.addWatch, updateWatch: m.updateWatch, removeWatch: m.removeWatch }))
 vi.mock('@/lib/watchRunner', () => ({ runAndRecord: m.runAndRecord }))
 vi.mock('@/lib/watchFindingStore', () => ({ jobFindings: m.jobFindings }))
@@ -96,7 +98,8 @@ describe('GET /api/admin/watches/hours', () => {
     expect(lmc).toMatchObject({ findings: [finding], decided: null, off: false, reason: null, fields: ['Women’s Hours', 'Men’s Hours'] })
     expect(lmc.pages.map((p: { source: string }) => p.source)).toEqual(['Found from its website', 'Found from its website’s Men’s Mikvah link', 'Added by hand'])
     expect(body.places.find((p: { id: string }) => p.id === MEI).decided).toEqual(decided)
-    expect(m.jobFindings).toHaveBeenCalledWith('philly', 'hours', [MIKVAH])
+    expect(m.jobFindings).toHaveBeenCalledWith('philly', 'hours', expect.anything(), expect.anything())
+    expect(await m.jobFindings.mock.calls[0][2]).toEqual([MIKVAH])
   })
 
   // The user, Oct 22: opening the page shows what was done; it searches
@@ -135,7 +138,7 @@ describe('the Shul times page (?job=times)', () => {
   it('lists the shuls, with what their times’ search said, in its own words', async () => {
     m.listWatches.mockResolvedValue({ watches: [w({ id: 's', url: hoursSearchedUrl(KESHER, 'times'), resourceId: KESHER, createdBy: HOURS_SEARCHED_CREATOR, active: false, lastError: 'Read its website: no davening times on it.' })], available: true })
     const body = await (await GET(req('GET', undefined, '?job=times'))).json()
-    expect(m.hoursJobPlaces).toHaveBeenCalledWith('philly', 'times')
+    expect(m.hoursJobPlaces).toHaveBeenCalledWith('philly', 'times', expect.anything())
     expect(body.name).toBe('Shul times')
     expect(body.places[0]).toMatchObject({ id: KESHER, fields: ['Davening Times'], reason: 'Read its website: no davening times on it.' })
     // The hours search's record is for the hours page.

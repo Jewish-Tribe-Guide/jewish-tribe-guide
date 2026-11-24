@@ -166,7 +166,8 @@ describe('/api/admin/main-dishes', () => {
 
     it('each place comes with its website’s pages, what they found, and its hours and phone as listed, only what Google doesn’t keep', async () => {
       const [cv, jd] = (await (await GET(req('GET'))).json()).places
-      expect(m.jobFindings).toHaveBeenCalledWith('philly', 'dishes', [withHours])
+      expect(m.jobFindings).toHaveBeenCalledWith('philly', 'dishes', expect.anything())
+      expect(await m.jobFindings.mock.calls[0][2]).toEqual([withHours])
       expect(cv).toMatchObject({ id: CV, pages: [home], findings: [finding], hours, contact: { name: 'Phone', fields: [{ key: 'phone', label: 'Phone', kind: 'phone', value: '(215) 555-0100' }] } })
       expect(jd).toMatchObject({ id: ID, pages: [], findings: [], contact: null })
       expect(jd).not.toHaveProperty('hours')

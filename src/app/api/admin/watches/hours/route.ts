@@ -11,6 +11,7 @@ import { hoursSections, offeredSections, sectionKeys } from '@/lib/hoursSections
 import { LISTING_PAGE_WATCH_CREATOR, isListingPageWatch, listingPageLabel, pageReadsFor } from '@/lib/listingPageWatch'
 import { HOURS_FOUND_CREATOR, HOURS_OFF_CREATOR, NOT_SEARCHED, NO_WEBSITE, PAGE_STOPPED_CREATOR, foundPageLabel, hoursJobName, hoursOffUrl, hoursSearchedUrl, isHoursOff, isHoursSearched, isStoppedPage, jobWords, samePage, searchReason, sourceLine, type PageJob } from '@/lib/hoursJob'
 import { CHECK_SEARCH_MS, deadline, hoursJobPlaces, recordSearch, searchHoursPages, websiteOf } from '@/lib/hoursJobRun'
+import { listResourcesForAdmin } from '@/lib/resourceStore'
 import { listingSlug } from '@/lib/listingSlug'
 import { listedContact } from '@/lib/contactRead'
 import { routes } from '@/lib/routes'
@@ -149,11 +150,16 @@ export const GET = adminRead(async (request: Request, { community }) => {
       if (!item || !category) return Response.json({ ok: false, errors: [`That place isn’t one whose ${jobWords(job).what} are read.`] }, { status: 404 })
       return Response.json({ ok: true, item, category })
     }
-    const [{ watches, available }, { categories, places }] = await Promise.all([listWatches(community.slug), hoursJobPlaces(community.slug, job)])
-
     // What their pages (and a shul's newsletter) found, waiting here to
-    // compare, and when each place's last one was decided (watchFindings.ts).
-    const { findings, decided } = await jobFindings(community.slug, job, categories)
+    // compare, and when each place's last one was decided (watchFindings.ts),
+    // read beside the places rather than after them.
+    const listings = listResourcesForAdmin(community.slug)
+    const placesRead = hoursJobPlaces(community.slug, job, listings)
+    const [{ watches, available }, { categories, places }, { findings, decided }] = await Promise.all([
+      listWatches(community.slug),
+      placesRead,
+      jobFindings(community.slug, job, placesRead.then((p) => p.categories), listings),
+    ])
 
     const rows = places.map((p) => {
       const { pages, stopped, marker, newsletters } = placeWatches(watches, p.id)
