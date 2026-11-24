@@ -196,6 +196,19 @@ describe('listJobRuns', () => {
     expect((await listJobRuns()).runs.watches[0].kinds).toEqual({ philly: { menus: { of: 33, read: 0 } } })
   })
 
+  // Nov 23: a page that shows one job's runs reads one job's (Sentry's
+  // N+1: Main dishes read all seven jobs' on every load).
+  it('reads only the jobs asked for', async () => {
+    db.calls.length = 0
+    db.rows = [{ id: 'r', job: 'watches', started_at: START.toISOString(), finished_at: null, ok: null, summary: null, warning: null, error: null }]
+    const { runs } = await listJobRuns('philly', ['watches'])
+    const reads = db.calls.filter((c) => c.op === 'select')
+    expect(reads).toHaveLength(1)
+    expect(reads[0].filters).toContainEqual(['eq', 'job', 'watches'])
+    expect(runs.watches).toHaveLength(1)
+    expect(runs['sync-hours']).toEqual([])
+  })
+
   it('without migration 087, reads the runs without it', async () => {
     db.errorFor = (c) => (c.op === 'select' && String(c.values?.columns).includes('kinds') ? { message: 'column job_run.kinds does not exist' } : null)
     db.rows = [{ id: 'r', job: 'watches', started_at: START.toISOString(), finished_at: null, ok: null, summary: null, warning: null, error: null }]

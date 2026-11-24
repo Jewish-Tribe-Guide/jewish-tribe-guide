@@ -77,13 +77,13 @@ async function startRun(job: JobId, now: Date, community?: string): Promise<stri
 
 const COLUMNS = 'id, job, started_at, finished_at, ok, summary, warning, error'
 
-/** Each job's latest `limit` runs, a query a job: a community's own and the
- *  whole site's when `community` is given. Falls back without the columns
- *  migrations 087 (kinds) and 101 (community_id) add. */
-async function latestRuns(limit: number, community: string | undefined, withKinds: boolean) {
+/** Each of `jobs`' latest `limit` runs, a query a job: a community's own
+ *  and the whole site's when `community` is given. Falls back without the
+ *  columns migrations 087 (kinds) and 101 (community_id) add. */
+async function latestRuns(limit: number, community: string | undefined, withKinds: boolean, jobs: readonly { id: JobId }[] = NIGHTLY_JOBS) {
   const read = (kinds: boolean, own: boolean) =>
     Promise.all(
-      NIGHTLY_JOBS.map((j) => {
+      jobs.map((j) => {
         const q = getAdminClient().from('job_run').select(kinds ? `${COLUMNS}, kinds` : COLUMNS).eq('job', j.id)
         return (own && community ? q.or(ownOrSiteRuns(community)) : q).order('started_at', { ascending: false }).limit(limit)
       }),
@@ -145,16 +145,19 @@ async function recordRun<T>(job: JobId, run: () => Promise<T>, outcome: (result:
 
 /** Each job's latest runs, newest first: with `community`, its own runs
  *  and the whole site's, never another community's. `available` is false
- *  without migration 086. */
-export async function listJobRuns(community?: string): Promise<{ available: boolean; runs: Record<JobId, JobRun[]> }> {
+ *  without migration 086. `only` reads just those jobs' (the rest come
+ *  back empty): a page that shows one job's runs reads one job's, not
+ *  all seven (Nov 23: Sentry's N+1 on Main dishes). */
+export async function listJobRuns(community?: string, only?: readonly JobId[]): Promise<{ available: boolean; runs: Record<JobId, JobRun[]> }> {
   const runs = Object.fromEntries(NIGHTLY_JOBS.map((j) => [j.id, [] as JobRun[]])) as Record<JobId, JobRun[]>
-  const results = await latestRuns(RUNS_SHOWN, community, true)
+  const jobs = only ? NIGHTLY_JOBS.filter((j) => only.includes(j.id)) : NIGHTLY_JOBS
+  const results = await latestRuns(RUNS_SHOWN, community, true, jobs)
   for (const [i, { data, error }] of results.entries()) {
     if (error) {
       if (runTableMissing(error.message)) return { available: false, runs }
       throw new Error(`Failed to load the job runs: ${error.message}`)
     }
-    runs[NIGHTLY_JOBS[i].id] = ((data ?? []) as unknown as Row[]).map(fromRow)
+    runs[jobs[i].id] = ((data ?? []) as unknown as Row[]).map(fromRow)
   }
   return { available: true, runs }
 }

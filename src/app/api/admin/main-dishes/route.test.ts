@@ -25,12 +25,14 @@ const m = vi.hoisted(() => ({
   jobFindings: vi.fn(),
   runAndRecord: vi.fn(),
   startMenuReading: vi.fn(),
+  listJobRuns: vi.fn(),
   afterCallbacks: [] as (() => unknown)[],
 }))
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => void m.afterCallbacks.push(fn) }))
 vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches, updateWatch: m.updateWatch }))
 vi.mock('@/lib/watchFindingStore', () => ({ jobFindings: m.jobFindings }))
 vi.mock('@/lib/watchRunner', () => ({ runAndRecord: m.runAndRecord }))
+vi.mock('@/lib/jobRunStore', () => ({ listJobRuns: m.listJobRuns }))
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({
   communitySlugFromRequest: (r: Request) => new URL(r.url).searchParams.get('community'),
@@ -114,6 +116,7 @@ beforeEach(() => {
   m.setMenuDishes.mockResolvedValue(true)
   m.listWatches.mockResolvedValue({ watches: [], available: true })
   m.jobFindings.mockResolvedValue({ findings: [], decided: new Map() })
+  m.listJobRuns.mockResolvedValue({ available: true, runs: { watches: [] } })
   m.runAndRecord.mockImplementation(async (w: { id: string }) => ({ watch: { ...w, lastRunAt: 'now' } }))
   vi.stubEnv('OPENAI_API_KEY', 'test-key')
 })
@@ -125,6 +128,14 @@ describe('/api/admin/main-dishes', () => {
     expect((await GET(req('GET'))).status).toBe(401)
     expect((await POST(req('POST', { action: 'read', resourceId: ID }))).status).toBe(401)
     expect(m.findMenu).not.toHaveBeenCalled()
+  })
+
+  // Nov 23: the tab uses only the watches job's last night, so it reads
+  // only that job's runs. It read all seven jobs', which Sentry flagged as
+  // an N+1 on every load.
+  it('reads the watches job’s runs, not every job’s', async () => {
+    expect((await GET(req('GET'))).status).toBe(200)
+    expect(m.listJobRuns).toHaveBeenCalledWith('philly', ['watches'])
   })
 
   it('lists the places whose category keeps dishes, not a grocery’s items', async () => {
