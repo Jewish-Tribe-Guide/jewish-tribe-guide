@@ -2,6 +2,7 @@ import { getAdminClient } from './supabase/admin'
 import { saySchemaMissing, schemaMissing } from './supabase/schemaMissing'
 import type { SourceRead } from './shulTimes'
 import type { PartGiven } from './timesParts'
+import type { Readings } from './readingMemo'
 import { withoutListRead, type ListRead, type Watch, type WatchCheck, type WatchKind } from './watches'
 import { readAll } from '@/lib/readAll'
 
@@ -142,6 +143,17 @@ export async function getListReads(community: string): Promise<Map<string, ListR
     throw new Error(`Failed to load the lists' reads: ${error.message}`)
   }
   return new Map(((data ?? []) as { id: string; listRead: ListRead | null }[]).flatMap((r) => (r.listRead ? [[r.id, r.listRead] as const] : [])))
+}
+
+/** A shul page's kept readings (WatchCheck.readings), off the watch on
+ *  that address. Empty when there are none, or the table isn't there. */
+export async function getReadings(community: string, url: string): Promise<Readings> {
+  const { data, error } = await getAdminClient().from('watch').select('readings:last_check->readings').eq('community_id', community).eq('url', url).maybeSingle()
+  if (error) {
+    if (checkColumnMissing(error.message) || tableMissing(error.message)) return {}
+    throw new Error(`Failed to load the page's readings: ${error.message}`)
+  }
+  return ((data as { readings: Readings | null } | null)?.readings ?? {}) as Readings
 }
 
 export async function getWatch(community: string, id: string): Promise<Watch | null> {

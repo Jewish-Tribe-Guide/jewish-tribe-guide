@@ -58,6 +58,10 @@ old number can still be looked up. When an item is done, move it to
     The bar for it (Nov 23): behaviour that's predictable on a website
     it has never seen, even if it catches a little less, since every
     special case so far was learned from one Philly shul's site.
+    Since Nov 24 the same words are read the same way (kept readings),
+    a date-only line doesn't make a page new, and a week read mid-week
+    is compared with the week we hold (`docs/history.md`, "Shul
+    watches: the same page reads the same way").
 86. **After 82: rehearse a second city before inviting anyone.** Pick a
     real one (Teaneck, Baltimore), paste its real lists into a hidden
     community, and let it run two weeks with no hand-fixing. Count what
