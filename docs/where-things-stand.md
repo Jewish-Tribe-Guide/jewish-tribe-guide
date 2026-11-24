@@ -95,8 +95,6 @@ old number can still be looked up. When an item is done, move it to
       deployment's settings, for Sundays' speed email.
     And agree the admin target, ≤ 1s at p75 for a screen and a save.
 
-2.  Copy dev's photos for Eruv, Hospitals, Childcare and Schools (iStock
-    links) to live? Live's tiles for those have none of their own.
 28. The drawings for asking for location when it helps (the hospital
     location boards, branch `claude/eager-nash-317067`): look, or let go.
 73. A phone that throws the page away in the background might ignore

@@ -4,6 +4,18 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## Item 2 closed: dev's tile photos not copied (Nov 24)
+
+"Copy dev's photos for Eruv, Hospitals, Childcare and Schools to live?"
+The dry run found the difference is only `icon_image_url` (and Hotel's),
+the category-wide icon photo, which no screen reads any more: rows show a
+place's own photo or its initials. Live's tiles already have photos
+(`card_image_url` or `card_band_image_url`). Closed with nothing written
+(the user, Nov 24). Still true and not decided: Mikvah's tile and Eruv's
+band on live are iStock preview links, Cemetery's a Google thumbnail
+(licence, and they can vanish); Childcare's photo is the whole card on
+dev and a band on live.
+
 ## Lint fails on a warning (Nov 24)
 
 Lint passed with 10 warnings, so a new one went by unseen (one had sat in
