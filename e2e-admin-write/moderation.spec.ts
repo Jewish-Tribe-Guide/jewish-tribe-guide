@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 import type { ResourceSubmission } from '../src/types'
-import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
+import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives the REAL admin UI (ModerationQueue) through the approve/reject
@@ -50,7 +50,7 @@ async function seedCategory(supabase: ReturnType<typeof getAdminClient>): Promis
   const categoryId = `e2e-review-${randomUUID().slice(0, 8)}`
   const { error } = await supabase.from('category').insert({
     id: categoryId,
-    community_id: WRITE_SUITE_COMMUNITY,
+    community_id: TEST_COMMUNITY,
     label: categoryId,
     plural_label: categoryId,
     fields: [],
@@ -71,8 +71,8 @@ test.afterEach(async () => {
     await supabase.from('resource').delete().eq('id', id)
   }
   for (const id of pendingCategoryIds.splice(0)) {
-    await supabase.from('resource').delete().eq('category', id).eq('community_id', WRITE_SUITE_COMMUNITY)
-    await supabase.from('category').delete().eq('id', id).eq('community_id', WRITE_SUITE_COMMUNITY)
+    await supabase.from('resource').delete().eq('category', id).eq('community_id', TEST_COMMUNITY)
+    await supabase.from('category').delete().eq('id', id).eq('community_id', TEST_COMMUNITY)
   }
 })
 
@@ -104,7 +104,7 @@ test.describe('signing out', () => {
   test.afterEach(async () => {
     const supabase = getAdminClient()
     if (originalAdminEmails !== undefined) {
-      await supabase.from('community').update({ admin_emails: originalAdminEmails }).eq('slug', WRITE_SUITE_COMMUNITY)
+      await supabase.from('community').update({ admin_emails: originalAdminEmails }).eq('slug', TEST_COMMUNITY)
     }
     const { data } = await supabase.auth.admin.listUsers()
     const user = data?.users.find((u) => u.email === disposableEmail)
@@ -119,14 +119,14 @@ test.describe('signing out', () => {
     const { data: community, error: communityError } = await admin
       .from('community')
       .select('admin_emails')
-      .eq('slug', WRITE_SUITE_COMMUNITY)
+      .eq('slug', TEST_COMMUNITY)
       .single()
-    if (communityError || !community) throw new Error(`Could not read ${WRITE_SUITE_COMMUNITY}'s admin_emails: ${communityError?.message}`)
+    if (communityError || !community) throw new Error(`Could not read ${TEST_COMMUNITY}'s admin_emails: ${communityError?.message}`)
     originalAdminEmails = (community.admin_emails as string[] | null) ?? []
     const { error: updateError } = await admin
       .from('community')
       .update({ admin_emails: [...originalAdminEmails, disposableEmail] })
-      .eq('slug', WRITE_SUITE_COMMUNITY)
+      .eq('slug', TEST_COMMUNITY)
     if (updateError) throw new Error(`Could not add the disposable admin: ${updateError.message}`)
 
     const { error: createError } = await admin.auth.admin.createUser({ email: disposableEmail, email_confirm: true })
@@ -161,7 +161,7 @@ test.describe('signing out', () => {
     // queue, which had its own Sign out button before this control moved
     // into AdminAuthGate) — every other admin tab had no sign-out control at
     // all.
-    await page.goto(`${baseURL}/${WRITE_SUITE_COMMUNITY}/admin/categories#${hash.toString()}`)
+    await page.goto(`${baseURL}/${TEST_COMMUNITY}/admin/categories#${hash.toString()}`)
     await expect(page.getByText(/^Signed in as /)).toBeVisible()
 
     await page.getByRole('button', { name: 'Sign out' }).click()
@@ -182,7 +182,7 @@ test('clicking Approve on a pending listing makes it live', async ({ page }) => 
   const { data: submission, error } = await supabase
     .from('submission')
     .insert({
-      community_id: WRITE_SUITE_COMMUNITY,
+      community_id: TEST_COMMUNITY,
       operation: 'create',
       target_type: 'listing',
       target_id: null,
@@ -197,7 +197,7 @@ test('clicking Approve on a pending listing makes it live', async ({ page }) => 
   pendingSubmissionIds.push(submission.id)
 
   // To do lists it as a row; it's decided opened.
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin`)
+  await page.goto(`/${TEST_COMMUNITY}/admin`)
   await page.getByRole('button', { name: `Open ${name}` }).click()
   const review = page.getByTestId('submission-review')
   await review.getByRole('button', { name: 'Approve', exact: true }).click()
@@ -229,7 +229,7 @@ test('opening a card, fixing the name and approving puts the fix live', async ({
   const { data: submission, error } = await supabase
     .from('submission')
     .insert({
-      community_id: WRITE_SUITE_COMMUNITY,
+      community_id: TEST_COMMUNITY,
       operation: 'create',
       target_type: 'listing',
       target_id: null,
@@ -243,7 +243,7 @@ test('opening a card, fixing the name and approving puts the fix live', async ({
   if (error || !submission) throw new Error(`Could not seed the pending submission: ${error?.message}`)
   pendingSubmissionIds.push(submission.id)
 
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin`)
+  await page.goto(`/${TEST_COMMUNITY}/admin`)
   await page.getByRole('button', { name: `Open ${sent}` }).click()
   const review = page.getByTestId('submission-review')
   await expect(review).toBeVisible()
@@ -270,7 +270,7 @@ test('clicking Reject with a reason marks the submission rejected and creates no
   const { data: submission, error } = await supabase
     .from('submission')
     .insert({
-      community_id: WRITE_SUITE_COMMUNITY,
+      community_id: TEST_COMMUNITY,
       operation: 'create',
       target_type: 'listing',
       target_id: null,
@@ -284,7 +284,7 @@ test('clicking Reject with a reason marks the submission rejected and creates no
   if (error || !submission) throw new Error(`Could not seed the pending submission: ${error?.message}`)
   pendingSubmissionIds.push(submission.id)
 
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin`)
+  await page.goto(`/${TEST_COMMUNITY}/admin`)
   await page.getByRole('button', { name: `Open ${name}` }).click()
   const review = page.getByTestId('submission-review')
   await review.getByRole('button', { name: 'Reject' }).click()
@@ -308,7 +308,7 @@ test('a left-out submission shows up in History, with its reason', async ({ page
   const { data: submission, error } = await supabase
     .from('submission')
     .insert({
-      community_id: WRITE_SUITE_COMMUNITY,
+      community_id: TEST_COMMUNITY,
       operation: 'create',
       target_type: 'listing',
       target_id: null,
@@ -322,7 +322,7 @@ test('a left-out submission shows up in History, with its reason', async ({ page
   if (error || !submission) throw new Error(`Could not seed the pending submission: ${error?.message}`)
   pendingSubmissionIds.push(submission.id)
 
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin`)
+  await page.goto(`/${TEST_COMMUNITY}/admin`)
   await page.getByRole('button', { name: `Open ${name}` }).click()
   const review = page.getByTestId('submission-review')
   await review.getByRole('button', { name: 'Reject' }).click()
@@ -334,7 +334,7 @@ test('a left-out submission shows up in History, with its reason', async ({ page
   // The click-through this test actually exists to prove: Reports' History
   // row, then Rejected, and the submission just rejected is on it — the
   // real-world case is "did I actually leave that out?".
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/metrics`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/metrics`)
   await page.getByRole('link', { name: /History/ }).click()
   await page.getByRole('link', { name: 'Rejected', exact: true }).click()
   await expect(page).toHaveURL(/\/admin\/history\/rejected/)

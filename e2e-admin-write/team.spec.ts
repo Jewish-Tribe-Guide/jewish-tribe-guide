@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
+import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Settings → Team (the admin redesign's step 5): one list of who can sign in,
@@ -24,16 +24,16 @@ test.afterEach(async () => {
   const supabase = getAdminClient()
   const gone = new Set(added.splice(0).map((e) => e.toLowerCase()))
   if (gone.size === 0) return
-  const { data } = await supabase.from('community').select('admin_emails').eq('slug', WRITE_SUITE_COMMUNITY).single()
+  const { data } = await supabase.from('community').select('admin_emails').eq('slug', TEST_COMMUNITY).single()
   const emails = ((data?.admin_emails as string[] | null) ?? []).filter((e) => !gone.has(e.toLowerCase()))
-  await supabase.from('community').update({ admin_emails: emails }).eq('slug', WRITE_SUITE_COMMUNITY)
+  await supabase.from('community').update({ admin_emails: emails }).eq('slug', TEST_COMMUNITY)
 })
 
 const visible = (page: Page, locator: Locator) => locator.and(page.locator(':visible'))
 
 async function addAdmin(page: Page, email: string) {
   added.push(email)
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/team`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/team`)
   const admins = visible(page, page.getByRole('region', { name: 'Admins' }))
   await admins.getByRole('textbox', { name: 'Email' }).fill(email)
   await admins.getByRole('button', { name: 'Add admin' }).click()
@@ -46,7 +46,7 @@ test('an admin adds someone to the team and takes them off again', async ({ page
   const email = `team-${randomUUID().slice(0, 8)}@example.com`
   const { admins, row } = await addAdmin(page, email)
 
-  const stored = async () => (await getAdminClient().from('community').select('admin_emails').eq('slug', WRITE_SUITE_COMMUNITY).single()).data?.admin_emails as string[]
+  const stored = async () => (await getAdminClient().from('community').select('admin_emails').eq('slug', TEST_COMMUNITY).single()).data?.admin_emails as string[]
   expect(await stored()).toContain(email)
 
   await row.getByRole('button', { name: `Remove ${email}` }).click()

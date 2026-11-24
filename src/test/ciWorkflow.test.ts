@@ -120,8 +120,8 @@ describe('a PR’s checks start at once and e2e is split', () => {
     })
   }
 
-  // The write suites change a community of their own (scripts/
-  // writeSuiteCommunity.mjs), so e2e's build has nothing to wait for. A
+  // Every suite has a database of its own (Nov 23), so e2e's build has
+  // nothing to wait for. A
   // `needs` back on them is the ~4 minutes this took off every PR (Nov 20).
   it('e2e’s build starts at once, beside the write suites', () => {
     expect(needs('e2e-build')).toBe('')
@@ -159,6 +159,15 @@ describe('every suite has a database of its own', () => {
       .map((b) => [b.match(/^([\w-]+):/)![1], b] as const),
   )
   const ownDatabase = (n: string) => jobs[n].includes('uses: ./.github/actions/own-test-database')
+
+  // One way to make it, so a local run starts from what CI's does: the
+  // action runs the command `npm run test:db` does (scripts/test-db.mjs).
+  it('is made by the same command a local run uses', () => {
+    const action = readFileSync('.github/actions/own-test-database/action.yml', 'utf-8')
+    expect(action).toContain('run: node scripts/test-db.mjs\n')
+    expect(SCRIPTS['test:db']).toBe('node scripts/test-db.mjs')
+    expect(action, 'the seed is loaded in test-db.mjs, not here').not.toMatch(/restore\.mjs|\.sql/)
+  })
 
   it('no job gets the test project’s keys', () => {
     expect(Object.keys(jobs).filter((n) => /secrets\.TEST_SUPABASE_/.test(jobs[n]))).toEqual([])

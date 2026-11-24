@@ -79,17 +79,6 @@ old number can still be looked up. When an item is done, move it to
     Speed Insights with your sign-in), after two weeks on today's code.
     Last read: iPhone category pages slow to draw and tap, before the
     Nov 16 and Nov 22 fixes; home taps 400–456ms (target 200ms).
-4.  **Take out the sharing workarounds** (the user, Nov 23: best
-    practice, not just green PRs). Every CI suite now starts its own
-    Supabase from the migrations and the committed `supabase/seed`
-    (`.github/actions/own-test-database`); none uses the shared test
-    project. What only sharing needed can go, one PR: row claims
-    (`e2e/suiteRows.ts`, `suiteRows.test.ts`), the hidden `e2e-writes`
-    community (`scripts/writeSuiteCommunity.mjs`), and the 20s
-    `TEST_PROJECT_TIMEOUT`. Local runs against the shared project still
-    need them until those move to the local stack too, so decide that
-    first. Rebuild the seed (`scripts/make-test-seed.mjs`) when a test
-    needs content it lacks.
 
 ### You decide
 

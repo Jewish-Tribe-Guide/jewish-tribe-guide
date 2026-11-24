@@ -2380,6 +2380,18 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   so `NEXT_PUBLIC_SUPABASE_STORAGE_URL` tells the image rules where
   uploads live when it isn't the database's project. Unset, it is the
   database's, as on the live site.
+- 4. Done Nov 23 (the user: "best practice, not just green PRs", and
+  "local Supabase, like CI"): the sharing workarounds came out. Local
+  runs of the write suites now use a local Supabase too (`npm run
+  test:db`, the same script CI's action runs), and `testDatabase.mjs`
+  refuses any address not on this machine, so no local run writes to
+  dev, which the previews read. With nothing else writing beside a
+  suite, the row claims (`e2e/suiteRows.ts`), the hidden `e2e-writes`
+  community and its minimal listing, the fixture's owns-it flag and the
+  20s `TEST_PROJECT_TIMEOUT` went. The write suites work in philly as
+  the seed has it; the test server adds their two admins. What's left
+  is within one run: admin-write's files run two at a time, so a test
+  still never picks a page another test made (`e2e/testMadePages.ts`).
 - Nov 23, two admin reads Sentry flagged as N+1s. Main dishes (and Look
   again) read all seven jobs' runs to show one job's: `listJobRuns` takes
   the jobs a page needs (`only`), so each reads one. The kosher job's

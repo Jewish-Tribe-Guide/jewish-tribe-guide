@@ -291,7 +291,7 @@ border border-sage-200 bg-sage-50 overflow-hidden relative`:
 Tests: `e2e-admin-write/campaign-banner.spec.ts` covers the admin side of
 banners (create/save), not this public card's markup, so it should be
 unaffected — but it's the suite `AGENTS.md` maps to this area, so still run
-`npm run test:admin-write` (needs `TEST_SUPABASE_*`; if you can't run it, say
+`npm run test:admin-write` (needs `npm run test:db`; if you can't run it, say
 so explicitly). Search `e2e/` and `src/**/*.test.tsx` for "Happening now",
 "Map View" and "Browse Listings": any locator that now matches both the mobile
 and desktop copies must be scoped to the visible one. Add a unit test that the

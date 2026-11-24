@@ -2,7 +2,7 @@ name: A test database of the job's own
 description: >
   Starts Supabase on this runner (database, sign-in and API), built from
   supabase/migrations, loads the tests' starting data (supabase/seed), and
-  points TEST_SUPABASE_* at it for the rest of the job.
+  points TEST_DB_* at it for the rest of the job.
 
 # Why (Nov 23): every suite used to share one hosted test project, with dev,
 # the previews and each other. Ten jobs signing in at once took the sign-in
@@ -15,27 +15,22 @@ description: >
 # copy of the test project: a copy taken while other jobs wrote to it caught
 # the integration suite's half-made page (PR 441, Nov 23). It holds only
 # public content, scrubbed (scripts/make-test-seed.mjs). The test server adds
-# `e2e-writes` and its fixtures itself. Needs Docker, so the job runs on a
+# its admins and fixtures itself. Needs Docker, so the job runs on a
 # bare runner, not in a container.
 
 runs:
   using: composite
   steps:
-    # Only what the suites use: no Studio, Storage, Realtime, email or logs
-    # (supabase/config.toml turns them off too, for a local `supabase start`).
+    # The same command a local run uses (scripts/test-db.mjs): starts only
+    # what the suites use, loads the seed, moves the id counters and dates.
     - shell: bash
-      run: npx -y supabase@3.1.0 start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+      run: node scripts/test-db.mjs
 
     - shell: bash
       run: |
         eval "$(npx -y supabase@3.1.0 status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
-        RESTORE_URL="$API_URL" RESTORE_KEY="$SERVICE_ROLE_KEY" node scripts/restore.mjs supabase/seed --no-files --replace
-        # The seed keeps its ids; move the id counters past them.
-        docker exec -i supabase_db_jewish-patient-connect psql -q -U postgres -v ON_ERROR_STOP=1 < scripts/reset-sequences.sql
-        # Its changes dated up to today: What changed shows the last 30 days.
-        docker exec -i supabase_db_jewish-patient-connect psql -q -U postgres -v ON_ERROR_STOP=1 < scripts/seed-fresh-dates.sql
         {
-          echo "TEST_SUPABASE_URL=$API_URL"
-          echo "TEST_SUPABASE_ANON_KEY=$ANON_KEY"
-          echo "TEST_SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+          echo "TEST_DB_URL=$API_URL"
+          echo "TEST_DB_ANON_KEY=$ANON_KEY"
+          echo "TEST_DB_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
         } >> "$GITHUB_ENV"

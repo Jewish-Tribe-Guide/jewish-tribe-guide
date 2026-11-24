@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { testDatabase } from './scripts/testDatabase.mjs'
 import { defineConfig, devices } from '@playwright/test'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -9,53 +10,20 @@ import { defineConfig, devices } from '@playwright/test'
 // authenticates as the actual production admin address — see that file's
 // own comments). Nothing has ever driven the admin console's actual
 // behavior: clicking Approve/Reject on a real submission, watching the
-// change land. This does, against the same dedicated, disposable test
-// Supabase project the integration/cache-roundtrip/form-roundtrip suites
-// use — never the real one, refused explicitly below.
+// change land. This does, against a local Supabase of its own (below),
+// like the other write suites.
 // `npm run test:admin-write` runs this config.
 // ─────────────────────────────────────────────────────────────────────────────
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local')
 
-const url = process.env.TEST_SUPABASE_URL
-const anonKey = process.env.TEST_SUPABASE_ANON_KEY
-const serviceRoleKey = process.env.TEST_SUPABASE_SERVICE_ROLE_KEY
-
-const missing = [
-  !url && 'TEST_SUPABASE_URL',
-  !anonKey && 'TEST_SUPABASE_ANON_KEY',
-  !serviceRoleKey && 'TEST_SUPABASE_SERVICE_ROLE_KEY',
-].filter(Boolean)
-if (missing.length) {
-  throw new Error(
-    `Missing ${missing.join(', ')} — see README "Integration tests" for how to set up the test project.`,
-  )
-}
-
-// Same worker-re-import guard as playwright.cache.config.ts/playwright.form.config.ts
-// — see playwright.cache.config.ts's comment for the full explanation. A
-// distinct marker name so the three suites' own remap-once checks can never
-// interfere with each other, even though in practice each runs as its own
-// top-level process.
-if (!process.env.ADMIN_WRITE_E2E_REMAPPED) {
-  // SHARED_DEV_TEST_PROJECT opts out of this refusal — see
-  // src/test/integrationEnv.ts's comment for why that's a deliberate choice,
-  // not a hole in the check.
-  if (url === process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.SHARED_DEV_TEST_PROJECT) {
-    throw new Error(
-      'TEST_SUPABASE_URL is the same as NEXT_PUBLIC_SUPABASE_URL — refusing to run the admin-write suite ' +
-        'against the real Supabase project. Point TEST_SUPABASE_URL at a separate, disposable project, ' +
-        'or set SHARED_DEV_TEST_PROJECT=1 if you deliberately use the same project for both.',
-    )
-  }
-
-  // e2e-admin-write/auth.setup.ts runs in this same process and reads these
-  // directly — same remap-in-process pattern as the sibling configs.
-  process.env.NEXT_PUBLIC_SUPABASE_URL = url
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = anonKey
-  process.env.SUPABASE_SERVICE_ROLE_KEY = serviceRoleKey
-  process.env.ADMIN_WRITE_E2E_REMAPPED = '1'
-}
+// The suites' own database, always a local Supabase (scripts/testDatabase.mjs;
+// `npm run test:db` starts one). Set here, before the server and the setup
+// start, so both use it too.
+const db = testDatabase()
+process.env.NEXT_PUBLIC_SUPABASE_URL = db.url
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = db.anonKey
+process.env.SUPABASE_SERVICE_ROLE_KEY = db.serviceRoleKey
 
 // Its own port and dist dir — never the real e2e suite's (3210), the
 // cache-round-trip suite's (3211), or the form-submission suite's (3212).

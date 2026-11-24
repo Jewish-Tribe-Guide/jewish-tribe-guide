@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Locator } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
+import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives CategoryManager/CategoryEditor's real create+delete flow — the
@@ -38,8 +38,8 @@ test.afterEach(async () => {
   }
 })
 
-// Each save below waits 30s: it is several database round trips against the
-// shared test project, and on CI one has taken over 10s, still "Sending…"
+// Each save below waits 30s: it is several database round trips, and on the
+// shared test project CI once used, one took over 10s, still "Sending…"
 // when a 10s wait ran out (Oct 18 on main, after Create; Oct 22 on #342,
 // after Add listing). Written out, so e2eTimeouts.test.ts can see them.
 
@@ -54,7 +54,7 @@ test('creating a category through the real editor makes it live, and deleting it
   // treatment as the "Title" input in form-editor.spec.ts.
   const visible = (l: Locator) => l.and(page.locator(':visible'))
 
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/categories`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/categories`)
   // Board 1: on a computer the button is level with the heading, at its right.
   const heading = await visible(page.getByRole('heading', { name: 'Category pages', level: 1 })).boundingBox()
   const add = await visible(page.getByRole('button', { name: '+ New category page' })).boundingBox()
@@ -70,7 +70,7 @@ test('creating a category through the real editor makes it live, and deleting it
   // Creating opens the new category's own page, saved (its heading is the
   // name typed, so it shows before the save lands); back to the list.
   await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
-  await expect(page).toHaveURL(new RegExp(`/${WRITE_SUITE_COMMUNITY}/admin/categories/cat:e2e-admin-write-`))
+  await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/categories/cat:e2e-admin-write-`))
 
   // Add a field, from a box of Fields (E1b: every box open, its Add a
   // field at its foot): the ready-made list loads (boards 7 and 11), and a
@@ -125,7 +125,7 @@ test('a page brought back after a save keeps a Delete already asked while the li
   // treatment as the "Title" input in form-editor.spec.ts.
   const visible = (l: Locator) => l.and(page.locator(':visible'))
 
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/categories`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/categories`)
   await visible(page.getByRole('button', { name: '+ New category page' })).click()
 
   await visible(page.getByRole('button', { name: 'Make your own page' })).click()
@@ -135,7 +135,7 @@ test('a page brought back after a save keeps a Delete already asked while the li
   // Creating opens the new category's own page, saved (its heading is the
   // name typed, so it shows before the save lands); back to the list.
   await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
-  await expect(page).toHaveURL(new RegExp(`/${WRITE_SUITE_COMMUNITY}/admin/categories/cat:e2e-admin-write-`))
+  await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/categories/cat:e2e-admin-write-`))
 
   // Add a field, from a box of Fields (E1b: every box open, its Add a
   // field at its foot): the ready-made list loads (boards 7 and 11), and a
@@ -195,7 +195,7 @@ test('a category created hidden stays hidden, and Places\' Add a place publishes
 
   const visible = (l: Locator) => l.and(page.locator(':visible'))
 
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/categories`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/categories`)
   await visible(page.getByRole('button', { name: '+ New category page' })).click()
 
   await visible(page.getByRole('button', { name: 'Make your own page' })).click()
@@ -237,7 +237,7 @@ test('a category created hidden stays hidden, and Places\' Add a place publishes
   // "+ Add listing" until Nov 3; Places offers hidden categories too.
   // The visitors' editor (ListingEditor): the Name row, then Done back to
   // the list, where Send reads "Add listing".
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/places?category=${created!.id}`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/places?category=${created!.id}`)
   await visible(page.getByRole('button', { name: 'Add a place' })).click()
   await visible(page.getByTestId('editor-row-name')).click()
   await visible(page.getByRole('textbox', { name: 'Name' })).fill(listingName)

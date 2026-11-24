@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
-import { changedByTests } from '../e2e/suiteRows'
-import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
+import { madeByTests } from '../e2e/testMadePages'
+import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // The user, Nov 15: "Campaign and banner photo don't seem to appear great on
 // mobile for admin". On a 390px phone the campaign's Ends date ran off its
@@ -21,7 +21,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('a new campaign fits a phone, with the banner shown as it will look', async ({ page }) => {
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/campaigns`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/campaigns`)
   // The console draws some screens twice (one hidden), as category-editor.spec.ts finds.
   const visible = page.locator(':visible')
   await page.getByRole('button', { name: /Add a campaign/ }).and(visible).click({ timeout: 30_000 })
@@ -41,10 +41,10 @@ test('a new campaign fits a phone, with the banner shown as it will look', async
 })
 
 test('a category’s banner photo keeps its buttons on the phone’s screen', async ({ page, request }) => {
-  const body = await (await request.get(`/api/categories?community=${WRITE_SUITE_COMMUNITY}`)).json()
-  const category = (body.categories as { id: string; kind?: string }[]).find((c) => (!c.kind || c.kind === 'listing') && !changedByTests(c))
+  const body = await (await request.get(`/api/categories?community=${TEST_COMMUNITY}`)).json()
+  const category = (body.categories as { id: string; kind?: string }[]).find((c) => (!c.kind || c.kind === 'listing') && !madeByTests(c))
   expect(category, 'no listing category in the test project').toBeTruthy()
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/categories/${encodeURIComponent(category!.id)}`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/categories/${encodeURIComponent(category!.id)}`)
   const visible = page.locator(':visible')
   await page.getByRole('button', { name: /^Basics/ }).and(visible).click({ timeout: 30_000 })
   await page.getByRole('button', { name: /^Banner photo/ }).and(visible).click()

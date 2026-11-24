@@ -3,7 +3,7 @@ import { listingActions } from '../src/lib/listingView'
 import { minyanimPage } from '../src/lib/davening'
 import type { CategoryConfig } from '../src/lib/categories'
 import type { DirectoryResource } from '../src/types'
-import { changedByTests } from './suiteRows'
+import { madeByTests } from './testMadePages'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers.
@@ -101,10 +101,10 @@ export type Category = {
 export async function categories(request: APIRequestContext, community: string): Promise<Category[]> {
   const body = await apiGet(request, `/api/categories?community=${community}`)
   if (!body.ok) throw new Error('Could not read categories')
-  // Never one another suite is changing right now (e2e/suiteRows.ts): every
-  // test here picks from this list, and a page mid-rename fails whichever
+  // Never one a test made (e2e/testMadePages.ts): every test here picks
+  // from this list, and a page a test beside it is renaming fails whichever
   // test picked it (PR 389's CI, Nov 16).
-  return (body.categories as Category[]).filter((c) => !changedByTests(c))
+  return (body.categories as Category[]).filter((c) => !madeByTests(c))
 }
 
 /** The page Minyanim by time opens on, by the app's own rule
@@ -412,22 +412,11 @@ export async function apiCallsForThisDocument(page: Page): Promise<string[]> {
   )
 }
 
-/** How long a wait on a round trip to the test project may take: an admin
- *  page saying who's signed in (/api/admin/whoami, a check against
- *  Supabase's auth server) and reading its content, or an admin's save
- *  coming back. In CI every job's browsers sign in to the
- *  one test project at once: one check is ~0.1s alone and ~1s thirty at a
- *  time, and the e2e shards' whoami took 3-4s (Nov 21-23 traces), so the
- *  first look on an admin page outran its 5s. Waits on the page itself
- *  keep expect's 5s. The live site has its own
- *  project and no such crowd. */
-export const TEST_PROJECT_TIMEOUT = 20_000
-
 /** Opens an admin page and waits until it has said who's signed in and
  *  loaded what it shows, so the test's own checks start on the page rather
  *  than on its loading line. */
 export async function openAdmin(page: Page, path: string): Promise<void> {
   await page.goto(path)
-  await expect(page.getByText(/^Signed in as /).first()).toBeAttached({ timeout: TEST_PROJECT_TIMEOUT })
-  await expect(page.getByText(/^Loading/)).toHaveCount(0, { timeout: TEST_PROJECT_TIMEOUT })
+  await expect(page.getByText(/^Signed in as /).first()).toBeAttached()
+  await expect(page.getByText(/^Loading/)).toHaveCount(0)
 }

@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:db": "node scripts/test-db.mjs",
     "test:integration": "vitest run --config vitest.integration.config.mts",
     "setup": "node --env-file=.env.local scripts/setup.mjs",
     "migrations:report": "node --env-file=.env.local scripts/migration-report.mjs",

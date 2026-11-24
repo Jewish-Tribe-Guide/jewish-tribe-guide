@@ -24,7 +24,7 @@
 //     and `vote-test` pages and forms, listings in pages that aren't kept,
 //     listings named "ZZ …" (made by hand to try something), the stamps
 //     of communities not kept). The test
-//     server makes `e2e-writes` and its fixtures itself
+//     server makes its fixtures and test admins itself
 //     (scripts/run-test-project-server.mjs)
 //   - every email address becomes a made-up one; a listing's submitted_by
 //     is emptied, and a community's preview_token made up

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
+import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives Places for real (the admin redesign's step 3): a listing is found
@@ -23,7 +23,7 @@ test.beforeEach(async () => {
   const supabase = getAdminClient()
   const { error: categoryError } = await supabase.from('category').insert({
     id: categoryId,
-    community_id: WRITE_SUITE_COMMUNITY,
+    community_id: TEST_COMMUNITY,
     label: categoryId,
     plural_label: categoryId,
     fields: [],
@@ -32,7 +32,7 @@ test.beforeEach(async () => {
   })
   if (categoryError) throw new Error(`Could not seed the category: ${categoryError.message}`)
   const { error } = await supabase.from('resource').insert({
-    community_id: WRITE_SUITE_COMMUNITY,
+    community_id: TEST_COMMUNITY,
     category: categoryId,
     name,
     anchor_id: 'community',
@@ -45,16 +45,16 @@ test.beforeEach(async () => {
 
 test.afterEach(async () => {
   const supabase = getAdminClient()
-  await supabase.from('submission').delete().eq('community_id', WRITE_SUITE_COMMUNITY).eq('payload->>category', categoryId)
-  await supabase.from('resource').delete().eq('community_id', WRITE_SUITE_COMMUNITY).eq('category', categoryId)
-  await supabase.from('category').delete().eq('community_id', WRITE_SUITE_COMMUNITY).eq('id', categoryId)
+  await supabase.from('submission').delete().eq('community_id', TEST_COMMUNITY).eq('payload->>category', categoryId)
+  await supabase.from('resource').delete().eq('community_id', TEST_COMMUNITY).eq('category', categoryId)
+  await supabase.from('category').delete().eq('community_id', TEST_COMMUNITY).eq('id', categoryId)
 })
 
 test('a place is found by name, archived after asking, and brought back', async ({ page }) => {
   const supabase = getAdminClient()
-  const status = async () => (await supabase.from('resource').select('status').eq('community_id', WRITE_SUITE_COMMUNITY).eq('name', name).single()).data?.status
+  const status = async () => (await supabase.from('resource').select('status').eq('community_id', TEST_COMMUNITY).eq('name', name).single()).data?.status
 
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/places`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/places`)
   await page.getByLabel('Find a place by name').fill(name)
   await page.getByRole('button', { name: `Open ${name}` }).click()
   await expect(page.getByRole('heading', { name })).toBeVisible()
@@ -86,8 +86,8 @@ test('a place is found by name, archived after asking, and brought back', async 
 })
 
 test('the old Archived tab opens Places on Archived', async ({ page }) => {
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/archived`)
-  await expect(page).toHaveURL(new RegExp(`/${WRITE_SUITE_COMMUNITY}/admin/places\\?show=archived$`))
+  await page.goto(`/${TEST_COMMUNITY}/admin/archived`)
+  await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/places\\?show=archived$`))
   await expect(page.getByRole('button', { name: 'On the site: Archived' })).toBeVisible()
 })
 
@@ -96,7 +96,7 @@ test('the old Archived tab opens Places on Archived', async ({ page }) => {
 for (const width of [390, 320]) {
   test(`on a ${width}px phone, each Places menu opens on the screen`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 })
-    await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/places`)
+    await page.goto(`/${TEST_COMMUNITY}/admin/places`)
     for (const name of ['On the site', 'Category', 'Checked by']) {
       const button = page.getByRole('button', { name: new RegExp(`^${name}:`) })
       await expect(button).toBeEnabled({ timeout: 30_000 })

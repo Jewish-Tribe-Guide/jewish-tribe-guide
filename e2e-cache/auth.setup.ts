@@ -12,8 +12,8 @@ import { CACHE_TEST_ADMIN_EMAIL, mintMagicLinkSession } from '../scripts/cacheE2
 // rather than driving a browser, so it just saves the access token to a
 // file instead of a full browser storageState.
 //
-// Always this suite's own admin: the community it tests lists it by name
-// (scripts/writeSuiteCommunity.mjs), so it never signs in as a real
+// Always this suite's own admin: the test server adds it to the community's
+// admins (scripts/testCommunity.mjs), so it never signs in as a real
 // community's admin, and never as the same person as admin-write. It
 // doesn't need to exist as a Supabase Auth user beforehand — this creates
 // it (idempotently, pre-confirmed) on first run. generateLink with type 'magiclink' alone was tried first and
@@ -32,7 +32,7 @@ setup('mint a cache-test admin session', async () => {
   if (!supabaseUrl || !anonKey || !serviceRoleKey) {
     throw new Error(
       'Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY in the ' +
-        'Playwright process itself — playwright.cache.config.ts should have remapped these from TEST_SUPABASE_*.',
+        'Playwright process itself — playwright.cache.config.ts should have set these from the test database (scripts/testDatabase.mjs).',
     )
   }
 

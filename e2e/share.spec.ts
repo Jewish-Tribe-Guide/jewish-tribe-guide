@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { shareDescription, type SiteSettings } from '../src/lib/siteSettings'
 import { defaultCommunity, defaultCommunitySlug, ready, serverMarkup } from './helpers'
-import { changedByTests } from './suiteRows'
+import { madeByTests } from './testMadePages'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // A question's own page, /philly/ask/<question>: its link preview answers
@@ -15,7 +15,7 @@ type Cat = { id: string; kind: string; detailFields?: Field[] }
 
 async function itemQuestion(request: import('@playwright/test').APIRequestContext, community: string): Promise<{ item: string; question: string }> {
   const cats = (await (await request.get(`/api/categories?community=${community}`, { timeout: 45_000 })).json()).categories as Cat[]
-  for (const c of cats.filter((x) => x.kind === 'listing' && !changedByTests(x))) {
+  for (const c of cats.filter((x) => x.kind === 'listing' && !madeByTests(x))) {
     const tagKeys = (c.detailFields ?? []).filter((f) => f.type === 'tags').map((f) => f.key)
     if (!tagKeys.length) continue
     const body = await (await request.get(`/api/resources?category=${c.id}&community=${community}`, { timeout: 45_000 })).json()

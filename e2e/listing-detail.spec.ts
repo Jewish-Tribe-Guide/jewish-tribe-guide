@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, listingWithFourActions, openListingEditor, ready, settled } from './helpers'
-import { changedByTests } from './suiteRows'
+import { madeByTests } from './testMadePages'
 
 // A screen opens at once; its address follows when Next's navigation to it
 // lands (router.push, AGENTS.md), a server render of the listing's page.
@@ -268,7 +268,7 @@ test.describe('listing detail — desktop', () => {
     test(`a group opened, a listing in it read and closed by ${back}, closes again`, async ({ page, request }) => {
       const community = await defaultCommunity(page)
       const res = await request.get(`/api/categories?community=${community}`)
-      const grouped = ((await res.json()).categories as { id: string; kind: string; groupBy?: unknown }[]).filter((c) => c.kind === 'listing' && c.groupBy && !changedByTests(c))
+      const grouped = ((await res.json()).categories as { id: string; kind: string; groupBy?: unknown }[]).filter((c) => c.kind === 'listing' && c.groupBy && !madeByTests(c))
       let found = false
       for (const category of grouped) {
         await page.goto(`/${community}/${category.id}`)

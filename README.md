@@ -152,16 +152,25 @@ they're organized and what each is for.
 
 `npm run test:integration` exercises real Supabase reads/writes (the
 submit → moderate → live-table pipeline in `src/lib/submissionStore.ts` and
-friends) against a **second, disposable** Supabase project — never your real
-one. It's optional for everyday work; skip it if `TEST_SUPABASE_URL` /
-`TEST_SUPABASE_SERVICE_ROLE_KEY` aren't set.
+friends) against a **local** Supabase of its own, never a hosted project.
+Start it first (needs Docker running):
+
+```bash
+npm run test:db
+```
+
+It's built from `supabase/migrations` and loaded with the public starting
+data in `supabase/seed`, the same as each CI job's. Every write suite finds
+it on its own and refuses any database that isn't on this machine
+(`scripts/testDatabase.mjs`). `npm run test:db -- seed` reloads the starting
+data; `npm run test:db -- stop` removes it.
 
 `npm run test:cache-roundtrip` and `npm run test:form-roundtrip` use the
-**same** test project to prove two things the real e2e suite can't (it's
+**same** local database to prove two things the real e2e suite can't (it's
 barred from writing to the database):
 
 - **Cache round-trip** — an admin's save actually reaches the cached public
-  page. Boots a real production build against the test project
+  page. Boots a real production build against it
   (`scripts/run-test-project-server.mjs`), signs in as a fixed test-only
   admin (`cache-roundtrip-admin@test.invalid`, created automatically on
   first run), saves a setting through the real admin API, and polls the
@@ -173,7 +182,7 @@ barred from writing to the database):
   landed with the right data, then deletes it. No admin session needed —
   submitting is public.
 
-`npm run test:admin-write` uses the same test project to drive the admin
+`npm run test:admin-write` uses the same local database to drive the admin
 console's actual write behavior — clicking Approve/Reject on a real
 submission in `ModerationQueue`, the same buttons a human admin clicks —
 rather than calling `approveSubmission()`/`rejectSubmission()` directly (the
@@ -182,39 +191,18 @@ suite's `admin.spec.ts`, which authenticates as the actual production admin
 and is barred from writing for that reason). Seeds a pending submission
 directly, verifies the resulting resource/submission rows, then cleans up.
 
-All three need `TEST_SUPABASE_ANON_KEY` in addition to the integration
-suite's two vars (they sign in for real, or their build needs it to boot
-even when the test itself doesn't sign in).
+The suites clean up what they create, and the next `npm run test:db -- seed`
+puts everything back regardless.
 
-To set the test project up:
-
-1. Create a free Supabase project (same as step 1 above, but a new one —
-   name it something like `<yourapp>-test`).
-2. Apply the schema: `supabase db push` against it, or paste
-   `supabase/migrations/*.sql` into its SQL editor in filename order. No
-   seeding needed — all three suites create/delete/edit their own rows.
-3. Add `TEST_SUPABASE_URL`, `TEST_SUPABASE_ANON_KEY`, and
-   `TEST_SUPABASE_SERVICE_ROLE_KEY` (all under Project Settings → API on the
-   *test* project) to `.env.local`.
-4. For CI, add the same three as repo secrets (Settings → Secrets and
-   variables → Actions) — see `.github/workflows/ci.yml`'s `integration`,
-   `cache-roundtrip` and `form-roundtrip` jobs.
-
-The integration suite cleans up the rows it creates in `afterEach`, tracked
-by id rather than assumed, so a failed assertion still leaves the project
-clean. The cache-round-trip and form-submission suites each revert/delete
-the one thing they changed in a `finally` block, same guarantee.
-
-**Using the test project for local dev too.** Supabase's free tier caps at 2
+**The hosted test project is dev.** Supabase's free tier caps at 2
 projects per account (not per organization — a new org doesn't get around
 it), so a solo/small deployment that already has a real prod project and this
 test project has nowhere free to put a separate "click around locally without
-touching prod" dev project. If that's you, point `NEXT_PUBLIC_SUPABASE_URL`/
-`NEXT_PUBLIC_SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` at this same test
-project and set `SHARED_DEV_TEST_PROJECT=1` — otherwise the write-test
-suites' own safety check (which normally refuses to run if `TEST_SUPABASE_URL`
-matches your main project, to stop them from ever touching real prod data)
-refuses unconditionally once they're the same project on purpose. The
+touching prod" dev project, so the second project is dev: `.env.local`
+points `NEXT_PUBLIC_SUPABASE_*` at it and names it again as
+`TEST_SUPABASE_*`, which `sync-dev-from-prod` (below) checks before writing.
+The Vercel previews read it too, which is why the test suites never write
+to it (Nov 23). The
 `DEV_ADMIN_BYPASS_SECRET` local-admin shortcut (see `AGENTS.md`) works
 against whichever project `NEXT_PUBLIC_SUPABASE_URL` points to, no changes
 needed there.
