@@ -122,35 +122,27 @@ jobs:
 
   cache-roundtrip:
     name: Cache round-trip (admin save reaches the cached page)
-    # See "One copy of each test-project suite at a time" above.
+    # Its own database, as admin-write (see that job): Supabase started on
+    # this runner, filled with a copy of the test project's rows, so it
+    # neither queues nor shares the test project with the other jobs.
+    # A bare runner for Docker; the suite runs in the Playwright image, as
+    # its "tab picks up an admin edit" test needs a real browser.
     if: github.event_name != 'push'
-    concurrency:
-      group: test-db-cache-roundtrip
-      cancel-in-progress: false
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.63.0-noble
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
         with:
           next-dist-dir: .next-e2e-3211
-      # This job ran on a bare runner while every test here took only the
-      # `request` fixture. That stopped being true when "an already-open tab
-      # picks up an admin edit when it regains focus" was added — it takes
-      # `page`, so it needs a real browser binary, and CI failed on
-      # "Executable doesn't exist … run npx playwright install" while the
-      # three request-only tests beside it passed.
-      #
-      # Fixed by putting it in the same image the other browser-driving jobs
-      # use, rather than adding a `playwright install` step: installing on a
-      # bare runner is the exact thing that used to hang for an hour in
-      # apt-get (see the note at the top of this file).
-      - run: npm run test:cache-roundtrip
-        env:
-          TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
-          TEST_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
-          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+      - uses: ./.github/actions/own-test-database
+        with:
+          test-supabase-url: ${{ secrets.TEST_SUPABASE_URL }}
+          test-supabase-service-role-key: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+      - run: >-
+          docker run --rm --network host --ipc host -v "$PWD:/work" -w /work
+          -e CI -e TEST_SUPABASE_URL -e TEST_SUPABASE_ANON_KEY -e TEST_SUPABASE_SERVICE_ROLE_KEY
+          mcr.microsoft.com/playwright:v1.63.0-noble npm run test:cache-roundtrip
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
