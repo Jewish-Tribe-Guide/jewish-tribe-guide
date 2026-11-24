@@ -12,6 +12,8 @@ rather than a feeling. Agreed Nov 16.
 | Largest Contentful Paint | ≤ 2.5s at p75 | Google's "good" line (Core Web Vitals). |
 | Interaction to Next Paint | ≤ 200ms at p75 | Same. |
 | Cumulative Layout Shift | ≤ 0.1 at p75 | Same. |
+| Admin: a screen's data arriving (`GET /api/admin/…`) | ≤ 1s at p75 | **Proposed Nov 24, waiting on the user's OK.** The same second as a visitor's answer: an admin is a visitor doing a job. |
+| Admin: a save answering (`POST`/`PATCH`/`DELETE /api/admin/…`) | ≤ 1s at p75 | **Proposed Nov 24, as above.** |
 
 p75 is measured over real visitors, not on a developer's laptop.
 
@@ -27,6 +29,20 @@ p75 is measured over real visitors, not on a developer's laptop.
 - **On real visitors**: Vercel Speed Insights (`@vercel/speed-insights` in
   `src/app/layout.tsx`) reports LCP, INP and CLS from the live site. Read it
   before and after anything that changes what a page loads.
+- **Every week, by email (Nov 24)**: Sentry measures the same web vitals
+  (its browser pageload and interaction spans) and every admin request's
+  duration, sampled at 10%. On Sundays the nightly email's run sends the
+  site owners (`SUPERADMIN_EMAILS`) the last 7 days' p75 against each target
+  above, and the slowest admin requests (`src/lib/speedReport.ts`). A
+  report, not an alert. Vercel's Speed Insights has no read API, only its
+  dashboard and CLI, which is why it reads Sentry. Needs `SENTRY_ORG` and
+  `SENTRY_API_TOKEN` (the read-only one) on the live deployment; without
+  them the email says it couldn't read.
+
+  First reading (Nov 17–24, low sample): LCP 2.3s, INP 150ms, CLS 0.19
+  (over), admin screens 532ms, saves under 1s except approving a
+  suggestion (990ms). Slowest screens: Watches' jobs 2.2s, hours 1.6s,
+  kosher 1.5s.
 
 ## Known causes, and what fixed them
 

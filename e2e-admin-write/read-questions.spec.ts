@@ -64,7 +64,7 @@ async function seedReading() {
 async function openRow(page: import('@playwright/test').Page) {
   await page.goto(`/${TEST_COMMUNITY}/admin/searches`)
   const searches = page.getByRole('region', { name: 'Asked more than once' })
-  await expect(searches).toBeVisible({ timeout: 20_000 })
+  await expect(searches).toBeVisible()
   // Five show; the test project may hold more searches than that.
   const more = searches.getByRole('button', { name: /^\d+ more$/ })
   if (await more.count()) await more.click()

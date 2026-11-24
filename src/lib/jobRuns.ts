@@ -262,7 +262,9 @@ export function nightlyEmailOutcome(run: NightlyEmailRun): JobOutcome {
   // how admins hear of everything else, so its own failure must not read
   // as fine.
   if (failed.length) return { ok: false, summary, error: `${failed.map((c) => c.slug).join(', ')}: couldn’t send` }
-  return { ok: true, summary, warning: null }
+  // The site owners' weekly speed email (Sundays) is not how admins hear
+  // of the night, so its failure warns rather than failing the run.
+  return { ok: true, summary, warning: run.speed?.error ? `Speed report: ${run.speed.error}` : null }
 }
 
 // ── Telling the admins (Oct 24) ─────────────────────────────────────────────

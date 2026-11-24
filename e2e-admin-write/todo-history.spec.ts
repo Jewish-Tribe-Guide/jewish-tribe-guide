@@ -55,14 +55,14 @@ const place = (page: Page) => page.getByTestId('todo-place')
 
 async function showsPlace(page: Page) {
   await expect(page).toHaveURL(/[?&]open=/)
-  await expect(place(page)).toBeVisible({ timeout: 15_000 })
+  await expect(place(page)).toBeVisible()
   await expect(place(page)).toContainText(name)
 }
 
 async function showsList(page: Page) {
   await expect(page).not.toHaveURL(/[?&]open=/)
   await expect(place(page)).toHaveCount(0)
-  await expect(row(page)).toBeVisible({ timeout: 15_000 })
+  await expect(row(page)).toBeVisible()
 }
 
 async function openTodo(page: Page) {

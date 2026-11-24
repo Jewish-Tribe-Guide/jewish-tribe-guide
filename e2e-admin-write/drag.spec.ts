@@ -19,7 +19,7 @@ test('a row dragged by its handle lands where it is dropped', async ({ page }) =
   await page.getByRole('group', { name: 'Show the page on' }).getByRole('button', { name: 'Phone' }).click()
   const tabs = page.getByRole('region', { name: 'Tabs' })
   const handles = tabs.getByRole('button', { name: /^Move / })
-  await expect(handles.nth(1)).toBeVisible({ timeout: 20_000 })
+  await expect(handles.nth(1)).toBeVisible()
   await tabs.scrollIntoViewIfNeeded()
   const before = await order(tabs)
 
@@ -44,7 +44,7 @@ test('a row held at the bottom of the window scrolls the page and stays under th
   await page.getByRole('group', { name: 'Show the page on' }).getByRole('button', { name: 'Phone' }).click()
   const tabs = page.getByRole('region', { name: 'Tabs' })
   const handle = tabs.getByRole('button', { name: /^Move / }).first()
-  await expect(handle).toBeVisible({ timeout: 20_000 })
+  await expect(handle).toBeVisible()
   await handle.evaluate((el) => el.scrollIntoView({ block: 'start' }))
   await page.evaluate(() => window.scrollBy(0, -80))
   const name = await handle.getAttribute('aria-label')
@@ -77,7 +77,7 @@ test.describe('on a phone', () => {
     await page.getByRole('group', { name: 'Show the page on' }).getByRole('button', { name: 'Phone' }).tap()
     const tabs = page.getByRole('region', { name: 'Tabs' })
     const rows = tabs.locator('[data-drag-row]')
-    await expect(rows.nth(1)).toBeVisible({ timeout: 20_000 })
+    await expect(rows.nth(1)).toBeVisible()
     await rows.last().scrollIntoViewIfNeeded()
     const before = await order(tabs)
 
@@ -125,7 +125,7 @@ test.describe('the home page cards', () => {
     await page.setViewportSize({ width: 1400, height: 1400 })
     await page.goto(`/${TEST_COMMUNITY}/admin/home`)
     const box = page.getByRole('region', { name: 'Cards under the search' })
-    await expect(box.getByRole('button', { name: /^Move / }).nth(1)).toBeVisible({ timeout: 20_000 })
+    await expect(box.getByRole('button', { name: /^Move / }).nth(1)).toBeVisible()
     await box.scrollIntoViewIfNeeded()
     return box
   }

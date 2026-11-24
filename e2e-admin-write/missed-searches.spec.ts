@@ -36,10 +36,10 @@ test('a missed search is listed, dismissed for real, and restored', async ({ pag
   expect(error).toBeNull()
 
   await page.goto(`/${TEST_COMMUNITY}/admin/searches`)
-  await page.getByRole('button', { name: 'Show Every search' }).click({ timeout: 20_000 })
+  await page.getByRole('button', { name: 'Show Every search' }).click()
   const missing = page.locator('section', { has: page.getByRole('heading', { name: /^Not in the guide/ }) })
   const row = missing.getByTestId('missed-search').filter({ hasText: `“${term}”` })
-  await expect(row).toBeVisible({ timeout: 20_000 })
+  await expect(row).toBeVisible()
   await expect(row).toContainText('3 times')
 
   await row.getByRole('button', { name: 'Dismiss' }).click()
@@ -51,7 +51,7 @@ test('a missed search is listed, dismissed for real, and restored', async ({ pag
   await page.getByRole('button', { name: 'Show Dismissed' }).click()
   const dismissed = page.getByTestId('missed-search').filter({ hasText: `“${term}”` })
   await dismissed.getByRole('button', { name: 'Restore' }).click()
-  await expect(row).toBeVisible({ timeout: 20_000 })
+  await expect(row).toBeVisible()
   await expect
     .poll(async () => (await supabase.from('search_miss_dismissal').select('key').eq('community_id', TEST_COMMUNITY).eq('key', term)).data?.length)
     .toBe(0)
@@ -65,7 +65,7 @@ test('a search asked more than once leads the page, and Dismiss there is the sam
 
   await page.goto(`/${TEST_COMMUNITY}/admin/searches`)
   const searches = page.getByRole('region', { name: 'Asked more than once' })
-  await expect(searches).toBeVisible({ timeout: 20_000 })
+  await expect(searches).toBeVisible()
   // Five show; the test project may hold more searches than that.
   const more = searches.getByRole('button', { name: /^\d+ more$/ })
   if (await more.count()) await more.click()
@@ -73,7 +73,7 @@ test('a search asked more than once leads the page, and Dismiss there is the sam
   await expect(row).toContainText('3 searches')
   await row.getByRole('button', { expanded: false }).click()
   await row.getByRole('button', { name: 'Dismiss' }).click()
-  await expect(row).not.toBeVisible({ timeout: 20_000 })
+  await expect(row).not.toBeVisible()
   await expect
     .poll(async () => (await supabase.from('search_miss_dismissal').select('key').eq('community_id', TEST_COMMUNITY).eq('key', term)).data?.length)
     .toBe(1)

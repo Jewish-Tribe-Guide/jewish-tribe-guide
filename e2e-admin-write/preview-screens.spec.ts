@@ -13,13 +13,13 @@ import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 // and the form is a new one that is never published.
 
 const at = (page: Page, path: string, query: string) =>
-  expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search, { timeout: 20_000 }).toBe(path + query)
+  expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search).toBe(path + query)
 
 test('Home page’s full-size preview: Back closes it, Forward and a reload reopen it', async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 })
   await page.goto(`/${TEST_COMMUNITY}/admin/home`)
   const back = page.getByRole('button', { name: '← Back to editor' })
-  await page.getByRole('button', { name: 'Open the preview' }).click({ timeout: 20_000 })
+  await page.getByRole('button', { name: 'Open the preview' }).click()
   await expect(back).toBeVisible()
   await at(page, `/${TEST_COMMUNITY}/admin/home`, '?preview=open')
 
@@ -32,7 +32,7 @@ test('Home page’s full-size preview: Back closes it, Forward and a reload reop
   await expect(back).toBeVisible()
 
   await page.reload()
-  await expect(back).toBeVisible({ timeout: 20_000 })
+  await expect(back).toBeVisible()
   // Its own Back goes to the editor, and the address with it.
   await back.click()
   await at(page, `/${TEST_COMMUNITY}/admin/home`, '')
@@ -43,8 +43,8 @@ test('a form’s question and its preview: Back, Forward and a reload land on ea
   await page.setViewportSize({ width: 1400, height: 900 })
   const visible = (l: Locator) => l.and(page.locator(':visible'))
   await page.goto(`/${TEST_COMMUNITY}/admin/forms`)
-  await visible(page.getByRole('button', { name: 'Add a form' })).click({ timeout: 20_000 })
-  await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/forms/form:new$`), { timeout: 20_000 })
+  await visible(page.getByRole('button', { name: 'Add a form' })).click()
+  await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/forms/form:new$`))
   const form = new URL(page.url()).pathname
   const formHeading = visible(page.getByRole('heading', { name: 'New form' }))
   await expect(formHeading).toBeVisible()
@@ -61,7 +61,7 @@ test('a form’s question and its preview: Back, Forward and a reload land on ea
   await page.goForward()
   await expect(question).toBeVisible()
   await page.reload()
-  await expect(question).toBeVisible({ timeout: 20_000 })
+  await expect(question).toBeVisible()
 
   // The preview, from the question.
   const back = page.getByRole('button', { name: '← Back to editor' })
@@ -74,7 +74,7 @@ test('a form’s question and its preview: Back, Forward and a reload land on ea
   await page.goForward()
   await expect(back).toBeVisible()
   await page.reload()
-  await expect(back).toBeVisible({ timeout: 20_000 })
+  await expect(back).toBeVisible()
   await back.click()
   await at(page, form, '?question=1')
   await expect(question).toBeVisible()
@@ -85,7 +85,7 @@ test('a form’s question and its preview: Back, Forward and a reload land on ea
 test('New community: Back closes it, Forward and a reload reopen it', async ({ page }) => {
   await page.goto('/admin')
   const form = page.getByRole('heading', { name: 'New community' })
-  await page.getByRole('button', { name: '+ New community' }).click({ timeout: 20_000 })
+  await page.getByRole('button', { name: '+ New community' }).click()
   await expect(form).toBeVisible()
   await at(page, '/admin', '?step=new')
   await page.goBack()
@@ -94,5 +94,5 @@ test('New community: Back closes it, Forward and a reload reopen it', async ({ p
   await page.goForward()
   await expect(form).toBeVisible()
   await page.reload()
-  await expect(form).toBeVisible({ timeout: 20_000 })
+  await expect(form).toBeVisible()
 })

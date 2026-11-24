@@ -4,6 +4,28 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## Checks that tell someone (Nov 24)
+
+The user, Nov 24: "we should be making sure our CI and tests are testing
+what we want and notifying us when our standards aren't met." Written up
+as `docs/checks.md`, then its seven gaps (the user's "Yes, all seven"):
+
+- CI's **All checks passed** job passes only when every PR suite did
+  (`ci.yml`'s `all-checks`). `ciWorkflow.test.ts` fails if a suite is left
+  out of its `needs` (5 new tests failed against the old workflow, 1 with
+  form-roundtrip left out). Requiring it is the user's ruleset change.
+- A production smoke failure opens a GitHub issue, or comments on the
+  open one (`prod-smoke-report`).
+- Sundays' speed email to the site owners (`src/lib/speedReport.ts`):
+  web vitals and admin request times from Sentry, against
+  `docs/speed-targets.md`, which now proposes ≤ 1s at p75 for an admin
+  screen and a save. Vercel's Speed Insights has no read API. New code,
+  so its tests had nothing older to fail against; the nightly run's
+  outcome test failed against the old outcome (no speed warning).
+- admin-write's 15s and 20s waits are gone: 60/60 on three runs with
+  expect's 5s. They dated from the shared test project.
+- Sentry's two N+1 issues turned out to be fixed already, by PR 442.
+
 ## Shul watches: the same page reads the same way (Nov 24)
 
 The user, Nov 24: the shul watches "came back with new information" and

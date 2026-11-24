@@ -97,7 +97,7 @@ async function openPlace(page: Page, shows: string) {
     // its own 15s.
     const loading = page.getByRole('main').getByText('Loading…')
     await expect(loading.or(page.getByRole('heading', { name })).first()).toBeVisible()
-    await expect(loading).toHaveCount(0, { timeout: 15_000 })
+    await expect(loading).toHaveCount(0)
     await expect(page.getByRole('heading', { name })).toBeVisible({ timeout: 1_000 })
     // Saying its menu's part, once the menu's job has it too: before, it's a
     // place nothing reads.
@@ -149,14 +149,14 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
   // then refreshes the site's cache before it answers: past expect's 5s in
   // CI (PR 400, Nov 20, the request still open at the timeout). Edit's Save
   // below already allowed 15s for the same.
-  await expect(open.getByTestId('waiting-group')).toHaveCount(0, { timeout: 15_000 })
+  await expect(open.getByTestId('waiting-group')).toHaveCount(0)
   // Its Dishes, with what the menu read made of the one added by hand (the
   // user, Oct 26: "see or know if the AI reader is picking things up").
   await expect(async () => {
     await page.goto(`/${TEST_COMMUNITY}/admin/watches/place/${id}`)
     await open.getByRole('button', { name: /more checked$/ }).click({ timeout: 3_000 })
     await expect(open.getByTestId('checked-mark')).toHaveText(['Laffa · Not found on its menu'], { timeout: 3_000 })
-  }).toPass({ timeout: 20_000 })
+  }).toPass()
 
   const stored = async () => (await supabase.from('resource').select('details').eq('id', id).single()).data?.details as Record<string, unknown>
   await expect.poll(async () => (await stored())[f.key]).toEqual(['Shawarma', 'Laffa', 'Falafel'])
@@ -182,7 +182,7 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
   await expect(async () => {
     await page.goto(`/${TEST_COMMUNITY}/${c.id}/${id}`)
     await expect(dishes).toContainText('Falafel', { timeout: 3_000 })
-  }).toPass({ timeout: 20_000 })
+  }).toPass()
   await expect(dishes).toContainText('Main dishes · 3')
   await expect(dishes.getByRole('link', { name: 'Full menu' })).toHaveAttribute('href', sourceUrl)
 })
@@ -220,10 +220,10 @@ test('Edit: the listing’s own dishes editor, started from the menu’s list, s
   await sheet.getByRole('button', { name: 'Save to the listing' }).click()
   // The sheet closes once the save is back: over 5s on CI's runner on
   // Nov 13 (PR 384), as the read after it was on Nov 3.
-  await expect(sheet).not.toBeVisible({ timeout: 15_000 })
+  await expect(sheet).not.toBeVisible()
   // The save, then To do read again: two round trips, which took over 5s on
   // CI's runner on Nov 3 (PR 373).
-  await expect(open.getByTestId('waiting-group')).toHaveCount(0, { timeout: 15_000 })
+  await expect(open.getByTestId('waiting-group')).toHaveCount(0)
 
   const stored = async () => (await supabase.from('resource').select('details').eq('id', id).single()).data?.details as Record<string, unknown>
   await expect.poll(async () => (await stored())[f.key]).toEqual(['Shawarma', 'Laffa Wraps'])

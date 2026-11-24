@@ -12,8 +12,11 @@ in `docs/operations.md`. The speed numbers are in `docs/speed-targets.md`.
 ## The code, before it merges
 
 `main` requires one check: **Lint, typecheck, unit tests**. Every other
-suite runs on each PR but can be merged past while red. In practice the
-user merges only on green, so they are watched, but nothing enforces it.
+suite runs on each PR but can be merged past while red. Since Nov 24 CI
+has **All checks passed** (`all-checks`), which passes only when every
+suite did; once the ruleset requires it instead, every row below blocks.
+Until then, nothing enforces the "No" rows but the user's habit of
+merging on green.
 
 | Standard | Checked by | Blocks a merge? |
 | --- | --- | --- |
@@ -35,35 +38,35 @@ notification settings allow it (not checked from here).
 
 | Standard | Checked by | Who hears |
 | --- | --- | --- |
-| Live data still fits the code | `e2e-prod-smoke`, on every push to `main` | **No one.** Every step is `continue-on-error`, so a failure only shows in the Actions tab |
+| Live data still fits the code | `e2e-prod-smoke`, on every push to `main` | A GitHub issue, "Production smoke tests are failing", assigned to whoever pushed (a comment on it if it's already open). Never blocks |
 | A visitor hitting an error | Sentry | Sentry's email on a new issue |
 | Sentry actually recording errors (not over quota) | `npm run sentry:check` | **Only whoever runs it.** Sentry was blind Nov 13–22 this way |
-| Visitor speed: LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1 at p75 | Vercel Speed Insights | **No one.** Read by hand (tracker 81, about Dec 6) |
-| Server speed problems (N+1 calls, slow requests) | Sentry performance issues | Sentry's new-issue email. Two "N+1 API Call" issues opened Nov 23 and are unhandled |
-| Admin speed (a save, To do loading) | **Nothing.** No target is set | — |
+| Visitor speed: LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1 at p75 | Sentry's web vitals (Speed Insights has no read API) | The site owners, every Sunday (`speedReport.ts`) |
+| Server speed problems (N+1 calls, slow requests) | Sentry performance issues | Sentry's new-issue email. The two "N+1 API Call" issues of Nov 23 were fixed by PR 442 the same night |
+| Admin speed: a screen's data and a save, ≤ 1s at p75 (proposed) | Sentry's request timings for `/api/admin` | The site owners, every Sunday, with the visitor numbers |
 | The security policy's reports | Sentry (`report-uri`), listed by `sentry:check` | Only whoever runs it |
 
-## The gaps, and the usual fix for each
+## The gaps, and what closed them (Nov 24)
 
-1. **Five suites guard behaviour but don't block a merge.** The usual
-   practice is that every check you rely on is required. To avoid listing
-   seven e2e shards, add one final CI job that passes only when all the
-   others did, and require that. It makes any flaky test block merges
-   until fixed, which is the point. (A ruleset change: the user's call.)
-2. **The production smoke run tells no one.** Have a failure open a
-   GitHub issue, or put its result in the nightly email.
-3. **Sentry going over quota is silent.** Sentry can email at 80% and
-   100% of the quota (its usage notification settings). Or the nightly
-   email could carry the dropped-event count `sentry:check` already reads.
-4. **Visitor speed has a target but no alert.** Either alerts on the web
-   vitals where they're measured (whether Sentry's plan or Vercel's
-   allows this is unchecked), or a weekly line in the nightly email.
-5. **Admin speed has no target.** Set one in `docs/speed-targets.md`
-   (for example: an admin save answers within 1s for most saves), and
-   check it on real use with Sentry's request timings for `/api/admin`,
-   not with a test timeout. CI checks counts and order, never time.
-6. **Leftovers from the shared test database.** 12 waits in `admin-write`
-   allow 15s where 5s is the norm; they were set when sign-in and saves
-   on the shared hosted project took seconds. CI's header comment in
-   `ci.yml` still describes that shared project. Both should go.
-7. **The N+1 issues in Sentry since Nov 23** need looking at.
+1. **Five suites guarded behaviour but didn't block a merge.** CI's
+   `all-checks` job passes only when every PR suite did, a skip on a PR
+   included; `ciWorkflow.test.ts` fails if a suite is missing from its
+   `needs`. **Open until the ruleset requires "All checks passed"** (the
+   user's call). It makes a flaky test block merges until fixed, which is
+   the point.
+2. **The production smoke run told no one.** `prod-smoke-report` opens
+   an issue on a failure, found by the report each failed shard uploads.
+3. **Sentry going over quota was silent.** Sentry emails at 80% and 100%
+   of the quota when its usage notifications are on (Settings → Account
+   → Notifications → Quota). **Open until the user turns them on.**
+4. **Visitor speed had a target but no alert.** The weekly speed email.
+   Needs `SENTRY_API_TOKEN` on the live deployment (the user's).
+5. **Admin speed had no target.** ≤ 1s at p75 for a screen and for a
+   save, proposed in `docs/speed-targets.md` and in the weekly email.
+   **Open until the user agrees the number.**
+6. **Leftovers from the shared test database.** admin-write's 15s and
+   20s waits are gone (60/60, three runs, on expect's 5s); `ci.yml`'s
+   header no longer describes the shared project.
+7. **The N+1 issues in Sentry** were already fixed by PR 442 (Nov 23,
+   `listJobRuns`'s `only`, `jobFindings`' one read a state). Sentry still
+   lists them as unresolved; mark them resolved there.

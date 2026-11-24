@@ -44,9 +44,10 @@ vi.mock('./nightNoteStore', () => ({ statusChangesSince: async () => m.google })
 vi.mock('./email', () => ({
   adminAppUrl: () => 'https://guide.example',
   sendNightlyEmail: async (slug: string, e: { subject: string; html: string }) => void m.sent.push({ slug, ...e }),
+  sendEmail: async () => {},
 }))
 
-const { sendNightlyEmails, stoppedJobs, stoppedWatch, watchWhy, isAutomated } = await import('./nightlyEmailRun')
+const { sendNightlyEmails, sendSpeedReport, stoppedJobs, stoppedWatch, watchWhy, isAutomated } = await import('./nightlyEmailRun')
 
 const NOW = new Date('2026-11-13T09:45:00Z')
 const TONIGHT = '2026-11-13T07:05:00Z'
@@ -197,5 +198,25 @@ describe('what counts as a watch’s', () => {
     expect(isAutomated({ submitted_by: { name: 'Its website (automated, eruv)' } })).toBe(true)
     expect(isAutomated({ submitted_by: { name: 'Dina' } })).toBe(false)
     expect(isAutomated({ submitted_by: null } as never)).toBe(false)
+  })
+})
+
+describe('the week’s speed, to the site owners', () => {
+  const SUNDAY = new Date('2026-11-29T09:45:00Z')
+  const week = { lcp: 1_500, inp: 150, cls: 0.02, adminRead: 530, adminSave: 990, slowAdmin: [] }
+  const deps = (sent: unknown[], to = ['owner@example.com']) => ({ read: async () => week, send: async (e: unknown) => void sent.push(e), to: () => to })
+
+  it('goes on a Sunday, to SUPERADMIN_EMAILS, and on no other day', async () => {
+    const sent: { to: string[]; subject: string }[] = []
+    expect(await sendSpeedReport(SUNDAY, deps(sent) as never)).toEqual({ sent: true })
+    expect(sent.map((e) => [e.to, e.subject])).toEqual([[['owner@example.com'], 'Speed this week: every target met']])
+    expect(await sendSpeedReport(NOW, deps(sent) as never)).toBeUndefined()
+    expect(sent).toHaveLength(1)
+  })
+
+  it('says so when there is no one to send it to, or the send fails', async () => {
+    expect(await sendSpeedReport(SUNDAY, deps([], []) as never)).toEqual({ sent: false, error: 'SUPERADMIN_EMAILS is empty' })
+    const failing = { ...deps([]), send: async () => { throw new Error('Resend 500') } }
+    expect(await sendSpeedReport(SUNDAY, failing as never)).toEqual({ sent: false, error: 'Resend 500' })
   })
 })
