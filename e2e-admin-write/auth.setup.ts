@@ -30,7 +30,7 @@ setup('authenticate as the disposable test-project admin', async ({ page, baseUR
   if (!supabaseUrl || !anonKey || !serviceRoleKey) {
     throw new Error(
       'Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY in the ' +
-        'Playwright process itself — playwright.admin-write.config.ts should have remapped these from TEST_SUPABASE_*.',
+        'Playwright process itself — playwright.admin-write.config.ts should have set these from the test database (scripts/testDatabase.mjs).',
     )
   }
 

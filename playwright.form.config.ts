@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { testDatabase } from './scripts/testDatabase.mjs'
 import { defineConfig } from '@playwright/test'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -9,54 +10,23 @@ import { defineConfig } from '@playwright/test'
 // pipeline works (branching DSL -> Wizard UI -> /api/requests -> the
 // database), which a passing test running against the real project would
 // leave sitting in someone's real inbox/moderation queue forever. So it runs
-// against the same dedicated, disposable test Supabase project the
-// integration and cache-round-trip suites use — never the real one, refused
-// explicitly below. `npm run test:form-roundtrip` runs this config.
+// against a local Supabase of its own (below), like the other write suites. `npm run test:form-roundtrip` runs this config.
 //
 // Unlike the cache-round-trip suite, this one needs no admin session — form
 // submission itself is a public endpoint. Verifying the response actually
 // landed (and cleaning it up afterward) uses a plain service-role Supabase
-// client created directly in the spec file, from these same remapped vars.
+// client created directly in the spec file, from these same vars.
 // ─────────────────────────────────────────────────────────────────────────────
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local')
 
-const url = process.env.TEST_SUPABASE_URL
-const anonKey = process.env.TEST_SUPABASE_ANON_KEY
-const serviceRoleKey = process.env.TEST_SUPABASE_SERVICE_ROLE_KEY
-
-const missing = [
-  !url && 'TEST_SUPABASE_URL',
-  !anonKey && 'TEST_SUPABASE_ANON_KEY',
-  !serviceRoleKey && 'TEST_SUPABASE_SERVICE_ROLE_KEY',
-].filter(Boolean)
-if (missing.length) {
-  throw new Error(
-    `Missing ${missing.join(', ')} — see README "Integration tests" for how to set up the test project.`,
-  )
-}
-
-// Same worker-re-import guard as playwright.cache.config.ts — see that
-// file's comment for the full explanation. A different marker name so the
-// two suites' own remap-once checks can never interfere with each other,
-// even though in practice each runs as its own top-level process.
-if (!process.env.FORM_E2E_REMAPPED) {
-  // SHARED_DEV_TEST_PROJECT opts out of this refusal — see
-  // src/test/integrationEnv.ts's comment for why that's a deliberate choice,
-  // not a hole in the check.
-  if (url === process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.SHARED_DEV_TEST_PROJECT) {
-    throw new Error(
-      'TEST_SUPABASE_URL is the same as NEXT_PUBLIC_SUPABASE_URL — refusing to run the form-submission suite ' +
-        'against the real Supabase project. Point TEST_SUPABASE_URL at a separate, disposable project, ' +
-        'or set SHARED_DEV_TEST_PROJECT=1 if you deliberately use the same project for both.',
-    )
-  }
-
-  process.env.NEXT_PUBLIC_SUPABASE_URL = url
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = anonKey
-  process.env.SUPABASE_SERVICE_ROLE_KEY = serviceRoleKey
-  process.env.FORM_E2E_REMAPPED = '1'
-}
+// The suites' own database, always a local Supabase (scripts/testDatabase.mjs;
+// `npm run test:db` starts one). Set here, before the server and the setup
+// start, so both use it too.
+const db = testDatabase()
+process.env.NEXT_PUBLIC_SUPABASE_URL = db.url
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = db.anonKey
+process.env.SUPABASE_SERVICE_ROLE_KEY = db.serviceRoleKey
 
 // Its own port and dist dir — never the real e2e suite's (3210) or the
 // cache-round-trip suite's (3211, .next-cache-e2e).

@@ -152,5 +152,5 @@ the narrower or wider reading rather than applying it silently.
 
 - Anything positional (hit-testing, scroll, gestures, overlap) is checked in
   a real browser (`e2e/`). jsdom has no layout.
-- Two sessions running the `TEST_SUPABASE_*` suites at once share port 3213
+- Two sessions running the write suites at once share port 3213
   and the test database. Check for another run first.

@@ -94,16 +94,16 @@ npm run test:integration    # store-level reads/writes against a disposable test
 npm run test:cache-roundtrip  # proves an admin save actually reaches the cached page (e2e-cache/)
 npm run test:form-roundtrip   # fills in and submits a real intake wizard (e2e-form/)
 npm run test:admin-write      # signs in and drives /admin for real: approve/reject, category/form CRUD (e2e-admin-write/)
-npm run test:all            # unit + e2e only — the four suites above need TEST_SUPABASE_* and run separately/in CI
+npm run test:all            # unit + e2e only — the four suites above need `npm run test:db` first and run separately/in CI
 ```
 
-The last four run against a **disposable second Supabase project** (`TEST_SUPABASE_*` env vars), specifically so they're free to write and delete real rows — unlike everything in `e2e/`. See each suite's own `e2e-*/auth.setup.ts` for the mechanism.
+The last four run against a **local Supabase of their own** (`npm run test:db` starts one; CI starts one per job), specifically so they're free to write and delete real rows — unlike everything in `e2e/`. See each suite's own `e2e-*/auth.setup.ts` for the mechanism.
 
 `e2e` itself is read-only, so it used to point at the real production project in CI on the theory that reads are harmless. In practice that made a required PR check depend on production's current data/config instead of on the PR's own code — a branch adding a new admin-configurable content kind failed `e2e` in CI because production's data hadn't been migrated to match, even though the code was correct (see git history around 2026-09-10 for the incident). `e2e` in CI then pointed at the shared `TEST_SUPABASE_*` project, and since Nov 23 each shard (and the build) starts a database of its own from the committed seed, like every other suite (below). A separate `e2e-prod-smoke` CI job runs the identical suite against real production instead — but only on push to `main` (never on a PR) and with every step `continue-on-error`, so it surfaces production data/config drift without ever gating a merge.
 
 ## Which suite covers what you just touched
 
-`test:all` is unit + e2e **only**. The four `TEST_SUPABASE_*` suites are not in
+`test:all` is unit + e2e **only**. The four write suites are not in
 it, not in `npm test`, and not in `test:e2e` — so a change to something they
 cover passes everything you'd normally run and fails in CI. That has already
 happened: the Pages tab got a rich-text editor, every local check was green,
@@ -122,11 +122,11 @@ Look up what you edited before calling it done:
 | `src/app/about/**`, `src/app/privacy/**`, `src/lib/pagesStore.ts`, `src/lib/richText.ts` | `test:admin-write` **and** `test:cache-roundtrip` (they split the `page` singletons between them — admin-write owns `privacy`, cache-roundtrip owns `about`) |
 | Routing, data loading, caching, metadata, page shells | `test:e2e` (see below) |
 
-Running one locally needs `TEST_SUPABASE_*` set, and `SHARED_DEV_TEST_PROJECT=1`
-if your `.env.local` points dev at that same project. All four refuse to run
-otherwise, rather than risk writing to the real database — the guard is in each
-`playwright.*.config.ts` for the three Playwright suites, and in
-`src/test/integrationEnv.ts` for `test:integration`.
+Running one locally needs Docker running and `npm run test:db` first. All
+four take their database from `scripts/testDatabase.mjs`, which refuses any
+address that isn't on this machine, so no local run can write to dev (which
+the previews read) or production. `testDatabase.test.ts` fails if a write
+suite's entry point stops asking it.
 
 **A database per job (Nov 23).** No CI job uses the shared test project
 any more. Each suite (`integration`, `cache-roundtrip`, `form-roundtrip`,
@@ -141,22 +141,25 @@ only, scrubbed, built by `scripts/make-test-seed.mjs` from a backup;
 committed in it, and `ciWorkflow.test.ts` if a job gets the test project's
 keys again. The sharing workarounds below (row claims, the `e2e-writes`
 community, `TEST_PROJECT_TIMEOUT`) are still in the code and come out next
-(tracker item 4). To run a suite the same way
-locally (needs Docker and about 3 GB):
+(tracker item 4).
+
+Locally it's the same database, made by the same command
+(`scripts/test-db.mjs`, which the action runs too). Needs Docker and about
+3 GB:
 
 ```bash
-npx supabase@3.1.0 start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+npm run test:db
 ```
 
-then load the seed as the action does (`restore.mjs supabase/seed
---no-files --replace`, then `reset-sequences.sql` and
-`seed-fresh-dates.sql`), and run the suite with `TEST_SUPABASE_*` set from `npx supabase@3.1.0 status -o
-env`. For e2e, also set the app's own `NEXT_PUBLIC_SUPABASE_*` and
-`SUPABASE_SERVICE_ROLE_KEY` to it, and `NEXT_PUBLIC_SUPABASE_STORAGE_URL` to
-the host the seed's photos are on (ci.yml has it), or the home page's image
-budget fails on full-size originals. Seed first, then build: the build
-prerenders What changed from whatever the database held. `npx supabase@3.1.0
-stop --no-backup` removes it.
+starts it if it isn't running and loads the seed (about 15 seconds once
+the images are pulled). `npm run test:db -- seed` loads the seed again, for
+a clean start; `npm run test:db -- stop` removes it. The write suites find
+it on their own. For e2e, set the app's own `NEXT_PUBLIC_SUPABASE_*` and
+`SUPABASE_SERVICE_ROLE_KEY` to it (`npx supabase@3.1.0 status -o env`), and
+`NEXT_PUBLIC_SUPABASE_STORAGE_URL` to the host the seed's photos are on
+(ci.yml has it), or the home page's image budget fails on full-size
+originals. Seed first, then build: the build prerenders What changed from
+whatever the database held.
 
 ### A wait can never outlast the test budget above it (closed)
 
@@ -454,7 +457,7 @@ None of those show up in `tsc`, `eslint`, or a passing build. Several looked fin
 - **Assert on server HTML** (`request.get()`) when the claim is about server rendering. A `page` assertion passes either way, because the client would fill it in.
 - Don't use `waitForLoadState('networkidle')` — the map, zmanim and geolocation keep connections open, so it never settles. Use `ready()` from the helpers.
 - **Open an admin page with `openAdmin()`** (`e2e/helpers.ts`), and give a wait on an admin save or a re-read `TEST_PROJECT_TIMEOUT`. Every CI job signs in to the one test project at once, and its sign-in check took 3–4s there (Nov 23 traces), against expect's 5s: the admin Home page, To do's reload and Teach failed on it. A wait on the page itself keeps the 5s.
-- **Nothing in `e2e/` may write to the database.** The suite runs against whichever project `NEXT_PUBLIC_SUPABASE_URL` points to — the `TEST_SUPABASE_*` project in CI's required `e2e` job (and locally, see README "Using the test project for local dev too"), or real production in the separate, non-blocking `e2e-prod-smoke` CI job — so a test that submits a listing leaves a row in that project's moderation queue for a human to clear either way. `api.spec.ts` posts to the write endpoints deliberately, but only unauthenticated and only with ids that cannot exist — a pass means each one was refused before it reached the database.
+- **Nothing in `e2e/` may write to the database.** The suite runs against whichever project `NEXT_PUBLIC_SUPABASE_URL` points to — its own seeded local database in CI's required `e2e` job, dev locally, or real production in the separate, non-blocking `e2e-prod-smoke` CI job — so a test that submits a listing leaves a row in that project's moderation queue for a human to clear either way. `api.spec.ts` posts to the write endpoints deliberately, but only unauthenticated and only with ids that cannot exist — a pass means each one was refused before it reached the database.
 - **`e2e/budgets.spec.ts` counts what a page downloads** (initial JS gzipped, image bytes, head preloads, whether a phone fetches the desktop hero, whether browsing loads Turnstile). Every budget guards something that shipped broken while passing tsc, lint, the unit suite and a look in the browser. It counts requests and bytes, never timings — a timing assertion on a shared CI runner is what makes a suite flaky. When it fails, the message names the offending request; check whether the page really got heavier before raising a ceiling. Two traps it already hit: Playwright's `request.sizes()` reports -1/0 for chunked responses (so bytes are measured from the body), and a warm browser context defeats `loading="lazy"` (Chrome loads lazy images already in its memory cache), so use the fresh context each test already gets.
 - **The Content-Security-Policy is report-only, and `e2e/csp.spec.ts` is what makes that safe to change.** `src/lib/csp.ts` builds the policy and `next.config.ts` ships it as `Content-Security-Policy-Report-Only`, so a wrong allowlist reports instead of breaking the map or the forms. The spec loads the pages and opens the interactive states that pull in third parties (map, Add form/Turnstile) and fails on any `securitypolicyviolation` — including report-only ones. A new script or API host goes in `csp.ts`, never as an exception in the spec. What it cannot cover locally is PostHog and Sentry (both initialize only on the real production deployment), so production violations are reported to Sentry via `report-uri` — read those before enforcing. To enforce, rename the header to `Content-Security-Policy` and drop the frame-ancestors-only one. `script-src` keeps `'unsafe-inline'` on purpose: a nonce would make every page dynamic and give up prerendering, so inline-script injection is NOT stopped yet (hashes are the way to close that).
 - **Check that a new test fails.** Several here would have passed against a broken app: an offline test passes when the page is simply still online, and a "not cached" assertion passes when the header is absent for an unrelated reason. Break the thing on purpose, watch it go red, put it back.

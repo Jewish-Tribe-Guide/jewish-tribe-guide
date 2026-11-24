@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Boots a REAL production build (`next build && next start` — Cache
 // Components only behaves correctly there, not under `next dev`) pointed at
-// a dedicated, disposable test Supabase project instead of the real one.
+// the write suites' own local Supabase (testDatabase.mjs), never a hosted one.
 // Shared by two e2e suites that both need to write through the real app
 // (something the real e2e/ suite is barred from doing — see AGENTS.md):
 //   - the cache-round-trip suite (e2e-cache/), which writes through the
@@ -10,38 +10,26 @@
 //     real wizard and watches the response land in the database
 // Each has its own playwright.*.config.ts and its own port (CACHE_E2E_PORT)
 // — build output is derived from that port below, so they never collide.
-//
-// The one-time-invoke-the-real-project safety check lives in each config
-// file, not here — those configs are the actual entry points
-// (`npm run test:cache-roundtrip` / `npm run test:form-roundtrip`), and each
-// runs BEFORE this script is spawned as its webServer child. This script
-// inherits that already-vetted, already-remapped environment; re-checking
-// here would compare TEST_SUPABASE_URL against a NEXT_PUBLIC_SUPABASE_URL
-// the parent has already overwritten to match it, which would always
-// "match" and refuse unconditionally — a real bug this comment is here so
-// nobody reintroduces.
 import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { createClient } from '@supabase/supabase-js'
+import { testDatabase } from './testDatabase.mjs'
 import { ADMIN_WRITE_TEST_ADMIN_EMAIL, CACHE_TEST_ADMIN_EMAIL } from './cacheE2eAdmin.mjs'
 import { FORM_E2E_FORM_ID } from './formE2eConstants.mjs'
 import { WRITE_SUITE_COMMUNITY, ensureWriteSuiteCommunity } from './writeSuiteCommunity.mjs'
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local')
 
-const url = process.env.TEST_SUPABASE_URL
-const anonKey = process.env.TEST_SUPABASE_ANON_KEY
-const serviceRoleKey = process.env.TEST_SUPABASE_SERVICE_ROLE_KEY
-
-const missing = [
-  !url && 'TEST_SUPABASE_URL',
-  !anonKey && 'TEST_SUPABASE_ANON_KEY',
-  !serviceRoleKey && 'TEST_SUPABASE_SERVICE_ROLE_KEY',
-].filter(Boolean)
-if (missing.length) {
-  console.error(`❌ Missing ${missing.join(', ')} — see README "Integration tests" for how to set up the test project.`)
+// The suite's config chose the database and set TEST_DB_* (testDatabase.mjs
+// refuses anything not local); asked again here, it is the same one.
+let db
+try {
+  db = testDatabase()
+} catch (err) {
+  console.error(`❌ ${err.message}`)
   process.exit(1)
 }
+const { url, anonKey, serviceRoleKey } = db
 
 // Next's Cache Components require every generateStaticParams to return at
 // least one result at build time — the listing-detail route

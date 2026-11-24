@@ -13,8 +13,7 @@ import { FORM_E2E_FORM_ID } from '../scripts/formE2eConstants.mjs'
 //
 // No admin session needed — submitting a form is a public endpoint. Reading
 // it back and cleaning up use a plain service-role client built from the
-// same TEST_SUPABASE_* vars playwright.form.config.ts already validated and
-// remapped in this process.
+// same database playwright.form.config.ts chose and set in this process.
 //
 // Drives the real UI (not a raw POST to /api/requests) deliberately: the
 // point is proving the branching DSL → Wizard.tsx → API → database pipeline
