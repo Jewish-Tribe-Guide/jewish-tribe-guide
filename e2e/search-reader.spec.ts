@@ -19,54 +19,67 @@ const QUESTION = 'zqxw qvvjk'
 /** useLearnAfterPause's LEARN_PAUSE_MS. */
 const PAUSE_MS = 2500
 
-/** When each read reached the stand-in, by the test's clock. */
-const askedAt = new WeakMap<string[], number[]>()
+// The pause is a timer, so the tests move the page's clock (page.clock)
+// rather than wait it out: each test installs it before loading the page,
+// and stops it while typing, so only the test moves it. Real waits made the
+// pause's timing depend on the machine: once (Nov 21) a loaded one read late
+// enough to fail a "nothing yet" check, and an installed clock left running
+// read early under the full suite (Nov 24).
 
 async function standIn(page: Page, categoryId: string) {
   const asked: string[] = []
-  const at: number[] = []
-  askedAt.set(asked, at)
   await page.route('**/api/ask/read**', async (route) => {
     asked.push((route.request().postDataJSON() as { question: string }).question)
-    at.push(Date.now())
     await route.fulfill({ json: { ok: true, reading: { categories: [{ id: categoryId, openNow: true }] }, remembered: true } })
   })
   return asked
 }
 
-/** No read has come sooner than the pause after `typed`. Timed rather
- * than checked for none at 1.5s: on a loaded machine that check itself ran
- * a second late and caught the read the pause had rightly made (Nov 21). */
-function noReadBeforePause(asked: string[], typed: number) {
-  for (const at of askedAt.get(asked)!) expect(at - typed).toBeGreaterThanOrEqual(PAUSE_MS)
+/** Stops the page's clock, a second on (pauseAt can't go back, and the
+ *  clock runs on while it's asked): from here only `after` moves it. Called
+ *  before typing, so the jump can't count toward the pause. */
+async function stopClock(page: Page) {
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1_000))
+}
+
+/** Lets the page's clock run `ms`, then gives a read it started a moment to
+ *  reach the stand-in, so "nothing was read" means it. */
+async function after(page: Page, ms: number) {
+  await page.clock.runFor(ms)
+  await page.waitForTimeout(300)
 }
 
 /** Typed, read once the typing stops (useLearnAfterPause's 2.5s), once. */
 async function typeAndLeave(page: Page, box: ReturnType<Page['getByRole']>, asked: string[]) {
-  const typed = Date.now()
+  await stopClock(page)
   await box.fill(QUESTION)
-  await expect.poll(() => asked, { timeout: 8000 }).toEqual([QUESTION])
-  noReadBeforePause(asked, typed)
-  await page.waitForTimeout(3000)
+  await after(page, PAUSE_MS - 500)
+  expect(asked, 'read before the pause was up').toEqual([])
+  await page.clock.runFor(500)
+  await expect.poll(() => asked).toEqual([QUESTION])
+  await after(page, PAUSE_MS * 2)
   expect(asked).toEqual([QUESTION])
+  await page.clock.resume()
 }
 
 /** Typed, Enter before the pause is up: read at once, and only once. */
 async function typeThenEnter(page: Page, box: ReturnType<Page['getByRole']>, asked: string[]) {
-  const typed = Date.now()
+  await stopClock(page)
   await box.fill(QUESTION)
-  await page.waitForTimeout(1500)
-  noReadBeforePause(asked, typed)
+  await after(page, PAUSE_MS - 1000)
+  expect(asked, 'read before the pause was up').toEqual([])
   await box.press('Enter')
   await expect.poll(() => asked).toEqual([QUESTION])
-  await page.waitForTimeout(3000)
+  await after(page, PAUSE_MS * 2)
   expect(asked).toEqual([QUESTION])
+  await page.clock.resume()
 }
 
 test('the home: Enter reads it in the background and says it found nothing', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const { category } = await categoryWithHoursField(request, community)
   const asked = await standIn(page, category.id)
+  await page.clock.install()
 
   await page.goto(`/${community}`)
   await ready(page)
@@ -85,6 +98,7 @@ test('a category page: Enter reads it in the background, and still says it found
   const community = await defaultCommunity(page)
   const { category } = await categoryWithHoursField(request, community)
   const asked = await standIn(page, category.id)
+  await page.clock.install()
 
   await page.goto(`/${community}/${category.id}`)
   await ready(page)
@@ -102,6 +116,7 @@ test('the map: Enter reads it in the background, and nothing says "Read as"', as
   const community = await defaultCommunity(page)
   const { category } = await categoryWithHoursField(request, community)
   const asked = await standIn(page, category.id)
+  await page.clock.install()
 
   await page.goto(`/${community}/map`)
   await ready(page)
@@ -119,6 +134,7 @@ test('typed and left, without Enter: read once the typing stops, on every page',
   const community = await defaultCommunity(page)
   const { category } = await categoryWithHoursField(request, community)
   const asked = await standIn(page, category.id)
+  await page.clock.install()
 
   await page.goto(`/${community}`)
   await ready(page)
@@ -126,19 +142,19 @@ test('typed and left, without Enter: read once the typing stops, on every page',
   // Words that find something are never read, however long they're left.
   await home.fill(category.pluralLabel)
   await expect(page.getByTestId('search-lines').filter({ visible: true })).toBeVisible()
-  await page.waitForTimeout(3500)
+  await stopClock(page)
+  await after(page, PAUSE_MS + 1000)
   expect(asked).toEqual([])
+  await page.clock.resume()
   await typeAndLeave(page, home, asked)
 
   // Each page is its own visit: the tab's answers don't carry over a load.
   asked.length = 0
-  askedAt.get(asked)!.length = 0
   await page.goto(`/${community}/${category.id}`)
   await ready(page)
   await typeAndLeave(page, page.getByRole('searchbox', { name: `Search ${category.pluralLabel}` }), asked)
 
   asked.length = 0
-  askedAt.get(asked)!.length = 0
   await page.goto(`/${community}/map`)
   await ready(page)
   await typeAndLeave(page, page.getByPlaceholder(/Search name, address/).filter({ visible: true }), asked)

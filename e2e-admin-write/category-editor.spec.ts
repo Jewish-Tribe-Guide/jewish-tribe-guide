@@ -147,6 +147,7 @@ test('a page brought back after a save keeps a Delete already asked while the li
   // it, hidden); that screen used to notice only when the list arrived, and
   // start the page over, throwing away the Delete asked meanwhile (PR 387).
   await page.route('**/api/admin/categories?*', async (r) => { await new Promise((res) => setTimeout(res, 4000)); await r.continue() })
+  const lateList = page.waitForResponse((r) => r.url().includes('/api/admin/categories?'), { timeout: 10_000 })
   await visible(page.getByRole('button', { name: '‹ Category pages' })).click()
   // One row per page, saying how many places it has (board 1).
   const row = visible(page.getByRole('button', { name }))
@@ -167,8 +168,9 @@ test('a page brought back after a save keeps a Delete already asked while the li
   await row.click()
   await visible(page.getByRole('button', { name: 'Delete this page' })).click()
   await expect(visible(page.getByText(`Delete ${name} and every place on it?`))).toBeVisible()
-  // Past the late list's arrival: the question is still there.
-  await page.waitForTimeout(6000)
+  // Past the late list's arrival (and its render): the question is still there.
+  await lateList
+  await page.waitForTimeout(500)
   await expect(visible(page.getByText(`Delete ${name} and every place on it?`)), 'Delete this page was started over by the list arriving').toBeVisible()
   await page.unroute('**/api/admin/categories?*')
   await visible(page.getByRole('button', { name: 'Delete it' })).click()

@@ -34,6 +34,25 @@ async function watchForViolations(page: Page): Promise<() => Promise<Violation[]
   return () => page.evaluate(() => (window as unknown as { __csp: Violation[] }).__csp)
 }
 
+/** Waits until the page has started no request for `idleMs`, `maxMs` at
+ *  most: a third party's script (the map's, Turnstile's) loads after `load`
+ *  and starts requests of its own, each of which can be blocked. A flat
+ *  six seconds used to stand in for this, on pages with no third party
+ *  too. */
+async function quiet(page: Page, idleMs = 2_000, maxMs = 6_000) {
+  let last = Date.now()
+  const started = last
+  const bump = () => {
+    last = Date.now()
+  }
+  page.on('request', bump)
+  try {
+    while (Date.now() - last < idleMs && Date.now() - started < maxMs) await page.waitForTimeout(200)
+  } finally {
+    page.off('request', bump)
+  }
+}
+
 const describeViolations = (vs: Violation[]) =>
   vs.map((v) => `${v.directive} <- ${v.blocked || '(inline)'}  [${v.source}]`).join('\n')
 
@@ -62,7 +81,7 @@ test.describe('content security policy (report-only)', () => {
       if (path === '/map') await page.locator('main').first().waitFor({ state: 'visible' })
       else await ready(page)
       // Third parties (analytics, the map's own scripts) load after `load`.
-      await page.waitForTimeout(6_000)
+      await quiet(page)
 
       const seen = await violations()
       expect(seen, describeViolations(seen)).toEqual([])
@@ -80,7 +99,7 @@ test.describe('content security policy (report-only)', () => {
     // Opens the Add form, which is what loads Cloudflare's script and frame.
     await openAddForm(page)
     await expect(page.getByRole('dialog')).toBeVisible()
-    await page.waitForTimeout(6_000)
+    await quiet(page)
 
     const seen = await violations()
     expect(seen, describeViolations(seen)).toEqual([])

@@ -475,7 +475,7 @@ test('two admin saves in quick succession both reach a category page mid-regener
 //
 // That matters most in the case this app is actually used in: an installed
 // PWA on a phone that gets backgrounded rather than closed, or a desktop tab
-// left open for days. RefreshContentOnFocus fixes it by asking the server
+// left open for days. RefreshContentOnReturn fixes it by asking the server
 // again when the tab is next looked at — the same trigger, and the same
 // reasoning, useNow.ts already uses to resync the clock.
 //
@@ -483,10 +483,11 @@ test('two admin saves in quick succession both reach a category page mid-regener
 // probe that established this watched x-nextjs-cache go STALE → HIT), so
 // anything still stale well after that is the client holding onto it.
 test('an already-open tab picks up an admin edit when it regains focus', async ({ page, request }) => {
-  // Deliberately generous. The bulk is one unavoidable wait: the refresh is
-  // throttled (see RefreshContentOnFocus) so that rapid alt-tabbing doesn't
-  // fire a request per switch, and this has to sit out that window to
-  // exercise the real thing rather than a version of it weakened for the test.
+  // Deliberately generous: the server's revalidation polls below. The
+  // refresh is throttled (RefreshContentOnReturn) so that rapid alt-tabbing
+  // doesn't fire a request per switch; the test moves the page's clock past
+  // that window rather than sitting it out, so the throttle it exercises is
+  // the real one, unweakened.
   test.setTimeout(90_000)
 
   const { accessToken } = JSON.parse(readFileSync('e2e-cache/.auth/token.json', 'utf-8')) as {
@@ -515,6 +516,7 @@ test('an already-open tab picks up an admin edit when it regains focus', async (
   // the admin's Preview does it (writes nothing), so this doesn't depend on
   // which home the admin has chosen. The Today home has no grid on a phone.
   await previewSettings(page, community, { homeStyle: 'classic' })
+  await page.clock.install()
   await page.goto(`/${community}?preview=1`)
   await page.locator('header').first().waitFor({ state: 'visible' })
 
@@ -565,8 +567,8 @@ test('an already-open tab picks up an admin edit when it regains focus', async (
       'before refocusing, an open tab should still be showing the pre-rename name',
     ).toHaveText(originalLabel)
 
-    // Sit out the refresh throttle (see this test's own timeout note).
-    await page.waitForTimeout(11_000)
+    // Past the refresh throttle (see this test's own timeout note).
+    await page.clock.fastForward(11_000)
 
     // Dispatched rather than driven by really backgrounding the tab, and the
     // reason is measured: Playwright's bringToFront() fires NOTHING in

@@ -29,14 +29,15 @@ test('a tap right after coming back to the app isn’t held up by a refresh', { 
       await route.continue().catch(() => {})
     },
   )
+  await page.clock.install()
   await page.goto(`/${community}`)
   await ready(page)
   const tile = page.locator(`main a[href="/${community}/${category.id}"]`).filter({ visible: true }).first()
   await expect(tile).toBeVisible()
 
   // Past RefreshContentOnReturn's ten-second throttle, which counts from
-  // when the page loaded.
-  await page.waitForTimeout(11_000)
+  // when the page loaded: the page's clock is moved on rather than waited out.
+  await page.clock.fastForward(11_000)
   await page.evaluate(() => {
     document.dispatchEvent(new Event('visibilitychange'))
     window.dispatchEvent(new Event('focus'))

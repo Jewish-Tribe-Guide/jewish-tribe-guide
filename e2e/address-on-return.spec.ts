@@ -16,8 +16,9 @@ import { categoryWithListings, defaultCommunity, ready } from './helpers'
  *  request: not a prefetch of either kind (a segment prefetch has its own
  *  header, and answering to one let this pass before the refresh went). */
 async function refreshOnReturn(page: Page) {
-  // Past RefreshContentOnReturn's ten-second throttle, counted from load.
-  await page.waitForTimeout(11_000)
+  // Past RefreshContentOnReturn's ten-second throttle, counted from load:
+  // the page's clock (installed in beforeEach) is moved on, not waited out.
+  await page.clock.fastForward(11_000)
   const refreshed = page.waitForResponse(
     (r) => {
       const h = r.request().headers()
@@ -36,6 +37,7 @@ test.beforeEach(async ({ page }) => {
     (url) => url.pathname === '/api/content-version',
     (route) => route.fulfill({ json: { ok: true, version: 'changed-by-address-on-return-spec' } }),
   )
+  await page.clock.install()
 })
 
 test('a refresh on coming back keeps an open listing in the address', async ({ page, request }) => {
