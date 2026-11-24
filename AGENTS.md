@@ -99,7 +99,7 @@ npm run test:all            # unit + e2e only — the four suites above need TES
 
 The last four run against a **disposable second Supabase project** (`TEST_SUPABASE_*` env vars), specifically so they're free to write and delete real rows — unlike everything in `e2e/`. See each suite's own `e2e-*/auth.setup.ts` for the mechanism.
 
-`e2e` itself is read-only, so it used to point at the real production project in CI on the theory that reads are harmless. In practice that made a required PR check depend on production's current data/config instead of on the PR's own code — a branch adding a new admin-configurable content kind failed `e2e` in CI because production's data hadn't been migrated to match, even though the code was correct (see git history around 2026-09-10 for the incident). `e2e` in CI now points at the same `TEST_SUPABASE_*` project as the other four. A separate `e2e-prod-smoke` CI job runs the identical suite against real production instead — but only on push to `main` (never on a PR) and with every step `continue-on-error`, so it surfaces production data/config drift without ever gating a merge.
+`e2e` itself is read-only, so it used to point at the real production project in CI on the theory that reads are harmless. In practice that made a required PR check depend on production's current data/config instead of on the PR's own code — a branch adding a new admin-configurable content kind failed `e2e` in CI because production's data hadn't been migrated to match, even though the code was correct (see git history around 2026-09-10 for the incident). `e2e` in CI then pointed at the shared `TEST_SUPABASE_*` project, and since Nov 23 each shard (and the build) starts a database of its own from the committed seed, like every other suite (below). A separate `e2e-prod-smoke` CI job runs the identical suite against real production instead — but only on push to `main` (never on a PR) and with every step `continue-on-error`, so it surfaces production data/config drift without ever gating a merge.
 
 ## Which suite covers what you just touched
 
@@ -128,17 +128,20 @@ otherwise, rather than risk writing to the real database — the guard is in eac
 `playwright.*.config.ts` for the three Playwright suites, and in
 `src/test/integrationEnv.ts` for `test:integration`.
 
-**Moving to a database per job (Nov 23).** CI's `admin-write` no longer
-uses the shared test project, and neither do `cache-roundtrip`,
-`form-roundtrip` and `integration`: each
-starts Supabase on its own runner from `supabase/migrations` and loads the
-starting data committed in `supabase/seed`
-(`.github/actions/own-test-database`), so it needs no queue, no row claims
-and none of the test project's keys. The seed is public content only,
-scrubbed, built by `scripts/make-test-seed.mjs` from a backup;
+**A database per job (Nov 23).** No CI job uses the shared test project
+any more. Each suite (`integration`, `cache-roundtrip`, `form-roundtrip`,
+`admin-write`, and e2e's build and every shard) starts Supabase on its own
+runner from `supabase/migrations` and loads the starting data committed in
+`supabase/seed` (`.github/actions/own-test-database`), so it needs no
+queue, no row claims and none of the test project's keys. A local
+Supabase always has the same address and keys, so the address fixed into
+e2e's build is each shard's own database too. The seed is public content
+only, scrubbed, built by `scripts/make-test-seed.mjs` from a backup;
 `make-test-seed.test.ts` fails if a real email or a test leftover is ever
-committed in it. The other suites still share the project and
-move over one at a time (tracker item 4). To run a suite the same way
+committed in it, and `ciWorkflow.test.ts` if a job gets the test project's
+keys again. The sharing workarounds below (row claims, the `e2e-writes`
+community, `TEST_PROJECT_TIMEOUT`) are still in the code and come out next
+(tracker item 4). To run a suite the same way
 locally (needs Docker and about 3 GB):
 
 ```bash
@@ -146,8 +149,14 @@ npx supabase@3.1.0 start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,
 ```
 
 then load the seed as the action does (`restore.mjs supabase/seed
---no-files --replace`, then `reset-sequences.sql`), and run the suite with `TEST_SUPABASE_*` set from `npx supabase@3.1.0 status -o
-env`. `npx supabase@3.1.0 stop --no-backup` removes it.
+--no-files --replace`, then `reset-sequences.sql` and
+`seed-fresh-dates.sql`), and run the suite with `TEST_SUPABASE_*` set from `npx supabase@3.1.0 status -o
+env`. For e2e, also set the app's own `NEXT_PUBLIC_SUPABASE_*` and
+`SUPABASE_SERVICE_ROLE_KEY` to it, and `NEXT_PUBLIC_SUPABASE_STORAGE_URL` to
+the host the seed's photos are on (ci.yml has it), or the home page's image
+budget fails on full-size originals. Seed first, then build: the build
+prerenders What changed from whatever the database held. `npx supabase@3.1.0
+stop --no-backup` removes it.
 
 ### A wait can never outlast the test budget above it (closed)
 
@@ -335,7 +344,7 @@ directly and then reads them through the site needs the same.
 
 **Claim every existing row a suite changes in `e2e/suiteRows.ts`, and never pick a claimed one.** The suites run as parallel CI jobs against the one test project, so a row one changes is a row another may be reading. PR 389 lost three CI runs on Nov 16 to tests that took "the first listing category" and got `cache-roundtrip-seed` mid-rename. Pick through `categories()` in `e2e/helpers.ts` (it skips claimed rows) or filter with `changedByTests`. `src/test/suiteRows.test.ts` reads every suite's source and fails on an unclaimed write, a row claimed twice, or an unfiltered pick. It reads source shapes (admin routes, `supabase.from(…).update`), so a write made by clicking Save in the admin isn't seen: claim those by hand.
 
-**Row claims don't stop two copies of the same suite, so CI queues them (Nov 20).** A PR's run and main's, or two PRs', ran `admin-write` at the same moment against the one test project, renaming the same fixture and minting the same admin's magic link (PR 400, Nov 19). Each test-project job now sits in a repo-wide `test-db-<suite>` concurrency group that waits rather than cancels (e2e's per shard), and none of them runs on push to main: main requires up-to-date branches, so the PR already passed them on that exact tree. GitHub keeps one waiting job per group, so a third run arriving cancels the waiting one; re-run it. `ciWorkflow.test.ts` holds every job using a `TEST_SUPABASE_*` secret to this. A cancelled job can also leave a page it made behind (`Integration Test 84ffbdbf`, Nov 20, walked into by e2e's every-category test), so every label a suite creates pages under is claimed too; `suiteRows.test.ts` finds them from `createCategory` calls. Locally it is still a habit: check for another run on port 3213 first.
+**Row claims don't stop two copies of the same suite, so CI queued them (Nov 20; gone Nov 23, when each job got a database of its own).** A PR's run and main's, or two PRs', ran `admin-write` at the same moment against the one test project, renaming the same fixture and minting the same admin's magic link (PR 400, Nov 19). Each test-project job now sits in a repo-wide `test-db-<suite>` concurrency group that waits rather than cancels (e2e's per shard), and none of them runs on push to main: main requires up-to-date branches, so the PR already passed them on that exact tree. GitHub keeps one waiting job per group, so a third run arriving cancels the waiting one; re-run it. The queues went when no job used the shared project any more. A cancelled job can also leave a page it made behind (`Integration Test 84ffbdbf`, Nov 20, walked into by e2e's every-category test), so every label a suite creates pages under is claimed too; `suiteRows.test.ts` finds them from `createCategory` calls. Locally it is still a habit: check for another run on port 3213 first.
 
 ## The moderation queue must show what an edit actually proposes
 

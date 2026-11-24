@@ -13,7 +13,11 @@
 //   - the three real communities (philly, ues, baltimore) and their pages,
 //     listings, tags, forms, home sections, hospitals, eruvs, walking routes,
 //     watches and settings; About and Privacy; the content stamps
-//   - not: submissions, subscribers, activity, votes, form responses, daily
+//   - each community's newest ACTIVITY_KEPT changes to listings kept here
+//     (What changed and Activity), with no one named: no actor, no
+//     submission. Their dates are moved up to the day the seed is loaded
+//     (scripts/seed-fresh-dates.sql), as those pages show the last 30 days
+//   - not: submissions, subscribers, older activity, votes, form responses, daily
 //     counts, search logs, AI readings, job runs, newsletter setup (its
 //     script address takes posts), the migration record
 //   - not: test leftovers (e2e-* communities and pages, `Integration Test`
@@ -36,8 +40,10 @@ import { pathToFileURL } from 'node:url'
 export const COMMUNITIES = ['philly', 'ues', 'baltimore']
 export const TABLES = [
   'community', 'category', 'resource', 'tag', 'resource_tag', 'form', 'home_section', 'hospital',
-  'page', 'eruv', 'walk_route', 'watch', 'site_settings', 'campaign_banner', 'content_stamp',
+  'page', 'eruv', 'walk_route', 'watch', 'site_settings', 'campaign_banner', 'content_stamp', 'activity',
 ]
+/** How many of each community's newest changes are kept. */
+export const ACTIVITY_KEPT = 60
 const TEST_CATEGORY = /^(integration-test-|vote-test-|e2e-)/
 
 /** Every email address in `value`, at any depth, replaced by a made-up one.
@@ -76,6 +82,13 @@ export function seedFrom(tables) {
     form: (tables.form ?? []).filter((f) => keepCommunity(f) && !TEST_CATEGORY.test(f.id)),
     // A stamp's id names its community ("c:philly"); one with none is site-wide.
     content_stamp: (tables.content_stamp ?? []).filter((s) => !/^c:/.test(s.id) || COMMUNITIES.includes(s.id.slice(2))),
+    activity: COMMUNITIES.flatMap((c) =>
+      (tables.activity ?? [])
+        .filter((a) => a.community_id === c && !a.hidden_at && resourceIds.has(a.resource_id))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id - a.id)
+        .slice(0, ACTIVITY_KEPT)
+        .map((a) => ({ ...a, actor_email: null, submission_id: null })),
+    ),
   }
   for (const name of TABLES) {
     if (kept[name]) continue

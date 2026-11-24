@@ -51,6 +51,14 @@ describe('isOptimizableImage', () => {
     expect(isOptimizableImage('https://abcdefg.supabase.co/rest/v1/resource')).toBe(false)
   })
 
+  it('accepts uploads from a storage project set apart from the database (CI’s seed)', () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'http://127.0.0.1:54321')
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_STORAGE_URL', SUPABASE)
+    const photo = 'https://abcdefg.supabase.co/storage/v1/object/public/site-assets/map.jpg'
+    expect(isOptimizableImage(photo)).toBe(true)
+    expect(photoProps(photo)).toEqual({ unoptimized: false })
+  })
+
   it('rejects a different Supabase project', () => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', SUPABASE)
     expect(
