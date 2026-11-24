@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { Suspense } from 'react'
 import { listCategories } from '@/lib/categoryStore'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { listCommunities } from '@/lib/communityStore'
@@ -139,9 +138,9 @@ export default async function ListingPage(props: PageProps<'/[community]/[slug]/
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: buildJsonLdScript(jsonLd) }} />
-      <Suspense fallback={<main className="flex flex-1 flex-col" />}>
-        <SlugScreen slug={slug} kind="category" listings={resolved.listings} initialItemId={resolved.item.id} />
-      </Suspense>
+      {/* No Suspense boundary: its empty fallback was painted first and the
+          listing then pushed the footer away (Nov 24, layout-shift.spec). */}
+      <SlugScreen slug={slug} kind="category" listings={resolved.listings} initialItemId={resolved.item.id} />
     </>
   )
 }

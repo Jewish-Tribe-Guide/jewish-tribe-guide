@@ -52,7 +52,18 @@ export default function SlugScreen({
   // possibly-still-correcting, mount).
   const isMobile = useIsMobile()
 
-  if (kind === 'form') return <FormScreen slug={slug} goHome={goHome} />
+  // The form's own boundary, for its useSearchParams. Only the form: an
+  // empty fallback above a whole directory or listing was painted first on
+  // a big page (React sends a large finished boundary after the shell), and
+  // the content arriving under it pushed the footer off a computer's
+  // screen, a 0.18-0.41 layout shift (Nov 24, e2e/layout-shift.spec.ts).
+  if (kind === 'form') {
+    return (
+      <Suspense fallback={<main className="flex flex-1 flex-col" />}>
+        <FormScreen slug={slug} goHome={goHome} />
+      </Suspense>
+    )
+  }
 
   // Not read directly by this component — see FindResourcesConnected, which
   // is what actually supplies ?item=/?q=/?hospital=/?form= once hydrated.
@@ -126,8 +137,7 @@ export default function SlugScreen({
 // too (see useSearchParams' own "Prerendering" docs — it defers the whole
 // Client Component tree from the nearest Suspense boundary down, not just
 // the part that reads it), even though a form and a category never share a
-// request. Still covered by the outer Suspense boundary in page.tsx, same
-// as before — forms aren't part of today's server-rendering fix.
+// request. Its boundary is SlugScreen's form branch.
 function FormScreen({
   slug,
   goHome,

@@ -89,7 +89,11 @@ export async function listMenuReadings(community: string): Promise<{ readings: S
     if (tableMissing(error.message)) return { readings: [], available: false }
     throw new Error(`Failed to load menu readings: ${error.message}`)
   }
-  return { readings: ((data ?? []) as Row[]).map(fromRow), available: true }
+  // Not `.map(fromRow)`: map hands it the index as `now`, and a read that
+  // never finished was "being read" for ever. Three from Nov 4 were, and
+  // every admin screen open asked for Main dishes every 6s (Nov 24).
+  const now = Date.now()
+  return { readings: ((data ?? []) as Row[]).map((r) => fromRow(r, now)), available: true }
 }
 
 export async function getMenuReading(community: string, resourceId: string): Promise<StoredMenuReading | null> {

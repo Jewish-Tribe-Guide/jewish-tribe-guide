@@ -26,6 +26,10 @@ p75 is measured over real visitors, not on a developer's laptop.
     preloads). Heavier pages are slower everywhere.
   - `e2e/first-tap.spec.ts`: the first tap on a place on a phone. The sheet
     never shows up empty.
+  - `e2e/layout-shift.spec.ts` (Nov 24): the home, a category page with a
+    map, a listing and the map, each loaded on a phone and a computer, add
+    up every shift as they load; over 0.1 fails, naming what moved and from
+    where. A shift is a count of area moved, not a time.
 - **On real visitors**: Vercel Speed Insights (`@vercel/speed-insights` in
   `src/app/layout.tsx`) reports LCP, INP and CLS from the live site. Read it
   before and after anything that changes what a page loads.
@@ -46,6 +50,15 @@ p75 is measured over real visitors, not on a developer's laptop.
 
 ## Known causes, and what fixed them
 
+- **Page jumping on a computer (Nov 24).** A category page and a listing
+  wrapped their whole screen in a `<Suspense>` with an empty `<main>` as
+  its fallback, for the form's `useSearchParams` only. On a big page React
+  sends a finished boundary that large after the shell, so the browser
+  painted the empty fallback with the footer under it, and the content
+  arriving 0.1–0.5s later pushed the footer off the screen: 0.18 on a
+  category page, 0.41 on a listing (the live reading was 0.19). The
+  boundary is around the form alone now (`SlugScreen`). A phone has no
+  footer there, so it never showed this.
 - **The Watches tab (Nov 24).** Its combined read waited on the database
   five times in a row: sign-in, then the categories and the rest, then
   each job's own slice of the places (eight reads of one table, each
