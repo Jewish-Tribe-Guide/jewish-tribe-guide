@@ -84,7 +84,8 @@ old number can still be looked up. When an item is done, move it to
     Last read: iPhone category pages slow to draw and tap, before the
     Nov 16 and Nov 22 fixes; home taps 400–456ms (target 200ms).
     And the Watches tab's admin reads (2.2s for the combined one before
-    Nov 24's change; `docs/speed-targets.md`), against ≤ 1s.
+    Nov 24's change; `docs/speed-targets.md`), against ≤ 1s. And CLS
+    (0.19 before Nov 24's footer fix), against 0.1.
 
 ### You decide
 

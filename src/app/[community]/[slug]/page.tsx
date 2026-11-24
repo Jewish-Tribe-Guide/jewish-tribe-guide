@@ -10,7 +10,6 @@ import { FIXED_VIEW_KINDS, RESERVED_SLUGS, routes } from '@/lib/routes'
 import { siteUrl } from '@/lib/siteUrl'
 import { buildJsonLdScript } from '@/lib/jsonLdScript'
 import { buildCategoryJsonLd } from '@/lib/structuredData'
-import { Suspense } from 'react'
 import SlugScreen from './SlugScreen'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -176,18 +175,13 @@ export default async function SlugPage(props: PageProps<'/[community]/[slug]'>) 
   }
 
   return (
-    // Only the 'form' kind actually needs this boundary now — SlugScreen's
-    // form branch (FormScreen) calls useSearchParams() with no boundary of
-    // its own, so this is what satisfies it. The 'category'/'view' branch
-    // doesn't call useSearchParams at this level at all any more (see
-    // SlugScreen's own comment), so this never suspends for it — that path
-    // prerenders for real, with its own narrower boundary further in, around
-    // just the part that does (FindResourcesConnected).
+    // No Suspense boundary here: the form's is its own (SlugScreen), and the
+    // category/view branch reads the query string only inside the narrower
+    // one around FindResourcesConnected. A boundary around the whole screen
+    // painted its empty fallback first and then jumped (Nov 24).
     <>
       {jsonLdScript && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript }} />}
-      <Suspense fallback={<main className="flex flex-1 flex-col" />}>
-        <SlugScreen slug={slug} kind={resolved.kind} listings={listings} />
-      </Suspense>
+      <SlugScreen slug={slug} kind={resolved.kind} listings={listings} />
     </>
   )
 }

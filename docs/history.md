@@ -4,6 +4,21 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## Page jumping (Nov 24)
+
+Sentry read CLS at 0.19 against 0.1, from too few visits to say where.
+`e2e/layout-shift.spec.ts` loads the main screens on a phone and a
+computer and adds up every shift: on a computer a category page jumped
+0.18 and a listing 0.41, both the footer, pushed off the screen when the
+content arrived under an empty Suspense fallback that only the form needed
+(`docs/speed-targets.md`). The boundary is around the form alone now. 2 of
+the 8 tests failed against the old code, none in 40 runs after.
+
+On the same list, Sentry's quota: the CSP reports that used it up were
+fixed by PR 432 (live Nov 23), and since then the events it turns away
+fell 54, 25, 1 a day. Nothing left to fix in code; it takes errors again
+when its billing month turns over.
+
 ## The Watches tab's reads (Nov 24)
 
 Sentry had the Watches tab's combined read at 2.2s p75 and its screens at
