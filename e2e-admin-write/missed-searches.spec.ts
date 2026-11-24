@@ -7,8 +7,7 @@ import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 // "Not in the guide", Dismiss takes it off the to-do list and stores that,
 // Restore puts it back. The count is inserted straight into daily_count —
 // the counter that normally writes it (/api/counts via countEvent) never
-// counts from an automated browser, by design. Needs migration 058
-// (search_miss_dismissal) on the test project.
+// counts from an automated browser, by design.
 //
 // The page's "Asked more than once" lists the same searches, and its Dismiss
 // is the same dismissal.
@@ -44,9 +43,7 @@ test('a missed search is listed, dismissed for real, and restored', async ({ pag
   await expect(row).toContainText('3 times')
 
   await row.getByRole('button', { name: 'Dismiss' }).click()
-  // The row moves once the save answers, and the test project is shared by
-  // every suite at once: 5s wasn't always enough (PR 417, Nov 21).
-  await expect(row).not.toBeVisible({ timeout: 20_000 })
+  await expect(row).not.toBeVisible()
   await expect
     .poll(async () => (await supabase.from('search_miss_dismissal').select('key').eq('community_id', TEST_COMMUNITY).eq('key', term)).data?.length)
     .toBe(1)

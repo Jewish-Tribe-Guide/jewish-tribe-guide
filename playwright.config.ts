@@ -91,10 +91,14 @@ export default defineConfig({
     // visitor suite these two run. (auth.setup.ts and warmup.setup.ts don't
     // need excluding — Playwright's default testMatch only picks up
     // *.spec.ts/*.test.ts.)
-    { name: 'desktop', testIgnore: /admin\.spec\.ts/, dependencies: ['warmup'], use: { ...devices['Desktop Chrome'] } },
+    // A test for one screen size is tagged @desktop or @mobile and is left
+    // out of the other project, rather than skipping in it: a skipped test
+    // still counts when CI splits the suite into shards, so skips left the
+    // shards uneven (Nov 23: 15 skipped in one, 46 in another).
+    { name: 'desktop', testIgnore: /admin\.spec\.ts/, grepInvert: /@mobile/, dependencies: ['warmup'], use: { ...devices['Desktop Chrome'] } },
     // The mobile tab bar and the inline card grid only exist below the `sm`
     // breakpoint, so they can't be covered by the desktop project at all.
-    { name: 'mobile', testIgnore: /admin\.spec\.ts/, dependencies: ['warmup'], use: { ...devices['Pixel 7'] } },
+    { name: 'mobile', testIgnore: /admin\.spec\.ts/, grepInvert: /@desktop/, dependencies: ['warmup'], use: { ...devices['Pixel 7'] } },
     // Mints a real admin session (via the service-role key, same mechanism
     // /api/admin/dev-login uses — see that route's own comments — just
     // reproduced here since dev-login refuses outright against this

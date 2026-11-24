@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { categories, defaultCommunity, ready, type Category } from './helpers'
+import { categories, defaultCommunity, ready, type Category, needs } from './helpers'
 
 // A tester always wants the map (Nov 16). On a phone, a category's list row
 // is Filters · Map on the left and Sort at the right, on one line (the
@@ -11,8 +11,7 @@ import { categories, defaultCommunity, ready, type Category } from './helpers'
 // symbol, and the sides are 12px on a phone), and only a real browser lays it out, so
 // it's measured here at the narrowest phone width in use, 360.
 
-test.describe('the phone list row with Map', () => {
-  test.skip(({ isMobile }) => !isMobile, 'phone only: a computer has the map beside the list')
+test.describe('the phone list row with Map', { tag: '@mobile' }, () => {
   test.use({ viewport: { width: 360, height: 780 } })
 
   async function mapCategories(page: Page, community: string): Promise<Category[]> {
@@ -71,7 +70,7 @@ test.describe('the phone list row with Map', () => {
   for (const width of [360, 375]) test(`Filters, Map and Sort sit on one line at ${width}, on every category with a map`, async ({ page }) => {
     const community = await defaultCommunity(page)
     const cats = await mapCategories(page, community)
-    test.skip(cats.length === 0, 'needs a category with a map and listings')
+    needs(cats.length > 0, 'needs a category with a map and listings')
     await page.setViewportSize({ width, height: 780 })
     for (const c of cats) {
       await page.goto(`/${community}/${c.id}`)
@@ -94,7 +93,7 @@ test.describe('the phone list row with Map', () => {
   test('Map opens the Map tab on the category, and ‹ comes back to it', async ({ page }) => {
     const community = await defaultCommunity(page)
     const [c] = await mapCategories(page, community)
-    test.skip(!c, 'needs a category with a map and listings')
+    needs(c, 'needs a category with a map and listings')
     await page.goto(`/${community}/${c.id}`)
     await ready(page)
     await page.getByTestId('list-heading').filter({ visible: true }).first().getByTestId('list-map').click()
@@ -125,7 +124,7 @@ test.describe('the phone list row with Map', () => {
   test('‹ comes back to the category with a place open on the map', async ({ page }) => {
     const community = await defaultCommunity(page)
     const [c] = await mapCategories(page, community)
-    test.skip(!c, 'needs a category with a map and listings')
+    needs(c, 'needs a category with a map and listings')
     await page.goto(`/${community}/${c.id}`)
     await ready(page)
     await page.getByTestId('list-heading').filter({ visible: true }).first().getByTestId('list-map').click()
@@ -157,7 +156,7 @@ test.describe('the phone list row with Map', () => {
         break
       }
     }
-    test.skip(!pick, 'needs a category with two mapped listings')
+    needs(pick, 'needs a category with two mapped listings')
     const { c, names } = pick!
     await page.goto(`/${community}/${c.id}`)
     await ready(page)

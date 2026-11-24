@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { defaultCommunity, minyanimCategory, ready } from './helpers'
+import { defaultCommunity, minyanimCategory, ready, needs } from './helpers'
 
 // Oct 16: a minyan tapped in Minyanim by time opens its place on that
 // minyan, the time it showed at the top, rather than at the top of the
@@ -8,7 +8,7 @@ import { defaultCommunity, minyanimCategory, ready } from './helpers'
 test('a minyan tapped in Minyanim by time opens its place on that minyan', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const shuls = await minyanimCategory(request, community)
-  test.skip(!shuls, 'No category with minyanim')
+  needs(shuls, 'No category with minyanim')
 
   await page.goto(`/${community}/${shuls!.id}?davening=1`)
   await ready(page)

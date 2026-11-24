@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test'
-import { categories, defaultCommunity, ready } from './helpers'
+import { categories, defaultCommunity, ready, needs } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tap targets (Nov 18, review item 39).
@@ -63,7 +63,7 @@ test('the header’s Set location takes a fingertip', async ({ page }) => {
 test('a listing’s phone number and website take a fingertip', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const details = await listingWithPhoneAndWebsite(request, community, page)
-  test.skip(!details, 'no listing here shows both a phone number and a website')
+  needs(details, 'no listing here shows both a phone number and a website')
 
   await expectFingerSized(details!.locator('a[href^="tel:"]').first(), 'the phone number')
   await expectFingerSized(details!.locator('a[target="_blank"]').first(), 'the website')
@@ -97,7 +97,7 @@ test('a contact’s phones and email each take a fingertip', async ({ page, requ
       break
     }
   }
-  test.skip(!found, 'no contact here has two ways to reach it')
+  needs(found, 'no contact here has two ways to reach it')
 
   await page.goto(`/${community}/${found!.category}/${found!.id}`)
   await ready(page)

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   assertUsableSlug,
@@ -81,6 +83,15 @@ describe('slugRejectionReason', () => {
     expect(FIXED_VIEW_KINDS).not.toHaveProperty('hospitals')
     expect(Object.values(FIXED_VIEW_KINDS)).not.toContain('medical')
     expect(slugRejectionReason('hospitals')).toMatch(/reserved/i)
+  })
+
+  // e2e/routing.spec.ts keeps its own copy on purpose (the literal links),
+  // so nothing made the two agree, and its hospitals entry outlived the view.
+  it('matches the copy e2e/routing.spec.ts checks the routes with', () => {
+    const spec = readFileSync(join(__dirname, '..', '..', 'e2e', 'routing.spec.ts'), 'utf8')
+    const copy = spec.match(/const FIXED_VIEW_KINDS: Record<string, string> = (\{[^}]*\})/)?.[1]
+    expect(copy, 'the copy in routing.spec.ts').toBeTruthy()
+    expect(Function(`return (${copy})`)()).toEqual(FIXED_VIEW_KINDS)
   })
 
   it('is case- and whitespace-insensitive when matching reserved slugs', () => {

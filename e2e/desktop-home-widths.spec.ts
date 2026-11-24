@@ -22,8 +22,7 @@ async function open(page: import('@playwright/test').Page, width: number) {
   await ready(page)
 }
 
-test.describe('computer home at a narrow window', () => {
-  test.skip(({ isMobile }) => isMobile, 'the computer home only')
+test.describe('computer home at a narrow window', { tag: '@desktop' }, () => {
 
   test('at 820px each section stacks inside its own box', async ({ page }) => {
     await open(page, 820)

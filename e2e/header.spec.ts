@@ -12,8 +12,7 @@ import { defaultCommunity, ready } from './helpers'
 // off the real header container, not a guessed breakpoint — jsdom can't
 // compute real layout (see HeaderNav's own comment), so this only has
 // coverage here.
-test.describe('header — Categories mega-menu spans the header content row', () => {
-  test.skip(({ isMobile }) => isMobile, 'desktop-only feature (hidden below the desktop breakpoint)')
+test.describe('header — Categories mega-menu spans the header content row', { tag: '@desktop' }, () => {
 
   test('matches the header content row\'s left/right edges, at a full-width window or a narrow one', async ({ page }) => {
     const community = await defaultCommunity(page)

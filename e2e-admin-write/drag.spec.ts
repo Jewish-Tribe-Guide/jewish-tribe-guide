@@ -102,7 +102,8 @@ test.describe('on a phone', () => {
 // The home page's cards, in rows (artifact 8HpeQANzsQyGbyHVPsXrc5): a card
 // dropped in a row's box shares that row, one dropped between boxes has a
 // row of its own, and a full row takes no more. Reads what's there first,
-// since the rows are the community's own.
+// since the rows are the community's own, and makes what a test needs by
+// dragging (never saved), so none depends on how the seed's home is laid out.
 test.describe('the home page cards', () => {
   // Each row's cards by name: a box is the cards whose spots share a border.
   const rows = (box: Locator) =>
@@ -142,6 +143,41 @@ test.describe('the home page cards', () => {
     }
   }
 
+  /** Drops `card` into the box of the row ending in `last`, to share it. */
+  async function join(page: Page, box: Locator, card: string, last: string) {
+    // A drop leaves a change, so the Save bar is up along the bottom of the
+    // window: bring the box clear of it before pressing a handle.
+    await box.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+    const into = await middle(box.locator('[data-drag-row]').filter({ hasText: last }))
+    await (await drag(page, box, box.getByRole('button', { name: `Move ${card}` }), into.bottom - 4))()
+    await expect.poll(async () => (await rows(box)).find((row) => row.includes(card))?.at(-2)).toBe(last)
+  }
+
+  /** Cards that always have a row of their own (ROW_OF_ITS_OWN). */
+  const ALONE = ['Categories', 'Right Now', 'Map']
+  const shares = (name: string) => !ALONE.includes(name)
+
+  /** The rows, with a row of `size` cards that share and `below` more such
+   *  cards under it: adds cards the home hasn't got (nothing saved) and
+   *  joins them up, so a test doesn't depend on how the home is laid out. */
+  async function arrange(page: Page, box: Locator, size: number, below: number) {
+    let now = await rows(box)
+    const count = () => now.flat().filter(shares).length
+    for (const name of ['Davening Times', 'Shabbat & Holiday Times']) {
+      if (count() >= size + below) break
+      await page.getByRole('button', { name: `Add ${name}` }).click()
+      await expect.poll(async () => (now = await rows(box)).flat()).toContain(name)
+    }
+    expect(count(), `${size + below} cards that can share a row`).toBeGreaterThanOrEqual(size + below)
+    const target = () => now.findIndex((row) => row.every(shares))
+    while (now[target()]!.length < size) {
+      const i = target()
+      await join(page, box, now.slice(i + 1).flat().find(shares)!, now[i]!.at(-1)!)
+      now = await rows(box)
+    }
+    return now
+  }
+
   test('a card dropped below them all has a row of its own; dropped in a box, it shares that row', async ({ page }) => {
     const box = await open(page)
     const last = (await rows(box)).at(-1)!.at(-1)!
@@ -152,7 +188,7 @@ test.describe('the home page cards', () => {
     await expect.poll(async () => (await rows(box)).at(-1)).toEqual([last])
 
     const above = (await rows(box)).at(-2)!
-    test.skip(above.length >= 3 || above.includes('Categories'), 'the row above has no room')
+    expect(above.length < 3 && !above.includes('Categories'), 'the row above has room').toBe(true)
     // The drop left a change, so the Save bar is up along the bottom of the
     // window: bring the box clear of it before pressing a handle.
     await box.evaluate((el) => el.scrollIntoView({ block: 'center' }))
@@ -164,10 +200,11 @@ test.describe('the home page cards', () => {
 
   test('a full row takes no fourth card, is dimmed while one is lifted, and says so when one is held over it', async ({ page }) => {
     const box = await open(page)
-    const before = await rows(box)
+    let before = await rows(box)
+    if (!before.some((row, i) => row.length === 3 && before.slice(i + 1).flat().some(shares))) before = await arrange(page, box, 3, 1)
     const full = before.findIndex((row) => row.length === 3)
-    const mover = before.find((row, i) => i > full && !row.includes('Categories'))?.[0]
-    test.skip(full < 0 || !mover, 'no full row with a card below it')
+    const mover = before.slice(full + 1).flat().find(shares)
+    expect(mover, 'a card below the full row').toBeTruthy()
 
     const fullSlot = box.locator('[data-drag-row]').filter({ hasText: before[full]![0]! }).locator('..')
     const handle = box.getByRole('button', { name: `Move ${mover}` })
@@ -193,7 +230,7 @@ test.describe('the home page cards', () => {
     const box = await open(page)
     const before = await rows(box)
     const at = before.findIndex((row) => row.includes('Categories'))
-    test.skip(at < 0 || !before[at + 1], 'no Categories card with a row below it')
+    expect(before[at + 1], 'a row below Categories').toBeTruthy()
 
     const onto = await middle(box.locator('[data-drag-row]').filter({ hasText: before[at + 1]![0]! }))
     const drop = await drag(page, box, box.getByRole('button', { name: 'Move Categories' }), onto.y)
@@ -209,9 +246,11 @@ test.describe('the home page cards', () => {
   // off its centre lands there too.
   test('a card let go anywhere between two boxes has a row of its own', async ({ page }) => {
     const box = await open(page)
-    const before = await rows(box)
-    const r = before.findIndex((row, i) => row.length > 1 && before[i + 1] && !row.includes('Categories'))
-    test.skip(r < 0, 'no shared row with another row below it')
+    let before = await rows(box)
+    const shared = () => before.findIndex((row, i) => row.length > 1 && before[i + 1] && !row.includes('Categories'))
+    if (shared() < 0) before = await arrange(page, box, 2, 1)
+    const r = shared()
+    expect(r, 'a shared row with another row below it').toBeGreaterThanOrEqual(0)
     const card = before[r]!.at(-1)!
     const next = before[r + 1]![0]!
 

@@ -157,8 +157,9 @@ it on their own. For e2e, set the app's own `NEXT_PUBLIC_SUPABASE_*` and
 `SUPABASE_SERVICE_ROLE_KEY` to it (`npx supabase@3.1.0 status -o env`), and
 `NEXT_PUBLIC_SUPABASE_STORAGE_URL` to the host the seed's photos are on
 (ci.yml has it), or the home page's image budget fails on full-size
-originals. Seed first, then build: the build prerenders What changed from
-whatever the database held.
+originals, and `E2E_SEEDED=1`, as CI's shards do, so a test missing its
+data fails rather than skips (below). Seed first, then build: the build
+prerenders What changed from whatever the database held.
 
 ### A wait can never outlast the test budget above it (closed)
 
@@ -452,6 +453,17 @@ None of those show up in `tsc`, `eslint`, or a passing build. Several looked fin
 
 - **Unit tests** (`src/**/*.test.ts`, Vitest, node environment) are for pure functions — time and hours logic, distance, validation, URL shapes. Anything that reads `new Date()` needs `vi.useFakeTimers()`.
 - **E2E tests** (`e2e/*.spec.ts`, Playwright) run against a **production build**, deliberately: prerendered HTML, Cache Components and the service worker all behave differently under `next dev`, so testing the dev server would test a different application.
+- **Don't skip a test by screen size or by data (Nov 23).** A test for one
+  size is tagged `{ tag: '@desktop' }` or `'@mobile'`, and the other
+  project leaves it out (`grepInvert` in `playwright.config.ts`); a
+  `test.skip` still counts when CI splits the suite into shards. A test
+  that needs something in the data calls `needs(found, why)` from the
+  helpers: on the seed (`E2E_SEEDED=1`) a missing one fails, and only
+  `e2e-prod-smoke`, on real data, skips. When the seed lacks it, add it to
+  `scripts/seed-test-fixtures.sql`, never to `supabase/seed`, which is
+  real content. The write suites always run on the seed, so they `expect`.
+  `src/test/e2eSkips.test.ts` fails on any other skip unless it's listed
+  there with its reason (the day, the build, the browser).
 - **Derive expectations from the running app**, don't hardcode content. `e2e/helpers.ts` reads the real categories and listings from the API. An assertion on `"ACME Markets"` fails when an admin edits a listing, and a suite that cries wolf gets ignored.
 - **Assert on server HTML** (`request.get()`) when the claim is about server rendering. A `page` assertion passes either way, because the client would fill it in.
 - Don't use `waitForLoadState('networkidle')` — the map, zmanim and geolocation keep connections open, so it never settles. Use `ready()` from the helpers.

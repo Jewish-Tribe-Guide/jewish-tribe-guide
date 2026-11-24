@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categories, ready } from './helpers'
+import { categories, ready, needs } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The user, Nov 17: on a category page on a computer, narrowing the window
@@ -10,15 +10,15 @@ import { categories, ready } from './helpers'
 // old, detached one. Positional, so a real browser: jsdom has no layout.
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.skip(({ isMobile }) => isMobile, 'a computer window, resized')
+// Every test here is tagged @desktop: it runs in that project only.
 
 const bar = (page: import('@playwright/test').Page) => page.locator('div.lg\\:sticky.lg\\:top-14').first()
 const docked = (page: import('@playwright/test').Page) => bar(page).evaluate((el) => getComputedStyle(el).backgroundColor !== 'rgba(0, 0, 0, 0)')
 
-test('the search bar isn’t docked on an unscrolled page after the window goes to a phone’s width and back', async ({ page, request }) => {
+test('the search bar isn’t docked on an unscrolled page after the window goes to a phone’s width and back', { tag: '@desktop' }, async ({ page, request }) => {
   // A category with no map beside its list: there the bar is sticky.
   const cat = (await categories(request, 'philly')).find((c) => c.hasAddress === false)
-  test.skip(!cat, 'no category without a map column')
+  needs(cat, 'no category without a map column')
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.goto(`/philly/${cat!.id}`)
   await ready(page)

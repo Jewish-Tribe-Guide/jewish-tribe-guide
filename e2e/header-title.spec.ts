@@ -12,12 +12,12 @@ import { categories, ready } from './helpers'
 // has its own size.
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.skip(({ isMobile }) => !isMobile, 'the phone header')
+// Every test here is tagged @mobile: it runs in that project only.
 
 const title = (page: import('@playwright/test').Page) => page.locator('header span.truncate:visible').first()
 
 for (const width of [320, 375]) {
-  test(`on a ${width}px phone, the longest page name fits the header whole`, async ({ page, request }) => {
+  test(`on a ${width}px phone, the longest page name fits the header whole`, { tag: '@mobile' }, async ({ page, request }) => {
     const longest = (await categories(request, 'philly')).sort((a, b) => b.pluralLabel.length - a.pluralLabel.length)[0]
     await page.setViewportSize({ width, height: 800 })
     await page.goto(`/philly/${longest.id}`)
@@ -33,10 +33,13 @@ for (const width of [320, 375]) {
   })
 }
 
-test('a short page name is 22px, as big as an app’s', async ({ page }) => {
+// A category's page, not a tab's (You): with several communities a tab's
+// page keeps the community's name, the switcher, in the header.
+test('a short page name is 22px, as big as an app’s', { tag: '@mobile' }, async ({ page, request }) => {
+  const shortest = (await categories(request, 'philly')).filter((c) => c.kind === 'listing').sort((a, b) => a.pluralLabel.length - b.pluralLabel.length)[0]
   await page.setViewportSize({ width: 375, height: 800 })
-  await page.goto('/philly/you')
+  await page.goto(`/philly/${shortest.id}`)
   await ready(page)
-  await expect(title(page)).toHaveText('You')
+  await expect(title(page)).toHaveText(shortest.pluralLabel)
   await expect(title(page)).toHaveCSS('font-size', '22px')
 })

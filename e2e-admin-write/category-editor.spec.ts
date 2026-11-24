@@ -38,11 +38,6 @@ test.afterEach(async () => {
   }
 })
 
-// Each save below waits 30s: it is several database round trips, and on the
-// shared test project CI once used, one took over 10s, still "Sending…"
-// when a 10s wait ran out (Oct 18 on main, after Create; Oct 22 on #342,
-// after Add listing). Written out, so e2eTimeouts.test.ts can see them.
-
 test('creating a category through the real editor makes it live, and deleting it removes it', async ({ page }) => {
   const name = `E2E Admin Write ${randomUUID().slice(0, 8)}`
   pendingCategoryNames.push(name)
@@ -69,7 +64,7 @@ test('creating a category through the real editor makes it live, and deleting it
 
   // Creating opens the new category's own page, saved (its heading is the
   // name typed, so it shows before the save lands); back to the list.
-  await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
+  await expect(visible(page.getByRole('status'))).toHaveText('Saved.')
   await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/categories/cat:e2e-admin-write-`))
 
   // Add a field, from a box of Fields (E1b: every box open, its Add a
@@ -80,12 +75,12 @@ test('creating a category through the real editor makes it live, and deleting it
   await visible(page.getByRole('button', { name: `Add to ${name}` })).click()
   await expect(visible(page.getByRole('region', { name: 'Fields' }).getByRole('button', { name: /^Hours/ }))).toBeVisible()
   await visible(page.getByRole('button', { name: 'Save' })).click()
-  await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
+  await expect(visible(page.getByRole('status'))).toHaveText('Saved.')
 
   await visible(page.getByRole('button', { name: '‹ Category pages' })).click()
   // One row per page, saying how many places it has (board 1).
   const row = visible(page.getByRole('button', { name }))
-  await expect(row).toBeVisible({ timeout: 30_000 })
+  await expect(row).toBeVisible()
   await expect(row).toContainText(`${name}0 places`)
 
   const supabase = getAdminClient()
@@ -103,7 +98,7 @@ test('creating a category through the real editor makes it live, and deleting it
   await visible(page.getByRole('button', { name: 'Delete this page' })).click()
   await expect(visible(page.getByText(`Delete ${name} and every place on it?`))).toBeVisible()
   await visible(page.getByRole('button', { name: 'Delete it' })).click()
-  await expect(visible(page.getByRole('button', { name: '+ New category page' }))).toBeVisible({ timeout: 30_000 })
+  await expect(visible(page.getByRole('button', { name: '+ New category page' }))).toBeVisible()
   await expect(row).not.toBeVisible()
 
   const { data: afterDelete } = await supabase
@@ -134,7 +129,7 @@ test('a page brought back after a save keeps a Delete already asked while the li
 
   // Creating opens the new category's own page, saved (its heading is the
   // name typed, so it shows before the save lands); back to the list.
-  await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
+  await expect(visible(page.getByRole('status'))).toHaveText('Saved.')
   await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/categories/cat:e2e-admin-write-`))
 
   // Add a field, from a box of Fields (E1b: every box open, its Add a
@@ -145,7 +140,7 @@ test('a page brought back after a save keeps a Delete already asked while the li
   await visible(page.getByRole('button', { name: `Add to ${name}` })).click()
   await expect(visible(page.getByRole('region', { name: 'Fields' }).getByRole('button', { name: /^Hours/ }))).toBeVisible()
   await visible(page.getByRole('button', { name: 'Save' })).click()
-  await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
+  await expect(visible(page.getByRole('status'))).toHaveText('Saved.')
 
   // From here the list answers 4s late, as it did on CI. Opening the page
   // again brings back its screen from before the field was added (Next keeps
@@ -155,7 +150,7 @@ test('a page brought back after a save keeps a Delete already asked while the li
   await visible(page.getByRole('button', { name: '‹ Category pages' })).click()
   // One row per page, saying how many places it has (board 1).
   const row = visible(page.getByRole('button', { name }))
-  await expect(row).toBeVisible({ timeout: 30_000 })
+  await expect(row).toBeVisible()
   await expect(row).toContainText(`${name}0 places`)
 
   const supabase = getAdminClient()
@@ -177,7 +172,7 @@ test('a page brought back after a save keeps a Delete already asked while the li
   await expect(visible(page.getByText(`Delete ${name} and every place on it?`)), 'Delete this page was started over by the list arriving').toBeVisible()
   await page.unroute('**/api/admin/categories?*')
   await visible(page.getByRole('button', { name: 'Delete it' })).click()
-  await expect(visible(page.getByRole('button', { name: '+ New category page' }))).toBeVisible({ timeout: 30_000 })
+  await expect(visible(page.getByRole('button', { name: '+ New category page' }))).toBeVisible()
   await expect(row).not.toBeVisible()
 
   const { data: afterDelete } = await supabase
@@ -215,10 +210,10 @@ test('a category created hidden stays hidden, and Places\' Add a place publishes
   await visible(page.getByRole('switch', { name: 'On the site', exact: true })).click()
   await visible(page.getByRole('button', { name: 'Create category' })).click()
 
-  await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
+  await expect(visible(page.getByRole('status'))).toHaveText('Saved.')
   await visible(page.getByRole('button', { name: '‹ Category pages' })).click()
   const row = visible(page.getByRole('button', { name: categoryName }))
-  await expect(row).toBeVisible({ timeout: 30_000 })
+  await expect(row).toBeVisible()
   await expect(row).toContainText('Hidden')
 
   const supabase = getAdminClient()
@@ -249,7 +244,7 @@ test('a category created hidden stays hidden, and Places\' Add a place publishes
   // With nothing to read, "… is added" shows only while it looks, then it's
   // back on Places, listing it. Waiting on the banner raced that: CI missed
   // it, a local run caught it.
-  await expect(visible(page.getByRole('button', { name: `Open ${listingName}` }))).toBeVisible({ timeout: 30_000 })
+  await expect(visible(page.getByRole('button', { name: `Open ${listingName}` }))).toBeVisible()
 
   const { data: listing } = await supabase
     .from('resource')

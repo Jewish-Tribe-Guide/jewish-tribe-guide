@@ -341,10 +341,8 @@ test('a left-out submission shows up in History, with its reason', async ({ page
   const card = page.locator('div.rounded-lg.shadow-sm', { hasText: name })
   await expect(card).toBeVisible()
 
-  // With its reason, once the database keeps one (migration 089). Before
-  // that, leaving it out still has to work, which the rest of this proves.
-  const { error: noColumn } = await supabase.from('submission').select('review_reason').limit(1)
-  if (!noColumn) await expect(card.getByText(`“${reason}”`)).toBeVisible()
+  // With its reason (migration 089).
+  await expect(card.getByText(`“${reason}”`)).toBeVisible()
 
   const { data: reloaded } = await supabase.from('submission').select('status').eq('id', submission.id).single()
   expect(reloaded?.status).toBe('rejected')

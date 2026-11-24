@@ -61,12 +61,10 @@ test('a place is found by name, archived after asking, and brought back', async 
 
   await page.getByRole('button', { name: 'Archive it' }).click()
   await expect(page.getByText(`Take ${name} off the site? It stays under Archived.`)).toBeVisible()
-  // Each write waited on its own answer, not on a 5s poll of the database.
-  // The archive is six database calls one after another, and with e2e's
-  // seven servers reading the same test project, each can queue a second or
-  // two: PR 405's first CI run took 10.4s, the poll gave up at 5s, and the
-  // cleanup below then deleted the suggestion the server was still
-  // approving ("Submission not found" in its log, a symptom, not the cause).
+  // Waits on the archive's own answer, not a 5s poll of the database: the
+  // archive is six database calls one after another, and when the poll gave
+  // up first (PR 405), the cleanup below deleted the suggestion the server
+  // was still approving.
   const archived = page.waitForResponse((r) => r.request().method() === 'DELETE' && r.url().includes('/api/admin/listings/'))
   await page.getByRole('button', { name: 'Archive it' }).click()
   expect((await archived).status(), 'the archive’s answer').toBe(200)

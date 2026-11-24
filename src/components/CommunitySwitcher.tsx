@@ -99,10 +99,13 @@ export default function CommunitySwitcher({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Switch community"
         className="flex min-w-0 flex-1 items-center gap-1 text-left cursor-pointer"
       >
         {children}
+        {/* Named by what it shows, then what it does: an aria-label in place
+            of the name on screen is a WCAG 2.5.3 failure (axe's
+            label-content-name-mismatch), and a voice user says the name. */}
+        <span className="sr-only">, switch community</span>
         <svg
           className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
           viewBox="0 0 24 24"

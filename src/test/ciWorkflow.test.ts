@@ -191,6 +191,16 @@ describe('every suite has a database of its own', () => {
     expect(jobs['e2e-build']).toContain(`NEXT_PUBLIC_SUPABASE_STORAGE_URL: ${hosts[0]}\n`)
   })
 
+  // On the seed, what a test needs is there (scripts/seed-test-fixtures.sql),
+  // so e2e's needs() fails when it's missing instead of skipping. Against
+  // production's real data it may well be missing, so the smoke run skips.
+  it('e2e tells its tests they run on the seed, and production’s smoke run doesn’t', () => {
+    expect(jobs.e2e).toMatch(/-e E2E_SEEDED=1\b/)
+    expect(jobs['e2e-prod-smoke']).toBeTruthy()
+    expect(jobs['e2e-prod-smoke']).not.toMatch(/E2E_SEEDED/)
+    expect(jobs['e2e-prod-build']).not.toMatch(/E2E_SEEDED/)
+  })
+
   for (const name of Object.keys(jobs).filter(ownDatabase)) {
     it(`${name} starts Supabase on the runner, so it has no container`, () => {
       expect(jobs[name], `${name} starts Supabase, which needs Docker: no container`).not.toMatch(/\n {4}container:/)

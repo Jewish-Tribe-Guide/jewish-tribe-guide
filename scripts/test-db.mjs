@@ -32,6 +32,8 @@ function seed() {
   psql('scripts/reset-sequences.sql')
   // Its changes dated up to today: What changed shows the last 30 days.
   psql('scripts/seed-fresh-dates.sql')
+  // What the tests need that the seed's real content hasn't got.
+  psql('scripts/seed-test-fixtures.sql')
 }
 
 const command = process.argv[2] ?? 'start'

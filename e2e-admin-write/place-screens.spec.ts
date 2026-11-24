@@ -89,8 +89,7 @@ const address = (page: Page) => {
 async function walk(page: Page, screens: Screen[]) {
   const at: string[] = []
   // A reload loads the whole list again (Places, To do) before the place
-  // and its steps can open: seconds, with the suite's other workers on the
-  // same test project.
+  // and its steps can open.
   const only = async (i: number, how: string, timeout = 5_000) => {
     await expect(screens[i].shows, `${how}: screen ${i} isn’t showing`).toBeVisible({ timeout })
     for (const [j, s] of screens.entries()) if (j !== i) await expect(s.shows, `${how}: screen ${j} shows with ${i}`).not.toBeVisible()
@@ -117,7 +116,7 @@ async function walk(page: Page, screens: Screen[]) {
     await only(i, 'Forward')
   }
   await page.reload()
-  await only(last, 'a reload', 20_000)
+  await only(last, 'a reload')
 
   // Another tab, then Back to it: after a reload, entries written behind the
   // router's back changed the address here and drew nothing.

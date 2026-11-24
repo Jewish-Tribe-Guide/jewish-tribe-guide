@@ -18,8 +18,7 @@ import { categoryWithListings, defaultCommunity, ready } from './helpers'
 
 const HELD_MS = 6_000
 
-test('a tap right after coming back to the app isn’t held up by a refresh', async ({ page, request, isMobile }) => {
-  test.skip(!isMobile, 'the phone, where it was seen')
+test('a tap right after coming back to the app isn’t held up by a refresh', { tag: '@mobile' }, async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const { category } = await categoryWithListings(request, community)
 

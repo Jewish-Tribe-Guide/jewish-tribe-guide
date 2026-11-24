@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
-import { categories, categoryWithListings, defaultCommunity, minyanimCategory, ready } from './helpers'
+import { categories, categoryWithListings, defaultCommunity, minyanimCategory, ready, needs } from './helpers'
 import { fixedViewSlug } from '../src/lib/routes'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ test('a place’s name: its line opens its listing', async ({ page, request }) =
 test('an item: Enter goes where its first line says, the item in that page’s box and ticked in its Filters', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const found = await itemOnAListing(request, community)
-  test.skip(!found, 'no listing has an item')
+  needs(found, 'no listing has an item')
   const { item } = found!
 
   const box = await homeBox(page, community)
@@ -91,7 +91,7 @@ test('an item: Enter goes where its first line says, the item in that page’s b
 test('a second search to a page already visited lands on that search, not the whole list', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const found = await itemOnAListing(request, community)
-  test.skip(!found, 'no listing has an item')
+  needs(found, 'no listing has an item')
   const { category, item } = found!
 
   const box = await homeBox(page, community)
@@ -107,7 +107,7 @@ test('a second search to a page already visited lands on that search, not the wh
   const again = page.getByRole('textbox', { name: 'Search resources' }).filter({ visible: true })
   const lines = await typeAndWait(page, again, item)
   const href = await lines.getByRole('option').first().getByRole('link').getAttribute('href')
-  test.skip(!href?.startsWith(`/${community}/${category.id}?`), `"${item}" goes elsewhere first`)
+  needs(href?.startsWith(`/${community}/${category.id}?`), `"${item}" goes elsewhere first`)
   await again.press('Enter')
 
   await page.waitForURL((url) => `${url.pathname}${url.search}` === href)
@@ -123,15 +123,17 @@ test('a second search to a page already visited lands on that search, not the wh
 test('Back to home, then a search to another page: that page has the search', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const found = await itemOnAListing(request, community)
-  test.skip(!found, 'no listing has an item')
+  needs(found, 'no listing has an item')
   const { category, item } = found!
-  // A kind of place no prompt goes to, so the search's page is a new one.
-  const other = ((await categories(request, community)) as Cat[]).find((c) => c.kind === 'listing' && c.id !== category.id && !['restaurant', 'synagogue'].includes(c.id))
-  test.skip(!other, 'only one kind of place')
-
+  // A kind of place no prompt goes to, so the search's page is a new one,
+  // and one the home links to (not every page has a card there).
   await homeBox(page, community)
-  const card = page.locator(`a[href="/${community}/${other!.id}"]`).filter({ visible: true }).first()
-  test.skip((await card.count()) === 0, `no link to ${other!.id} on home`)
+  const others = ((await categories(request, community)) as Cat[]).filter((c) => c.kind === 'listing' && c.id !== category.id && !['restaurant', 'synagogue'].includes(c.id))
+  const cardOf = (c: Cat) => page.locator(`a[href="/${community}/${c.id}"]`).filter({ visible: true }).first()
+  let other: Cat | undefined
+  for (const c of others) if (!other && (await cardOf(c).count()) > 0) other = c
+  needs(other, 'no other kind of place linked on home')
+  const card = cardOf(other)
   await card.click()
   await page.waitForURL((url) => url.pathname === `/${community}/${other!.id}`)
 
@@ -156,7 +158,7 @@ test('Back to home, then a search to another page: that page has the search', as
   await again.fill(item)
   await again.press('Enter')
   await page.waitForURL((url) => url.pathname !== `/${community}`)
-  test.skip(!page.url().includes(`/${category.id}?`), `"${item}" goes elsewhere first`)
+  needs(page.url().includes(`/${category.id}?`), `"${item}" goes elsewhere first`)
   await expect(page.getByRole('searchbox').filter({ visible: true }).first()).toHaveValue(item)
   await page.waitForTimeout(800)
   expect(new URL(page.url()).searchParams.get('q')).toBe(item)
@@ -165,7 +167,7 @@ test('Back to home, then a search to another page: that page has the search', as
 test('a minyan: Minyanim by time, the words in its box, no sentence over the list', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const shuls = await minyanimCategory(request, community)
-  test.skip(!shuls, 'no category with minyanim')
+  needs(shuls, 'no category with minyanim')
 
   const box = await homeBox(page, community)
   await typeAndWait(page, box, 'next maariv')
@@ -182,7 +184,7 @@ test('a minyan: Minyanim by time, the words in its box, no sentence over the lis
 test('a zman: the times page, with the time asked for picked out', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const zmanim = ((await categories(request, community)) as Cat[]).find((c) => c.kind === 'zmanim')
-  test.skip(!zmanim, 'no zmanim page')
+  needs(zmanim, 'no zmanim page')
 
   const box = await homeBox(page, community)
   await typeAndWait(page, box, 'when is candle lighting')
@@ -198,7 +200,7 @@ test('a zman: the times page, with the time asked for picked out', async ({ page
 test('the eruv: its page', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const eruv = ((await categories(request, community)) as Cat[]).find((c) => c.kind === 'eruv')
-  test.skip(!eruv, 'no eruv page')
+  needs(eruv, 'no eruv page')
 
   const box = await homeBox(page, community)
   await typeAndWait(page, box, 'is the eruv up')

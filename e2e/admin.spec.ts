@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { madeByTests } from './testMadePages'
-import { openAdmin } from './helpers'
+import { openAdmin, needs } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Real, signed-in admin console coverage — the gap every other e2e test
@@ -59,7 +59,7 @@ test.describe('admin console', () => {
     const res = await request.get('/api/categories')
     const body = await res.json()
     const listingCategory = (body.categories as { id: string; kind: string; pluralLabel: string }[]).find((c) => c.kind === 'listing' && !madeByTests(c))
-    test.skip(!listingCategory, 'no listing-kind category configured')
+    needs(listingCategory, 'no listing-kind category configured')
 
     await openAdmin(page, '/philly/admin/categories')
 
@@ -73,7 +73,7 @@ test.describe('admin console', () => {
     const res = await request.get('/api/categories')
     const body = await res.json()
     const listingCategory = (body.categories as { id: string; kind: string; pluralLabel: string }[]).find((c) => c.kind === 'listing' && !madeByTests(c))
-    test.skip(!listingCategory, 'no listing-kind category configured')
+    needs(listingCategory, 'no listing-kind category configured')
 
     await openAdmin(page, '/philly/admin/categories')
     // One row per page, the whole row a button that opens it (board 1).

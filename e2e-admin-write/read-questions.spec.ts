@@ -8,8 +8,7 @@ import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 // rows under "Asked more than once". A reading that proposes a word is a row of its own;
 // Dismiss deletes the reading so the question is read afresh. The reading
 // is inserted straight into question_reading: no test server ever calls
-// the reader (QUESTION_READER=off). Needs migration 062 (question_reading)
-// on the test project.
+// the reader (QUESTION_READER=off).
 //
 // And teaching: the row's proposed word, Teach stores it (question_word,
 // migration 063) and it reaches the public site's categories (the cached
@@ -37,18 +36,16 @@ test.afterEach(async () => {
 type Field = { key: string; label: string; type: string; filterable?: boolean; filterLabel?: string; options?: { value: string; label: string }[] }
 
 /** A reading of `word` as one option of a filterable pick-list, which the
- *  console proposes teaching. Skips when the test project has none. */
+ *  console proposes teaching. The seed has some. */
 async function seedReading() {
   const supabase = getAdminClient()
-  const { error: missing } = await supabase.from('question_word').select('word').limit(1)
-  expect(missing?.message ?? null, 'needs migration 063 (question_word) on the test project').toBeNull()
   // Any filterable pick-list with an option, on any category.
   const { data: cats } = await supabase.from('category').select('id, plural_label, fields').eq('community_id', TEST_COMMUNITY)
   const found = (cats as { id: string; plural_label: string; fields: Field[] }[])
     .filter((c) => !madeByTests(c))
     .flatMap((c) => (c.fields ?? []).filter((f) => f.type === 'select' && f.filterable && f.options?.length).map((f) => ({ c, f })))
     .at(0)
-  test.skip(!found, 'no filterable pick-list on the test project')
+  expect(found, 'no filterable pick-list in the seed').toBeTruthy()
   const { c, f } = found!
   const option = f.options![0]
   const { error } = await supabase.from('question_reading').insert({

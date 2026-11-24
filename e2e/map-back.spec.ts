@@ -1,13 +1,12 @@
 import { expect, test } from '@playwright/test'
-import { defaultCommunity, ready } from './helpers'
+import { defaultCommunity, ready, needs } from './helpers'
 
 // The browser's Back on the Map page (Nov 18, items 5 and 6 of the public
 // review). A computer's Back with a place open left the map and its search
 // altogether; a phone reloaded with a place open needed Back pressed twice
 // to close it, the reload adding a second entry for the same place.
 
-test('computer: Back closes the place open in the sidebar and stays on the map', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'the computer’s sidebar')
+test('computer: Back closes the place open in the sidebar and stays on the map', { tag: '@desktop' }, async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
   await ready(page)
@@ -37,8 +36,7 @@ test('computer: Back closes the place open in the sidebar and stays on the map',
   await expect.poll(() => new URL(page.url()).pathname).not.toBe(`/${community}/map`)
 })
 
-test('phone: after a reload with a place open, one Back closes it', async ({ page, isMobile }) => {
-  test.skip(!isMobile, 'the phone’s sheet')
+test('phone: after a reload with a place open, one Back closes it', { tag: '@mobile' }, async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
   await ready(page)
@@ -63,8 +61,7 @@ test('phone: after a reload with a place open, one Back closes it', async ({ pag
 // a reload comes back to it. Opens nothing that writes.
 const editingIn = (url: string) => new URL(url).searchParams.get('editing')
 
-test('computer: the place’s editor in the sidebar is an address of its own', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'the computer’s sidebar')
+test('computer: the place’s editor in the sidebar is an address of its own', { tag: '@desktop' }, async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
   await ready(page)
@@ -76,7 +73,7 @@ test('computer: the place’s editor in the sidebar is an address of its own', a
   const toResults = page.getByRole('button', { name: 'Back to results' }).filter({ visible: true })
   await expect(toResults).toBeVisible()
   const edit = page.getByRole('button', { name: 'Edit listing' }).filter({ visible: true })
-  test.skip((await edit.count()) === 0, 'the first place can’t be edited')
+  needs((await edit.count()) > 0, 'the first place can’t be edited')
   const place = new URL(page.url()).searchParams.get('place')
   const editor = page.getByTestId('editor-list')
 
@@ -100,8 +97,7 @@ test('computer: the place’s editor in the sidebar is an address of its own', a
   expect(editingIn(page.url())).toBeNull()
 })
 
-test('phone: the place’s editor in the sheet is an address of its own, through a reload', async ({ page, isMobile }) => {
-  test.skip(!isMobile, 'the phone’s sheet')
+test('phone: the place’s editor in the sheet is an address of its own, through a reload', { tag: '@mobile' }, async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
   await ready(page)
@@ -110,7 +106,7 @@ test('phone: the place’s editor in the sheet is an address of its own, through
   const backToList = page.getByRole('button', { name: 'Back to list' })
   await expect(backToList).toBeVisible()
   const edit = page.getByRole('button', { name: 'Edit listing' }).filter({ visible: true })
-  test.skip((await edit.count()) === 0, 'the first place can’t be edited')
+  needs((await edit.count()) > 0, 'the first place can’t be edited')
   const place = new URL(page.url()).searchParams.get('place')
   const editor = page.getByTestId('editor-list')
 

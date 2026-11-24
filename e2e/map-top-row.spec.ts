@@ -10,8 +10,7 @@ import { defaultCommunity, ready } from './helpers'
 
 // Oct 16: the phone's chips too, the same size (not the map under the
 // status bar, which waits).
-test('phone map: the chips are Google Maps’ size too', async ({ page, isMobile }) => {
-  test.skip(!isMobile, 'the phone’s chip row')
+test('phone map: the chips are Google Maps’ size too', { tag: '@mobile' }, async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
   await ready(page)
@@ -21,8 +20,7 @@ test('phone map: the chips are Google Maps’ size too', async ({ page, isMobile
   expect(await all.evaluate((el) => getComputedStyle(el).fontSize), 'its words are 14px').toBe('14px')
 })
 
-test('desktop map: Google Maps’ sizes, and the chips, Set location and ✕ on one line with room', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'the desktop map’s top row')
+test('desktop map: Google Maps’ sizes, and the chips, Set location and ✕ on one line with room', { tag: '@desktop' }, async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
   await ready(page)

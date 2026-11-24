@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib'
 import { expect, test, type Page } from '@playwright/test'
-import { openAddForm, defaultCommunitySlug, largestCategory, ready } from './helpers'
+import { openAddForm, defaultCommunitySlug, largestCategory, previewSettings, ready, needs } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // What a page actually downloads.
@@ -191,7 +191,14 @@ test.describe('home screen weight', () => {
     page.on('request', (r) => {
       if (r.headers()['next-router-prefetch']) prefetched.push(decodeURIComponent(r.url()))
     })
-    await page.goto(`/${community}`)
+    // The computer half needs the Next minyan card, which a community can
+    // have Right now in place of (board U1, Nov 14), as the seed's philly
+    // does: added through the admin's Preview, which saves nothing.
+    if (!isMobile) {
+      const davening = { id: 'davening', kind: 'davening', title: '', sortOrder: 50, cardIds: [], width: 'full', sharesRow: false }
+      await previewSettings(page, community, {}, (sections) => [davening, ...sections.filter((s) => s.kind !== 'rightNow')])
+    }
+    await page.goto(isMobile ? `/${community}` : `/${community}?preview=1`)
     await ready(page)
     const fromCards = () => prefetched.filter((u) => u.includes('davening=1'))
 
@@ -217,10 +224,8 @@ test.describe('home screen weight', () => {
       expect(fromCards(), 'the Next minyan card’s link, on a phone').toEqual([])
     } else {
       // The positive control: on a computer the card is real, and its link
-      // prefetches once it's on screen. A community whose computer home has
-      // Right now in the card's place (board U1, Nov 14) has no such card.
+      // prefetches once it's on screen.
       const card = page.getByTestId('home-next-minyan')
-      test.skip((await card.count()) === 0, 'no Next minyan card on this computer home (Right now took its place)')
       await card.scrollIntoViewIfNeeded()
       await expect.poll(() => fromCards().length, 'the Next minyan card’s link, on a computer').toBeGreaterThan(0)
     }
@@ -254,7 +259,7 @@ test.describe('home screen weight', () => {
   test('the desktop hero photo is fetched on desktop and never on a phone', async ({ page, request, isMobile }) => {
     const community = await defaultCommunitySlug(request)
     const hero = await heroUrl(page, community)
-    test.skip(!hero, 'this community has no desktop hero image set')
+    needs(hero, 'this community has no desktop hero image set')
 
     const loaded = await load(page, `/${community}`)
 

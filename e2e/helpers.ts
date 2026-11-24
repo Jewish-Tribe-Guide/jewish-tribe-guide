@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, type APIRequestContext } from '@playwright/test'
+import { expect, test, type Locator, type Page, type APIRequestContext } from '@playwright/test'
 import { listingActions } from '../src/lib/listingView'
 import { minyanimPage } from '../src/lib/davening'
 import type { CategoryConfig } from '../src/lib/categories'
@@ -14,6 +14,19 @@ import { madeByTests } from './testMadePages'
 // asserting on "ACME Markets" would fail on a content edit rather than on a
 // regression, and a suite that cries wolf gets ignored.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** For a test that needs something in the data: a shul with usual Shabbos
+ *  times, a listing with an item. `why` says what's missing, as a skip
+ *  would. CI's required e2e runs on the committed seed (supabase/seed, plus
+ *  scripts/seed-test-fixtures.sql), which has it, so there a missing one
+ *  fails rather than switching the test off unseen (E2E_SEEDED, set by
+ *  ci.yml). Against real data (e2e-prod-smoke, or dev locally) it skips:
+ *  an admin may have removed the last one. `src/test/e2eSkips.test.ts`
+ *  holds every data-dependent skip in e2e/ to this. */
+export function needs<T>(found: T, why: string): asserts found is NonNullable<T> {
+  if (process.env.E2E_SEEDED) expect(found, `${why}, on the seed (scripts/seed-test-fixtures.sql adds what it lacks)`).toBeTruthy()
+  else test.skip(!found, why)
+}
 
 // Every content read below goes through this rather than `request.get`
 // directly.
@@ -52,10 +65,17 @@ async function apiGet(request: APIRequestContext, url: string): Promise<Record<s
  *  settings given), the way the admin's Preview does: a draft in
  *  sessionStorage, read only when the URL has ?preview=1. Never a save, so
  *  it writes nothing; and a test of one home doesn't depend on which one the
- *  admin has chosen. Load the page with `?preview=1` after calling this. */
-export async function previewSettings(page: Page, community: string, overrides: Record<string, unknown>): Promise<void> {
+ *  admin has chosen. Load the page with `?preview=1` after calling this.
+ *  `withSections` changes the home's sections the same way. */
+export async function previewSettings(
+  page: Page,
+  community: string,
+  overrides: Record<string, unknown>,
+  withSections: (sections: Record<string, unknown>[]) => Record<string, unknown>[] = (s) => s,
+): Promise<void> {
   const { settings } = (await apiGet(page.request, `/api/site-settings?community=${community}`)) as { settings: Record<string, unknown> }
-  const { sections } = (await apiGet(page.request, `/api/home-sections?community=${community}`)) as { sections: unknown[] }
+  const { sections: saved } = (await apiGet(page.request, `/api/home-sections?community=${community}`)) as { sections: Record<string, unknown>[] }
+  const sections = withSections(saved)
   await page.addInitScript((value) => {
     try {
       sessionStorage.setItem('jpc:adminPreviewDraft', value)
