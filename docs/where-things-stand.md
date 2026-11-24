@@ -89,14 +89,6 @@ old number can still be looked up. When an item is done, move it to
 
 ### You decide
 
-87. Two settings from `docs/checks.md` (Nov 24), both yours:
-    - turn on Sentry's quota emails (80% and 100%);
-    - add `SENTRY_API_TOKEN` (the read-only one) to the live
-      deployment's settings, for Sundays' speed email.
-    And agree the admin target, ≤ 1s at p75 for a screen and a save.
-
-2.  Copy dev's photos for Eruv, Hospitals, Childcare and Schools (iStock
-    links) to live? Live's tiles for those have none of their own.
 28. The drawings for asking for location when it helps (the hospital
     location boards, branch `claude/eager-nash-317067`): look, or let go.
 73. A phone that throws the page away in the background might ignore
@@ -106,6 +98,17 @@ old number can still be looked up. When an item is done, move it to
 
 ### You do
 
+87. Settings, a few minutes each (the user will do them, Nov 24):
+    - Sentry: turn on the quota emails, 80% and 100% (Settings →
+      Account → Notifications → Quota);
+    - Vercel: add `SENTRY_API_TOKEN` (the read-only one in
+      `.env.local`) to the live deployment, for Sundays' speed email;
+    - Supabase: check the live project's region is US East, near
+      Vercel's `iad1`, or every admin read pays the distance;
+    - Sentry: resolve JAVASCRIPT-NEXTJS-12 and -13, both from before
+      fixes now live;
+    - Main dishes: Read now on the three menus stopped since Nov 4;
+    - try the phone home's "+ Add" hiding as you scroll, on a phone.
 19. Mekor's list against ours: PLNT Burger Jenkintown (IKC?), and Nothing
     Bundt Cakes, Cherry-K there and Keystone-K here.
 35. Magical Sweet Shop's hechsher: call 856-309-1100, or ask Mekor.
