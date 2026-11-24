@@ -23,6 +23,10 @@ work is in `docs/where-things-stand.md`.
 - **Say what is drawn only.** When some things were built and others only
   drawn, end with a plain list of the drawn-only ones, named by what the user
   would see on the site, and "not built until you OK it".
+- **Is it worth doing? Check the bar.** `docs/checks.md`, "Healthy, in
+  seven lines": work that moves one of the seven is worth it; the rest
+  waits for real work or real visitors to ask. Say which line a
+  suggestion moves, or that it moves none (Nov 24).
 - **Say what "nothing left" covers.** "Nothing on the tracker" is not
   "nothing to do": the tracker holds only what someone has found. Say
   which, and when the code was last looked over (the monthly health
