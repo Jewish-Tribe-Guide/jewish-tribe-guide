@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { categories, defaultCommunity, listingCounts, ready, needs } from './helpers'
+import { DAYS, onDay } from './fixedDays'
 
 // The phone home (the user, Oct 17), on a real build, at a fixed moment for
 // each kind of day: who keeps the guide right at the top (and the sheet it
@@ -15,21 +16,6 @@ import { categories, defaultCommunity, listingCounts, ready, needs } from './hel
 // /api/zmanim itself, where page.route can't stand in for it.
 test.use({ timezoneId: 'America/New_York', serviceWorkers: 'block' })
 
-const ZMANIM = {
-  hebrewDate: '2 Cheshvan 5787',
-  parsha: 'Parashat Noach',
-  dailyZmanim: [{ label: 'Sunset', time: '6:18 PM' }],
-  shabbos: {
-    candleLighting: { label: 'Friday', time: '6:01 PM', iso: '2026-10-16T18:01:00-04:00' },
-    havdalah: { label: 'Saturday', time: '6:59 PM', iso: '2026-10-17T18:59:00-04:00' },
-  },
-}
-const DAYS = {
-  tuesday: { at: '2026-10-13T12:30:00-04:00', zmanim: { ...ZMANIM, dayOfWeek: 2, isFriday: false, isShabbos: false } },
-  friday: { at: '2026-10-16T13:30:00-04:00', zmanim: { ...ZMANIM, hebrewDate: '5 Cheshvan 5787', dayOfWeek: 5, isFriday: true, isShabbos: false } },
-  shabbos: { at: '2026-10-17T11:00:00-04:00', zmanim: { ...ZMANIM, hebrewDate: '6 Cheshvan 5787', dayOfWeek: 6, isFriday: false, isShabbos: true } },
-}
-
 // The eruvim as /api/eruv gives them, stood in for: the real route reads
 // each eruv's site as it answers, so what it says depends on the day and
 // the network. Two read from their sites, one with only a hotline.
@@ -41,12 +27,11 @@ const ERUVIM = [
 
 async function openHome(page: Page, day: keyof typeof DAYS) {
   const community = await defaultCommunity(page)
-  await page.route('**/api/zmanim?**', (route) => route.fulfill({ json: { ok: true, data: DAYS[day].zmanim } }))
   await page.route(
     (url) => url.pathname === '/api/eruv',
     (route) => route.fulfill({ json: { ok: true, available: true, timezone: 'America/New_York', candles: null, eruvim: ERUVIM, mapsVersion: null } }),
   )
-  await page.clock.setFixedTime(new Date(DAYS[day].at))
+  await onDay(page, day)
   await page.goto(`/${community}`)
   await ready(page)
   // A phone's first render is the computer's layout, with the computer's
