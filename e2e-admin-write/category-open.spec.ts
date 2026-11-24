@@ -48,7 +48,10 @@ function watchPrefetchesOf(path: string) {
     try {
       res = await realFetch(input, init)
     } catch (err) {
-      if (watched) ((w.__prefetching! -= 1), (w.__prefetchQuietSince = Date.now()))
+      if (watched) {
+        w.__prefetching! -= 1
+        w.__prefetchQuietSince = Date.now()
+      }
       throw err
     }
     if (!watched) return res

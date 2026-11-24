@@ -164,7 +164,6 @@ const hasChanges = !probe
 const removed = await removeSeed()
 const { error: insertError } = await supabase
   .from('activity')
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- _show is the dry run's label, not a column
   .insert(rows.map(({ _show, changes, ...r }) => (hasChanges ? { ...r, changes } : r)))
 if (insertError) throw new Error(insertError.message)
 console.log(`Removed ${removed} earlier seeded rows; wrote ${rows.length}.${hasChanges ? '' : ' Without what each edit changed: migration 069 isn’t applied yet.'}`)

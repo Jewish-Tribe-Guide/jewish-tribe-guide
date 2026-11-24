@@ -62,7 +62,6 @@ export async function listPublishedForms(community: string): Promise<Omit<FormCo
   return (data as FormRow[])
     .map(toConfig)
     .filter((f) => f.active !== false)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- left out, see above
     .map(({ draft: _unpublished, ...form }) => form)
 }
 

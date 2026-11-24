@@ -67,6 +67,7 @@ export function SubmissionReview({
   onModerate: (id: string, status: 'approved' | 'rejected', reason?: string, payload?: ResourceSubmission) => void
 }) {
   const sent = s.payload as unknown as ResourceSubmission
+  const current = s.current
   const fields = useMemo(() => category?.detailFields ?? [], [category])
   const source = submissionSource(s)
   const [draft, setDraft] = useState<ResourceSubmission>(() => structuredClone(sent))
@@ -76,7 +77,7 @@ export function SubmissionReview({
 
   // What the edit changes, against the listing as it is now.
   const diff = useMemo(() => (s.operation === 'update' ? diffListing(s.current, sent, fields) : []), [s, sent, fields])
-  const before = useMemo(() => new Map(flatListing(s.current ?? undefined, fields).map((r) => [r.key, r.value])), [s.current, fields])
+  const before = useMemo(() => new Map(flatListing(current ?? undefined, fields).map((r) => [r.key, r.value])), [current, fields])
   const changedKeys = useMemo(() => {
     const keys: string[] = []
     for (const row of diff) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
 import { isCategorySyncEligible, type CategoryConfig } from '@/lib/categories'
 import { sectionFlags, type EditorRow, type EditorValues } from '@/lib/editorRows'
 import { websiteKeyOf, type CheckedField } from '@/lib/googleJob'
@@ -137,12 +137,16 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     setOverAsked(to ?? null)
     if (!to) setScreen(null)
   })
-  useEffect(() => {
+  // A line records its screen as it renders, so one asked for before its
+  // line is drawn (a reload) opens after the render that draws it: the
+  // check runs after every render.
+  const openAsked = useEffectEvent(() => {
     const spec = overAsked ? screensSeen.current.get(overAsked) : undefined
     if (!overAsked || !spec) return
     setOverAsked(null)
     openScreen(overAsked, spec)
   })
+  useEffect(() => openAsked())
 
   if (step === 'find') {
     return (

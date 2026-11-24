@@ -19,7 +19,7 @@ row below blocks a merge.
 
 | Standard | Checked by | Blocks a merge? |
 | --- | --- | --- |
-| It builds, lints, type-checks, unit tests pass | `unit` job | Yes |
+| It builds, lints with no warning left (`--max-warnings 0`, since Nov 24), type-checks, unit tests pass | `unit` job | Yes |
 | Unit coverage doesn't drop below its floor | `unit` job (`vitest.config` thresholds) | Yes |
 | The tests themselves can be trusted: no skips, no long fixed waits, every wait under its test's budget, no async `waitForFunction`, no test picking a page another made, no real email in the seed, no job holding the test project's keys | Guard tests in `src/test/`, inside `unit` | Yes |
 | The moderation queue shows every field an edit changes | `SubmissionCard.test.tsx` (a compile error until a new field is classified) | Yes |

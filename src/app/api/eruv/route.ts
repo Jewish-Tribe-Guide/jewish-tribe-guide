@@ -30,7 +30,6 @@ export async function GET(request: Request) {
     const read = await refreshStale(eruvim, { now, timezone: community.timezone, candles, save: (id, r) => saveStatusRead(community.slug, id, r) })
     // Why a read failed is the admin's to see (the Watches tab); a visitor's
     // page needs only that it did, and when (statusErrorAt).
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- left out, see above
     const eruvimForVisitors = read.map(({ statusError: _why, ...e }) => e)
     return Response.json({ ok: true, available: true, timezone: community.timezone, candles, eruvim: eruvimForVisitors, mapsVersion }, { headers: { 'Cache-Control': CACHE_CONTROL } })
   } catch (err) {
