@@ -86,10 +86,7 @@ old number can still be looked up. When an item is done, move it to
 
 ### You decide
 
-87. Three settings from `docs/checks.md` (Nov 24), all yours:
-    - require **All checks passed** on `main` in the ruleset "Da
-      Rules(et)" (alongside or instead of "Lint, typecheck, unit
-      tests"), so every suite blocks a merge;
+87. Two settings from `docs/checks.md` (Nov 24), both yours:
     - turn on Sentry's quota emails (80% and 100%);
     - add `SENTRY_API_TOKEN` (the read-only one) to the live
       deployment's settings, for Sundays' speed email.

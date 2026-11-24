@@ -11,12 +11,11 @@ in `docs/operations.md`. The speed numbers are in `docs/speed-targets.md`.
 
 ## The code, before it merges
 
-`main` requires one check: **Lint, typecheck, unit tests**. Every other
-suite runs on each PR but can be merged past while red. Since Nov 24 CI
-has **All checks passed** (`all-checks`), which passes only when every
-suite did; once the ruleset requires it instead, every row below blocks.
-Until then, nothing enforces the "No" rows but the user's habit of
-merging on green.
+`main` requires **All checks passed** (`all-checks`, since Nov 24, the
+user's yes), which passes only when every suite below did, and
+**Lint, typecheck, unit tests**, in the ruleset "Require a pull request
+before merging" (the one called "Da Rules(et)" is turned off). So every
+row below blocks a merge.
 
 | Standard | Checked by | Blocks a merge? |
 | --- | --- | --- |
@@ -24,12 +23,12 @@ merging on green.
 | Unit coverage doesn't drop below its floor | `unit` job (`vitest.config` thresholds) | Yes |
 | The tests themselves can be trusted: no skips, no long fixed waits, every wait under its test's budget, no async `waitForFunction`, no test picking a page another made, no real email in the seed, no job holding the test project's keys | Guard tests in `src/test/`, inside `unit` | Yes |
 | The moderation queue shows every field an edit changes | `SubmissionCard.test.tsx` (a compile error until a new field is classified) | Yes |
-| Public pages: routing, redirects, server-rendered content, caching, icons, offline, the security policy | `e2e`, 7 shards, on the seed | **No** |
-| Pages stay light (JS, images, preloads) | `e2e/budgets.spec.ts` | **No** |
-| Admin writes work through the real console, and Back/Forward/reload land on the same screen | `admin-write` | **No** |
-| An admin save reaches the cached public page | `cache-roundtrip` | **No** |
-| The intake form reaches the database | `form-roundtrip` | **No** |
-| Store reads and writes | `integration` | **No** |
+| Public pages: routing, redirects, server-rendered content, caching, icons, offline, the security policy | `e2e`, 7 shards, on the seed | Yes |
+| Pages stay light (JS, images, preloads) | `e2e/budgets.spec.ts` | Yes |
+| Admin writes work through the real console, and Back/Forward/reload land on the same screen | `admin-write` | Yes |
+| An admin save reaches the cached public page | `cache-roundtrip` | Yes |
+| The intake form reaches the database | `form-roundtrip` | Yes |
+| Store reads and writes | `integration` | Yes |
 
 When a PR's check fails, GitHub emails whoever pushed, if their GitHub
 notification settings allow it (not checked from here).
@@ -51,9 +50,8 @@ notification settings allow it (not checked from here).
 1. **Five suites guarded behaviour but didn't block a merge.** CI's
    `all-checks` job passes only when every PR suite did, a skip on a PR
    included; `ciWorkflow.test.ts` fails if a suite is missing from its
-   `needs`. **Open until the ruleset requires "All checks passed"** (the
-   user's call). It makes a flaky test block merges until fixed, which is
-   the point.
+   `needs`. Required on `main` since Nov 24 (the user's yes). A flaky
+   test now blocks merges until fixed, which is the point.
 2. **The production smoke run told no one.** `prod-smoke-report` opens
    an issue on a failure, found by the report each failed shard uploads.
 3. **Sentry going over quota was silent.** Sentry emails at 80% and 100%
