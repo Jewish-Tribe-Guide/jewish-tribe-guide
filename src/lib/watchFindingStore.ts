@@ -18,29 +18,36 @@ export async function jobFindings(
   categories: readonly CategoryConfig[],
 ): Promise<{ findings: Finding[]; decided: Map<string, Decided> }> {
   const supabase = getAdminClient()
-  // Each watch's, waiting (whole) and decided (only when, and how: a
-  // decided one carries the page it was read from, which isn't needed).
-  const read = async <T,>(name: string, waiting: boolean): Promise<T[]> => {
+  // Every watch of this job's, in one read each: waiting (whole) and
+  // decided (only when, and how: a decided one carries the page it was
+  // read from, which isn't needed). One read for all the job's watches,
+  // not one a watch (Nov 23: Sentry's N+1 on the kosher job's three).
+  const names = FINDING_SOURCES[job]
+  const read = async <T,>(waiting: boolean): Promise<T[]> => {
     const { data, error } = await readAll((from, to) => {
       const q = supabase
         .from('submission')
-        .select(waiting ? '*' : 'target_id,status,reviewed_at')
+        .select(waiting ? '*' : 'target_id,status,reviewed_at,submitted_by')
         .eq('community_id', community)
         .eq('target_type', 'listing')
-        .eq('submitted_by->>name', name)
+        .in('submitted_by->>name', [...names])
       return (waiting ? q.eq('status', 'pending').order('created_at', { ascending: true }) : q.neq('status', 'pending')).order('id').range(from, to)
     })
     if (error) throw new Error(`Couldn’t read the findings: ${error.message}`)
     return (data ?? []) as T[]
   }
-  const names = FINDING_SOURCES[job]
-  const [waiting, done] = await Promise.all([
-    Promise.all(names.map((n) => read<SubmissionRow>(n, true))),
-    Promise.all(names.map((n) => read<Pick<SubmissionRow, 'target_id' | 'status' | 'reviewed_at'>>(n, false))),
+  // In the order of the job's watches, as when each was read on its own.
+  const byWatch = <T extends { submitted_by?: unknown }>(rows: T[]) => {
+    const at = (r: T) => names.indexOf((r.submitted_by as { name?: string } | null)?.name ?? '')
+    return rows.map((r, i) => [r, i] as const).sort(([a, i], [b, j]) => at(a) - at(b) || i - j).map(([r]) => r)
+  }
+  const [waitingRows, doneRows] = await Promise.all([
+    read<SubmissionRow>(true),
+    read<Pick<SubmissionRow, 'target_id' | 'status' | 'reviewed_at' | 'submitted_by'>>(false),
   ])
-  const pending = waiting.flat()
+  const pending = byWatch(waitingRows)
   const decided = new Map<string, Decided>()
-  for (const s of done.flat()) {
+  for (const s of doneRows) {
     if (s.status === 'pending' || !s.target_id || !s.reviewed_at) continue
     const was = decided.get(s.target_id)
     if (!was || was.at < s.reviewed_at) decided.set(s.target_id, { at: s.reviewed_at, status: s.status })

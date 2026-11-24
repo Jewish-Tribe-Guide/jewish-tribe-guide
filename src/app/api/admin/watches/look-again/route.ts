@@ -33,7 +33,7 @@ const TRY_LIMIT = { limit: 20, windowSec: 600 }
 
 export const GET = adminRead(async (request: Request, { community }) => {
   try {
-    const [loaded, { runs }] = await Promise.all([loadLookAgain(community.slug), listJobRuns(community.slug)])
+    const [loaded, { runs }] = await Promise.all([loadLookAgain(community.slug), listJobRuns(community.slug, ['look-again'])])
     return Response.json({ ok: true, ...loaded, runs: runs['look-again'] ?? [] })
   } catch (err) {
     reportServerError('[admin/watches/look-again] GET failed:', err)
