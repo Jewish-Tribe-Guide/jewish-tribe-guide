@@ -193,10 +193,11 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   // right now.
   const onHeightChangeRef = useRef(onHeightChange)
   useEffect(() => { onHeightChangeRef.current = onHeightChange }, [onHeightChange])
+  const settledHeight = snap === 'full' ? heights.half : heights[snap]
   useEffect(() => {
-    onHeightChangeRef.current?.(snap === 'full' ? heights.half : heights[snap])
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snap, containerHeight])
+    onHeightChangeRef.current?.(settledHeight)
+    // snap too: a new snap point is reported even at the same height.
+  }, [snap, containerHeight, settledHeight])
 
   // Selecting a place gets its own history entry, so a swipe-back/browser-
   // back gesture returns to the list instead of leaving the map screen

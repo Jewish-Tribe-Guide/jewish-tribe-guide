@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { track } from '@vercel/analytics'
 import { formatPhone, isValidPhone } from '@/lib/validation'
 import { stepIsVisible, type StepCondition } from '@/lib/forms'
@@ -132,10 +132,10 @@ export default function Wizard({
   // turning true later from an actual submit in the same session — that
   // path already shows the confirmation the normal way, and shouldn't also
   // bounce the visitor straight through it.
-  useEffect(() => {
+  const leaveIfSubmitted = useEffectEvent(() => {
     if (submitted) onClose()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  })
+  useEffect(() => leaveIfSubmitted(), [])
 
   // Steps visible given the current answers — branching recomputes this live.
   const visible = useMemo(() => steps.filter((s) => stepIsVisible(s, answers)), [steps, answers])

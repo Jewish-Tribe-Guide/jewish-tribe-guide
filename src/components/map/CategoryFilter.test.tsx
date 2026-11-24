@@ -159,9 +159,9 @@ describe('CategoryFilter', () => {
     // listens for that natively (not via React's synthetic system), same
     // as a real scroll gesture would fire it.
     afterEach(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- removing jsdom's stubbed property
       delete (HTMLElement.prototype as any).scrollWidth
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- removing jsdom's stubbed property
       delete (HTMLElement.prototype as any).clientWidth
     })
 
@@ -222,7 +222,7 @@ describe('CategoryFilter', () => {
       // jsdom has no real scroll implementation to observe — assert the
       // component asked the row to scroll, and which way, not that any
       // pixel moved.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- jsdom has no scrollBy to type
       ;(row as any).scrollBy = scrollBy
 
       await user.click(screen.getByRole('button', { name: 'Show more categories' }))

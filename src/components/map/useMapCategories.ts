@@ -4,7 +4,7 @@
 // picker checkbox does to the selection. Called where the block it came
 // from sat, so the view's effects run in the same order.
 import { track } from '@vercel/analytics'
-import { useEffect, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import { useEffect, useEffectEvent, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { FilterOption } from './CategoryFilter'
 import type { MobileNearbySheetHandle } from './MobileNearbySheet'
 
@@ -176,14 +176,14 @@ export function useMapCategories({
   // nothing shown" promise toggle/togglePinnedSelected/toggleCategoryCheckbox
   // already keep for an on-screen tap; this covers the one way the same
   // "nothing selected" state can be reached from OUTSIDE a chip tap.
-  useEffect(() => {
+  const nothingLeftPinned = useEffectEvent(() => {
     // With the eruv lines on, they're left showing on their own.
     if (pinnedSelected && mappablePinnedCount === 0 && effectiveSelected.size === 0) {
       if (eruvimOn) setPinnedSelected(false)
       else showAll()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mappablePinnedCount, pinnedSelected, effectiveSelected.size])
+  })
+  useEffect(() => nothingLeftPinned(), [mappablePinnedCount, pinnedSelected, effectiveSelected.size])
   // Same "surface the results" side effects toggling a category chip gets
   // (raise the mobile sheet, drop the desktop sidebar's collapse) — without
   // them, turning Pinned on looked like it did nothing when nothing else

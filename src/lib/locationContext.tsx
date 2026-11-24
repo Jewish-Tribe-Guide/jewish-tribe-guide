@@ -150,10 +150,9 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
         setAnchor({ address: '', coords: null, listingId: null })
       },
     }),
-    // setAddress/setCoords/setAnchor are stable useCallback setters; start/stop
-    // are stable closures over the same watch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [address, coords, accuracy, listingId, tracking, geoError, geoErrorSilent],
+    // The setters and start/stop are stable useCallbacks, so only the values
+    // make a new context.
+    [address, coords, accuracy, listingId, tracking, geoError, geoErrorSilent, setAddress, setCoords, setAnchor, start, stop],
   )
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>

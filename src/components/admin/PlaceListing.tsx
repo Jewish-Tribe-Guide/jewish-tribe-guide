@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { EnrichedSubmission } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import type { AdminPlace } from '@/lib/adminPlaces'
@@ -334,7 +334,7 @@ export default function PlaceListing({
     }
     setOverAsked(to)
   })
-  useEffect(() => {
+  const openAsked = useEffectEvent(() => {
     if (!overAsked) return
     const dot = overAsked.lastIndexOf('.')
     const row = rowsSeen.current.get(overAsked.slice(0, dot))
@@ -342,10 +342,10 @@ export default function PlaceListing({
     if (!spec) return
     setOverAsked(null)
     setScreen({ ...spec, key: overAsked })
-    // Every row is seen on the editor's first render (its aside); the
-    // sources come with the jobs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- screensOf reads `sources`
-  }, [overAsked, sources])
+  })
+  // Every row is seen on the editor's first render (its aside); the
+  // sources come with the jobs, so it is tried again when they arrive.
+  useEffect(() => openAsked(), [overAsked, sources])
 
   if (place.status === 'archived' || !category) {
     return (

@@ -3,7 +3,7 @@
 // eruvim with a map, the layer's lines and list rows, and opening one.
 // Called where the block it came from sat, so the view's effects run in the
 // same order.
-import { useEffect, useMemo, useRef, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import MapEruvDetail from './MapEruvDetail'
 import type { MapEruv } from './eruvLayer'
 import type { NearbyEruv } from './NearbyList'
@@ -114,13 +114,13 @@ export function useMapEruvim({
   // the layer on, once the eruvim have arrived (their fetch outlasts the
   // render a phone takes to know it's a phone; see the restore above).
   const restoredEruv = useRef(false)
-  useEffect(() => {
+  const restoreEruv = useEffectEvent(() => {
     if (!standalone || restoredEruv.current || !initialPlaceId?.startsWith(ERUV_PREFIX) || eruvimWithLines.length === 0) return
     restoredEruv.current = true
     setEruvimOn(true)
     openEruv(initialPlaceId.slice(ERUV_PREFIX.length))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eruvimWithLines, standalone, initialPlaceId])
+  })
+  useEffect(() => restoreEruv(), [eruvimWithLines, standalone, initialPlaceId])
   // Turning the layer off closes the eruv open in it, so mid-edit that
   // asks first too, and a No leaves both the layer and the edit as they were.
   const eruvimOff = (then?: () => void) => {

@@ -41,7 +41,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /* eslint-disable @typescript-eslint/no-unused-vars -- Apps Script calls install, readNewsletters and doPost by name */
-/* global ContentService, GmailApp, PropertiesService, ScriptApp, Session, UrlFetchApp, Utilities */
+/* global ContentService, GmailApp, PropertiesService, ScriptApp, Session, UrlFetchApp, Utilities -- Apps Script's own objects */
 
 var SITE = 'https://phillyjewishguide.com'
 var COMMUNITY = 'philly'

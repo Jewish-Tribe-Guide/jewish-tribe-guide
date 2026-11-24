@@ -5,7 +5,7 @@
 // write itself stays in the view (see its effect there), and uses what this
 // returns. Called where the block it came from sat, so the view's effects
 // run in the same order.
-import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useEffectEvent, useRef, type Dispatch, type SetStateAction } from 'react'
 import type { MapFilterState } from '@/lib/mapFilters'
 import { normalizeSearch, resolveInitialSelected, type ResourceMapViewProps } from './mapViewShared'
 
@@ -108,7 +108,8 @@ export function useViewFromLink({
     },
     [],
   )
-  useEffect(() => {
+  // Keyed on the link's view by value (above); the rest is read as it is.
+  const applyLink = useEffectEvent(() => {
     if (initialViewKey === appliedInitialViewKeyRef.current) return
     const echo = viewSearch === undefined ? -1 : ownWritesRef.current.indexOf(normalizeSearch(viewSearch))
     if (echo >= 0) {
@@ -127,8 +128,8 @@ export function useViewFromLink({
     setCommittedQuery(initialQueryText)
     setOwnFilters(null)
     setBaseFilters({ query: initialFiltersQuery, forCategory: filtersForCategory })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialViewKey])
+  })
+  useEffect(() => applyLink(), [initialViewKey])
 
   return { thisRender, applyingRenderRef, ownWritesRef, appliedInitialViewKeyRef }
 }

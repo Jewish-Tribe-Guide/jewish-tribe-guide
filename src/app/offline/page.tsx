@@ -29,7 +29,7 @@ export default function OfflinePage() {
           community home saved last (sw.js); a router move would ask for
           data nothing has saved. Without it, an installed app opened with
           no signal was stuck here (Nov 18, review item 36). */}
-      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- a full page load on purpose, see above */}
       <a
         href="/"
         className="mt-6 inline-flex min-h-11 items-center rounded-full bg-slate-900 px-5 text-sm font-semibold text-white"

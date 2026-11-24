@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 
 // The "start empty to match SSR, then restore from localStorage in a
 // post-mount effect, then persist on every change" hydration dance — shared
@@ -33,14 +33,14 @@ export function usePersistedState<T>(
   const [value, setValue] = useState<T>(initial)
   const [hydrated, setHydrated] = useState(false)
 
+  // Once: `load` reads a mount-time snapshot, not a live subscription — see
+  // the three callers' own reasoning for why this isn't a
+  // useSyncExternalStore candidate.
+  const loadOnce = useEffectEvent(load)
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setValue(load())
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the device's storage is read after mount, so the first render matches the server's HTML
+    setValue(loadOnce())
     setHydrated(true)
-    // Deliberately once-only: `load` reads a mount-time snapshot, not a live
-    // subscription — see the three callers' own reasoning for why this isn't
-    // a useSyncExternalStore candidate.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

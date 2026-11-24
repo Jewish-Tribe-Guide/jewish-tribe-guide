@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useStoredLocation } from './useStoredLocation'
 import { useWatchPosition } from './useWatchPosition'
 
@@ -30,6 +30,9 @@ export const CURRENT_LOCATION_LABEL = 'Current location'
 export function useLiveLocation() {
   const stored = useStoredLocation()
   const watch = useWatchPosition()
+  // All stable: useCallback setters, and the watch's own useCallbacks.
+  const { setCoords, setAddress } = stored
+  const { start: watchStart, stop: watchStop, position } = watch
 
   // Auto-resume on mount if a previous visit turned tracking on. Silent: the
   // visitor isn't doing anything at this instant, so if permission has since
@@ -38,14 +41,13 @@ export function useLiveLocation() {
   // LocationControl's geoError effect.
   useEffect(() => {
     try {
-      if (localStorage.getItem(ENABLED_KEY) === '1') watch.start({ silent: true })
+      if (localStorage.getItem(ENABLED_KEY) === '1') watchStart({ silent: true })
     } catch {
       // Storage unavailable — just don't auto-resume.
     }
-    // Intentionally once-only: watch.start is stable, and this is a mount-time
-    // restore, not a live sync (see the effect below for that).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    // Once: watchStart is stable, and this is a mount-time restore, not a
+    // live sync (see the effect below for that).
+  }, [watchStart])
 
   // Every GPS tick updates the same stored coords/address everything else
   // already reads from — this is what makes tracking "site-wide" rather than
@@ -57,31 +59,28 @@ export function useLiveLocation() {
   // the hotel marked as their location while the coordinates walked away from
   // it.
   useEffect(() => {
-    if (!watch.position) return
-    stored.setCoords({ lat: watch.position.lat, lng: watch.position.lng })
-    stored.setAddress(CURRENT_LOCATION_LABEL)
-    // stored.setCoords/setAddress are stable useCallback setters — omitting
-    // them avoids re-running this on unrelated `stored` identity changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watch.position])
+    if (!position) return
+    setCoords({ lat: position.lat, lng: position.lng })
+    setAddress(CURRENT_LOCATION_LABEL)
+  }, [position, setCoords, setAddress])
 
-  const start = () => {
+  const start = useCallback(() => {
     try {
       localStorage.setItem(ENABLED_KEY, '1')
     } catch {
       // Best-effort persistence.
     }
-    watch.start()
-  }
+    watchStart()
+  }, [watchStart])
 
-  const stop = () => {
+  const stop = useCallback(() => {
     try {
       localStorage.removeItem(ENABLED_KEY)
     } catch {
       // Best-effort persistence.
     }
-    watch.stop()
-  }
+    watchStop()
+  }, [watchStop])
 
   return {
     ...stored,

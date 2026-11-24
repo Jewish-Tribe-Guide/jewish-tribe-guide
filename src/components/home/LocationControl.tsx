@@ -146,13 +146,14 @@ export default function LocationControl({ controls }: Props) {
   // auto-resume) failure — nobody just pressed anything, so there's no
   // optimistic close to rescue and popping the popover open unprompted on
   // page load would be the surprise, not the fix (see geoErrorSilent's doc).
-  // Reacting to a transition (error just occurred), not deriving a value from
-  // current props — an effect is the right tool here, not render-time
-  // computation; geoErrorSilent is useLiveLocation's.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  // Reacting to a transition (error just occurred), so it's done while
+  // rendering when either changes (React's "adjust state when a prop
+  // changes"); geoErrorSilent is useLiveLocation's.
+  const [errorSeen, setErrorSeen] = useState<{ error: unknown; silent: unknown }>({ error: null, silent: false })
+  if (controls.geoError !== errorSeen.error || controls.geoErrorSilent !== errorSeen.silent) {
+    setErrorSeen({ error: controls.geoError, silent: controls.geoErrorSilent })
     if (controls.geoError && !controls.geoErrorSilent) setOpen(true)
-  }, [controls.geoError, controls.geoErrorSilent])
+  }
 
   // Only a resolved address counts as "set" here — typed-but-unpicked text
   // stays in the input (see the AddressInput below) but isn't shown as the

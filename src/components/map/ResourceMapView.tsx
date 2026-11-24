@@ -268,7 +268,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // uniformly, instead of only the one that happened to trigger the mount.
   useEffect(() => {
     if (!standalone || !visible) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the visitor can leave fullscreen while here; it is put back each time the screen comes into view, which only an effect sees
     setFullscreen(true)
   }, [standalone, visible])
   // Escape steps back one level at a time (Oct 15, board "A"): a place
@@ -401,7 +401,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // panel a phone never shows, and the place was simply lost (a hotel's
   // "See them on the map", Oct 6; the same trap the commit effect below
   // describes). Retried only while that first selection still stands.
-  useEffect(() => {
+  // The latest selection, read without re-running when it changes.
+  const restoreInitialPlace = useEffectEvent(() => {
     if (!standalone || !initialPlaceId) return
     const retryOnPhone = restoredInitialPlace.current === 'desktop' && isMobile && desktopSelected?.id === initialPlaceId
     if (restoredInitialPlace.current && !retryOnPhone) return
@@ -410,8 +411,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     restoredInitialPlace.current = isMobile ? 'phone' : 'desktop'
     if (retryOnPhone) setDesktopSelected(null)
     selectPlace(point)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPoints, standalone, initialPlaceId, isMobile])
+  })
+  useEffect(() => restoreInitialPlace(), [allPoints, standalone, initialPlaceId, isMobile])
 
   // initialSelectedCategories (a full toggle set restored from history after
   // browser back) takes precedence over initialCategory (the single-category
@@ -424,11 +425,11 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // The Pinned chip lives in PinnedContext (it outlives this screen); a link
   // that says to show the pins turns it on.
   // The lines alone mean no pins either.
-  useEffect(() => {
+  const pinsFromLink = useEffectEvent(() => {
     if (initialPinned) setPinnedSelected(true)
     else if (initialEruvim === 'only') setPinnedSelected(false)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialPinned])
+  })
+  useEffect(() => pinsFromLink(), [initialPinned])
   const effectiveSelected = useMemo(
     () => selected ?? new Set(options.map((o) => o.id)),
     [selected, options],
@@ -546,8 +547,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       const count = allPoints.filter((p) => p.filterId === o.id && (!p.raw || (passesOwnFilters(p.raw) && (!f.openNow || open.has(p.id))))).length
       return { ...o, count }
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options, filtersKey, allPoints, passesOwnFilters, hoursKeysByCat, clock])
+    // filters as such: passesOwnFilters already changes with it.
+  }, [options, hasFilters, filters, allPoints, passesOwnFilters, hoursKeysByCat, clock])
 
   // Keeps the standalone map screen's own address bar in sync with the
   // category chips, committed search/filters, and selected pin — so a
@@ -576,7 +577,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // pristine "nothing tapped yet" state already does — allSelected treats
   // both the same, since they mean the same thing.
   const allSelected = !selected || (selected.size === options.length && options.every((o) => selected.has(o.id)))
-  useEffect(() => {
+  // Run on what the address shows (the deps below), reading the rest as it is.
+  const writeAddress = useEffectEvent(() => {
     if (!standalone) return
     // Not in the commit that applies a link: its state is the last view's
     // until the next render, and writing it would put that view back over
@@ -611,8 +613,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // new navigation, even if this write never comes back as props (Next
     // doesn't always echo one).
     appliedInitialViewKeyRef.current = null
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [standalone, committedQuery, selected, allSelected, filtersKey, categories, selectedPointId, pinnedSelected, eruvimOn, options])
+  })
+  useEffect(() => writeAddress(), [standalone, committedQuery, selected, allSelected, filtersKey, categories, selectedPointId, pinnedSelected, eruvimOn, options])
 
   // "Open now" has to re-answer as the clock moves — a pin that closed at 6pm
   // should drop off a filtered map at 6pm, not when the visitor next reloads.
@@ -626,8 +628,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // and the clock reaches nothing.
   const openNowIds = useMemo(
     () => openNowIdsFor(allPoints, filters, clock, hoursKeysByCat).join('|'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filtersKey, clock, allPoints, hoursKeysByCat],
+    [filters, clock, allPoints, hoursKeysByCat],
   )
 
   const visiblePoints = useMemo(() => {
@@ -643,8 +644,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       )
       .filter((p) => !p.raw || passesOwnFilters(p.raw))
       .filter((p) => !p.raw || !filters[p.raw.category]?.openNow || openNow.has(p.id))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPoints, effectiveSelected, askIds, activeTerms, passesOwnFilters, openNowIds, pinnedSelected])
+    // filters as such: passesOwnFilters already changes with it.
+  }, [allPoints, effectiveSelected, askIds, activeTerms, passesOwnFilters, filters, openNowIds, pinnedSelected])
   // A plain `[...visiblePoints, ...droppedMapPoints]` spread inline in the
   // JSX below would build a fresh array on every ResourceMapView render —
   // including ones that don't touch either input, e.g. a background tap
@@ -683,7 +684,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // on the very first render, before isMobile has corrected itself — without
   // this dep the effect ran once against the stale `isMobile === false`,
   // took the desktop branch, and never got another chance to raise the sheet.
-  useEffect(() => {
+  // Reacts to a commit (the deps below), reading the rest as it is then.
+  const surfaceCommit = useEffectEvent(() => {
     if (suppressNextCommitEffectRef.current) {
       suppressNextCommitEffectRef.current = false
       return
@@ -701,8 +703,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       if (!desktopEditing) setDesktopSelected(visiblePoints.length === 1 ? visiblePoints[0] : null)
       setSidebarCollapsed(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [committedQuery, filtersKey, isMobile])
+  })
+  useEffect(() => surfaceCommit(), [committedQuery, filtersKey, isMobile])
 
   const {
     categoriesOpen,
@@ -872,7 +874,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     options,
     effectiveSelected,
     filters,
-    filtersKey,
     allPoints,
     optionsWithFilters,
     colorById,

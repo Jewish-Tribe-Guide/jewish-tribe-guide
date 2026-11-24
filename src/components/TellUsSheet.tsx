@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { changeableFields, changeLines, DAYS } from '@/lib/fieldChanges'
@@ -416,12 +416,12 @@ export function TellUsBody({
       return
     }
   })
-  useLayoutEffect(() => {
-    if (step === 'edit' && editing) onTitle(editorTitle ?? editing.name)
-    else if (step === 'add' && adding) onTitle(editorTitle ?? addTitle(adding.category))
-    // Only when the editor's own step changes: the steps set their titles.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editorTitle])
+  // Only when the editor's own step changes: the steps set their titles.
+  const titleFromEditor = useEffectEvent((title: string | null | undefined) => {
+    if (step === 'edit' && editing) onTitle(title ?? editing.name)
+    else if (step === 'add' && adding) onTitle(title ?? addTitle(adding.category))
+  })
+  useLayoutEffect(() => titleFromEditor(editorTitle), [editorTitle])
   const [email, setEmail] = useState('')
   // One place at a time (agreed Oct 5): which one is showing, among those
   // not sent yet; and what's been sent, for the thank-you and its email.

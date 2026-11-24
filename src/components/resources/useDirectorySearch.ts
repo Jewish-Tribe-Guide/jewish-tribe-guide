@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import { addressFilters, carriesSearch, withoutChosen, type Landed, type ParamsOpts } from './directoryAddress'
 
@@ -82,12 +82,12 @@ export function useDirectorySearch({ category, initialSearch, initialOpenNow, in
       setLanded({ search: params.q, openNow: params.openNow === '1', bool: Object.keys(bools), select: sels, has })
     }
   }
+  const applyInitialFilters = useEffectEvent((params: Record<string, string>) => applyAddressFilters(params))
   useEffect(() => {
     if (appliedInitialFiltersRef.current || !initialFilters) return
     appliedInitialFiltersRef.current = true
-    applyAddressFilters(initialFilters)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialFilters, category])
+    applyInitialFilters(initialFilters)
+  }, [initialFilters])
   // Resets this screen's own search/openNow/filters to blank, both in local
   // state and (via onParamsChange) back out to the address bar — what a
   // return to this screen with no search in its address shows. A ref,
@@ -172,19 +172,21 @@ export function useDirectorySearch({ category, initialSearch, initialOpenNow, in
   // Back and Forward too: the address is what the page shows (Nov 18).
   const hasActivatedBeforeRef = useRef(false)
   const hiddenAtRef = useRef<string | null>(null)
-  useEffect(() => {
+  // On each activation only (Activity re-runs it), never on a change of
+  // category: a category is its own screen.
+  const onActivate = useEffectEvent(() => {
     if (hasActivatedBeforeRef.current && hiddenAtRef.current !== window.location.pathname) {
       const params = Object.fromEntries(new URLSearchParams(window.location.search))
       if (!carriesSearch(category, params)) clearFiltersRef.current!()
       else fromAddressRef.current!(params)
     }
     hasActivatedBeforeRef.current = true
+  })
+  useEffect(() => {
+    onActivate()
     return () => {
       hiddenAtRef.current = window.location.pathname
     }
-    // On each activation only (Activity re-runs it), never on a change of
-    // category: a category is its own screen.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Sync search + "Open now" into the URL (see onParamsChange's own doc) ──
@@ -215,20 +217,20 @@ export function useDirectorySearch({ category, initialSearch, initialOpenNow, in
   // The question edited or cleared: the Filters it was read as come off
   // with it (see `landed`). What's typed now is searched, and read again
   // if it needs it.
-  useEffect(() => {
-    if (!landed || search === landed.search) return
-    const was = landed
-    // Follows the visitor's own edit of the box, once: not state derived
-    // from props.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLanded(null)
-    if (was.openNow) setOpenNow(false)
-    if (was.bool.length) setBoolFilters((prev) => ({ ...prev, ...Object.fromEntries(was.bool.map((key) => [key, false])) }))
-    setSelectFilters((prev) => withoutChosen(prev, was.select))
-    setHasFilters((prev) => withoutChosen(prev, was.has))
-    // Only the box's own changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search])
+  // Only the box's own changes, so it's done while rendering when `search`
+  // changes (React's "adjust state when a prop changes").
+  const [searchSeen, setSearchSeen] = useState(search)
+  if (search !== searchSeen) {
+    setSearchSeen(search)
+    if (landed && search !== landed.search) {
+      const was = landed
+      setLanded(null)
+      if (was.openNow) setOpenNow(false)
+      if (was.bool.length) setBoolFilters((prev) => ({ ...prev, ...Object.fromEntries(was.bool.map((key) => [key, false])) }))
+      setSelectFilters((prev) => withoutChosen(prev, was.select))
+      setHasFilters((prev) => withoutChosen(prev, was.has))
+    }
+  }
   const openNowSyncedOnce = useRef(false)
   useEffect(() => {
     if (!openNowSyncedOnce.current) {

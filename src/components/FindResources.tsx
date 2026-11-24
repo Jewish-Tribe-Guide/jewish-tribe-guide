@@ -1,7 +1,7 @@
 'use client'
 
 import { useCommunityPlace } from '@/lib/communityContext'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import ResourceLoader from '@/components/resources/ResourceLoader'
 import ListingAdd from '@/components/resources/ListingAdd'
 import dynamic from 'next/dynamic'
@@ -224,12 +224,15 @@ export default function FindResources({
   // that navigation resolves is the tradeoff for not re-deriving `actionSubject`
   // from the URL on every render any more (see above) — the same one
   // GenericDirectory's own listing-expand already accepted for "back" on a
-  // card, just spelled out as an effect here because closing has to
-  // positively clear local state rather than just stop rendering it.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  // card. Closing has to positively clear local state rather than just stop
+  // rendering it, so it's done while rendering, when `formParam` changes
+  // (React's "adjust state when a prop changes"), not in an effect a frame
+  // later.
+  const [formParamSeen, setFormParamSeen] = useState(formParam)
+  if (formParam !== formParamSeen) {
+    setFormParamSeen(formParam)
     if (formParam === null) setActionSubject(null)
-  }, [formParam])
+  }
 
   const action = actionSubject
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { useToday } from '@/lib/useNow'
 import { useCommunityTimezone } from '@/lib/communityContext'
 import type { ZmanimData } from '@/types'
@@ -118,6 +118,9 @@ export function useZmanAnchors(coords: Array<Geo | null | undefined>): Record<st
 
   const keyed = coords.filter((c): c is Geo => !!c).map((c) => [geoKey(c), c] as const)
   const depKey = keyed.map(([k]) => k).sort().join('|')
+  // A fresh array each render: read, not depended on; depKey says when its
+  // places change.
+  const keyedNow = useEffectEvent(() => keyed)
 
   useEffect(() => {
     // Anything not yet cached needs this component to wait for it — even if
@@ -126,7 +129,7 @@ export function useZmanAnchors(coords: Array<Geo | null | undefined>): Record<st
     // already cached; otherwise still await whichever promise is in flight
     // (starting a fresh one only when nobody else has), or this component
     // would never re-render once that shared fetch resolves.
-    const pending = keyed
+    const pending = keyedNow()
       .map(([key, geo]) => [dayScopedKey(timezone, day, key), geo] as const)
       .filter(([cacheKey]) => !cache.has(cacheKey))
     if (pending.length === 0) return
@@ -144,7 +147,6 @@ export function useZmanAnchors(coords: Array<Geo | null | undefined>): Record<st
       if (!cancelled) setVersion((v) => v + 1)
     })
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [depKey, day, timezone])
 
   const result: Record<string, AnchorTimes> = {}

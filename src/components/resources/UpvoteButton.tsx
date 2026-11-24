@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { getVoterToken, getMyVotedIds, noteMyVote } from '@/lib/voteToken'
 import { usePreviewSend, useFetchOrPreview } from '@/lib/previewSend'
 import { ThumbIcon } from '@/components/icons'
@@ -83,7 +83,7 @@ export default function UpvoteButton({
     // successful vote), and the server is the only durable copy of "did this
     // browser actually vote."
     const localVoted = getVotedSet().has(resourceId)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- this browser's storage is read after mount, so the server's HTML matches the first render
     setVoted(localVoted)
     getMyVotedIds().then((serverIds) => {
       const serverVoted = serverIds.has(resourceId)
@@ -93,15 +93,18 @@ export default function UpvoteButton({
       }
     })
 
-    // Same idea for the count: prefer a recent, this-browser-confirmed count
-    // over `initialCount`, which can be a cache-stale snapshot from just
-    // before this browser's own last vote (see REMEMBER_WINDOW_MS's comment).
-    const remembered = getRememberedCounts()[resourceId]
+    countFromThisBrowser(resourceId)
+  }, [resourceId])
+  // Same idea for the count: prefer a recent, this-browser-confirmed count
+  // over `initialCount`, which can be a cache-stale snapshot from just
+  // before this browser's own last vote (see REMEMBER_WINDOW_MS's comment).
+  // Checked when the listing changes, not when its count does.
+  const countFromThisBrowser = useEffectEvent((id: string) => {
+    const remembered = getRememberedCounts()[id]
     if (remembered && Date.now() - remembered.at < REMEMBER_WINDOW_MS && remembered.count !== initialCount) {
       applyCount(remembered.count)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resourceId])
+  })
 
   function applyCount(next: number) {
     setCount(next)

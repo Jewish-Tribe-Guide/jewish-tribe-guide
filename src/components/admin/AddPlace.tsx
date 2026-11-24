@@ -86,17 +86,23 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   // A mikvah's Women's, Men's and Keilim are each a row here, and only the ones
   // written in say the mikvah has them.
   const flags = JSON.stringify(sectionFlags(category, draft.details))
-  useEffect(() => {
-    for (const [flag, on] of Object.entries(JSON.parse(flags) as Record<string, boolean>)) {
+  const syncFlags = useEffectEvent((wanted: string) => {
+    for (const [flag, on] of Object.entries(JSON.parse(wanted) as Record<string, boolean>)) {
       if (!!draft.details[flag] !== on) draft.setDetail(flag, on)
     }
-  }, [flags]) // eslint-disable-line react-hooks/exhaustive-deps
+  })
+  useEffect(() => syncFlags(flags), [flags])
 
+  // Asked again by its name and where it is, not every keystroke elsewhere;
+  // the rest of the draft goes as it is when the request leaves.
+  const askKosher = useEffectEvent(() =>
+    post<{ kosher?: KosherLookup | null }>('/api/admin/read-now', { category: category.id, slot: 'kosher', draft: { name: draft.name, address: draft.address, phone: draft.phone, details: draft.details } }),
+  )
   useEffect(() => {
     if (!asksKosher) return
     let live = true
     const wait = setTimeout(() => {
-      post<{ kosher?: KosherLookup | null }>('/api/admin/read-now', { category: category.id, slot: 'kosher', draft: { name: draft.name, address: draft.address, phone: draft.phone, details: draft.details } })
+      askKosher()
         .then((r) => {
           if (live) setKosher(r.kosher ?? null)
         })
@@ -106,7 +112,6 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       live = false
       clearTimeout(wait)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- by its name and where it is, not every keystroke elsewhere
   }, [asksKosher, draft.name, draft.address])
 
   const back = googleFirst ? () => setStep('find') : onClose
