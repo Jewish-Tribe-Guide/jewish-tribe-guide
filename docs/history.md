@@ -18,6 +18,17 @@ screen as it renders), and the moderation card's `before` keys on the
 listing rather than the whole submission. Lint with one new unused name
 exits 1; admin-write 60/60.
 
+## The "+" over the tiles (Nov 24)
+
+On a phone the floating "+ Add" sat over half a tile in the home's
+right-hand column, and a tap there opened Add (tracker item 27). The user
+chose "Hide while scrolling": on a phone every "+ Add" (`AddButton`: the
+home's, a category page's, the Eruv page's, admin Places) goes as you
+scroll down and comes back as you scroll up, with the header
+(`useScrollShowHide`), and at the end of the page, where nothing is under
+it. A computer keeps it. `e2e/add-button-scroll.spec.ts`: both phone tests
+failed against the old button.
+
 ## Page jumping (Nov 24)
 
 Sentry read CLS at 0.19 against 0.1, from too few visits to say where.
