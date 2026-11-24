@@ -1,0 +1,21 @@
+{
+  "from": "https://seed.invalid",
+  "made": "scripts/make-test-seed.mjs",
+  "tables": {
+    "community": 3,
+    "category": 17,
+    "resource": 159,
+    "tag": 158,
+    "resource_tag": 0,
+    "form": 2,
+    "home_section": 11,
+    "hospital": 4,
+    "page": 2,
+    "eruv": 5,
+    "walk_route": 403,
+    "watch": 195,
+    "site_settings": 1,
+    "campaign_banner": 0,
+    "content_stamp": 2
+  }
+}

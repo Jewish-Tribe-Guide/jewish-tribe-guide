@@ -161,25 +161,23 @@ describe('test-project suites never run two copies at once', () => {
       .map((b) => [b.match(/^([\w-]+):/)![1], b] as const),
   )
   // A job with a database of its own (.github/actions/own-test-database)
-  // only reads the test project, for its copy, so it needn't queue.
+  // starts from supabase/seed and never touches the test project.
   const ownDatabase = (n: string) => jobs[n].includes('uses: ./.github/actions/own-test-database')
-  const usesTestProject = Object.keys(jobs).filter((n) => /secrets\.TEST_SUPABASE_/.test(jobs[n]) && !ownDatabase(n))
+  const usesTestProject = Object.keys(jobs).filter((n) => /secrets\.TEST_SUPABASE_/.test(jobs[n]))
 
   for (const name of Object.keys(jobs).filter(ownDatabase)) {
-    it(`${name} hands the test project's keys only to the copy`, () => {
-      // Every secrets.TEST_SUPABASE_* line is an input of the action: one
-      // in a step's env would point the suite back at the shared project.
-      for (const line of jobs[name].split('\n').filter((l) => /secrets\.TEST_SUPABASE_/.test(l))) {
-        expect(line.trim(), name).toMatch(/^test-supabase-(url|service-role-key): \$\{\{ secrets\.TEST_SUPABASE_(URL|SERVICE_ROLE_KEY) \}\}$/)
-      }
+    it(`${name} gets none of the test project's keys`, () => {
+      // One would point the suite (or a copy of its rows) back at the
+      // shared project, which is what the job's own database is to avoid.
+      expect(jobs[name], name).not.toMatch(/secrets\.TEST_SUPABASE_/)
       expect(jobs[name], `${name} starts Supabase, which needs Docker: no container`).not.toMatch(/\n {4}container:/)
     })
   }
   const field = (block: string, re: RegExp) => block.match(re)?.[1].trim() ?? ''
 
   it('finds the test-project jobs at all', () => {
-    expect(usesTestProject.length).toBeGreaterThanOrEqual(4)
-    expect(Object.keys(jobs).filter(ownDatabase).length).toBeGreaterThanOrEqual(1)
+    expect(usesTestProject.length).toBeGreaterThanOrEqual(3)
+    expect(Object.keys(jobs).filter(ownDatabase).length).toBeGreaterThanOrEqual(2)
   })
 
   for (const name of usesTestProject) {

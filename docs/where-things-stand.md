@@ -80,18 +80,17 @@ old number can still be looked up. When an item is done, move it to
     Last read: iPhone category pages slow to draw and tap, before the
     Nov 16 and Nov 22 fixes; home taps 400–456ms (target 200ms).
 4.  **A test database per CI job** (started Nov 23; the user: best
-    practice, not just green PRs). `admin-write` runs on its own:
-    Supabase started on the runner from the migrations, filled with a
-    copy of the test project's rows (`.github/actions/own-test-database`).
-    Locally 58 passed in 1.5 minutes against 2.0 on the shared one.
-    Next, one PR each: `cache-roundtrip`, `form-roundtrip`,
+    practice, not just green PRs). `admin-write` and `cache-roundtrip`
+    run on their own: Supabase started on the runner from the
+    migrations, loaded with the starting data committed in
+    `supabase/seed` (`.github/actions/own-test-database`), with none of
+    the test project's keys. Next, one PR each: `form-roundtrip`,
     `integration`, then e2e's build and shards. Once all are over, the
     sharing workarounds can go: row claims (`e2e/suiteRows.ts`), the
     `test-db-*` queues, the hidden `e2e-writes` community, and the 20s
-    `TEST_PROJECT_TIMEOUT`. Later, best practice would also replace the
-    copy with a seed kept in the repo (public content only), so CI
-    doesn't depend on the test project's state at all. Costs no money
-    (public repo); about 1–2 minutes a job.
+    `TEST_PROJECT_TIMEOUT`. Rebuild the seed
+    (`scripts/make-test-seed.mjs`) when a test needs content it lacks.
+    Costs no money (public repo); about 1–2 minutes a job.
 
 ### You decide
 

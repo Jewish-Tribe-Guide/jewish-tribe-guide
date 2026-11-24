@@ -1,0 +1,1266 @@
+[
+ {
+  "id": "0416d1ac-0555-4a12-afe3-7c7bfbc39294",
+  "slug": "hamburger-meat",
+  "label": "Hamburger Meat",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:13:58.094587+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "052d124a-c4da-40ae-8222-2e576f006b9a",
+  "slug": "frozen-herbs",
+  "label": "Frozen Herbs",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:55.573268+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "073bb8e7-85ff-4c02-bc42-d327027dd200",
+  "slug": "garlic-basil-cheese",
+  "label": "Garlic basil cheese",
+  "group": "more_kosher_items",
+  "created_at": "2026-10-21T19:08:57.52777+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "07bf07a8-45bf-4677-9d35-cb0542fc67a6",
+  "slug": "bakery",
+  "label": "Bakery",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:13:58.094587+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "0999c40f-4a4a-4564-9837-34a759c87688",
+  "slug": "kosher-noodles",
+  "label": "Kosher Noodles",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T14:20:51.804708+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "0b4ea5e4-026c-421f-a525-0a304e0144d0",
+  "slug": "avocado-toast",
+  "label": "Avocado Toast",
+  "group": "dishes",
+  "created_at": "2026-10-16T18:48:12.268205+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "0c6d1c80-12ab-4c99-8333-16244f79ab14",
+  "slug": "pancakes",
+  "label": "Pancakes",
+  "group": "dishes",
+  "created_at": "2026-10-16T18:48:12.268205+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "0d2be9a6-4bf4-4ef5-9772-cca708a60c0c",
+  "slug": "kosher-deli",
+  "label": "Kosher Deli",
+  "group": "kosher_product",
+  "created_at": "2026-06-08T02:59:09.080925+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "0d60287b-b729-4a00-9502-e2a0abf32197",
+  "slug": "sandwiches",
+  "label": "Sandwiches",
+  "group": "dishes",
+  "created_at": "2026-10-15T00:00:06.77076+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "13c5c961-3689-46f1-8d70-b31119cd5533",
+  "slug": "kosher-wine",
+  "label": "Kosher Wine",
+  "group": "kosher_product",
+  "created_at": "2026-06-08T02:59:09.080925+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "142267a6-f9fb-4612-a97f-3c8fbccad86c",
+  "slug": "italian-ice",
+  "label": "Italian Ice",
+  "group": "dishes",
+  "created_at": "2026-10-22T12:25:47.087355+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "14dde932-fdd6-4360-81e0-43d86a401571",
+  "slug": "prepared-shabbos-food",
+  "label": "Prepared Shabbos Food",
+  "group": "more_kosher_items",
+  "created_at": "2026-06-08T02:59:09.080925+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "18be2832-fb2e-4813-8382-ff6d9eecd80e",
+  "slug": "boursin",
+  "label": "Boursin",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:06:02.390722+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "1edfa7d5-6df8-41c1-8d3b-9ac353ee476e",
+  "slug": "locally-sourced",
+  "label": "Locally Sourced",
+  "group": "dietary_option",
+  "created_at": "2026-07-28T15:51:54.656076+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "1f34a5dc-3bc9-4423-b5a3-214cd90bcec8",
+  "slug": "frozen-custard",
+  "label": "Frozen Custard",
+  "group": "dishes",
+  "created_at": "2026-10-22T12:25:47.087355+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "1f599d94-bbf8-4847-a821-fa983ec2ba3e",
+  "slug": "pizza-bagels",
+  "label": "Pizza Bagels",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:13:56.942936+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "1f5b68f0-f59a-48cf-ad19-4d9149248d51",
+  "slug": "knishes",
+  "label": "Knishes",
+  "group": "dishes",
+  "created_at": "2026-10-21T12:23:58.338995+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "1fdd8ab2-5ce5-41b4-be88-f7621a1ee60e",
+  "slug": "kosher-salmon",
+  "label": "Kosher Salmon",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-19T20:04:37.49277+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "204e08a7-b22e-45f5-84ac-3e231201d4ea",
+  "slug": "vegetarian",
+  "label": "Vegetarian",
+  "group": "dietary_option",
+  "created_at": "2026-06-12T20:11:27.464044+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "21d2cf0f-92c8-45da-a104-0fc5da5a3741",
+  "slug": "fish-sandwiches",
+  "label": "Fish Sandwiches",
+  "group": "dishes",
+  "created_at": "2026-10-22T16:44:59.923123+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "21d2ebc6-feb3-4af7-95b2-12d9c1dfd463",
+  "slug": "kosher-oyster-sauce",
+  "label": "Kosher Oyster Sauce",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T14:20:51.804708+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "2437405f-df22-4dac-b4bc-66b72a21b2db",
+  "slug": "vegan",
+  "label": "Vegan",
+  "group": "dietary_option",
+  "created_at": "2026-06-12T20:11:27.464044+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "2491e803-2868-4647-a040-df40d5b6f508",
+  "slug": "marshmallows",
+  "label": "Marshmallows",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:10:54.25116+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "25299da9-47f3-4841-81f7-49772e9248f1",
+  "slug": "kosher-chicken",
+  "label": "Kosher Chicken",
+  "group": "kosher_product",
+  "created_at": "2026-06-15T20:13:43.647116+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "261a6154-7b93-46ae-a0d0-469a3c569c4a",
+  "slug": "sugar-free",
+  "label": "Sugar-free",
+  "group": "dietary_option",
+  "created_at": "2026-07-28T15:51:54.656076+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "2961dd7a-c1a7-4a4b-85aa-3707a101ad96",
+  "slug": "stew-meat",
+  "label": "Stew Meat",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:10:57.57632+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "2996d1c6-26d6-4b4f-ac61-431f803158a9",
+  "slug": "sliders",
+  "label": "Sliders",
+  "group": "dishes",
+  "created_at": "2026-10-14T23:59:51.000579+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "2a03ca5b-55f2-4412-9f91-65a44de6f870",
+  "slug": "ground-turkey",
+  "label": "Ground Turkey",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:13:56.942936+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "2c117402-b1ac-4e2f-a8b3-8ba8123da3ce",
+  "slug": "seitan",
+  "label": "Seitan",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:57.94978+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "2cf6fba9-a9a0-4b72-bd75-b0d79be20fcb",
+  "slug": "tofu",
+  "label": "Tofu",
+  "group": "dishes",
+  "created_at": "2026-07-28T03:05:57.94978+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "2ef41e65-0d49-428e-8882-7fd9cb25a9a6",
+  "slug": "hot-dogs",
+  "label": "Hot Dogs",
+  "group": "dishes",
+  "created_at": "2026-10-21T12:23:58.338995+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "30b43dfe-6779-400c-8314-871b322b8bcb",
+  "slug": "fried-calamari",
+  "label": "Fried Calamari",
+  "group": "dishes",
+  "created_at": "2026-10-14T23:59:51.000579+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "314d27e3-47b6-4145-a25a-715dd3467d4b",
+  "slug": "salmon",
+  "label": "Salmon",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:13:56.942936+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "317577e9-081d-4d64-a553-fb551b4d3297",
+  "slug": "beef",
+  "label": "Beef",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:10:57.550785+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "365bc34b-b03b-48af-91a5-73d7367b4e02",
+  "slug": "turkey",
+  "label": "Turkey",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:10:59.795877+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "3677400a-733a-4834-947c-b2e7bf24ee90",
+  "slug": "philly-cheesesteak",
+  "label": "Philly Cheesesteak",
+  "group": "dishes",
+  "created_at": "2026-10-14T23:59:47.924635+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "3ad92c9d-70ec-418b-87c2-6dceabb13414",
+  "slug": "nuggets",
+  "label": "Nuggets",
+  "group": "dishes",
+  "created_at": "2026-10-14T23:59:47.924635+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "3b9a6063-48ba-43d9-b1a0-17913aafadc1",
+  "slug": "nachos",
+  "label": "Nachos",
+  "group": "dishes",
+  "created_at": "2026-10-16T18:48:12.268205+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "3c0a63ed-4e10-4e42-b870-8cf0ea1a23ab",
+  "slug": "grilled-cheese",
+  "label": "Grilled Cheese",
+  "group": "dishes",
+  "created_at": "2026-10-14T23:59:51.000579+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "3d785748-ce48-4324-bc5d-7082dcfc1b08",
+  "slug": "kosher-ground-turkey",
+  "label": "Kosher Ground Turkey",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-19T20:04:37.49277+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "3e48ca85-f075-4a9b-a9da-a787fdd75c25",
+  "slug": "chicken-broth",
+  "label": "Chicken Broth",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:10:54.25116+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "3f06c78c-1afb-4e90-af7b-cbfb5cca6717",
+  "slug": "shredded-cheese",
+  "label": "Shredded Cheese",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:53.285036+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "41cef0c3-5377-44c0-b586-590b359943e2",
+  "slug": "govinda-s-chicken-cheesesteak",
+  "label": "Govinda's Chicken Cheesesteak",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:10:31.242215+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "420886e7-7ce2-4b91-bc70-8ac0977713db",
+  "slug": "wine",
+  "label": "Wine",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:05:51.212958+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "426577bf-03ac-4721-8bc9-453509ab93bf",
+  "slug": "samosa-salad",
+  "label": "Samosa Salad",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:10:31.242215+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "4387c9e2-d9ff-4ee2-834b-f58d47e50fa9",
+  "slug": "general-tso-s-seitan",
+  "label": "General Tso’s Seitan",
+  "group": "dishes",
+  "created_at": "2026-10-20T22:02:56.476729+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "43bec4a5-2fe2-43f4-b6d6-322bf4b3a89e",
+  "slug": "nut-free",
+  "label": "Nut-free",
+  "group": "dietary_option",
+  "created_at": "2026-07-28T15:51:54.656076+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "44bf7926-0619-46d3-acd1-6d374feb603c",
+  "slug": "salads",
+  "label": "Salads",
+  "group": "dishes",
+  "created_at": "2026-10-14T23:59:47.924635+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "45438043-f171-4b80-9f98-290e50db0d2b",
+  "slug": "kosher-mozzarella-cheese",
+  "label": "Kosher Mozzarella Cheese",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-19T20:07:09.594448+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "45d6dae6-ae05-4f0c-8c76-8cca51a0b155",
+  "slug": "butcher",
+  "label": "Butcher",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:16:22.032705+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "462453f6-0603-4c7c-8b92-63346941a165",
+  "slug": "tiramisu",
+  "label": "Tiramisu",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:39:05.79694+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "4630634d-a991-4b17-82c7-19eb321f6d8c",
+  "slug": "banana-pudding",
+  "label": "Banana Pudding",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:39:05.79694+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "4688fff6-8090-4db3-8672-875587f915cb",
+  "slug": "kosher-challah",
+  "label": "Kosher Challah",
+  "group": "kosher_product",
+  "created_at": "2026-06-08T10:39:22.96746+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "4b9bcf90-e595-49b8-b30c-c4d811b1c18e",
+  "slug": "eggplant-with-tofu",
+  "label": "Eggplant with Tofu",
+  "group": "dishes",
+  "created_at": "2026-10-20T22:02:56.476729+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "4fff466c-457d-452d-9d2a-79f831c94629",
+  "slug": "cookie-dough",
+  "label": "Cookie Dough",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:39:05.79694+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "54e609ae-e9d3-46ec-b75f-25f3e1d04649",
+  "slug": "chocolates",
+  "label": "Chocolates",
+  "group": "dishes",
+  "created_at": "2026-10-22T16:44:45.691117+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "5a59a3f2-dcea-4a5a-bfd4-928ec8eba1e9",
+  "slug": "kosher-style",
+  "label": "Kosher-style",
+  "group": "dietary_option",
+  "created_at": "2026-07-28T15:51:54.656076+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "5d8ed096-9512-4f78-b9a7-77bd17d3a761",
+  "slug": "borsht",
+  "label": "Borsht",
+  "group": "more_kosher_items",
+  "created_at": "2026-10-07T02:04:31.092468+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "6044b806-995f-4fbe-a8d2-5c8babeb86ce",
+  "slug": "bao-buns",
+  "label": "Bao Buns",
+  "group": "dishes",
+  "created_at": "2026-10-14T23:59:51.000579+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "618d45ec-9f17-407b-a933-7d7d34e28422",
+  "slug": "kosher-chuck-roast",
+  "label": "Kosher Chuck Roast",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-19T20:07:09.594448+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "63b7a1aa-c386-4c28-8ca0-f425c08c6586",
+  "slug": "cheddar-cheese",
+  "label": "Cheddar Cheese",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:10:57.57632+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "66794a08-d25e-4f82-a163-86e93aea9224",
+  "slug": "sabich",
+  "label": "Sabich",
+  "group": "dishes",
+  "created_at": "2026-11-03T01:49:26.652807+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "66aee901-70dc-47c1-b68c-e0077e69cbfb",
+  "slug": "organic",
+  "label": "Organic",
+  "group": "dietary_option",
+  "created_at": "2026-07-28T15:51:54.656076+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "6a841cc8-4fea-4e53-9394-fa49e61cec84",
+  "slug": "paleo",
+  "label": "Paleo",
+  "group": "dietary_option",
+  "created_at": "2026-07-28T15:51:54.656076+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "6a98e972-4c36-412a-aa28-e3a3f4b17502",
+  "slug": "tacos",
+  "label": "Tacos",
+  "group": "dishes",
+  "created_at": "2026-10-14T23:59:51.000579+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "6c958e5d-393e-4f79-b1f8-6ee955646a76",
+  "slug": "chuck-roast",
+  "label": "Chuck Roast",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:13:56.942936+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "70096efc-bdeb-4f06-9b52-2a1c61644245",
+  "slug": "halal-friendly",
+  "label": "Halal-friendly",
+  "group": "dietary_option",
+  "created_at": "2026-07-28T15:51:54.656076+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "703111d3-d2dd-413c-ad5b-e3369a6ef4bf",
+  "slug": "sesame-seitan",
+  "label": "Sesame Seitan",
+  "group": "dishes",
+  "created_at": "2026-10-20T22:02:56.476729+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "7989b143-40b3-4ef1-85d3-4f8f27024547",
+  "slug": "mozzarella-cheese",
+  "label": "Mozzarella Cheese",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T14:17:24.944042+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "79f0e178-4c02-4a88-a3c3-e88705cb98b6",
+  "slug": "potato-pierogis",
+  "label": "Potato Pierogis",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:13:56.942936+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "7b01e9f2-b87d-4d7a-a833-e24702034aa5",
+  "slug": "pareve-products",
+  "label": "Pareve Products",
+  "group": "kosher_product",
+  "created_at": "2026-06-08T02:59:09.080925+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "7bd7e208-022e-47dc-8291-a143b8b16079",
+  "slug": "benne-dosa",
+  "label": "Benne Dosa",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:10:31.242215+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "7c6a4829-703d-4d98-b803-c474c85dec52",
+  "slug": "kung-pao-dried-tofu",
+  "label": "Kung Pao Dried Tofu",
+  "group": "dishes",
+  "created_at": "2026-10-20T22:02:56.476729+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "80c42a09-bfac-476f-b7dd-572089f4dc57",
+  "slug": "dairy-free",
+  "label": "Dairy-free",
+  "group": "dietary_option",
+  "created_at": "2026-07-28T15:51:54.656076+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "848d6332-e5ba-4431-9243-d2b965269394",
+  "slug": "baked-goods",
+  "label": "Baked Goods",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:16:19.973791+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "85b85c2f-8087-4767-9428-500cb7ef9b16",
+  "slug": "pas-yisroel-bread",
+  "label": "Pas Yisroel Bread",
+  "group": "more_kosher_items",
+  "created_at": "2026-06-08T02:59:09.080925+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "876561e2-2bdd-4c78-ae7f-11ade1704a87",
+  "slug": "chipotle-cheese",
+  "label": "Chipotle cheese",
+  "group": "more_kosher_items",
+  "created_at": "2026-10-21T19:08:57.52777+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "8baebaf1-0b25-4fc6-98aa-9fcfed60acc7",
+  "slug": "cheese-sticks",
+  "label": "Cheese Sticks",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:06:00.209122+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "91ab70fd-2e83-4280-83ee-ea46fc247932",
+  "slug": "general-tso-s-tofu",
+  "label": "General Tso’s Tofu",
+  "group": "dishes",
+  "created_at": "2026-10-20T22:02:56.476729+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "966bcb9e-a86c-4e5b-bc80-55828795c99c",
+  "slug": "wraps",
+  "label": "Wraps",
+  "group": "dishes",
+  "created_at": "2026-10-22T16:44:59.923123+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "97e3171d-7587-499b-92cd-0f5c0b44212b",
+  "slug": "chicken-sandwiches",
+  "label": "Chicken Sandwiches",
+  "group": "dishes",
+  "created_at": "2026-10-22T16:44:59.923123+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "9826866c-19a3-4910-976f-ed9e6b3a49b3",
+  "slug": "kosher-frozen-products",
+  "label": "Kosher Frozen Products",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:06:03.538713+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "996d3161-069e-4eab-a863-e725b0247f81",
+  "slug": "hummus",
+  "label": "Hummus",
+  "group": "dishes",
+  "created_at": "2026-11-03T01:49:26.652807+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "9a6b4b35-b08a-4d36-86fb-5a3bd76cc66c",
+  "slug": "kosher-stew-meat",
+  "label": "Kosher Stew Meat",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:51.929779+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "9cae8674-a228-41d9-a8a4-ed2aba5c503a",
+  "slug": "cholov-yisroel-milk",
+  "label": "Cholov Yisroel Milk",
+  "group": "kosher_product",
+  "created_at": "2026-06-08T02:59:09.080925+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "9e806d10-ee92-4d38-bfca-26e03bb0cca0",
+  "slug": "low-carb",
+  "label": "Low-carb",
+  "group": "dietary_option",
+  "created_at": "2026-07-28T15:51:54.656076+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "a2c32170-1c8e-41c4-a771-cfca179f7a8f",
+  "slug": "cake-slices",
+  "label": "Cake Slices",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:39:05.79694+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "a34afa11-740c-45b2-9e0a-aa3a62e444b7",
+  "slug": "kosher-cheese",
+  "label": "Kosher Cheese",
+  "group": "kosher_product",
+  "created_at": "2026-06-08T02:59:09.080925+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "a376a559-4a51-4d07-b007-9bc5ee1c1a74",
+  "slug": "kosher-fish",
+  "label": "Kosher Fish",
+  "group": "more_kosher_items",
+  "created_at": "2026-06-08T02:59:09.080925+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "a3a28fce-5405-4d6d-9576-b668e4702861",
+  "slug": "challah",
+  "label": "Challah",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:10:49.454212+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "a3f61780-ef0d-4117-85f6-b5d5314ed1e6",
+  "slug": "kosher-tofu",
+  "label": "Kosher Tofu",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T14:20:51.804708+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "a5c69ac4-2897-4fef-8456-70351ae6765a",
+  "slug": "kosher-butcher",
+  "label": "Kosher Butcher",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:50.785126+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "a671289b-3e60-4ac9-a68a-874ad105cf7b",
+  "slug": "meatballs",
+  "label": "Meatballs",
+  "group": "dishes",
+  "created_at": "2026-10-14T23:59:51.000579+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "a77c7b87-237e-43e7-89fe-b98cf0c556b0",
+  "slug": "chocolate-covered-oreos",
+  "label": "Chocolate-Covered Oreos",
+  "group": "dishes",
+  "created_at": "2026-10-22T16:44:45.691117+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "a7904c8d-667d-4743-aad6-596aa684ea09",
+  "slug": "chicken",
+  "label": "Chicken",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:10:50.433013+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "a9429e5f-581c-4fb8-b398-e4f755e136ac",
+  "slug": "chalav-yisroel-milk",
+  "label": "Chalav Yisroel Milk",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T14:17:24.944042+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "aaa5f24b-adc3-4014-b017-4eb28d8e1374",
+  "slug": "frozen-products",
+  "label": "Frozen Products",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:05:53.496694+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "abbfe83c-dd3e-4608-aa5f-b08946b78809",
+  "slug": "bean-curd-home-style",
+  "label": "Bean Curd Home Style",
+  "group": "dishes",
+  "created_at": "2026-10-20T22:02:56.476729+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "aca1815f-b57d-49b9-8a37-4eca9cf15b55",
+  "slug": "pretzel-dogs",
+  "label": "Pretzel Dogs",
+  "group": "dishes",
+  "created_at": "2026-10-22T12:25:54.578984+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "affe8c20-97e6-4474-b5f2-5bcb253b3377",
+  "slug": "some-cheeses",
+  "label": "Some Cheeses",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:55.573268+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "b09f08e4-3ca3-4e55-a209-6df99cf8acb5",
+  "slug": "fresh-fish-counter",
+  "label": "Fresh Fish Counter",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-27T20:22:46.934946+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "b0f2efc7-a727-4e33-97cd-370922686f03",
+  "slug": "breakfast-tacos",
+  "label": "Breakfast Tacos",
+  "group": "dishes",
+  "created_at": "2026-10-16T18:48:12.268205+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "b4cd6a10-fd73-44ba-9a07-3f38e4449344",
+  "slug": "kosher-marshmallows",
+  "label": "Kosher Marshmallows",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:51.929779+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "b517a3dd-fd53-47cf-bf90-25c128165709",
+  "slug": "large-selection-of-cheese",
+  "label": "Large Selection of Cheese",
+  "group": "kosher_product",
+  "created_at": "2026-07-28T03:05:59.102679+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "b51ab634-47f7-4310-ad26-3923c5a538ba",
+  "slug": "brownies",
+  "label": "Brownies",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:39:05.79694+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "b5667164-d5dd-4669-9d1b-b3008d114347",
+  "slug": "kosher-goat-cheese",
+  "label": "Kosher Goat Cheese",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:49.192536+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "b9197d8b-3a07-4f54-9340-e38891633fec",
+  "slug": "kosher-ground-beef",
+  "label": "Kosher Ground Beef",
+  "group": "kosher_product",
+  "created_at": "2026-07-28T03:05:49.192536+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "ba27116b-02fc-442c-85e2-55ee1df0f4cd",
+  "slug": "kichari",
+  "label": "Kichari",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:10:31.242215+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "bafc6df7-0dc2-47f3-9725-9eb956f5e180",
+  "slug": "cupcakes",
+  "label": "Cupcakes",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:39:05.79694+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "bd8155bf-ba77-45a2-a005-d64ef486592e",
+  "slug": "zucchini-crabcake-slider",
+  "label": "Zucchini Crabcake Slider",
+  "group": "dishes",
+  "created_at": "2026-10-16T18:48:15.810691+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "bd817a8e-799d-478d-8c58-3990d547b4cf",
+  "slug": "macaroons",
+  "label": "Macaroons",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:39:05.79694+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "beb333d0-1b1c-4934-8676-2df3791ea5d5",
+  "slug": "falafel",
+  "label": "Falafel",
+  "group": "dishes",
+  "created_at": "2026-11-03T01:49:26.652807+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "bf860ea0-5b58-4942-bfbf-c4f79035aa87",
+  "slug": "glatt-kosher-meat",
+  "label": "Glatt Kosher Meat",
+  "group": "more_kosher_items",
+  "created_at": "2026-06-08T02:59:09.080925+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "c024061b-dbf6-4052-822f-a061caf12be3",
+  "slug": "brie",
+  "label": "Brie",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:06:02.390722+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "c92af178-2d12-4de9-93f6-373f7242da60",
+  "slug": "pretzels",
+  "label": "Pretzels",
+  "group": "dishes",
+  "created_at": "2026-10-22T12:25:54.578984+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "c9a7fa96-7b7b-4f73-b778-d441b2acf80e",
+  "slug": "kosher-chicken-broth",
+  "label": "Kosher Chicken Broth",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:06:04.746144+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "cad869f1-7e80-4261-973c-25f789e15bc7",
+  "slug": "kosher-pizza-bagels",
+  "label": "Kosher Pizza Bagels",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:49.192536+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "cc6fc80b-2800-41e3-a98d-be85672fe1c7",
+  "slug": "mushroom-delight",
+  "label": "Mushroom Delight",
+  "group": "dishes",
+  "created_at": "2026-10-20T22:02:56.476729+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "ce0c4860-240a-4521-8fea-61abc7f49ea5",
+  "slug": "burgers",
+  "label": "Burgers",
+  "group": "dishes",
+  "created_at": "2026-10-14T23:59:47.924635+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "cf81dc98-6c20-47d3-a111-99997e820331",
+  "slug": "oyster-sauce",
+  "label": "Oyster Sauce",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:57.94978+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "d446d50e-bc78-4255-a385-f3637f38d0ed",
+  "slug": "donuts",
+  "label": "Donuts",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:06:02.390722+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "d4f2db55-3aa2-4c36-b593-d83026ffb37b",
+  "slug": "noodles",
+  "label": "Noodles",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:57.94978+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "d67e6e75-a6d0-465d-98c4-4203eb78ea47",
+  "slug": "korean-fried-tofu",
+  "label": "Korean Fried Tofu",
+  "group": "dishes",
+  "created_at": "2026-10-14T23:59:51.000579+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "d7aa5d6e-d84b-4253-a17c-04d386fd71bf",
+  "slug": "pasta",
+  "label": "Pasta",
+  "group": "dishes",
+  "created_at": "2026-10-14T23:59:51.000579+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "d8478534-a405-42b0-94b3-96b1543d8a5e",
+  "slug": "kosher-cheddar-cheese",
+  "label": "Kosher Cheddar Cheese",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:51.929779+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "d9e530e0-c59b-4b14-8236-0048496ecce8",
+  "slug": "spinach-cheese-pocket",
+  "label": "Spinach & Cheese Pocket",
+  "group": "dishes",
+  "created_at": "2026-10-22T12:25:54.578984+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "daa894ae-77c6-4503-a6a0-53988bd7cd68",
+  "slug": "kosher-potato-pierogis",
+  "label": "Kosher Potato Pierogis",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:49.192536+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "dadb01cc-15c6-48a1-83fe-d89c0b816976",
+  "slug": "soups",
+  "label": "Soups",
+  "group": "dishes",
+  "created_at": "2026-10-22T16:42:59.779071+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "db362783-fe38-4cb7-a339-fefd3e30a22d",
+  "slug": "camembert",
+  "label": "Camembert",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:06:02.390722+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "dc536ec9-39dc-48ab-b65b-2e3916c99635",
+  "slug": "apple-turnover",
+  "label": "Apple Turnover",
+  "group": "dishes",
+  "created_at": "2026-10-22T12:25:54.578984+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "ddfb8c12-e37b-4c3b-857f-527ceb222a18",
+  "slug": "kofta-bowl",
+  "label": "Kofta Bowl",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:10:31.242215+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "df44495c-3dff-4a77-bece-79144a517076",
+  "slug": "some-sliced-cheese",
+  "label": "Some Sliced Cheese",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:53.285036+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "e126c76a-7e28-49c0-9a13-27c80fbdaf46",
+  "slug": "deli",
+  "label": "Deli",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:10:49.454212+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "e1407d6f-11cd-4546-9ab5-f27859ebb7c5",
+  "slug": "pretzel-buns",
+  "label": "Pretzel Buns",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:06:02.390722+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "e1754919-4bf0-4c94-8522-04b03592bab5",
+  "slug": "bars",
+  "label": "Bars",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:39:05.79694+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "e312b9f3-40a7-494c-a587-d39722c7c3f5",
+  "slug": "bagels",
+  "label": "Bagels",
+  "group": "dishes",
+  "created_at": "2026-10-22T16:44:09.614296+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "e4fa9276-5eb8-4387-8764-a859393a7812",
+  "slug": "kosher-turkey",
+  "label": "Kosher Turkey",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:56.72367+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "e53dbdb9-f833-4d18-9ea7-bdcafebf5159",
+  "slug": "kofta",
+  "label": "Kofta",
+  "group": "dishes",
+  "created_at": "2026-10-14T23:59:51.000579+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "e57e3525-788e-464d-b0e5-4577ac3ceb24",
+  "slug": "sliced-cheeses",
+  "label": "Sliced Cheeses",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:06:01.295169+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "e8bf6e61-675b-4c34-9d50-6ab7be2ad189",
+  "slug": "premade-shabbat-meals",
+  "label": "Premade Shabbat Meals",
+  "group": "more_kosher_items",
+  "created_at": "2026-08-14T20:38:42.18055+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "e9893857-baf2-4c66-aded-6d7711809539",
+  "slug": "gluten-free",
+  "label": "Gluten-free",
+  "group": "dietary_option",
+  "created_at": "2026-06-12T20:11:27.464044+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "eac39509-3657-470f-a920-71e439cd56c6",
+  "slug": "kosher-beef",
+  "label": "Kosher Beef",
+  "group": "kosher_product",
+  "created_at": "2026-07-28T03:05:51.929779+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "ec784bcb-7a6f-48f8-831c-41b0a43d67ef",
+  "slug": "lox",
+  "label": "lox",
+  "group": "kosher_product",
+  "created_at": "2026-06-09T01:57:06.112651+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "eccaa5aa-139d-4a1f-b0e3-b9138feb1d3d",
+  "slug": "european-style-butter",
+  "label": "European Style Butter",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:05:54.41557+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "eebd060c-b50d-4625-a158-9d23049330c6",
+  "slug": "cheese",
+  "label": "Cheese",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T16:10:49.454212+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "ef96786d-9087-4964-af58-2b3b688001c7",
+  "slug": "kofta-ball-sub",
+  "label": "Kofta Ball Sub",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:10:31.242215+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "f15df8a6-e949-4797-b594-4b6eaf80ad94",
+  "slug": "chocolate-covered-pretzels",
+  "label": "Chocolate-Covered Pretzels",
+  "group": "dishes",
+  "created_at": "2026-10-22T16:44:45.691117+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "f53f1229-8bdf-4672-afba-93fb5b9a9b2b",
+  "slug": "veggie-steak",
+  "label": "Veggie Steak",
+  "group": "dishes",
+  "created_at": "2026-10-20T22:02:56.476729+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "f5e7cb94-8456-4691-a675-18be646e43f0",
+  "slug": "kosher-hamburger-meat",
+  "label": "Kosher Hamburger Meat",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-19T20:04:37.49277+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "f71e21ba-87a3-4047-8f74-103a8ec51733",
+  "slug": "deli-sandwiches",
+  "label": "Deli Sandwiches",
+  "group": "dishes",
+  "created_at": "2026-10-21T12:23:58.338995+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "f918ad10-2ae8-4cfb-ae37-948918e97949",
+  "slug": "cookies",
+  "label": "Cookies",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:39:05.79694+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "f9fb3b14-f80d-4491-a047-c62bc0ac4018",
+  "slug": "kosher-baked-goods",
+  "label": "Kosher Baked Goods",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-27T20:22:47.945494+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "fb5159d2-e7d6-47ee-b88a-a4948e254643",
+  "slug": "hari-bowl",
+  "label": "Hari Bowl",
+  "group": "dishes",
+  "created_at": "2026-10-08T00:10:31.242215+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "fd9f91e8-3766-4d31-9f22-6bfef99ed863",
+  "slug": "goat-cheese",
+  "label": "Goat Cheese",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T03:06:02.390722+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "fda94d61-2f3d-418b-a1c6-8dae92eb1c04",
+  "slug": "breakfast-sandwiches",
+  "label": "Breakfast Sandwiches",
+  "group": "dishes",
+  "created_at": "2026-10-22T16:44:59.923123+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "fe56236f-11a4-414c-86c8-f0de13b10c5a",
+  "slug": "kosher-seitan",
+  "label": "Kosher Seitan",
+  "group": "more_kosher_items",
+  "created_at": "2026-07-28T14:20:51.804708+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "fece91ab-ac0a-4335-ae4c-5d13ce37ada2",
+  "slug": "chicken-tenders",
+  "label": "Chicken tenders",
+  "group": "more_kosher_items",
+  "created_at": "2026-10-07T02:58:36.037606+00:00",
+  "community_id": "philly"
+ },
+ {
+  "id": "ff293c17-a14b-4989-b194-f40c15c5d9da",
+  "slug": "kosher-bakery",
+  "label": "Kosher Bakery",
+  "group": "more_kosher_items",
+  "created_at": "2026-06-08T02:59:09.080925+00:00",
+  "community_id": "philly"
+ }
+]
