@@ -9,9 +9,9 @@ import { openAdmin } from './helpers'
 // submission, editing a category, previewing settings).
 //
 // Runs in the `admin` project (see playwright.config.ts), which reuses the
-// session e2e/auth.setup.ts mints via the service-role key — the real
-// production admin address in SUPERADMIN_EMAILS, since there is no separate
-// test-admin account.
+// session e2e/auth.setup.ts mints via the service-role key, as philly's
+// own first admin: the seed's made-up one in CI, a real admin against
+// production.
 //
 // DELIBERATELY READ-ONLY. Two independent reasons, either one sufficient on
 // its own:

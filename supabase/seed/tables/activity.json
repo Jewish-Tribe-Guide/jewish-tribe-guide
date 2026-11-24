@@ -1,0 +1,1247 @@
+[
+ {
+  "id": 10432,
+  "community_id": "philly",
+  "resource_id": "f339bc42-19a8-427f-b46f-cb89eb7779c2",
+  "kind": "item_confirmed",
+  "source": "visitor",
+  "field_key": "dishes",
+  "item": "Salads",
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-15T14:00:00+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 10433,
+  "community_id": "philly",
+  "resource_id": "751cddf5-20ae-46d7-8e0f-4af63b4a4f35",
+  "kind": "listing_confirmed",
+  "source": "visitor",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-15T13:00:00+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 10434,
+  "community_id": "philly",
+  "resource_id": "1ab90837-1d41-4b8e-ab36-1409d4543b70",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-14T22:00:00+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "hours",
+    "label": "Hours",
+    "value": "Sunday 11 AM – 10 PM"
+   }
+  ]
+ },
+ {
+  "id": 10435,
+  "community_id": "philly",
+  "resource_id": "6d0c02fc-b3fd-440b-91da-138e701c55fd",
+  "kind": "item_added",
+  "source": "submission",
+  "field_key": "m",
+  "item": "Marshmallows",
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-14T16:00:00+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 10436,
+  "community_id": "philly",
+  "resource_id": "932ce52d-72ce-47f3-96a3-b5fafa8feddf",
+  "kind": "listing_added",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-13T19:00:00+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "facts",
+    "label": "",
+    "quiet": true,
+    "value": "Vegan Dine In · Restaurant · Parve · IKC"
+   }
+  ]
+ },
+ {
+  "id": 10437,
+  "community_id": "philly",
+  "resource_id": "dacc7adb-4f2c-4545-9cd1-5ec546cdb995",
+  "kind": "listing_edited",
+  "source": "google",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-13T15:00:00+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "hours",
+    "label": "Hours",
+    "value": "Sunday 9 AM – 8 PM"
+   }
+  ]
+ },
+ {
+  "id": 10438,
+  "community_id": "philly",
+  "resource_id": "dacc7adb-4f2c-4545-9cd1-5ec546cdb995",
+  "kind": "item_reported_gone",
+  "source": "visitor",
+  "field_key": "m",
+  "item": "Pretzel Buns",
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-13T00:00:00+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 10439,
+  "community_id": "philly",
+  "resource_id": "6d0c02fc-b3fd-440b-91da-138e701c55fd",
+  "kind": "listing_confirmed",
+  "source": "visitor",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-11T17:00:00+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 10440,
+  "community_id": "philly",
+  "resource_id": "78da8ef4-72b5-45d6-8c32-2c763e0e2a90",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-10T14:00:00+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "minyanim",
+    "label": "",
+    "value": "Shabbos Shacharis 10:45 AM"
+   }
+  ]
+ },
+ {
+  "id": 10441,
+  "community_id": "philly",
+  "resource_id": "f339bc42-19a8-427f-b46f-cb89eb7779c2",
+  "kind": "item_confirmed",
+  "source": "visitor",
+  "field_key": "dishes",
+  "item": "Deli Sandwiches",
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-10T13:00:00+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 10442,
+  "community_id": "philly",
+  "resource_id": "03b59841-6b10-41bb-86ea-02558b5a40c7",
+  "kind": "listing_confirmed",
+  "source": "visitor",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-10T01:00:00+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 10443,
+  "community_id": "philly",
+  "resource_id": "8df82bda-233e-4a93-a00f-c2d1cb533853",
+  "kind": "listing_added",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-07T18:00:00+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 10444,
+  "community_id": "philly",
+  "resource_id": "a12d7744-d346-4978-9952-25172ba9a543",
+  "kind": "listing_edited",
+  "source": "google",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-06T15:00:00+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 10445,
+  "community_id": "philly",
+  "resource_id": "fb212e9e-e820-46a6-bef7-4707520027a3",
+  "kind": "item_added",
+  "source": "submission",
+  "field_key": "dishes",
+  "item": "Salads",
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-05T23:00:00+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 10446,
+  "community_id": "philly",
+  "resource_id": "f339bc42-19a8-427f-b46f-cb89eb7779c2",
+  "kind": "listing_confirmed",
+  "source": "visitor",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-03T14:00:00+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 6631,
+  "community_id": "philly",
+  "resource_id": "af8839dc-65ee-43f8-af68-436469dc644e",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-03T01:51:39.22126+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "women_s_notes",
+    "label": "Women’s Notes",
+    "value": "To make an apppointment please call or text. Mikvah Moishe Zvi is kosher for women and open to married women by appointment only. A thorough cleaning and filtering process is gone through before every woman’s appointment. 48 hours notice is required*. *Exceptions can be made for unexpected circumstances."
+   }
+  ]
+ },
+ {
+  "id": 6630,
+  "community_id": "philly",
+  "resource_id": "af8839dc-65ee-43f8-af68-436469dc644e",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-03T01:51:30.259974+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "men_s_notes",
+    "label": "Men's Notes",
+    "value": "To gain access to the mikvah please call or text. Mikvah Moishe Zvi is conveniently accessible via a combination lock so visitors can let themselves in on their own schedule."
+   }
+  ]
+ },
+ {
+  "id": 6629,
+  "community_id": "philly",
+  "resource_id": "9fb02fcc-3b1c-421d-b390-397f4ab21933",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-03T01:51:15.029439+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "minyanim_schedules",
+    "label": "New:",
+    "value": "Times for Nov 1 – Nov 7 times"
+   }
+  ]
+ },
+ {
+  "id": 6628,
+  "community_id": "philly",
+  "resource_id": "088343a1-e9b6-4735-8c2e-4b1654bf0454",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-03T01:50:20.41368+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "women_s_notes",
+    "label": "Women’s Notes",
+    "value": "On Shabbos, the mikvah is open by appointment only, one hour after candle-lighting time.\n\nOn Motzei Shabbos, the mikvah will be open for 2 hours, beginning 2 hours after candle lighting time.\n\nPlease call the mikvah before 9:00 PM if you are going to be arriving after the last appointment time. A late fee will apply."
+   }
+  ]
+ },
+ {
+  "id": 6627,
+  "community_id": "philly",
+  "resource_id": "73f459cb-16e7-4aa6-8401-9685c24c22a7",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-03T01:49:27.055436+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "phone",
+    "label": "Phone",
+    "value": "(267) 317-7709"
+   }
+  ]
+ },
+ {
+  "id": 10447,
+  "community_id": "philly",
+  "resource_id": "4a7a7af4-724c-4667-823b-df037f06cb00",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-03T01:00:00+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 6536,
+  "community_id": "philly",
+  "resource_id": "751cddf5-20ae-46d7-8e0f-4af63b4a4f35",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-02T19:45:10.998085+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "minyanim",
+    "label": "",
+    "value": "Weekday Shacharis 7 AM"
+   }
+  ]
+ },
+ {
+  "id": 6535,
+  "community_id": "philly",
+  "resource_id": "751cddf5-20ae-46d7-8e0f-4af63b4a4f35",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-11-02T19:44:43.028615+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "minyanim",
+    "label": "",
+    "value": "Shabbos Shacharis 9:15 AM"
+   }
+  ]
+ },
+ {
+  "id": 2194,
+  "community_id": "philly",
+  "resource_id": "e77b2b73-0d46-4802-a09f-46b30087758a",
+  "kind": "listing_removed",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:45:58.553576+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 2193,
+  "community_id": "philly",
+  "resource_id": "e77b2b73-0d46-4802-a09f-46b30087758a",
+  "kind": "listing_added",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:45:13.105711+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "facts",
+    "label": "",
+    "quiet": true,
+    "value": "Ice Cream & Treats · Keystone-K"
+   }
+  ]
+ },
+ {
+  "id": 2192,
+  "community_id": "philly",
+  "resource_id": "844da99a-4d98-4387-8e50-f02974eca200",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:45:00.959545+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "kosherCert",
+    "label": "Kosher Certification",
+    "value": "Keystone-K, IKC"
+   }
+  ]
+ },
+ {
+  "id": 2191,
+  "community_id": "philly",
+  "resource_id": "1166719b-a33b-498d-8fdb-59e10dff6ee0",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:44:46.167692+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "t",
+    "label": "Food Type",
+    "value": "Dairy, Parve"
+   }
+  ]
+ },
+ {
+  "id": 2190,
+  "community_id": "philly",
+  "resource_id": "4a2318cb-0944-4bad-a9ac-b9134b033f31",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:44:33.519938+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "kosherCert",
+    "label": "Kosher Certification",
+    "value": "None"
+   }
+  ]
+ },
+ {
+  "id": 2189,
+  "community_id": "philly",
+  "resource_id": "36fdf7e1-0891-4255-9c53-caa3fd6617b9",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:44:25.495473+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "t",
+    "label": "Food Type",
+    "value": "Dairy"
+   }
+  ]
+ },
+ {
+  "id": 2188,
+  "community_id": "philly",
+  "resource_id": "ffcb3a7b-bc6f-4ce2-8c17-0421bac1e321",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:44:10.2137+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "t",
+    "label": "Food Type",
+    "value": "Dairy, Parve"
+   }
+  ]
+ },
+ {
+  "id": 2187,
+  "community_id": "philly",
+  "resource_id": "5e3f23d2-d533-458a-89b5-edd1af7147bf",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:43:00.184408+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "kosherCert",
+    "label": "Kosher Certification",
+    "value": "None"
+   }
+  ]
+ },
+ {
+  "id": 2183,
+  "community_id": "philly",
+  "resource_id": "96a4fd9b-6b3d-4e6c-b1f4-df40daaf7f7e",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:18:27.369758+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "minyanim",
+    "label": "New:",
+    "value": "Friday Mincha & Maariv 6 PM"
+   }
+  ]
+ },
+ {
+  "id": 2182,
+  "community_id": "philly",
+  "resource_id": "ff812262-35f2-4b8f-b995-be348ce01bb1",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:18:18.774786+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "minyanim",
+    "label": "",
+    "value": "Sun–Thu Mincha & Maariv 15 min before Sunset · Summer only · Sign-up: chat.whatsapp.com/LsoBVmlxG4Z6qRKM1ZooGJ"
+   },
+   {
+    "key": "minyanim",
+    "label": "New:",
+    "value": "Friday Mincha & Maariv 7 PM · Summer; includes Kabbalat Shabbat"
+   }
+  ]
+ },
+ {
+  "id": 2181,
+  "community_id": "philly",
+  "resource_id": "9fb02fcc-3b1c-421d-b390-397f4ab21933",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:18:07.874033+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "minyanim",
+    "label": "New:",
+    "value": "Kabbalas Shabbos 6:30 PM"
+   }
+  ]
+ },
+ {
+  "id": 2180,
+  "community_id": "philly",
+  "resource_id": "2497de4e-2e6a-4b1f-a703-b3272a224794",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:17:59.067776+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "minyanim_schedules",
+    "label": "New:",
+    "value": "Shabbat Lekh Lekha times"
+   }
+  ]
+ },
+ {
+  "id": 2179,
+  "community_id": "philly",
+  "resource_id": "4a7a7af4-724c-4667-823b-df037f06cb00",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:17:50.819974+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "minyanim",
+    "label": "New:",
+    "value": "Sun–Thu Mincha & Maariv Approximately 15 minutes before shkiah."
+   },
+   {
+    "key": "minyanim",
+    "label": "New:",
+    "value": "Friday Mincha & Maariv 7 PM · Summer only · Mincha followed by Kabbalat Shabbat"
+   },
+   {
+    "key": "minyanim",
+    "label": "New:",
+    "value": "Friday Mincha & Maariv within 5 minutes of candle-lighting · Winter only"
+   },
+   {
+    "key": "minyanim",
+    "label": "New:",
+    "value": "Shabbos Shacharis 8:30 AM · in the Chapel"
+   },
+   {
+    "key": "minyanim",
+    "label": "New:",
+    "value": "Shabbos Shacharis 9 AM · Main Sanctuary Minyan"
+   },
+   {
+    "key": "minyanim",
+    "label": "New:",
+    "value": "Shabbos Mincha approximately 45 minutes before shkiya · followed by Seudah Shlishit"
+   },
+   {
+    "key": "minyanim",
+    "label": "New:",
+    "value": "Shabbos Maariv within 5 minutes of the time for Havdala"
+   },
+   {
+    "key": "minyanim",
+    "label": "No longer listed:",
+    "value": "Sun–Thu Mincha & Maariv 15 min before Sunset"
+   },
+   {
+    "key": "minyanim",
+    "label": "No longer listed:",
+    "value": "Kabbalas Shabbos 7 PM · Summer only"
+   },
+   {
+    "key": "minyanim",
+    "label": "No longer listed:",
+    "value": "Friday Mincha 15 min before Sunset"
+   },
+   {
+    "key": "minyanim",
+    "label": "No longer listed:",
+    "value": "Shabbos Shacharis 9 AM"
+   }
+  ]
+ },
+ {
+  "id": 2178,
+  "community_id": "philly",
+  "resource_id": "4a7a7af4-724c-4667-823b-df037f06cb00",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:17:45.188914+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "minyanim",
+    "label": "",
+    "value": "Sun, Sat Shacharis 8 AM"
+   },
+   {
+    "key": "minyanim",
+    "label": "New:",
+    "value": "Kabbalas Shabbos 7 PM · Summer only"
+   },
+   {
+    "key": "minyanim",
+    "label": "New:",
+    "value": "Friday Mincha 15 min before Sunset"
+   },
+   {
+    "key": "minyanim",
+    "label": "New:",
+    "value": "Shabbos Shacharis 9 AM · in the Chapel"
+   }
+  ]
+ },
+ {
+  "id": 2177,
+  "community_id": "philly",
+  "resource_id": "4a7a7af4-724c-4667-823b-df037f06cb00",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T16:17:39.13379+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "minyanim_schedules",
+    "label": "New:",
+    "value": "Times for Oct 21 – Oct 24 times"
+   },
+   {
+    "key": "minyanim",
+    "label": "",
+    "value": "Sun–Thu Mincha & Maariv 15 min before Sunset"
+   }
+  ]
+ },
+ {
+  "id": 2167,
+  "community_id": "philly",
+  "resource_id": "fb2b6b36-783a-4a7c-ae82-6ac6af9e4261",
+  "kind": "listing_removed",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T14:36:52.460508+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 2166,
+  "community_id": "philly",
+  "resource_id": "a43c070b-40f1-4fe7-95fb-f8591153fb33",
+  "kind": "listing_removed",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T14:36:18.09847+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 2165,
+  "community_id": "philly",
+  "resource_id": "6ee80eba-8984-44cb-941e-b2752faf7ab9",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T14:30:48.258441+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "minyanim_schedules",
+    "label": "New:",
+    "value": "Fri Oct 30 times"
+   }
+  ]
+ },
+ {
+  "id": 2122,
+  "community_id": "philly",
+  "resource_id": "1622cdaf-521c-4cff-9149-ab24e2caa7d2",
+  "kind": "listing_added",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T12:26:15.324368+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "facts",
+    "label": "",
+    "quiet": true,
+    "value": "Restaurant · KCL"
+   }
+  ]
+ },
+ {
+  "id": 2121,
+  "community_id": "philly",
+  "resource_id": "42ddd1ae-79ad-48d7-b589-2e011b803e9c",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T12:25:54.932657+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "t",
+    "label": "Food Type",
+    "value": "Parve"
+   }
+  ]
+ },
+ {
+  "id": 2120,
+  "community_id": "philly",
+  "resource_id": "ad7afdb4-b8d7-4c5c-a620-f88b901ed1c2",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T12:25:47.623533+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "t",
+    "label": "Food Type",
+    "value": "Dairy, Parve"
+   }
+  ]
+ },
+ {
+  "id": 2116,
+  "community_id": "philly",
+  "resource_id": "adeb501e-48da-4a7f-9568-57e11e52e490",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T12:24:55.2578+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "t",
+    "label": "Food Type",
+    "value": "Dairy, Parve"
+   },
+   {
+    "key": "dishes",
+    "label": "Main dishes",
+    "value": "taken off Italian Ice, Frozen Custard"
+   }
+  ]
+ },
+ {
+  "id": 2115,
+  "community_id": "philly",
+  "resource_id": "7922bbcc-e0b5-4ccd-9289-af7862e898ac",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T12:24:48.522035+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "t",
+    "label": "Food Type",
+    "value": "Dairy"
+   },
+   {
+    "key": "dishes",
+    "label": "Main dishes",
+    "value": "taken off Acai Bowls, Mango Bowls, Pitaya Bowls, Coconut Bowls, Green Bowls, Banana Bowls, Oatmeal"
+   }
+  ]
+ },
+ {
+  "id": 2107,
+  "community_id": "philly",
+  "resource_id": "af8839dc-65ee-43f8-af68-436469dc644e",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T12:19:04.980906+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "women_s_notes",
+    "label": "Women’s Notes",
+    "value": "To make an apppointment please call or text\nMikvah Moishe Zvi is kosher for women and open to married women by appointment only. 48 hours notice is required*."
+   }
+  ]
+ },
+ {
+  "id": 2106,
+  "community_id": "philly",
+  "resource_id": "af8839dc-65ee-43f8-af68-436469dc644e",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-22T12:18:59.979509+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "men_s_notes",
+    "label": "Men's Notes",
+    "value": "To gain access to the mikvah please call or text\nMikvah Moishe Zvi is conveniently accessible via a combination lock so visitors can let themselves in on their own schedule."
+   }
+  ]
+ },
+ {
+  "id": 2006,
+  "community_id": "philly",
+  "resource_id": "7cab8a86-d70a-4037-8c8d-22a325fb09b7",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-21T23:17:53.624635+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "t",
+    "label": "Food Type",
+    "value": "Dairy"
+   },
+   {
+    "key": "dishes",
+    "label": "Main dishes",
+    "value": "taken off Pura Vida, Tropical, Nutella Bowl, Power Bowl, Dragonberry, Electric Mermaid, Coco Berry, Lola, Mucho Mango Bowl, Booster Bowl"
+   }
+  ]
+ },
+ {
+  "id": 2005,
+  "community_id": "philly",
+  "resource_id": "727f6593-25e1-42dc-9bb9-cbe995a2f9c3",
+  "kind": "listing_removed",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-21T23:17:21.110489+00:00",
+  "hidden_at": null,
+  "changes": null
+ },
+ {
+  "id": 2004,
+  "community_id": "philly",
+  "resource_id": "36fdf7e1-0891-4255-9c53-caa3fd6617b9",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-21T23:17:14.889908+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "t",
+    "label": "Food Type",
+    "value": "None"
+   },
+   {
+    "key": "kosherCert",
+    "label": "Kosher Certification",
+    "value": "Keystone-K, Cherry-K"
+   }
+  ]
+ },
+ {
+  "id": 2003,
+  "community_id": "philly",
+  "resource_id": "36fdf7e1-0891-4255-9c53-caa3fd6617b9",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-21T23:17:06.465446+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "t",
+    "label": "Food Type",
+    "value": "Dairy"
+   },
+   {
+    "key": "dishes",
+    "label": "Main dishes",
+    "value": "taken off Bundt Cakes"
+   }
+  ]
+ },
+ {
+  "id": 2002,
+  "community_id": "philly",
+  "resource_id": "57d423c5-bce3-49a3-b83f-a15fc863b18d",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-21T23:16:58.562911+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "t",
+    "label": "Food Type",
+    "value": "Dairy"
+   },
+   {
+    "key": "kosherCert",
+    "label": "Kosher Certification",
+    "value": "Cherry-K, Keystone-K"
+   },
+   {
+    "key": "k",
+    "label": "Kosher Certification URL",
+    "value": "keystone-k.org/kosher/nothing-bundt-cakes-marlton"
+   },
+   {
+    "key": "dishes",
+    "label": "Main dishes",
+    "value": "taken off Bundt Cakes"
+   }
+  ]
+ },
+ {
+  "id": 2001,
+  "community_id": "philly",
+  "resource_id": "191d9359-e9e2-4069-9d5e-1e50cf61d285",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-21T23:16:32.579354+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "t",
+    "label": "Food Type",
+    "value": "Dairy"
+   },
+   {
+    "key": "dishes",
+    "label": "Main dishes",
+    "value": "taken off Bundt Cakes"
+   }
+  ]
+ },
+ {
+  "id": 1913,
+  "community_id": "philly",
+  "resource_id": "785f05a5-0d1e-4f88-b86f-f2f8c8dc1382",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-21T19:52:34.957269+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "k",
+    "label": "Kosher Certification URL",
+    "value": "keystone-k.org/kosher/the-kosher-grill-xfinity-center"
+   },
+   {
+    "key": "dishes",
+    "label": "Main dishes",
+    "value": "taken off Hot Dogs, Pastrami Sandwich, Brisket Sandwich, Pretzels, Knishes"
+   }
+  ]
+ },
+ {
+  "id": 1912,
+  "community_id": "philly",
+  "resource_id": "a43c070b-40f1-4fe7-95fb-f8591153fb33",
+  "kind": "listing_added",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-21T19:52:18.544119+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "facts",
+    "label": "",
+    "quiet": true,
+    "value": "Bakery, Restaurant · Cherry-K"
+   }
+  ]
+ },
+ {
+  "id": 1911,
+  "community_id": "philly",
+  "resource_id": "fb2b6b36-783a-4a7c-ae82-6ac6af9e4261",
+  "kind": "listing_added",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-21T19:52:09.583717+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "facts",
+    "label": "",
+    "quiet": true,
+    "value": "Bakery, Restaurant · Cherry-K"
+   }
+  ]
+ },
+ {
+  "id": 1910,
+  "community_id": "philly",
+  "resource_id": "ffcb3a7b-bc6f-4ce2-8c17-0421bac1e321",
+  "kind": "listing_added",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-21T19:51:32.238551+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "facts",
+    "label": "",
+    "quiet": true,
+    "value": "Bakery · Keystone-K"
+   }
+  ]
+ },
+ {
+  "id": 1909,
+  "community_id": "philly",
+  "resource_id": "2eaa34ba-20ef-4996-90da-267812ac5469",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-21T19:50:51.347735+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "t",
+    "label": "Food Type",
+    "value": "Parve"
+   },
+   {
+    "key": "dishes",
+    "label": "Main dishes",
+    "value": "taken off Falafel, Hummus"
+   }
+  ]
+ },
+ {
+  "id": 1908,
+  "community_id": "philly",
+  "resource_id": "b69cbe5d-341d-4b89-a6b6-043186c88803",
+  "kind": "listing_edited",
+  "source": "submission",
+  "field_key": null,
+  "item": null,
+  "actor_email": null,
+  "submission_id": null,
+  "created_at": "2026-10-21T19:50:14.420563+00:00",
+  "hidden_at": null,
+  "changes": [
+   {
+    "key": "t",
+    "label": "Food Type",
+    "value": "Meat, Parve"
+   },
+   {
+    "key": "dishes",
+    "label": "Main dishes",
+    "value": "taken off Deli Sandwiches, Shawarma, Burgers, Knishes"
+   }
+  ]
+ }
+]

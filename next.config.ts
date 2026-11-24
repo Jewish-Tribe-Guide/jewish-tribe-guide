@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs/config";
-import { optimizedImagePatterns } from "./src/lib/imageHosts";
+import { optimizedImagePatterns, storageUrl } from "./src/lib/imageHosts";
 import { buildCsp } from "./src/lib/csp";
 
 // Security headers applied to every response. These are the "safe" set — they
@@ -68,7 +68,7 @@ const nextConfig: NextConfig = {
     // Shared with the components that render these images, so the config and
     // the "can this be optimized?" check can't drift apart — see
     // src/lib/imageHosts.ts for why the list is narrow rather than a wildcard.
-    remotePatterns: optimizedImagePatterns(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    remotePatterns: optimizedImagePatterns(storageUrl()),
     // Next's own default is 8 deviceSizes (640-3840) + 8 imageSizes (16-384)
     // — every distinct (photo, width) pair the optimizer is ever asked for
     // counts as its own Image Optimization Transformation, so a wide,

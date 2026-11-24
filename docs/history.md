@@ -2366,6 +2366,20 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
 - Nov 23, integration moved too: its own seeded Supabase, run on the
   runner itself (no browser). Locally 24 passed. Only e2e still uses the
   shared test project in CI.
+- Nov 23, e2e moved last: its build and each of its seven shards start
+  their own Supabase from the seed, the build and the tests in the
+  Playwright image at one path. A local Supabase's address and keys are
+  always the same, so the build's fixed address is every shard's. No CI
+  job uses the shared test project now, and the `test-db-*` queues are
+  gone with it.
+  Three things the seed lacked, found by running it locally: philly's
+  admin (e2e now signs in as the community's own first admin, not a
+  superadmin), the activity log (the 60 newest shown changes on kept
+  listings, nobody named, moved to end at load time by
+  `seed-fresh-dates.sql`), and the photos' host: they are dev's uploads,
+  so `NEXT_PUBLIC_SUPABASE_STORAGE_URL` tells the image rules where
+  uploads live when it isn't the database's project. Unset, it is the
+  database's, as on the live site.
 - Nov 23, two admin reads Sentry flagged as N+1s. Main dishes (and Look
   again) read all seven jobs' runs to show one job's: `listJobRuns` takes
   the jobs a page needs (`only`), so each reads one. The kosher job's

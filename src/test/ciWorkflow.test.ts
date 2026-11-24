@@ -131,7 +131,7 @@ describe('a PR’s checks start at once and e2e is split', () => {
   // else fails on it (scripts/buildLog.mjs, Nov 20).
   it('e2e’s build fails on a prerender stop our code caught', () => {
     const build = job('e2e-build')
-    expect(build).toMatch(/npm run build 2>&1 \| tee build\.log\n\s+shell: bash/)
+    expect(build).toMatch(/bash -o pipefail -c 'npm run build 2>&1 \| tee build\.log'/)
     expect(build).toContain('node scripts/buildLog.mjs build.log')
   })
 
@@ -143,15 +143,13 @@ describe('a PR’s checks start at once and e2e is split', () => {
   })
 })
 
-// Every job that uses the test project (any `secrets.TEST_SUPABASE_*`) shares
-// one database with every other run of the same job, on any branch. Two copies
-// of one suite at once rename the same fixture and mint the same admin's
-// magic link — PR 400's admin-write failed beside main's that way (Nov 19).
-// Row claims (e2e/suiteRows.ts) only separate different suites. So each such
-// job queues repo-wide, and none runs on push to main, whose tree its PR
-// already tested (main requires up-to-date branches). Derived from the
-// secrets, so a new suite against the test project is held to it too.
-describe('test-project suites never run two copies at once', () => {
+// Every suite used to share one hosted test project, so each queued
+// repo-wide (two copies renamed the same fixture, PR 400, Nov 19) and row
+// claims kept different suites apart. Since Nov 23 every job that reads a
+// database starts one of its own (.github/actions/own-test-database), from
+// supabase/seed, and nothing in CI uses the shared project. A job given
+// its keys again would bring the sharing, and its workarounds, back.
+describe('every suite has a database of its own', () => {
   // Top-level job blocks, as the suites above split them.
   const body = WORKFLOW.slice(WORKFLOW.indexOf('\njobs:'))
   const jobs = Object.fromEntries(
@@ -160,49 +158,35 @@ describe('test-project suites never run two copies at once', () => {
       .slice(1)
       .map((b) => [b.match(/^([\w-]+):/)![1], b] as const),
   )
-  // A job with a database of its own (.github/actions/own-test-database)
-  // starts from supabase/seed and never touches the test project.
   const ownDatabase = (n: string) => jobs[n].includes('uses: ./.github/actions/own-test-database')
-  const usesTestProject = Object.keys(jobs).filter((n) => /secrets\.TEST_SUPABASE_/.test(jobs[n]))
+
+  it('no job gets the test project’s keys', () => {
+    expect(Object.keys(jobs).filter((n) => /secrets\.TEST_SUPABASE_/.test(jobs[n]))).toEqual([])
+  })
+
+  it('finds the jobs with their own at all', () => {
+    expect(Object.keys(jobs).filter(ownDatabase).sort()).toEqual(
+      expect.arrayContaining(['admin-write', 'cache-roundtrip', 'e2e', 'e2e-build', 'form-roundtrip', 'integration']),
+    )
+  })
+
+  // The seed's photos are uploads in another project's storage. e2e's build
+  // is told that host, so its image rules resize them as the live site
+  // resizes its own (imageHosts.ts storageUrl); without it the home page's
+  // image budget fails on full-size originals. A new seed from another
+  // project, with the setting left behind, fails here instead.
+  it('e2e is told where the seed’s photos are stored', () => {
+    const seed = readdirSync('supabase/seed/tables').map((f) => readFileSync(`supabase/seed/tables/${f}`, 'utf-8')).join('\n')
+    const hosts = [...new Set(seed.match(/https:\/\/[a-z0-9]+\.supabase\.co(?=\/storage\/)/g) ?? [])]
+    expect(hosts).toHaveLength(1)
+    expect(jobs['e2e-build']).toContain(`NEXT_PUBLIC_SUPABASE_STORAGE_URL: ${hosts[0]}\n`)
+  })
 
   for (const name of Object.keys(jobs).filter(ownDatabase)) {
-    it(`${name} gets none of the test project's keys`, () => {
-      // One would point the suite (or a copy of its rows) back at the
-      // shared project, which is what the job's own database is to avoid.
-      expect(jobs[name], name).not.toMatch(/secrets\.TEST_SUPABASE_/)
+    it(`${name} starts Supabase on the runner, so it has no container`, () => {
       expect(jobs[name], `${name} starts Supabase, which needs Docker: no container`).not.toMatch(/\n {4}container:/)
     })
   }
-  const field = (block: string, re: RegExp) => block.match(re)?.[1].trim() ?? ''
-
-  it('finds the test-project jobs at all', () => {
-    expect(usesTestProject.length).toBeGreaterThanOrEqual(1)
-    expect(Object.keys(jobs).filter(ownDatabase).length).toBeGreaterThanOrEqual(4)
-  })
-
-  for (const name of usesTestProject) {
-    it(`${name} queues in its own repo-wide group and skips main's push`, () => {
-      const job = jobs[name]
-      const group = field(job, /\n {4}concurrency:\n {6}group:\s*(.+)/)
-      // Repo-wide: no ref, run or PR number in the group, or each branch
-      // gets its own queue and the copies overlap again.
-      expect(group, `${name} needs concurrency.group test-db-…`).toMatch(/^test-db-/)
-      expect(group).not.toMatch(/github\.(ref|run_id|head_ref|event\.number)/)
-      // A matrix job's group must name its cell, or its shards queue
-      // behind each other instead of behind the other run's same shard.
-      for (const [, key] of job.matchAll(/\n {6}matrix:\n {8}([\w-]+):/g)) {
-        expect(group).toContain(`matrix.${key}`)
-      }
-      // Wait, never kill: cancelling would fail the running PR's check.
-      expect(field(job, /\n {6}cancel-in-progress:\s*(.+)/)).toBe('false')
-      expect(field(job, /\n {4}if:\s*(.+)/)).toMatch(/github\.event_name\s*!=\s*'push'/)
-    })
-  }
-
-  it('each suite has a group of its own', () => {
-    const groups = usesTestProject.map((n) => field(jobs[n], /\n {4}concurrency:\n {6}group:\s*(.+)/))
-    expect(new Set(groups).size).toBe(groups.length)
-  })
 })
 
 // Each build-and-start suite restores Turbopack's build cache for its own
@@ -261,7 +245,7 @@ describe('each build restores its own build cache', () => {
     const shards = jobs['e2e'] ?? ''
 
     it('e2e-build builds into the dist dir e2e starts, cached, and hands it over', () => {
-      expect(build).toMatch(/run: npm run build 2>&1 \| tee build\.log\n/)
+      expect(build).toMatch(/bash -o pipefail -c 'npm run build 2>&1 \| tee build\.log'\n/)
       expect(build.match(/next-dist-dir:\s*(\S+)/)?.[1]).toBe(distDirFor('test:e2e'))
       expect(build).toMatch(/name: e2e-build\n\s+path: \|\n\s+\.next\/\n\s+!\.next\/cache\/\n\s+include-hidden-files: true/)
     })
@@ -269,15 +253,22 @@ describe('each build restores its own build cache', () => {
     it('every shard waits for it, downloads it, and starts it unbuilt', () => {
       expect(shards).toMatch(/\n {4}needs: \[e2e-build\]/)
       expect(shards).toMatch(/download-artifact@v\d+\n\s+with:\n\s+name: e2e-build\n\s+path: \.next\n/)
-      expect(shards).toMatch(/npm run test:e2e[^\n]*\n\s+env:\n\s+E2E_PREBUILT: '1'/)
+      expect(shards).toMatch(/-e E2E_PREBUILT=1\n[^]*?npm run test:e2e -- --shard=/)
       expect(readFileSync('playwright.config.ts', 'utf-8')).toMatch(/process\.env\.E2E_PREBUILT \? `npx next start/)
     })
 
     it('the shards run with exactly the build’s settings', () => {
       expect(build).toMatch(/\n {4}env: &e2e-env\n/)
       expect(shards).toMatch(/\n {4}env: \*e2e-env\n/)
-      // And nowhere else gives a shard a setting of its own beside them.
-      expect(shards.match(/\n {10}[A-Z0-9_]+:/g) ?? []).toEqual(['\n          E2E_PREBUILT:'])
+      // And nowhere else gives a shard a setting of its own beside them:
+      // no step env, the same database step, the same names into the image.
+      expect(shards.match(/\n {10}[A-Z0-9_]+:/g) ?? []).toEqual([])
+      const dbStep = (b: string) => b.match(/own-test-database\n\s+- run: \|\n([^]*?GITHUB_ENV")/)?.[1]
+      expect(dbStep(shards)).toBeDefined()
+      expect(dbStep(shards)).toBe(dbStep(build))
+      const passed = (b: string) => [...(b.match(/docker run[^]*?mcr\.microsoft/)?.[0] ?? '').matchAll(/-e ([A-Z0-9_]+)(?=\s)/g)].map((m) => m[1]).sort()
+      expect(passed(build).length).toBeGreaterThan(3)
+      expect(passed(shards)).toEqual(passed(build))
     })
   })
 

@@ -18,9 +18,18 @@
 // who can set a category image.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Where uploaded files are served from: the database's own project, unless
+ *  NEXT_PUBLIC_SUPABASE_STORAGE_URL says otherwise. Only CI sets it: its
+ *  database is a local one loaded from the committed seed, whose uploads
+ *  still live in the dev project's storage (Nov 23). The live site and
+ *  previews leave it unset. */
+export function storageUrl(): string | undefined {
+  return process.env.NEXT_PUBLIC_SUPABASE_STORAGE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+}
+
 /** Hosts worth routing through the optimizer, as next/image remotePatterns.
- *  Takes the Supabase URL rather than reading env directly so next.config.ts
- *  and the browser bundle can both call it. */
+ *  Takes the storage URL (storageUrl()) rather than reading env directly so
+ *  next.config.ts and the browser bundle can both call it. */
 export function optimizedImagePatterns(supabaseUrl: string | undefined) {
   const patterns: { protocol: 'https'; hostname: string; pathname: string }[] = []
 
@@ -72,7 +81,7 @@ export function optimizedImagePatterns(supabaseUrl: string | undefined) {
  *    reach for the total switch above only if it isn't enough on its own. */
 export function isOptimizableImage(src: string): boolean {
   if (process.env.NEXT_PUBLIC_IMAGES_UNOPTIMIZED === '1') return false
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseUrl = storageUrl()
   try {
     const url = new URL(src)
     if (url.protocol !== 'https:') return false
@@ -185,7 +194,7 @@ export function photoProps(src: string): { loader?: (p: { src: string; width: nu
     const url = new URL(src)
     if (url.protocol === 'https:') {
       if (UNSPLASH_HOSTS.has(url.hostname)) return { loader: unsplashCopy }
-      const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabase = storageUrl()
       // Storage only stands in for the optimizer when it's off: its WebP is
       // heavier than the optimizer's copy (the desktop home's map photo,
       // 1280px: 207 KB against under 150), though far lighter than the

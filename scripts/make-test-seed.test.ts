@@ -35,6 +35,11 @@ describe('seedFrom', () => {
       { community_id: 'philly', id: 'e2e-test-form' },
     ],
     content_stamp: [{ id: 'all' }, { id: 'c:philly' }, { id: 'c:e2e-writes' }],
+    activity: [
+      { id: 1, community_id: 'philly', resource_id: 'r1', created_at: '2026-11-01', actor_email: 'a@b.com', submission_id: 's1', hidden_at: null },
+      { id: 2, community_id: 'philly', resource_id: 'r2', created_at: '2026-11-02', actor_email: null, submission_id: null, hidden_at: null },
+      { id: 3, community_id: 'philly', resource_id: 'r1', created_at: '2026-11-03', actor_email: null, submission_id: null, hidden_at: '2026-11-04' },
+    ],
   }
   const seed = seedFrom(tables)
 
@@ -45,6 +50,12 @@ describe('seedFrom', () => {
     expect(seed.watch).toEqual([{ community_id: 'philly', resource_id: 'r1' }])
     expect(seed.form.map((f: { id: string }) => f.id)).toEqual(['volunteer'])
     expect(seed.content_stamp.map((s: { id: string }) => s.id)).toEqual(['all', 'c:philly'])
+  })
+
+  it('keeps changes to kept listings, shown ones only, with no one named', () => {
+    expect(seed.activity).toEqual([
+      { id: 1, community_id: 'philly', resource_id: 'r1', created_at: '2026-11-01', actor_email: null, submission_id: null, hidden_at: null },
+    ])
   })
 
   it('leaves no real email, submitter or preview token', () => {

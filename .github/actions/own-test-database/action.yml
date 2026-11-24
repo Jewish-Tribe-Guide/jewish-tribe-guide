@@ -32,6 +32,8 @@ runs:
         RESTORE_URL="$API_URL" RESTORE_KEY="$SERVICE_ROLE_KEY" node scripts/restore.mjs supabase/seed --no-files --replace
         # The seed keeps its ids; move the id counters past them.
         docker exec -i supabase_db_jewish-patient-connect psql -q -U postgres -v ON_ERROR_STOP=1 < scripts/reset-sequences.sql
+        # Its changes dated up to today: What changed shows the last 30 days.
+        docker exec -i supabase_db_jewish-patient-connect psql -q -U postgres -v ON_ERROR_STOP=1 < scripts/seed-fresh-dates.sql
         {
           echo "TEST_SUPABASE_URL=$API_URL"
           echo "TEST_SUPABASE_ANON_KEY=$ANON_KEY"

@@ -54,22 +54,15 @@ name: CI
 # apt-get ever runs in CI and that mirror can't be hit. Keep the image tag
 # in sync with @playwright/test's version in package.json.
 #
-# One copy of each test-project suite at a time (Nov 20). The workflow-level
-# `concurrency` below is per ref, so two branches' runs — or a PR's and
-# main's — ran the same suite at the same moment against the one test
-# project. Row claims (e2e/suiteRows.ts) keep DIFFERENT suites off each
-# other's rows; they can't stop two copies of the SAME suite renaming the
-# same fixture or minting the same admin's magic link, which is how PR 400's
-# admin-write failed alongside main's on Nov 19. So each suite job queues in
-# a repo-wide `test-db-<suite>` group (cancel-in-progress: false — wait,
-# never kill). GitHub keeps one waiting job per group: if a third run
-# arrives while one runs and one waits, the waiting one is cancelled, and
-# that PR needs a re-run. Rare with one PR at a time; a re-run fixes it.
+# Each test suite starts a database of its own on its runner (Nov 23,
+# .github/actions/own-test-database), so two runs of a suite, on any
+# branches, never meet. Until then they shared one test project and queued
+# repo-wide (`test-db-<suite>` groups) so two copies didn't rename the same
+# fixture (PR 400, Nov 19).
 #
-# And they don't run on push to main at all. main requires a branch to be
-# up to date before merging, so the tree a push to main builds is the tree
-# its PR already passed these suites on; running them again only doubled
-# the collisions. `unit` still runs there, and `e2e-prod-smoke`.
+# They don't run on push to main. main requires a branch to be up to
+# date before merging, so the tree a push to main builds is the tree its
+# PR already passed these suites on. `unit` still runs there, and `e2e-prod-smoke`.
 on:
   push:
     branches: [main]
@@ -207,26 +200,22 @@ jobs:
   e2e-build:
     name: Build for the end-to-end tests
     # The app, built once for every e2e shard, which start it rather than
-    # each building their own (Nov 20): one artifact tested, not six
-    # identical builds. The same container as the shards, so the build's
-    # paths are the paths they run it at.
+    # each building their own (Nov 20): one artifact tested, not seven
+    # identical builds. Built in the shards' Playwright image, at the same
+    # path (/work), so the build's paths are the paths they run it at.
     #
-    # Starts with everything else (Nov 20). It prerenders philly, and the
-    # write suites change a community of their own, never philly (see
-    # e2e's comment), so there is nothing of theirs for it to wait for.
+    # Its own database, as admin-write (see that job): Supabase started on
+    # this runner and loaded with the tests' starting data, which the
+    # build prerenders. Each shard starts its own from the same seed, and
+    # a local Supabase always has the same address and keys, so the
+    # address and key fixed into the build are each shard's too.
     if: github.event_name != 'push'
-    concurrency:
-      group: test-db-e2e-build
-      cancel-in-progress: false
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.63.0-noble
-    timeout-minutes: 15
+    timeout-minutes: 20
     # The shards reuse these (env: *e2e-env), so what they test is what
-    # was built: NEXT_PUBLIC_ values are fixed into the build.
+    # was built: NEXT_PUBLIC_ values are fixed into the build. The
+    # database's come from own-test-database (the step after it).
     env: &e2e-env
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
       SUPERADMIN_EMAILS: ${{ secrets.SUPERADMIN_EMAILS }}
       INBOX_EMAILS: ${{ secrets.INBOX_EMAILS }}
       # Cloudflare's published always-passes Turnstile test key (not a
@@ -241,16 +230,32 @@ jobs:
       # secret only to keep it out of the repo. Locally .env.local has it.
       NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
       NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID }}
+      # The seed's photos are the dev project's uploads, still served from
+      # there; this lets the image rules treat them as ours (resized, as
+      # on the live site) though the database is local (imageHosts.ts).
+      NEXT_PUBLIC_SUPABASE_STORAGE_URL: https://lzkulpwawxneelhwvych.supabase.co
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
         with:
           next-dist-dir: .next
-      # bash for pipefail, so a failed build still fails here. Then the
-      # log is checked for Next's prerender stops our code caught and
-      # logged as errors (scripts/buildLog.mjs).
-      - run: npm run build 2>&1 | tee build.log
-        shell: bash
+      - uses: ./.github/actions/own-test-database
+      - run: |
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$TEST_SUPABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$TEST_SUPABASE_ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$TEST_SUPABASE_SERVICE_ROLE_KEY"
+          } >> "$GITHUB_ENV"
+      # pipefail, so a failed build still fails here. Then the log is
+      # checked for Next's prerender stops our code caught and logged as
+      # errors (scripts/buildLog.mjs).
+      - run: >-
+          docker run --rm --network host --ipc host -v "$PWD:/work" -w /work
+          -e CI -e NEXT_PUBLIC_SUPABASE_URL -e NEXT_PUBLIC_SUPABASE_ANON_KEY -e SUPABASE_SERVICE_ROLE_KEY
+          -e SUPERADMIN_EMAILS -e INBOX_EMAILS -e NEXT_PUBLIC_TURNSTILE_SITE_KEY
+          -e NEXT_PUBLIC_GOOGLE_MAPS_API_KEY -e NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID -e NEXT_PUBLIC_SUPABASE_STORAGE_URL
+          mcr.microsoft.com/playwright:v1.63.0-noble
+          bash -o pipefail -c 'npm run build 2>&1 | tee build.log'
       - run: node scripts/buildLog.mjs build.log
       # Not .next/cache: the shards only start the build, and it's the
       # setup action's cache, kept apart from the artifact.
@@ -264,51 +269,29 @@ jobs:
           retention-days: 1
 
   e2e:
-    name: End-to-end tests (test project, ${{ matrix.shard }}/7)
-    # See "One copy of each test-project suite at a time" above.
-    if: github.event_name != 'push'
-    concurrency:
-      group: test-db-e2e-${{ matrix.shard }}
-      cancel-in-progress: false
-    runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.63.0-noble
-    # Runs beside cache-roundtrip and admin-write, on the same test project.
-    # It reads philly, the project's default community, and they change
-    # `e2e-writes`, a hidden community of their own
-    # (scripts/writeSuiteCommunity.mjs). Until Nov 20 they changed philly
-    # too, so e2e (and its build, which prerenders philly) had to wait for
-    # both to finish, and a PR's run was those two suites end to end. The
-    # `page` rows (About, Privacy) belong to no community and are still
-    # shared; e2e checks those pages' structure, never their words.
-    # src/test/suiteRows.test.ts fails if a write suite claims a row in
-    # philly or adds one with no community.
-    #
-    # Nor form-roundtrip: it only creates/deletes form and submission rows
-    # (a seeded test form, its response), which nothing in e2e/ reads.
+    name: End-to-end tests (${{ matrix.shard }}/7)
+    # Each shard has its own database, loaded from the same seed as the
+    # build's (see e2e-build), so it neither queues nor shares one with
+    # any other job. e2e itself never writes (AGENTS.md).
     #
     # Split seven ways (four until Nov 20, then six; the seventh took the
     # slowest shard's 168s of tests down), each shard on its own runner
     # (Oct 19). Playwright splits by test count, not time, and a skipped
-    # test counts, so four shards ran 150–208s of tests each; six, with the
-    # build cached (see .github/actions/setup), cost one more cold start
-    # each and take ~70s off the slowest. The suite runs
-    # one test at a time per runner (playwright.config.ts's `workers` — a
-    # 4-vCPU runner shared with the server and Chromium flaked with more),
-    # so on one runner it took ~10 minutes, half of every PR's wait. Four
-    # runners keep one worker each, so the per-runner contention that comment
-    # describes is unchanged. Each shard starts the one build e2e-build
-    # made (until Nov 20 each built its own, six identical builds a run) and
-    # runs the `warmup` project first; Playwright puts a dependency project in
+    # test counts. The suite runs one test at a time per runner
+    # (playwright.config.ts's `workers` — a 4-vCPU runner shared with the
+    # server and Chromium flaked with more), so on one runner it took ~10
+    # minutes. Each shard starts the one build e2e-build made and runs the
+    # `warmup` project first; Playwright puts a dependency project in
     # every shard whose tests need it. Public repo: the extra runners are free.
     needs: [e2e-build]
-    timeout-minutes: 15
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7]
-    # The same settings the build had (the anchor on e2e-build): the
-    # tests read the test project with them, and the server reads its
-    # runtime ones.
+    # The same settings the build had (the anchor on e2e-build).
     env: *e2e-env
     steps:
       - uses: actions/checkout@v7
@@ -317,13 +300,21 @@ jobs:
         with:
           name: e2e-build
           path: .next
-      # Only the two engines the config actually uses (Desktop Chrome + Pixel 7
-      # device emulation are both Chromium) — no `playwright install` step
-      # needed, see container image above. It ships every engine, but we
-      # only invoke Chromium via test:e2e.
-      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/7
-        env:
-          E2E_PREBUILT: '1'
+      - uses: ./.github/actions/own-test-database
+      - run: |
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$TEST_SUPABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$TEST_SUPABASE_ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$TEST_SUPABASE_SERVICE_ROLE_KEY"
+          } >> "$GITHUB_ENV"
+      - run: >-
+          docker run --rm --network host --ipc host -v "$PWD:/work" -w /work
+          -e CI -e E2E_PREBUILT=1
+          -e NEXT_PUBLIC_SUPABASE_URL -e NEXT_PUBLIC_SUPABASE_ANON_KEY -e SUPABASE_SERVICE_ROLE_KEY
+          -e SUPERADMIN_EMAILS -e INBOX_EMAILS -e NEXT_PUBLIC_TURNSTILE_SITE_KEY
+          -e NEXT_PUBLIC_GOOGLE_MAPS_API_KEY -e NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID -e NEXT_PUBLIC_SUPABASE_STORAGE_URL
+          mcr.microsoft.com/playwright:v1.63.0-noble
+          npm run test:e2e -- --shard=${{ matrix.shard }}/7
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
