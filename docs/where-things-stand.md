@@ -80,12 +80,11 @@ old number can still be looked up. When an item is done, move it to
     Last read: iPhone category pages slow to draw and tap, before the
     Nov 16 and Nov 22 fixes; home taps 400–456ms (target 200ms).
 4.  **A test database per CI job** (started Nov 23; the user: best
-    practice, not just green PRs). `admin-write`, `cache-roundtrip` and
-    `form-roundtrip` run on their own: Supabase started on the runner from the
+    practice, not just green PRs). `admin-write`, `cache-roundtrip`,
+    `form-roundtrip` and `integration` run on their own: Supabase started on the runner from the
     migrations, loaded with the starting data committed in
     `supabase/seed` (`.github/actions/own-test-database`), with none of
-    the test project's keys. Next, one PR each: `integration`, then
-    e2e's build and shards. Once all are over, the
+    the test project's keys. Next and last: e2e's build and shards. Once all are over, the
     sharing workarounds can go: row claims (`e2e/suiteRows.ts`), the
     `test-db-*` queues, the hidden `e2e-writes` community, and the 20s
     `TEST_PROJECT_TIMEOUT`. Rebuild the seed

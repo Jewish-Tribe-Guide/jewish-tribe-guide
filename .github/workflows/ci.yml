@@ -105,20 +105,18 @@ jobs:
 
   integration:
     name: Integration tests (real Supabase reads/writes)
-    # See "One copy of each test-project suite at a time" above.
+    # Its own database, as admin-write (see that job): Supabase started on
+    # this runner with the tests' starting data, so it neither queues nor
+    # shares the test project with the other jobs. No browser: the tests
+    # run on the runner itself.
     if: github.event_name != 'push'
-    concurrency:
-      group: test-db-integration
-      cancel-in-progress: false
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
+      - uses: ./.github/actions/own-test-database
       - run: npm run test:integration
-        env:
-          TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
-          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
 
   cache-roundtrip:
     name: Cache round-trip (admin save reaches the cached page)

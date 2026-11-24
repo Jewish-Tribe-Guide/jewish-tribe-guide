@@ -129,8 +129,8 @@ otherwise, rather than risk writing to the real database — the guard is in eac
 `src/test/integrationEnv.ts` for `test:integration`.
 
 **Moving to a database per job (Nov 23).** CI's `admin-write` no longer
-uses the shared test project, and neither do `cache-roundtrip` and
-`form-roundtrip`: each
+uses the shared test project, and neither do `cache-roundtrip`,
+`form-roundtrip` and `integration`: each
 starts Supabase on its own runner from `supabase/migrations` and loads the
 starting data committed in `supabase/seed`
 (`.github/actions/own-test-database`), so it needs no queue, no row claims
