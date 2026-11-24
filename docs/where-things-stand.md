@@ -79,6 +79,16 @@ old number can still be looked up. When an item is done, move it to
     if only known noise, switch the security policy to enforce (one
     word in `next.config.ts`, **mid-December**). Inline scripts stay
     allowed (a nonce would end prerendering).
+90. **Monthly, next about Dec 24:** the health review (the user, Nov 24).
+    `npm run health` (`scripts/code-health.mjs`), `npm run sentry:check`
+    and the last Sundays speed email; compare with the numbers below and
+    bring the user only what changed or got worse, with a recommendation.
+    Then write the new numbers here. Nov 24 (after the hooks audit):
+    139,238 app lines, 14 files over 800 lines (largest ListingView,
+    1,552), 73 `as unknown as`, 26 `any`, 24 rules switched off (13 of
+    them hooks), no TODOs, 102 files naming Philly-only sources, 4
+    packages a major version behind (TypeScript 7 among them), no
+    advisories.
 81. **About Dec 6:** speed from real visitors again (Sentry, or Vercel
     Speed Insights with your sign-in), after two weeks on today's code.
     Last read: iPhone category pages slow to draw and tap, before the
