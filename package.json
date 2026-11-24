@@ -24,6 +24,7 @@
     "doctor": "node --env-file=.env.local scripts/doctor.mjs",
     "backup": "node --env-file=.env.local scripts/backup.mjs",
     "sentry:check": "node --env-file=.env.local scripts/sentry-check.mjs",
+    "health": "node scripts/code-health.mjs",
     "import": "node --env-file=.env.local scripts/import.mjs",
     "sync-dev-from-prod": "node --env-file=.env.local scripts/sync-dev-from-prod.mjs",
     "test:e2e": "playwright test",

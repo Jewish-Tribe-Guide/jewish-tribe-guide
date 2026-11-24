@@ -23,6 +23,10 @@ work is in `docs/where-things-stand.md`.
 - **Say what is drawn only.** When some things were built and others only
   drawn, end with a plain list of the drawn-only ones, named by what the user
   would see on the site, and "not built until you OK it".
+- **Say what "nothing left" covers.** "Nothing on the tracker" is not
+  "nothing to do": the tracker holds only what someone has found. Say
+  which, and when the code was last looked over (the monthly health
+  review, item 90, Nov 24).
 - **Don't ask between steps.** Once a multi-step build is approved, test,
   commit and push each step and carry on, then report once at the end. Still
   stop for production writes and for design calls the drawings don't settle.
