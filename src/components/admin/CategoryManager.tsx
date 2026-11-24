@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { prefetchCategoryListings } from '@/lib/categoryListings'
@@ -93,12 +93,14 @@ export default function CategoryManager({
   useEffect(() => {
     savedHandOff = null
   }, [])
-  useEffect(() => {
-    // Leaving it ends the "Saved.", so it isn't still saying so next time.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  // Leaving it ends the "Saved.", so it isn't still saying so next time.
+  // Checked as the open screen changes (and on the first render), while
+  // rendering, so a screen never draws with the last one's "Saved.".
+  const [savedCheckedFor, setSavedCheckedFor] = useState<string | null | undefined>(undefined)
+  if (savedCheckedFor !== editingId) {
+    setSavedCheckedFor(editingId)
     if (justSaved && editingId !== `${CAT_PREFIX}${justSaved}`) setJustSaved(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingId])
+  }
 
   // Next keeps a screen left behind mounted, hidden, and brings it back when
   // its address is opened again: a page's screen came back showing the list
@@ -127,15 +129,15 @@ export default function CategoryManager({
     if (!id) return false
     return JSON.stringify(before.find((c) => c.id === id)) !== JSON.stringify(after.find((c) => c.id === id))
   }
-  useLayoutEffect(() => {
+  const takeKeptList = useEffectEvent(() => {
     if (!keptNow(community) || !shownRef.current || keptNow(community)!.categories === shownRef.current) return
     const latest = keptNow(community)!
     const restart = openPageChanged(shownRef.current, latest.categories)
     setCategories(latest.categories)
     setPlaceCounts(latest.placeCounts)
     if (restart) setListRound((r) => r + 1)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  })
+  useLayoutEffect(() => takeKeptList(), [])
 
   const load = useCallback(async () => {
     setError(null)
@@ -163,11 +165,11 @@ export default function CategoryManager({
   // kept, the editor shows at once and asks itself.
   const openedId = editingId?.startsWith(CAT_PREFIX) && !editingId.startsWith(NEW_PREFIX) && editingId !== `${CAT_PREFIX}new` ? editingId.slice(CAT_PREFIX.length) : null
   const listKept = categories !== null
-  useEffect(() => {
-    if (openedId && !listKept) prefetchCategoryListings(community, openedId)
-    // Only as the page opens: once the list is here, the editor has asked.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openedId])
+  // Only as the page opens: once the list is here, the editor has asked.
+  const prefetchOpened = useEffectEvent((id: string | null) => {
+    if (id && !listKept) prefetchCategoryListings(community, id)
+  })
+  useEffect(() => prefetchOpened(openedId), [openedId])
 
   // Every page in one list by name (board 1): the categories that hold
   // places, and the Eruv and Candle Lighting, with or without a row yet
@@ -192,12 +194,13 @@ export default function CategoryManager({
   // The rows' pages, while the list shows, and the list from a page (Back
   // to it), so neither click waits on the server.
   const rowKeys = entries?.map((e) => e.key).join(' ') ?? ''
-  useEffect(() => {
+  const listShowing = editingId === null
+  const prefetchScreens = useEffectEvent((keys: string) => {
     if (!prefetch) return
     if (editingId) prefetch(null)
-    else for (const key of rowKeys.split(' ').filter(Boolean)) prefetch(key)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rowKeys, editingId === null])
+    else for (const key of keys.split(' ').filter(Boolean)) prefetch(key)
+  })
+  useEffect(() => prefetchScreens(rowKeys), [rowKeys, listShowing])
 
   // On makes the screen's row the first time and shows it after that; off
   // hides the row, so its name and photo are still there when it comes back.

@@ -189,7 +189,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
       if (loc) onCoords?.({ lat: loc.lat(), lng: loc.lng() })
 
       if (onPlaceSelect && place.id) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Google's Place type lacks the opening-hours fields read here
         const p = place as any
         const periods = p.regularOpeningHours?.periods ?? null
         onPlaceSelect({

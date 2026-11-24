@@ -68,7 +68,6 @@ export function useFilterSections({
   options,
   effectiveSelected,
   filters,
-  filtersKey,
   allPoints,
   optionsWithFilters,
   colorById,
@@ -77,7 +76,6 @@ export function useFilterSections({
   options: FilterOption[]
   effectiveSelected: Set<string>
   filters: MapFilterState
-  filtersKey: string
   allPoints: MapViewPoint[]
   optionsWithFilters: FilterOption[]
   colorById: Map<string, string>
@@ -88,7 +86,6 @@ export function useFilterSections({
     const byId = new Map((categories ?? []).map((c) => [c.id, c]))
     return options.flatMap((o) => (effectiveSelected.has(o.id) && byId.has(o.id) ? [byId.get(o.id)!] : []))
   }, [options, effectiveSelected, categories])
-  const topOpenNow = openNowAll(filters, showingCategories)
   const categorySections = useMemo<MapFilterSection[]>(() => {
     return showingCategories.flatMap((c) => {
       const f = filters[c.id] ?? {}
@@ -120,8 +117,8 @@ export function useFilterSections({
         },
       ]
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showingCategories, filtersKey, allPoints, optionsWithFilters, colorById])
+  }, [showingCategories, filters, allPoints, optionsWithFilters, colorById])
+  const topOpenNow = openNowAll(filters, showingCategories)
   const filterSections = categorySections
   const andNames = (names: string[]) => (names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`)
   const topOpenNowNote = topOpenNow.on

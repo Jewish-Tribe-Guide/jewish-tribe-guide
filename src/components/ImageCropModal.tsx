@@ -73,7 +73,7 @@ export default function ImageCropModal({ source, shape, aspect = 1, onCancel, on
   const [imgUrl, setImgUrl] = useState<string | null>(isFile ? null : source)
   useEffect(() => {
     if (typeof source === 'string') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the URL is made and revoked in this effect (see above), so it is set here too
       setImgUrl(source)
       return
     }

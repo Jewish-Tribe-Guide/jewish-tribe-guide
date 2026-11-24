@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import { itemFields } from '@/lib/itemFilter'
 import type { ParamsOpts } from './directoryAddress'
@@ -18,6 +18,11 @@ export function useFiltersInAddress({ category, boolFilters, selectFilters, hasF
   const fields = category.detailFields
   const filterableBooleans = fields.filter((f) => f.filterable && f.type === 'boolean')
   const filterableSelects = fields.filter((f) => f.filterable && f.type === 'select')
+  // The category's filterable fields as they are when a write goes out.
+  // Read, not depended on: they're fresh arrays every render, and the
+  // writes follow the filters, not the category (a category is its own
+  // screen).
+  const fieldsNow = useEffectEvent(() => ({ booleans: filterableBooleans, selects: filterableSelects, items: itemFields(category) }))
 
   // Sync boolFilters/selectFilters into the URL — same `?f_<key>=`/
   // `?sel_<key>=` shape initialFilters reads above, and the same
@@ -46,15 +51,10 @@ export function useFiltersInAddress({ category, boolFilters, selectFilters, hasF
     }
     const timer = setTimeout(() => {
       const changes: Record<string, string | null> = {}
-      for (const f of filterableBooleans) changes[`f_${f.key}`] = boolFilters[f.key] ? '1' : null
+      for (const f of fieldsNow().booleans) changes[`f_${f.key}`] = boolFilters[f.key] ? '1' : null
       onParamsChange?.(changes, { replace: true })
     }, 300)
     return () => clearTimeout(timer)
-    // filterableBooleans is a fresh array every render (derived from the
-    // stable `category` prop) — including it here would refire this on
-    // every unrelated render instead of only when the filter state itself
-    // changes; `category` doesn't change without remounting this component.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boolFilters, onParamsChange])
 
   const selectFiltersSyncedOnce = useRef(false)
@@ -65,14 +65,13 @@ export function useFiltersInAddress({ category, boolFilters, selectFilters, hasF
     }
     const timer = setTimeout(() => {
       const changes: Record<string, string | null> = {}
-      for (const f of filterableSelects) {
+      for (const f of fieldsNow().selects) {
         const chosen = selectFilters[f.key] ?? []
         changes[`sel_${f.key}`] = chosen.length > 0 ? chosen.join(',') : null
       }
       onParamsChange?.(changes, { replace: true })
     }, 300)
     return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectFilters, onParamsChange])
 
   const hasFiltersSyncedOnce = useRef(false)
@@ -83,13 +82,12 @@ export function useFiltersInAddress({ category, boolFilters, selectFilters, hasF
     }
     const timer = setTimeout(() => {
       const changes: Record<string, string | null> = {}
-      for (const f of itemFields(category)) {
+      for (const f of fieldsNow().items) {
         const chosen = hasFilters[f.key] ?? []
         changes[`has_${f.key}`] = chosen.length > 0 ? chosen.join(',') : null
       }
       onParamsChange?.(changes, { replace: true })
     }, 300)
     return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasFilters, onParamsChange])
 }

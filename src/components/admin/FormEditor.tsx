@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import Link from 'next/link'
 import { DEFAULT_CONTACT_STEPS, type FormConfig, type FormContent, type FormStep, type StepCondition } from '@/lib/forms'
 import Wizard from '@/components/wizard/Wizard'
@@ -160,14 +160,17 @@ export default function FormEditor({
   // edits are all undone. A draft the server would refuse (no name, no
   // questions) waits until it's whole again; Publish says what's missing.
   const keepTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => {
-    if (!form || !unkept || publishing) return
-    if (wanted && (!wanted.title.trim() || wanted.steps.length === 0)) return
+  const keepSoon = useEffectEvent(() => {
+    if (!form || !unkept || publishing) return false
+    if (wanted && (!wanted.title.trim() || wanted.steps.length === 0)) return false
     keepTimer.current = setTimeout(() => void keepDraft(wanted), DRAFT_KEEP_DELAY_MS)
+    return true
+  })
+  useEffect(() => {
+    if (!keepSoon()) return
     return () => {
       if (keepTimer.current) clearTimeout(keepTimer.current)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wanted, kept, publishing])
 
   // The preview and a question's screen each get their own history entry,

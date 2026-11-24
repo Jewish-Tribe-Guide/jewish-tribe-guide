@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import comments from "@eslint-community/eslint-plugin-eslint-comments/configs";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -21,6 +22,18 @@ const eslintConfig = defineConfig([
           ignoreRestSiblings: true,
         },
       ],
+    },
+  },
+  // Switching a rule off says why, after "--": a switch-off with no reason
+  // can't be told from one that hides a bug (Nov 24, the hooks audit), and
+  // never for a whole file.
+  comments.recommended,
+  {
+    rules: {
+      "@eslint-community/eslint-comments/require-description": "error",
+      "@eslint-community/eslint-comments/no-unlimited-disable": "error",
+      // A whole file may opt out of one named rule (the Apps Script's globals).
+      "@eslint-community/eslint-comments/disable-enable-pair": ["error", { allowWholeFile: true }],
     },
   },
   // Override default ignores of eslint-config-next.

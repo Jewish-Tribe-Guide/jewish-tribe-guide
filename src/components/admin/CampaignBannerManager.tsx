@@ -327,7 +327,7 @@ function BannerPreview({ title, subtitle }: { title: string; subtitle: string })
   return (
     <div data-testid="campaign-banner-preview" className="overflow-hidden rounded-[10px] border border-slate-200 bg-white">
       <div className="relative h-[140px]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- a fixed preview of the banner, nothing to optimize */}
         <img src={BANNER_PHOTO} alt="" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-white/40 to-transparent" />
         <div className="absolute inset-x-3 bottom-2.5">

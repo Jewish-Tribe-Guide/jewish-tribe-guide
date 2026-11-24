@@ -73,17 +73,21 @@ export function useZmanim(coords?: { lat: number; lng: number } | null): {
   // in the key, a tab left open overnight goes on presenting yesterday's
   // sunset as today's.
   const day = useToday()
-  const hasCoords = coords?.lat != null && coords?.lng != null
-  const key = hasCoords ? cacheKey(day, coords.lat, coords.lng, timezone) : null
+  const lat = coords?.lat
+  const lng = coords?.lng
+  const key = lat != null && lng != null ? cacheKey(day, lat, lng, timezone) : null
+  const hasCoords = key !== null
 
+  // `key` holds the day, the place and the timezone, so it changes whenever
+  // any of them do.
   useEffect(() => {
-    if (!hasCoords || !key) return
+    if (lat == null || lng == null || !key) return
     if (cache.has(key)) return
     let cancelled = false
 
     let promise = inFlight.get(key)
     if (!promise) {
-      const url = zmanimPath(coords.lat, coords.lng, timezone, zmanimDate(Date.now(), timezone))
+      const url = zmanimPath(lat, lng, timezone, zmanimDate(Date.now(), timezone))
       promise = loadOne(url).finally(() => inFlight.delete(key))
       inFlight.set(key, promise)
     }
@@ -105,8 +109,7 @@ export function useZmanim(coords?: { lat: number; lng: number } | null): {
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, hasCoords])
+  }, [key, lat, lng, timezone])
 
   if (!hasCoords || !key) return { data: null, status: 'no-location' }
   const cached = cache.get(key)

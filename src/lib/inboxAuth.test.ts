@@ -22,7 +22,7 @@ function mockSupabaseUser(result: { email?: string; error?: unknown; confirmed?:
         error: result.error ?? null,
       }),
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a partial Supabase client, as a stub
   } as any)
 }
 

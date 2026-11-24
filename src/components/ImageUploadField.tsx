@@ -331,7 +331,7 @@ export default function ImageUploadField({
             // field) — no benefit from the optimizer, and a real risk of it
             // showing a stale cached copy while the admin checks the upload
             // just landed.
-            // eslint-disable-next-line @next/next/no-img-element
+            // eslint-disable-next-line @next/next/no-img-element -- the upload as it landed, see above
             <img src={value} alt="" className="h-full w-full object-cover" />
           ) : (
             <span className="text-[0.625rem] text-slate-400">

@@ -98,7 +98,7 @@ export default function EruvMap({ eruvim, you, fallbackCenter, onSelect, highlig
       cancelled = true
       unsubscribe()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the map is made once; fallbackCenter only says where it first opens
   }, [])
 
   // The page hands over a new list on every render (the clock, each
@@ -125,22 +125,25 @@ export default function EruvMap({ eruvim, you, fallbackCenter, onSelect, highlig
   }, [ready, drawKey, highlightId])
 
   // The visitor's dot moves in place.
+  // Moved on the coordinates, not the object: a new one comes with each fix.
+  const youLat = you?.lat
+  const youLng = you?.lng
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map) return
-    if (!you) {
+    if (youLat === undefined || youLng === undefined) {
       if (markerRef.current) markerRef.current.map = null
       markerRef.current = null
       return
     }
     if (markerRef.current) {
-      markerRef.current.position = you
+      markerRef.current.position = { lat: youLat, lng: youLng }
       return
     }
     const dot = document.createElement('div')
     dot.style.cssText = 'width:18px;height:18px;border-radius:9px;background:#1d4ed8;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);transform:translateY(50%)'
-    markerRef.current = new google.maps.marker.AdvancedMarkerElement({ map, position: you, content: dot, title: 'You' })
-  }, [ready, you?.lat, you?.lng]) // eslint-disable-line react-hooks/exhaustive-deps
+    markerRef.current = new google.maps.marker.AdvancedMarkerElement({ map, position: { lat: youLat, lng: youLng }, content: dot, title: 'You' })
+  }, [ready, youLat, youLng])
 
   // Framed on every eruv once, or on the eruv opened. Anything else leaves
   // the map where the visitor put it. Closed again, it goes back to them

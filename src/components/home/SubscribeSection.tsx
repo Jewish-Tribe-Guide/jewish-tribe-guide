@@ -109,11 +109,14 @@ export default function SubscribeSection({
   // actually being hovered. Also closes it on the grid's own scroll — a
   // `fixed` tooltip has no way to follow its row once that row moves under
   // it.
+  const [pickerSeen, setPickerSeen] = useState(pickerOpen)
+  if (pickerOpen !== pickerSeen) {
+    setPickerSeen(pickerOpen)
+    if (!pickerOpen) setTooltip(null)
+  }
   useEffect(() => {
     if (!pickerOpen) {
       if (delayedHoverRef.current != null) clearTimeout(delayedHoverRef.current)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setTooltip(null)
       return
     }
     function onScroll() { setTooltip(null) }

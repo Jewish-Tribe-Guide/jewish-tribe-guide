@@ -76,7 +76,7 @@ export function useStepsInAddress(
       window.removeEventListener('popstate', onPop)
       written.current = null
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the router is one for the page
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the router is one for the page; re-running would drop and re-read the address mid-move
   }, [param, owner])
 
   const key = path.join('\n')
@@ -103,7 +103,7 @@ export function useStepsInAddress(
     }
     for (let i = shared; i < path.length; i++) void moveTo(router, 'push', at(path.slice(0, i + 1)))
     written.current = [...path]
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the path
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the path's and inner's contents (`key`, `inner.join()`), not the arrays, which are new each render
   }, [param, owner, key, router, inner.join()])
 }
 

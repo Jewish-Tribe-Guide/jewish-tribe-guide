@@ -97,20 +97,17 @@ function ResponsesList({
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
+  const params = 'feedback' in query ? 'feedback=1' : `formId=${encodeURIComponent(query.formId)}`
   const load = useCallback(async () => {
     setError(null)
     setItems(null)
     try {
-      const params = 'feedback' in query ? 'feedback=1' : `formId=${encodeURIComponent(query.formId)}`
       const body = await api.get<{ responses: InboxResponse[] }>(`/api/admin/responses?${params}`, 'Failed to load.')
       setItems(body.responses)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-    // query is a fresh object each render; stringify-free re-run is driven by
-    // ResponsesManager remounting this component via `key={activeKey}` instead.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api])
+  }, [api, params])
 
   useLoadOnMount(load)
 

@@ -4,6 +4,24 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## The hooks audit (Nov 24)
+
+63 places switched React's hooks checks off (50 `exhaustive-deps`, 13
+`set-state-in-effect`), most with no reason given, and each could hide a
+screen holding an old value. All 63 were read: none was a stale value a
+person could hit. 50 now use React's own patterns instead (an effect
+event, `useEffectEvent`, to read the latest values without re-running;
+state adjusted while rendering when a prop changes; plain values pulled
+out as dependencies) and 13 stay, each with its reason: reading the
+browser's storage or address after the first render so it matches the
+server's HTML, the history steps' sequencing (`useStepsInAddress`,
+`ModerationQueue`), a map made once. Lint now refuses any switch-off
+without a reason after `--`, or for a whole file
+(`@eslint-community/eslint-plugin-eslint-comments`). Small differences:
+Add a place's kosher lookup sends the phone as it is when the request
+leaves; "Saved." and a closed listing form clear before paint, not a
+frame later; the location controls' `start`/`stop` are stable.
+
 ## Item 2 closed: dev's tile photos not copied (Nov 24)
 
 "Copy dev's photos for Eruv, Hospitals, Childcare and Schools to live?"

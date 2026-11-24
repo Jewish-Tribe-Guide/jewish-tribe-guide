@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import Link from 'next/link'
 import { DEFAULT_CATEGORY_ICON, bandImageFor, type CategoryConfig } from '@/lib/categories'
@@ -372,11 +372,12 @@ function CategoryEditorScreen({
   useEffect(() => {
     removeStep.current = (ref) => void showRemoveStep(ref)
   })
-  useEffect(() => {
+  // On opening only: a Remove step already in the address.
+  const openRemoveFromAddress = useEffectEvent(() => {
     const s = screenFromSearch(window.location.search)
     if (s.remove) void showRemoveStep(s.field)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- on opening only
-  }, [])
+  })
+  useEffect(() => openRemoveFromAddress(), [])
 
   function leave() {
     if (dirty && !window.confirm(LEAVE_QUESTION)) return
@@ -983,7 +984,7 @@ function BannerThumb({ url }: { url: string | null }) {
   // A photo that may have been uploaded seconds ago: see ImageUploadField's
   // own note on not optimising it.
   return url ? (
-    // eslint-disable-next-line @next/next/no-img-element
+    // eslint-disable-next-line @next/next/no-img-element -- a just-uploaded photo, not optimised (see above)
     <img src={url} alt="" className="h-9 w-[72px] rounded-md object-cover" />
   ) : (
     <span className="grid h-9 w-[72px] place-items-center rounded-md bg-slate-200 text-xs font-semibold text-slate-600">None</span>

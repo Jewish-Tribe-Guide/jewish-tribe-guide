@@ -1,6 +1,6 @@
 'use client'
 
-import { cloneElement, useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
+import { cloneElement, useEffect, useEffectEvent, useMemo, useRef, useState, ViewTransition } from 'react'
 import { track } from '@vercel/analytics'
 import { CategoryTileRow, groupCardsIntoSections, resourceCards, useEntryCards, withEruvCount } from '@/components/home/sections'
 import { useEruvCount } from '@/lib/useEruvStatuses'
@@ -228,15 +228,18 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   // can work out where; the address is replaced, so Back doesn't return to
   // a page that leaves again.
   const sharedLanded = useRef(false)
-  useEffect(() => {
-    if (sharedLanded.current || !sharedQuestion || !asked) return
-    sharedLanded.current = true
+  const canPlace = !!asked
+  const landShared = useEffectEvent(() => {
     const first = lines[0]
     if (first?.href) router.replace(first.href)
-    // Once, when the shared question can first be placed.
     else if (first) goTo(first, q)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sharedQuestion, !!asked])
+  })
+  useEffect(() => {
+    // Once, when the shared question can first be placed.
+    if (sharedLanded.current || !sharedQuestion || !canPlace) return
+    sharedLanded.current = true
+    landShared()
+  }, [sharedQuestion, canPlace])
 
   // Questions to tap under the empty box (see searchPrompts.ts): each goes
   // where it would on Enter, so only ones that go somewhere are offered.

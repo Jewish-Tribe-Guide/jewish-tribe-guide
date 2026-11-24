@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import { useOptionalLocation } from '@/lib/locationContext'
 import type { GenericListingCardHandle } from './GenericListingCard'
 
@@ -13,6 +13,9 @@ type Options = {
 }
 
 export function useListingCards({ reopenItemId, scrollItemIntoViewWhenSettled }: Options) {
+  // A fresh closure every render: read, not depended on, so only the ids
+  // below re-run the effects.
+  const scrollWhenSettled = useEffectEvent((id: string, behavior: ScrollBehavior) => scrollItemIntoViewWhenSettled(id, behavior))
   // Every rendered card's open/close handle, keyed by listing id — same
   // "callback ref in a Map, not an array" shape as itemRowRefs above, and
   // for the same reason (found by id, not position, after a re-sort).
@@ -67,8 +70,7 @@ export function useListingCards({ reopenItemId, scrollItemIntoViewWhenSettled }:
     // pre-reorder position, so the visitor ends up scrolled to wherever
     // that used to be — short of or past where the reopened listing
     // actually settled, off by however far the reorder moved it.
-    return scrollItemIntoViewWhenSettled(reopenItemId, 'instant')
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only reopenItemId should retrigger this; scrollItemIntoViewWhenSettled is a fresh closure every render
+    return scrollWhenSettled(reopenItemId, 'instant')
   }, [reopenItemId])
 
   // Tapping a listing's "I'm here" (see SetLocationButton) re-anchors every
@@ -101,8 +103,7 @@ export function useListingCards({ reopenItemId, scrollItemIntoViewWhenSettled }:
     // stops GPS tracking and touches several other contexts upstream (see
     // setListingAnchor), and their re-renders can land a tick or two apart —
     // scrollItemIntoViewWhenSettled polls instead of guessing one.
-    return scrollItemIntoViewWhenSettled(anchorListingId, 'smooth')
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- only anchorListingId should retrigger this; scrollItemIntoViewWhenSettled is a fresh closure every render
+    return scrollWhenSettled(anchorListingId, 'smooth')
   }, [anchorListingId])
   return { cardRefs, setCardRef, openCardIdsRef }
 }

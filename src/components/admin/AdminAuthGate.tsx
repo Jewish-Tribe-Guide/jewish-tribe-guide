@@ -194,7 +194,7 @@ export default function AdminAuthGate({
     replaceAddress(window.location.pathname)
     // Reading state Supabase's redirect set on the URL (external to React),
     // once on mount — the exact case the lint rule's own guidance carves out.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the address is only readable after mount; reading it while rendering would differ from the server's render
     setSignInError(description.replace(/\+/g, ' '))
   }, [])
 
@@ -218,7 +218,7 @@ export default function AdminAuthGate({
     const description = hash.get('error_description')
     if (!description) return
     replaceAddress(window.location.pathname + window.location.search)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- as above: the hash is only readable after mount
     setSignInError(description.replace(/\+/g, ' '))
   }, [])
 

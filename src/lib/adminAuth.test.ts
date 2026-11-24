@@ -31,7 +31,7 @@ function mockSupabaseUser(result: { email?: string; error?: unknown; confirmed?:
         error: result.error ?? null,
       }),
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a partial Supabase client, as a stub
   } as any)
 }
 
@@ -203,7 +203,7 @@ describe('getAdminUserForCommunity', () => {
     const held = new Promise<void>((r) => (answer = r))
     vi.mocked(createClient).mockReturnValue({
       auth: { getUser: vi.fn(async () => (await held, { data: { user: { email: 'philly-admin@example.com', email_confirmed_at: '2026-11-20T00:00:00Z' } }, error: null })) },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a partial Supabase client, as a stub
     } as any)
     vi.mocked(getCommunityAdminEmails).mockResolvedValue(['philly-admin@example.com'])
     const checking = getAdminUserForCommunity(req('Bearer goodtoken'), 'philly')
@@ -239,7 +239,7 @@ describe('one token checked by many routes at once', () => {
     vi.mocked(getCommunityAdminEmails).mockResolvedValue(['a@example.com'])
     vi.mocked(createClient).mockReturnValue({
       auth: { getUser: vi.fn(async (t: string) => ({ data: { user: t === 'good' ? { email: 'a@example.com', email_confirmed_at: '2026-11-20T00:00:00Z' } : null }, error: null })) },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a partial Supabase client, as a stub
     } as any)
     const [good, bad] = await Promise.all([getAdminUserForCommunity(req('Bearer good'), 'philly'), getAdminUserForCommunity(req('Bearer bad'), 'philly')])
     expect(good).toEqual({ email: 'a@example.com' })

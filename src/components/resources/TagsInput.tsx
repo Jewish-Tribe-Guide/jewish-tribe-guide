@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CategoryField } from '@/lib/categories'
 import { useActiveCommunity } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
@@ -77,15 +77,12 @@ export default function TagsInput({ field, value, onChange, sometimes = [], onCh
 
   const q = input.trim().toLowerCase()
   const allSelected = [...always, ...sometimes]
-  const suggestions = useMemo(
-    () =>
-      vocab
-        .filter((t) => !allSelected.some((s) => s.toLowerCase() === t.toLowerCase()))
-        .filter((t) => !q || t.toLowerCase().includes(q))
-        .slice(0, 8),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [vocab, always, sometimes, q],
-  )
+  // A short filter of a short list: no memo (its inputs were new arrays on
+  // most renders anyway).
+  const suggestions = vocab
+    .filter((t) => !allSelected.some((s) => s.toLowerCase() === t.toLowerCase()))
+    .filter((t) => !q || t.toLowerCase().includes(q))
+    .slice(0, 8)
 
   const canAddNew = !field.fixedVocabulary && q &&
     !vocab.some((t) => t.toLowerCase() === q) &&

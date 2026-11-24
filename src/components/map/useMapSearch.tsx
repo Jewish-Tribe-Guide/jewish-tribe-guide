@@ -3,7 +3,7 @@
 // box's text, what's committed, the autocomplete, and what the committed
 // query finds. Called where the block it came from sat, so the view's
 // effects run in the same order.
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type RefObject } from 'react'
 import type { MobileNearbySheetHandle } from './MobileNearbySheet'
 import type { LatLng } from '@/lib/googleMapsLinks'
 import type { useAllListings } from '@/lib/useAllListings'
@@ -107,7 +107,7 @@ export function useMapSearch({
   // box as it's typed, and in the list once it's searched. Not only on
   // Enter, which most people never press (the user, Oct 27). Not for the
   // questions our search has its own answers to (the eruv, minyanim, times).
-  const findsNothing = (text: string) => {
+  const findsNothing = useCallback((text: string) => {
     const typed = stripApostrophes(text.trim().toLowerCase())
     if (typed.length < 2 || isOpenNowWord(typed) || !categories || !listings) return false
     if (allPoints.some((p) => stripApostrophes(p.searchText).includes(typed))) return false
@@ -117,14 +117,12 @@ export function useMapSearch({
     const result = searchAsk(listings, categories, text, { places: neighborhoodsFor(countCommunity) })
     const q = result.query
     return !q.meta && !q.times && !q.eruv && !q.minyan && result.hits.length === 0 && result.noHours.length === 0
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const typedNothing = useMemo(() => findsNothing(input), [input, allPoints, categories, listings])
+  }, [allPoints, categories, listings, countCommunity])
+  const typedNothing = useMemo(() => findsNothing(input), [findsNothing, input])
   // Read in the background once the typing stops, as Enter does. Not the
   // words a shared link arrived with.
   useLearnAfterPause({ query: input, foundNothing: typedNothing, ready: input !== initialQueryText, community: countCommunity })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const searchedNothing = useMemo(() => findsNothing(committedQuery), [committedQuery, allPoints, categories, listings])
+  const searchedNothing = useMemo(() => findsNothing(committedQuery), [findsNothing, committedQuery])
   const nothingBox = (text: string, className?: string) =>
     countCommunity ? <AskTheGroup query={text.trim()} nothingClose sharePath={routes.ask(countCommunity, text.trim())} className={className} /> : null
 
@@ -229,13 +227,15 @@ export function useMapSearch({
   // be taught to the search (learnFrom). The map never waits for it or
   // shows it (the user, Oct 27). A question is committed on Enter; one
   // typed and left is read too (useLearnAfterPause, by typedNothing).
-  useEffect(() => {
+  const learnIfNothing = useEffectEvent(() => {
     if (!askIds || !categories || !listings) return
     const found = allPoints.some((p) => (p.raw ? askIds.has(p.raw.id) : activeTerms.every((t) => stripApostrophes(p.searchText).includes(t))))
     if (!found) learnFrom(committedQuery, countCommunity)
-    // Once per question committed, once it can be answered.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [askIds, !!categories, !!listings])
+  })
+  // Once per question committed, once it can be answered.
+  const haveCategories = !!categories
+  const haveListings = !!listings
+  useEffect(() => learnIfNothing(), [askIds, haveCategories, haveListings])
 
   return {
     input,
