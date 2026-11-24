@@ -4,6 +4,20 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## Lint fails on a warning (Nov 24)
+
+Lint passed with 10 warnings, so a new one went by unseen (one had sat in
+`googleJobRun.ts` since Nov 1). `npm run lint` is `eslint --max-warnings 0`
+now, which CI's `unit` job runs. Seven were names kept on purpose with an
+underscore (a stub's parameter, a key taken out with a rest): the config
+allows `_` names, the usual way, and four `eslint-disable` lines for the
+same thing went. One was a comma expression in a test. Two were hooks:
+Add a place's reopen of a Change screen on Back moved into
+`useEffectEvent`, still checked after every render (a line records its
+screen as it renders), and the moderation card's `before` keys on the
+listing rather than the whole submission. Lint with one new unused name
+exits 1; admin-write 60/60.
+
 ## The "+" over the tiles (Nov 24)
 
 On a phone the floating "+ Add" sat over half a tile in the home's

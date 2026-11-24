@@ -77,7 +77,6 @@ export function useFetchOrPreview(): FetchOrPreview {
  *  edit over the listing it edits, an add with an id of its own. The
  *  Google bookkeeping the server reads on approval is left out. */
 export function previewListing(payload: ResourceSubmission, existing?: DirectoryResource): DirectoryResource {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- left out, see above
   const { googleAutofill, businessStatus, ...details } = payload.details
   return {
     ...existing,
