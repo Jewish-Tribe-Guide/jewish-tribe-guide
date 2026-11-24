@@ -4,6 +4,17 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## The "+" over the tiles (Nov 24)
+
+On a phone the floating "+ Add" sat over half a tile in the home's
+right-hand column, and a tap there opened Add (tracker item 27). The user
+chose "Hide while scrolling": on a phone every "+ Add" (`AddButton`: the
+home's, a category page's, the Eruv page's, admin Places) goes as you
+scroll down and comes back as you scroll up, with the header
+(`useScrollShowHide`), and at the end of the page, where nothing is under
+it. A computer keeps it. `e2e/add-button-scroll.spec.ts`: both phone tests
+failed against the old button.
+
 ## Page jumping (Nov 24)
 
 Sentry read CLS at 0.19 against 0.1, from too few visits to say where.

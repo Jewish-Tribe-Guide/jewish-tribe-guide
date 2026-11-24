@@ -139,3 +139,14 @@ describe('useHeaderOverlay / useHeaderOverlaid', () => {
     expect(result.current).toBe(false)
   })
 })
+
+describe('atPageEnd (the + comes back at the end of a phone page)', async () => {
+  const { atPageEnd } = await import('@/components/AddButton')
+  it('is the end within 24px of the bottom', () => {
+    expect(atPageEnd(1176, 800, 2000)).toBe(true)
+    expect(atPageEnd(1100, 800, 2000)).toBe(false)
+  })
+  it('is the end on a page too short to scroll', () => {
+    expect(atPageEnd(0, 800, 600)).toBe(true)
+  })
+})

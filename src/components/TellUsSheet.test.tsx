@@ -9,7 +9,7 @@ import TellUsSheet, { addableCategories } from './TellUsSheet'
 import { track } from '@vercel/analytics'
 
 vi.mock('@/components/resources/useListingSubmit', async (original) => ({ ...(await original<object>()), TURNSTILE_ACTIVE: false }))
-vi.mock('@/lib/useIsMobile', () => ({ useIsMobile: () => true }))
+vi.mock('@/lib/useIsMobile', () => ({ useIsMobile: () => true, useMeasuredIsMobile: () => true }))
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
