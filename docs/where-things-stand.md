@@ -123,10 +123,6 @@ old number can still be looked up. When an item is done, move it to
 
 ### Mine to fix
 
-89. Main dishes' list is asked for far more than anything else in the
-    admin (about 6,300 sampled requests in 14 days, against 380 for the
-    next): find what keeps asking.
-
 27. The "+" covers part of the third tile in a row on the phone home.
 
 ### Waiting on others

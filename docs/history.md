@@ -14,6 +14,18 @@ content arrived under an empty Suspense fallback that only the form needed
 (`docs/speed-targets.md`). The boundary is around the form alone now. 2 of
 the 8 tests failed against the old code, none in 40 runs after.
 
+Main dishes' list was asked for about 5,700 times in two weeks (Sentry,
+sampled), against ~100 for each other admin read (tracker item 89). Its
+reader marks a menu "being read" and gives up after 6 minutes, but the
+list built every reading with `rows.map(fromRow)`, which hands `fromRow`
+the row's index as the time, so nothing was ever too old. Three reads that
+never finished on Nov 4 stayed "being read", and every admin screen that
+opened asked for the list every 6s, To do for 7 minutes at a time, the
+Watches screens for as long as they were open (one tab: 17 hours). The
+list passes the time now; on live those three show as stopped, to read
+again. `watchJobPlaces.test.ts`'s Main dishes test failed against the old
+code.
+
 On the same list, Sentry's quota: the CSP reports that used it up were
 fixed by PR 432 (live Nov 23), and since then the events it turns away
 fell 54, 25, 1 a day. Nothing left to fix in code; it takes errors again

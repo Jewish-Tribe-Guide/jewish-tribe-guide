@@ -185,3 +185,25 @@ describe('a Watches screen’s findings', () => {
     expect(placeReads()).toHaveLength(1)
   })
 })
+
+// A menu read that never finished (its function stopped) says so once it's
+// older than any read can run. Main dishes' list read every reading as
+// "being read" for ever (the list's `.map(fromRow)` gave it the index as the
+// time), so three stuck since Nov 4 kept every admin screen asking for the
+// list every 6s: about 5,700 requests in two weeks (Sentry, Nov 24).
+describe('Main dishes', () => {
+  it('says a menu read that never finished stopped, not that it is being read', async () => {
+    const places = seed('resource').filter((r) => r.community_id === COMMUNITY && r.status === 'approved' && r.category === 'restaurant').slice(0, 2)
+    expect(places).toHaveLength(2)
+    const row = (id: unknown, readAt: string) => ({ community_id: COMMUNITY, resource_id: id, status: 'failed', source_url: 'https://menu.test', dishes: [], note: 'Reading its menu now', model: null, read_at: readAt, decided_at: null, decided_by: null })
+    extra.menu_reading = [row(places[0].id, '2026-11-04T00:19:52.111+00:00'), row(places[1].id, new Date().toISOString())]
+    releaseCategories()
+    const { GET } = await import('@/app/api/admin/main-dishes/route')
+    const res = await GET(new Request(`http://site.test/api/admin/main-dishes?community=${COMMUNITY}`, { headers: { authorization: 'Bearer t' } }))
+    expect(res.status).toBe(200)
+    const status = new Map(((await res.json()) as { places: { id: string; reading: { status: string } | null }[] }).places.map((p) => [p.id, p.reading?.status]))
+    expect(status.get(String(places[0].id))).toBe('failed')
+    // One started just now is still being read.
+    expect(status.get(String(places[1].id))).toBe('reading')
+  })
+})
