@@ -14,6 +14,7 @@ const m = vi.hoisted(() => ({
   jobFindings: vi.fn(),
   listCategories: vi.fn(),
   listApprovedResources: vi.fn(),
+  listResourcesForAdmin: vi.fn(),
   single: {} as Record<string, unknown>,
   submitListingUpdate: vi.fn(),
   submitListingDelete: vi.fn(),
@@ -25,7 +26,13 @@ const m = vi.hoisted(() => ({
 }))
 vi.mock('@/lib/watchFindingStore', () => ({ jobFindings: m.jobFindings }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: m.listCategories }))
-vi.mock('@/lib/resourceStore', () => ({ listApprovedResources: m.listApprovedResources, restoreResource: m.restoreResource }))
+// The listings come from the read every Watches job shares; it is a
+// community's, whatever the categories (the route keeps the kosher ones).
+vi.mock('@/lib/resourceStore', () => ({
+  listApprovedResources: m.listApprovedResources,
+  restoreResource: m.restoreResource,
+  listResourcesForAdmin: (community: string) => (m.listResourcesForAdmin(community), Promise.resolve(m.rows.resource ?? [])),
+}))
 vi.mock('@/lib/walkRouteJob', () => ({ runWalkRoutesAfterChange: m.runWalkRoutesAfterChange }))
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => fn() }))
 vi.mock('@/lib/submissionStore', () => ({
@@ -221,7 +228,8 @@ describe('GET /api/admin/watches/kosher', () => {
     expect(body.others).toEqual([stray])
     // Judah, Holy Bagel and the stray one.
     expect(body.counts.toCheck).toBe(3)
-    expect(m.jobFindings).toHaveBeenCalledWith('philly', 'kosher', [expect.objectContaining({ id: 'restaurant' }), expect.objectContaining({ id: 'grocery' })])
+    expect(m.jobFindings).toHaveBeenCalledWith('philly', 'kosher', expect.anything(), expect.anything())
+    expect(await m.jobFindings.mock.calls[0][2]).toEqual([expect.objectContaining({ id: 'restaurant' }), expect.objectContaining({ id: 'grocery' })])
   })
 
   it('a paused list isn’t read, and a list with no watch is offered', async () => {
@@ -239,7 +247,8 @@ describe('GET /api/admin/watches/kosher', () => {
 
   it('reads only this community’s listings and suggestions', async () => {
     await GET(req())
-    expect(m.filters.filter(([, col]) => col === 'community_id').map(([, , v]) => v)).toEqual(['philly', 'philly', 'philly', 'philly'])
+    expect(m.filters.filter(([, col]) => col === 'community_id').map(([, , v]) => v)).toEqual(['philly', 'philly', 'philly'])
+    expect(m.listResourcesForAdmin.mock.calls).toEqual([['philly']])
   })
 })
 

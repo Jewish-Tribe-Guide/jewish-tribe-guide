@@ -209,21 +209,23 @@ export const GET = adminRead(async (request: Request, { community }) => {
   }
 
   try {
-    const [categories, listings, { readings, available }, { watches }, night] = await Promise.all([
-      listCategories(community.slug),
+    const categoriesRead = listCategories(community.slug)
+    const [categories, listings, { readings, available }, { watches }, night, { findings }] = await Promise.all([
+      categoriesRead,
       listApprovedResources(community.slug),
       listMenuReadings(community.slug),
       listWatches(community.slug),
       listJobRuns(community.slug, ['watches'])
         .then(({ runs }) => lastNight(runs.watches))
         .catch(() => null),
+      // Beside the rest, not after the categories.
+      jobFindings(
+        community.slug,
+        'dishes',
+        categoriesRead.then((all) => dishKinds(all).map((k) => k.category)),
+      ),
     ])
     const kinds = dishKinds(categories)
-    const { findings } = await jobFindings(
-      community.slug,
-      'dishes',
-      kinds.map((k) => k.category),
-    )
     const byId = new Map(readings.map((r) => [r.resourceId, r]))
     const places = kinds.flatMap(({ category, field }) =>
       listings

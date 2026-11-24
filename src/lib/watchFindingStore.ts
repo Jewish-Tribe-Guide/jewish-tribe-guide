@@ -12,10 +12,16 @@ import { readAll } from '@/lib/readAll'
 /** When a place's last finding from this job was decided, and how. */
 export type Decided = { at: string; status: 'approved' | 'rejected' }
 
+/** `categories` may still be on its way, and are waited for only at the
+ *  end: the reads start at once (Nov 24, the Watches tab's speed).
+ *  `listings`, the read every Watches job shares (listResourcesForAdmin),
+ *  saves reading again the places the findings name, a round trip after
+ *  the findings; a route that doesn't make it leaves it out. */
 export async function jobFindings(
   community: string,
   job: FindingJob,
-  categories: readonly CategoryConfig[],
+  categories: readonly CategoryConfig[] | PromiseLike<readonly CategoryConfig[]>,
+  listings?: Promise<readonly ResourceRow[]>,
 ): Promise<{ findings: Finding[]; decided: Map<string, Decided> }> {
   const supabase = getAdminClient()
   // Every watch of this job's, in one read each: waiting (whole) and
@@ -41,9 +47,10 @@ export async function jobFindings(
     const at = (r: T) => names.indexOf((r.submitted_by as { name?: string } | null)?.name ?? '')
     return rows.map((r, i) => [r, i] as const).sort(([a, i], [b, j]) => at(a) - at(b) || i - j).map(([r]) => r)
   }
-  const [waitingRows, doneRows] = await Promise.all([
+  const [waitingRows, doneRows, shared] = await Promise.all([
     read<SubmissionRow>(true),
     read<Pick<SubmissionRow, 'target_id' | 'status' | 'reviewed_at' | 'submitted_by'>>(false),
+    listings ?? [],
   ])
   const pending = byWatch(waitingRows)
   const decided = new Map<string, Decided>()
@@ -54,13 +61,18 @@ export async function jobFindings(
   }
 
   const ids = [...new Set(pending.map((s) => s.target_id).filter((id): id is string => !!id))]
-  const current = new Map<string, ResourceRow>()
-  if (ids.length) {
-    const { data, error } = await supabase.from('resource').select('*').eq('community_id', community).in('id', ids)
+  const wanted = new Set(ids)
+  const current = new Map<string, ResourceRow>(shared.filter((r) => wanted.has(r.id)).map((r) => [r.id, r]))
+  // Not among them (no shared read, or a listing neither live nor
+  // archived): read as before.
+  const missing = ids.filter((id) => !current.has(id))
+  if (missing.length) {
+    const { data, error } = await supabase.from('resource').select('*').eq('community_id', community).in('id', missing)
     if (error) throw new Error(`Couldn’t read the listings: ${error.message}`)
     for (const r of (data ?? []) as ResourceRow[]) current.set(r.id, r)
   }
-  const fieldsOf = (category: string | undefined) => categories.find((c) => c.id === category)?.detailFields ?? []
+  const cats = await categories
+  const fieldsOf = (category: string | undefined) => cats.find((c) => c.id === category)?.detailFields ?? []
   const findings = pending.map((s) => {
     const row = s.target_id ? current.get(s.target_id) ?? null : null
     return findingFrom(s, row, fieldsOf(row?.category ?? (s.payload as { category?: string }).category))

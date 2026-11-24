@@ -3,7 +3,7 @@ import { dayNumber, inTurn } from './inTurn'
 import { fewAtATime } from './fewAtATime'
 import { jobsOff } from './jobOff'
 import { listCategoriesUncached } from '@/lib/categoryStore'
-import { normalizeRow } from '@/lib/resourceStore'
+import { approvedIn, listResourcesForAdmin, normalizeRow } from '@/lib/resourceStore'
 import { addWatch, listWatches, removeWatch, updateWatch } from '@/lib/watchStore'
 import { fetchPublic, troubleClause, type Trouble } from '@/lib/menuReader'
 import { WATCH_FETCH_HEADERS } from '@/lib/websiteWatch'
@@ -16,7 +16,6 @@ import { siteCategories } from '@/lib/watchFindings'
 import type { Watch } from '@/lib/watches'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource, ResourceRow } from '@/types'
-import { readAll } from '@/lib/readAll'
 
 // The hours job's database and network half (hoursJob.ts has the rules).
 // Run every morning by /api/cron/watches before the reads, and by the job's
@@ -75,45 +74,32 @@ export const deadline = <T,>(work: Promise<T>, ms: number): Promise<T | null> =>
   Promise.race([work, new Promise<null>((done) => setTimeout(() => done(null), ms))])
 
 /** The places with the job in one community, and their categories. */
-export async function hoursJobPlaces(community: string, job: PageJob = 'hours'): Promise<{ categories: CategoryConfig[]; places: DirectoryResource[] }> {
-  const categories = hoursJobCategories(await listCategoriesUncached(community), job)
-  if (!categories.length) return { categories, places: [] }
-  const { data, error } = await readAll((from, to) => getAdminClient()
-    .from('resource')
-    .select('*')
-    .eq('community_id', community)
-    .eq('status', 'approved')
-    .in(
-      'category',
-      categories.map((c) => c.id),
-    ).order('id').range(from, to))
-  if (error) throw new Error(`Couldn’t list the places: ${error.message}`)
-  return { categories, places: ((data ?? []) as ResourceRow[]).map(normalizeRow).sort((a, b) => a.name.localeCompare(b.name)) }
+export async function hoursJobPlaces(
+  community: string,
+  job: PageJob = 'hours',
+  listings: Promise<readonly ResourceRow[]> = listResourcesForAdmin(community),
+): Promise<{ categories: CategoryConfig[]; places: DirectoryResource[] }> {
+  const [all, rows] = await Promise.all([listCategoriesUncached(community), listings])
+  const categories = hoursJobCategories(all, job)
+  return { categories, places: approvedIn(rows, categories).map(normalizeRow).sort((a, b) => a.name.localeCompare(b.name)) }
 }
 
 /** A community's places whose own websites are read for what Google
  *  doesn't have (ownSiteCategories), and their categories. */
-async function ownSitePlaces(community: string): Promise<{ categories: CategoryConfig[]; places: DirectoryResource[] }> {
-  const categories = ownSiteCategories(await listCategoriesUncached(community))
-  if (!categories.length) return { categories, places: [] }
-  const { data, error } = await readAll((from, to) => getAdminClient()
-    .from('resource')
-    .select('*')
-    .eq('community_id', community)
-    .eq('status', 'approved')
-    .in(
-      'category',
-      categories.map((c) => c.id),
-    ).order('id').range(from, to))
-  if (error) throw new Error(`Couldn’t list the places: ${error.message}`)
-  return { categories, places: ((data ?? []) as ResourceRow[]).map(normalizeRow) }
+async function ownSitePlaces(community: string, listings: Promise<readonly ResourceRow[]> = listResourcesForAdmin(community)): Promise<{ categories: CategoryConfig[]; places: DirectoryResource[] }> {
+  const [all, rows] = await Promise.all([listCategoriesUncached(community), listings])
+  const categories = ownSiteCategories(all)
+  return { categories, places: approvedIn(rows, categories).map(normalizeRow) }
 }
 
 /** The places whose website findings wait under their kind's row on the
  *  Watches tab (siteCategories): ownSitePlaces less the food places, whose
  *  wait on Main dishes. */
-export async function sitePlaces(community: string): Promise<{ categories: CategoryConfig[]; places: DirectoryResource[] }> {
-  const own = await ownSitePlaces(community)
+export async function sitePlaces(
+  community: string,
+  listings: Promise<readonly ResourceRow[]> = listResourcesForAdmin(community),
+): Promise<{ categories: CategoryConfig[]; places: DirectoryResource[] }> {
+  const own = await ownSitePlaces(community, listings)
   const categories = siteCategories(own.categories)
   const ids = new Set(categories.map((c) => c.id))
   return { categories, places: own.places.filter((p) => ids.has(p.category)) }

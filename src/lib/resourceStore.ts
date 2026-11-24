@@ -158,6 +158,19 @@ export async function listResourcesForAdmin(community: string): Promise<Resource
   return data as ResourceRow[]
 }
 
+/** A community's live places in some categories, out of the read above.
+ *
+ *  Every Watches job used to read its own slice of the places, and only
+ *  once the categories had answered: eight reads of one table, a round
+ *  trip apart, when the tab loads them all at once (Nov 24: the jobs read
+ *  took 2.2s at p75 on the live site). A job now starts listResourcesForAdmin
+ *  beside its categories and keeps its own with this: inside shareReads the identical reads
+ *  are one, and none waits on the categories (watchJobPlaces.test.ts). */
+export function approvedIn(rows: readonly ResourceRow[], categories: readonly Pick<CategoryConfig, 'id'>[]): ResourceRow[] {
+  const ids = new Set(categories.map((c) => c.id))
+  return ids.size ? rows.filter((r) => r.status === 'approved' && ids.has(r.category)) : []
+}
+
 /** How many places each category has on the site, for Category pages' rows
  *  ("71 places"). Uncached, like Places. */
 export async function countApprovedByCategory(community: string): Promise<Record<string, number>> {

@@ -46,6 +46,20 @@ p75 is measured over real visitors, not on a developer's laptop.
 
 ## Known causes, and what fixed them
 
+- **The Watches tab (Nov 24).** Its combined read waited on the database
+  five times in a row: sign-in, then the categories and the rest, then
+  each job's own slice of the places (eight reads of one table, each
+  after the categories), then the findings (after the places), then the
+  places the findings name, read again. Live, each wait was about 0.3s at
+  p75, and the read took 2.2s. Now every job filters one read of the
+  community's places (`listResourcesForAdmin`, `approvedIn`), started
+  beside the categories, and the findings start at once and take their
+  places from it. Two waits: sign-in, then everything together. Locally
+  each job's own screen went from 0.8–1.0s to about 0.45s, the combined
+  read from 1.0–1.1s to 0.75–0.85s; what's left is building its 858KB
+  answer. `watchJobPlaces.test.ts` fails if a job's places or findings
+  wait on its categories again, or the places are read more than once.
+
 - **The first tap on a place (Nov 16).** On a phone the sheet slid up empty
   and the place arrived about 0.3s later, on the first tap only. Two causes
   together. The place's code loaded on that tap (`next/dynamic`, kept lazy so

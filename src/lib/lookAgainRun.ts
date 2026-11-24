@@ -2,6 +2,7 @@ import { getAdminClient } from './supabase/admin'
 import { withinOrLate } from './lateWork'
 import { dayNumber, inTurn } from './inTurn'
 import { listCategoriesUncached } from './categoryStore'
+import { approvedIn, listResourcesForAdmin } from './resourceStore'
 import { isCategorySyncEligible } from './categories'
 import { listEruvimForAdmin } from './eruvStore'
 import { findEruvStatusPages } from './eruvFind'
@@ -14,7 +15,6 @@ import { jobsOff } from './jobOff'
 import { listLookRows, getNotThese, saveTry } from './lookAgainStore'
 import { dueQueue, lookItems, pickFound, pickPage, LOOKS_PER_NIGHT, type FoundPage, type FoundPlace, type LookAgainLoaded, type LookItem, type LookKind, type LookAgainRun } from './lookAgain'
 import type { NightKindId } from './jobRuns'
-import { readAll } from '@/lib/readAll'
 
 // Look again, on the server (lookAgain.ts): what it tries, each try, and the
 // night's run (/api/cron/look-again). Server-only.
@@ -24,24 +24,21 @@ const JOB_OF: Record<LookKind, NightKindId> = { eruv: 'eruvs', menu: 'menus', go
 
 /** Everything Look again tries for a community, or has stopped trying. */
 export async function loadLookAgain(community: string, now = Date.now()): Promise<LookAgainLoaded> {
-  const [{ rows, available }, { eruvim }, { readings }, google, categories, { watches }] = await Promise.all([
+  const [{ rows, available }, { eruvim }, { readings }, google, categories, { watches }, places] = await Promise.all([
     listLookRows(community),
     listEruvimForAdmin(community),
     listMenuReadings(community),
     loadGoogleJob(community, now),
     listCategoriesUncached(community),
     listWatches(community),
+    listResourcesForAdmin(community),
   ])
   const failed = readings.filter((r) => r.status === 'failed')
-  const groups = categories.filter((c) => !isCategorySyncEligible(c)).map((c) => c.id)
-  const db = getAdminClient()
-  const [names, leftOut] = await Promise.all([
-    failed.length ? db.from('resource').select('id,name').eq('community_id', community).eq('status', 'approved').in('id', failed.map((r) => r.resourceId)) : Promise.resolve({ data: [], error: null }),
-    groups.length ? readAll((from, to) => db.from('resource').select('name').eq('community_id', community).eq('status', 'approved').in('category', groups).order('name').order('id').range(from, to)) : Promise.resolve({ data: [], error: null }),
-  ])
-  if (names.error) throw new Error(`Failed to load the food places: ${names.error.message}`)
-  if (leftOut.error) throw new Error(`Failed to load the groups: ${leftOut.error.message}`)
-  const nameOf = new Map(((names.data ?? []) as { id: string; name: string }[]).map((r) => [r.id, r.name]))
+  const live = places.filter((p) => p.status === 'approved')
+  const nameOf = new Map(live.map((r) => [r.id, r.name]))
+  const leftOut = approvedIn(places, categories.filter((c) => !isCategorySyncEligible(c)))
+    .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+    .map((r) => r.name)
   const off = jobsOff(watches)
   const items = lookItems({
     eruvim,
@@ -50,7 +47,7 @@ export async function loadLookAgain(community: string, now = Date.now()): Promis
     google,
     rows,
   }).filter((i) => !off.includes(JOB_OF[i.kind]))
-  return { available, items, leftOut: ((leftOut.data ?? []) as { name: string }[]).map((r) => r.name) }
+  return { available, items, leftOut }
 }
 
 /** One try, saved: what it found, if anything. A menu read again is kept

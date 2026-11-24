@@ -19,12 +19,14 @@ vi.mock('@/lib/supabase/admin', () => ({
   getAdminClient: () => ({
     from: () => {
       const where: Record<string, unknown> = {}
+      const among: Record<string, unknown[]> = {}
       let patch: Record<string, unknown> | null = null
-      const hits = () => m.rows.filter((r) => Object.entries(where).every(([k, v]) => r[k] === v))
+      const hits = () => m.rows.filter((r) => Object.entries(where).every(([k, v]) => r[k] === v) && Object.entries(among).every(([k, vs]) => vs.includes(r[k])))
       const q = {
         select: () => q,
         update: (p: Record<string, unknown>) => ((patch = p), q),
         eq: (k: string, v: unknown) => ((where[k] = v), q),
+        in: (k: string, vs: unknown[]) => ((among[k] = vs), q),
         maybeSingle: async () => ({ data: hits()[0] ?? null, error: null }),
         order: () => q,
         range: () => q,

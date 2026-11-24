@@ -6,6 +6,8 @@ const m = vi.hoisted(() => ({ getAdminUserForCommunity: vi.fn(), sitePlaces: vi.
 vi.mock('@/lib/adminAuth', () => ({ getAdminUserForCommunity: m.getAdminUserForCommunity }))
 vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly', resolveCommunity: async () => ({ slug: 'philly' }) }))
 vi.mock('@/lib/hoursJobRun', () => ({ sitePlaces: m.sitePlaces }))
+// The read the places and the findings share (approvedIn's comment).
+vi.mock('@/lib/resourceStore', async (real) => ({ ...(await real<typeof import('@/lib/resourceStore')>()), listResourcesForAdmin: async () => [] }))
 vi.mock('@/lib/watchStore', () => ({ listWatches: m.listWatches }))
 vi.mock('@/lib/watchFindingStore', () => ({ jobFindings: m.jobFindings }))
 
@@ -37,7 +39,8 @@ it('refuses anyone but an admin', async () => {
 // website is read, with no job page of its own, and what it found.
 it('each place, its own website’s pages, what they found and when it was last decided', async () => {
   const body = await (await GET(req())).json()
-  expect(m.jobFindings).toHaveBeenCalledWith('philly', 'sites', [{ id: 'grocery' }, { id: 'childcare' }])
+  expect(m.jobFindings).toHaveBeenCalledWith('philly', 'sites', expect.anything(), expect.anything())
+    expect(await m.jobFindings.mock.calls[0][2]).toEqual([{ id: 'grocery' }, { id: 'childcare' }])
   expect(body.places.map((p: { name: string; category: string; pages: { watch: Watch }[]; findings: { id: string }[]; decided: unknown }) => [p.name, p.category, p.pages.map((x) => x.watch.id), p.findings.map((f) => f.id), p.decided])).toEqual([
     ['GIANT', 'grocery', ['w1'], ['f1'], null],
     ['CKids Philly', 'childcare', [], [], { at: '2026-10-24T08:00:00Z', status: 'rejected' }],

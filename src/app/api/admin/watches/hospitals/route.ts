@@ -126,7 +126,15 @@ export const GET = adminRead(async (request: Request, { community }) => {
       if (!item || !category) return Response.json({ ok: false, errors: ['That hospital isn’t in this guide.'] }, { status: 404 })
       return Response.json({ ok: true, item, category })
     }
-    const [{ watches, available }, hospitals] = await Promise.all([listWatches(community.slug), hospitalsIn(community.slug)])
+    // The findings are read beside the hospitals, not after them, and kept
+    // only when there are any hospitals.
+    const categoriesRead = listCategories(community.slug)
+    const [{ watches, available }, hospitals, filed, allCategories] = await Promise.all([
+      listWatches(community.slug),
+      hospitalsIn(community.slug),
+      jobFindings(community.slug, 'hospitals', categoriesRead),
+      categoriesRead,
+    ])
     // The Watches tab asks for its counts every time it opens: Refuah isn't
     // asked for them. No hospitals, no request either.
     const counts = new URL(request.url).searchParams.has('counts')
@@ -138,9 +146,9 @@ export const GET = adminRead(async (request: Request, { community }) => {
 
     // What Refuah has that a listing doesn't, waiting here to compare, and
     // when each hospital's last one was decided (watchFindings.ts).
-    const categories = hospitals.length ? await listCategories(community.slug) : []
+    const categories = hospitals.length ? allCategories : []
     const categoryOf = (h: DirectoryResource) => categories.find((c) => c.id === h.category)
-    const { findings, decided } = hospitals.length ? await jobFindings(community.slug, 'hospitals', categories) : { findings: [], decided: new Map() }
+    const { findings, decided } = hospitals.length ? filed : { findings: [], decided: new Map() }
 
     return Response.json({
       ok: true,
