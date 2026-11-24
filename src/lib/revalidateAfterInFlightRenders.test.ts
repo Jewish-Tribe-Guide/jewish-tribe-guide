@@ -50,7 +50,7 @@ describe('revalidateRouteAfterInFlightRenders', () => {
   })
 
   it('leaves a window comfortably above the measured in-flight render time', () => {
-    // Under 0.6s for /about locally; CI's shared test project is slower.
+    // Under 0.6s for /about locally; a CI runner is slower.
     expect(IN_FLIGHT_RENDER_GRACE_MS).toBeGreaterThanOrEqual(3_000)
   })
 })

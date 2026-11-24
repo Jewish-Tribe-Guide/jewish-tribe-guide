@@ -120,8 +120,8 @@ describe('a PR’s checks start at once and e2e is split', () => {
     })
   }
 
-  // The write suites change a community of their own (scripts/
-  // writeSuiteCommunity.mjs), so e2e's build has nothing to wait for. A
+  // Every suite has a database of its own (Nov 23), so e2e's build has
+  // nothing to wait for. A
   // `needs` back on them is the ~4 minutes this took off every PR (Nov 20).
   it('e2e’s build starts at once, beside the write suites', () => {
     expect(needs('e2e-build')).toBe('')

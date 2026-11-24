@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 import { madeByTests } from '../e2e/testMadePages'
-import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
+import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives the AI's readings on the Searches page for real: its readings are
@@ -30,8 +30,8 @@ const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 
 const word = `qqzv${suffix}x`
 
 test.afterEach(async () => {
-  await getAdminClient().from('question_reading').delete().eq('community_id', WRITE_SUITE_COMMUNITY).eq('key', word)
-  await getAdminClient().from('question_word').delete().eq('community_id', WRITE_SUITE_COMMUNITY).eq('word', word)
+  await getAdminClient().from('question_reading').delete().eq('community_id', TEST_COMMUNITY).eq('key', word)
+  await getAdminClient().from('question_word').delete().eq('community_id', TEST_COMMUNITY).eq('word', word)
 })
 
 type Field = { key: string; label: string; type: string; filterable?: boolean; filterLabel?: string; options?: { value: string; label: string }[] }
@@ -43,7 +43,7 @@ async function seedReading() {
   const { error: missing } = await supabase.from('question_word').select('word').limit(1)
   expect(missing?.message ?? null, 'needs migration 063 (question_word) on the test project').toBeNull()
   // Any filterable pick-list with an option, on any category.
-  const { data: cats } = await supabase.from('category').select('id, plural_label, fields').eq('community_id', WRITE_SUITE_COMMUNITY)
+  const { data: cats } = await supabase.from('category').select('id, plural_label, fields').eq('community_id', TEST_COMMUNITY)
   const found = (cats as { id: string; plural_label: string; fields: Field[] }[])
     .filter((c) => !madeByTests(c))
     .flatMap((c) => (c.fields ?? []).filter((f) => f.type === 'select' && f.filterable && f.options?.length).map((f) => ({ c, f })))
@@ -52,7 +52,7 @@ async function seedReading() {
   const { c, f } = found!
   const option = f.options![0]
   const { error } = await supabase.from('question_reading').insert({
-    community_id: WRITE_SUITE_COMMUNITY,
+    community_id: TEST_COMMUNITY,
     key: word,
     question: word,
     reading: { categories: [{ id: c.id, select: { [f.key]: [option.value] } }] },
@@ -65,7 +65,7 @@ async function seedReading() {
 
 /** The reading's row, opened. */
 async function openRow(page: import('@playwright/test').Page) {
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/searches`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/searches`)
   const searches = page.getByRole('region', { name: 'Asked more than once' })
   await expect(searches).toBeVisible({ timeout: 20_000 })
   // Five show; the test project may hold more searches than that.
@@ -81,7 +81,7 @@ async function openRow(page: import('@playwright/test').Page) {
 test('a reading with a word to teach is a row, and Dismiss forgets it for real', async ({ page }) => {
   const supabase = getAdminClient()
   await seedReading()
-  const stored = async () => (await supabase.from('question_reading').select('key').eq('community_id', WRITE_SUITE_COMMUNITY).eq('key', word)).data
+  const stored = async () => (await supabase.from('question_reading').select('key').eq('community_id', TEST_COMMUNITY).eq('key', word)).data
 
   const row = await openRow(page)
   // A reading never answers on the site, so there's nothing to approve.
@@ -102,16 +102,16 @@ test('a word a reading proposes is taught, reaches the site, and is untaught', a
   // Taught, the search is off the list.
   await expect(row).not.toBeVisible()
 
-  const stored = async () => (await supabase.from('question_word').select('category_id, field_key, value, from_question, taught_by').eq('community_id', WRITE_SUITE_COMMUNITY).eq('word', word)).data
+  const stored = async () => (await supabase.from('question_word').select('category_id, field_key, value, from_question, taught_by').eq('community_id', TEST_COMMUNITY).eq('word', word)).data
   await expect.poll(stored).toEqual([{ category_id: c.id, field_key: f.key, value: option.value, from_question: word, taught_by: expect.any(String) }])
   // The public, cached categories carry it: every search box reads it now.
   const taughtOnSite = async () => {
-    const body = await (await request.get(`/api/categories?community=${WRITE_SUITE_COMMUNITY}`)).json()
+    const body = await (await request.get(`/api/categories?community=${TEST_COMMUNITY}`)).json()
     return (body.categories as { id: string; askWords?: { word: string }[] }[]).find((x) => x.id === c.id)?.askWords?.some((w) => w.word === word) ?? false
   }
   await expect.poll(taughtOnSite, { timeout: 30_000 }).toBe(true)
 
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/searches`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/searches`)
   await page.getByRole('button', { name: /Taught words/ }).click()
   const taught = page.getByTestId('taught-word').filter({ hasText: `“${word}”` })
   await taught.getByRole('button', { name: 'Unteach' }).click()

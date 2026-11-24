@@ -3,13 +3,13 @@ import { ADMIN_WRITE_TEST_ADMIN_EMAIL, CACHE_TEST_ADMIN_EMAIL } from './cacheE2e
 
 // cache-roundtrip and admin-write sign in at the same moment in CI, and
 // generateLink cancels any link still outstanding for that user, so the two
-// must never be the same person. Both are listed on the community they
-// change (writeSuiteCommunity.mjs), so neither borrows a real admin's.
+// must never be the same person. Both are put on the community they change
+// (testCommunity.mjs), so neither borrows a real admin's.
 describe('the write suites\' admins', () => {
-  it('are two different people, both on the write community\'s own list', async () => {
-    const { WRITE_SUITE_ADMINS } = await import('./writeSuiteCommunity.mjs')
+  it('are two different people, both put on the test community\'s list', async () => {
+    const { TEST_ADMINS } = await import('./testCommunity.mjs')
     expect(CACHE_TEST_ADMIN_EMAIL).not.toBe(ADMIN_WRITE_TEST_ADMIN_EMAIL)
-    expect(WRITE_SUITE_ADMINS).toEqual([CACHE_TEST_ADMIN_EMAIL, ADMIN_WRITE_TEST_ADMIN_EMAIL])
+    expect(TEST_ADMINS).toEqual([CACHE_TEST_ADMIN_EMAIL, ADMIN_WRITE_TEST_ADMIN_EMAIL])
   })
 })
 

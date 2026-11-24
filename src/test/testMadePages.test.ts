@@ -1,33 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { madeByTests } from '../../e2e/testMadePages'
-
-vi.mock('next/cache', () => ({ cacheTag: () => {}, cacheLife: () => {} }))
-const { COMMUNITY_SCOPED_TABLES } = await import('../lib/communityStore')
-
-/** Inserts into a table that has a community, with no community named: the
- *  column's default then puts the row in philly, the community e2e reads.
- *  Seven did, the first time the write suites moved out (Nov 20), and their
- *  rows never showed in the write community's To do. */
-export function insertsWithNoCommunity(text: string): number[] {
-  const scoped = new Set<string>(COMMUNITY_SCOPED_TABLES)
-  const lines: number[] = []
-  for (const m of text.matchAll(/from\('(\w+)'\)\s*\.(?:insert|upsert)\(/g)) {
-    if (!scoped.has(m[1])) continue
-    let depth = 1
-    let i = m.index + m[0].length
-    for (; i < text.length && depth > 0; i++) {
-      if ('([{'.includes(text[i])) depth++
-      else if (')]}'.includes(text[i])) depth--
-    }
-    const body = text.slice(m.index, i)
-    // Or spread from a row that names it, as place-screens' are.
-    const spread = [...body.matchAll(/\.\.\.(\w+)/g)].some(([, name]) => new RegExp(`const ${name} = \\{[^}]*community_id`).test(text))
-    if (!/community_id/.test(body) && !spread) lines.push(lineOf(text, m.index))
-  }
-  return lines
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // A test that picks "a listing category" never picks a page a test made
@@ -61,8 +35,6 @@ const sources = Object.entries(DIRS).flatMap(([dir, suite]) =>
   files(join(ROOT, dir)).map((path) => ({ suite, file: path.slice(ROOT.length + 1), text: readFileSync(path, 'utf8') })),
 )
 
-const lineOf = (text: string, index: number) => text.slice(0, index).split('\n').length
-
 /** Reads of the whole category list that then pick from it, unless they
  *  skip the pages tests made or narrow to a row of the test's own. */
 export function unsafePicks(text: string): number[] {
@@ -85,13 +57,6 @@ export function unsafePicks(text: string): number[] {
 }
 
 describe('a test never picks a page a test made', () => {
-  it('the write suites name their community on every row they add', () => {
-    const missing = sources
-      .filter(({ suite }) => suite === 'cache-roundtrip' || suite === 'admin-write')
-      .flatMap(({ file, text }) => insertsWithNoCommunity(text).map((line) => `${file}:${line}`))
-    expect(missing, 'add community_id: WRITE_SUITE_COMMUNITY').toEqual([])
-  })
-
   it('every pick from the category list skips them', () => {
     const unsafe = sources.flatMap(({ file, text }) => unsafePicks(text).map((line) => `${file}:${line}`))
     expect(unsafe, 'pick through madeByTests (e2e/testMadePages.ts) or categories() in e2e/helpers.ts').toEqual([])
@@ -130,14 +95,6 @@ describe('a test never picks a page a test made', () => {
 })
 
 describe('the scans themselves', () => {
-  it('catches a row added with no community, and passes one that names it', () => {
-    expect(insertsWithNoCommunity("await supabase.from('submission').insert({\n  operation: 'create',\n  payload: { name },\n})")).toEqual([1])
-    expect(insertsWithNoCommunity("await supabase.from('submission').insert({ community_id: WRITE_SUITE_COMMUNITY, operation: 'create' })")).toEqual([])
-    expect(insertsWithNoCommunity("const pending = { community_id: WRITE_SUITE_COMMUNITY }\nawait s.from('submission').insert([{ ...pending }])")).toEqual([])
-    expect(insertsWithNoCommunity("const pending = { status: 'pending' }\nawait s.from('submission').insert([{ ...pending }])")).toEqual([2])
-    expect(insertsWithNoCommunity("await supabase.from('page').update({ body })")).toEqual([])
-  })
-
   it('catches a pick of the first listing category', () => {
     expect(unsafePicks("const body = await (await request.get('/api/categories?community=philly')).json()\nconst c = body.categories.find((c) => c.kind === 'listing')")).toEqual([1])
     expect(unsafePicks("const { data } = await supabase.from('category').select('id').eq('community_id', 'philly')\nconst first = data[0]")).toEqual([1])

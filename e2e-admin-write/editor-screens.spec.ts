@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
+import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // A category page's own screens (a field, Add a field, the preview, a
@@ -35,14 +35,14 @@ test.afterEach(async () => {
 async function makePage(page: Page, visible: (l: Locator) => Locator): Promise<{ name: string; editor: string }> {
   const name = `E2E Screens ${randomUUID().slice(0, 8)}`
   pendingCategoryNames.push(name)
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/categories`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/categories`)
   await visible(page.getByRole('button', { name: '+ New category page' })).click()
   await visible(page.getByRole('button', { name: 'Make your own page' })).click()
   await visible(page.getByLabel('Name', { exact: true })).fill(name)
   await visible(page.getByRole('button', { name: 'Create category' })).click()
-  // Saving is several database round trips against the shared test project.
+  // Saving is several database round trips.
   await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
-  await expect(page).toHaveURL(new RegExp(`/${WRITE_SUITE_COMMUNITY}/admin/categories/cat:e2e-screens-[^/?]+$`))
+  await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/categories/cat:e2e-screens-[^/?]+$`))
   return { name, editor: new URL(page.url()).pathname }
 }
 
@@ -123,7 +123,7 @@ test('a page’s screens are history entries: Back, Forward and reload land on e
   await openHours()
   await at('?field=hours')
   await visible(page.getByRole('link', { name: /^Places/ })).click()
-  await expect(page).toHaveURL(new RegExp(`/${WRITE_SUITE_COMMUNITY}/admin/places$`))
+  await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/places$`))
   await page.goBack()
   await expect(title(/^Hours/)).toBeVisible({ timeout: 30_000 })
   await at('?field=hours')
@@ -168,6 +168,6 @@ test('Back out of a page with unsaved changes asks; No stays with them, Yes leav
 
   page.once('dialog', (d) => void d.accept())
   await page.goBack()
-  await expect.poll(() => new URL(page.url()).pathname).toBe(`/${WRITE_SUITE_COMMUNITY}/admin/categories`)
+  await expect.poll(() => new URL(page.url()).pathname).toBe(`/${TEST_COMMUNITY}/admin/categories`)
   await expect(visible(page.getByRole('button', { name: '+ New category page' }))).toBeVisible({ timeout: 30_000 })
 })

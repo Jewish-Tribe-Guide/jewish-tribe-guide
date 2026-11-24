@@ -24,7 +24,7 @@ export const ADMIN_WRITE_TEST_ADMIN_EMAIL = 'admin-write-admin@test.invalid'
 // fail whichever redeems second with "invalid or has expired". Nov 3:
 // admin-write failed in CI that way with all 33 of its tests unrun, while
 // cache-roundtrip signed in beside it as the same real admin. Each suite
-// signs in as its own admin now (writeSuiteCommunity.mjs), so this is the
+// signs in as its own admin now (testCommunity.mjs), so this is the
 // fallback, for a local run beside CI's. A fresh link a moment later is
 // redeemed in the same few hundred milliseconds, so a few tries converge.
 export async function mintMagicLinkSession(admin, anon, email, { tries = 5, pause = () => 300 + Math.random() * 1200 } = {}) {

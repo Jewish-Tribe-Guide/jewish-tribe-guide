@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
+import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // To do keeps your spot (the user, Nov 2: "when I scroll on to do and then
@@ -26,7 +26,7 @@ test.beforeAll(async () => {
     .from('submission')
     .insert(
       names.map((name) => ({
-        community_id: WRITE_SUITE_COMMUNITY,
+        community_id: TEST_COMMUNITY,
         operation: 'create',
         target_type: 'listing',
         target_id: null,
@@ -56,7 +56,7 @@ async function openTodo(page: Page) {
   page.on('requestfinished', (r) => void inFlight.delete(r))
   page.on('requestfailed', (r) => void inFlight.delete(r))
   await page.setViewportSize({ width: 1280, height: 700 })
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin`)
+  await page.goto(`/${TEST_COMMUNITY}/admin`)
   // The same 30s as the wait below: on CI To do was still "Loading
   // submissions…" when a 5s wait ran out (PR 387, Nov 16; main, Nov 14).
   await expect(page.getByRole('button', { name: `Open ${names[9]}` })).toBeVisible({ timeout: 30_000 })

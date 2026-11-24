@@ -1,7 +1,7 @@
 import { test as setup } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 import { ADMIN_WRITE_TEST_ADMIN_EMAIL, mintMagicLinkSession } from '../scripts/cacheE2eAdmin.mjs'
-import { WRITE_SUITE_COMMUNITY, writeSuitePreviewCookie } from '../scripts/writeSuiteCommunity.mjs'
+import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mints a real, full-browser admin session against the disposable test
@@ -14,8 +14,8 @@ import { WRITE_SUITE_COMMUNITY, writeSuitePreviewCookie } from '../scripts/write
 // with an explicit createUser step first (a brand-new email's magic link
 // was unreliable to redeem without it).
 //
-// Always ADMIN_WRITE_TEST_ADMIN_EMAIL: the community this suite changes
-// lists it by name (scripts/writeSuiteCommunity.mjs). It used to be philly's
+// Always ADMIN_WRITE_TEST_ADMIN_EMAIL: the test server puts it on the
+// community this suite changes (scripts/testCommunity.mjs). It used to be philly's
 // real admin whenever philly had one, the same person cache-roundtrip
 // signed in as, and the two cancelled each other's magic links (see
 // cacheE2eAdmin.mjs).
@@ -23,7 +23,7 @@ import { WRITE_SUITE_COMMUNITY, writeSuitePreviewCookie } from '../scripts/write
 
 const authFile = 'e2e-admin-write/.auth/admin.json'
 
-setup('authenticate as the disposable test-project admin', async ({ page, baseURL }) => {
+setup('authenticate as the suite’s own test admin', async ({ page, baseURL }) => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -60,10 +60,8 @@ setup('authenticate as the disposable test-project admin', async ({ page, baseUR
   // The community's own console, not bare /admin — /admin is the standalone
   // superadmin console now (src/app/admin/page.tsx), a different page with
   // no "Signed in as" moderation-queue text to wait for.
-  await page.goto(`${baseURL}/${WRITE_SUITE_COMMUNITY}/admin#${hash.toString()}`)
+  await page.goto(`${baseURL}/${TEST_COMMUNITY}/admin#${hash.toString()}`)
   await page.getByText(`Signed in as ${testAdminEmail}`).waitFor()
 
-  // The community is hidden; this opens its public pages for every test.
-  await page.context().addCookies([writeSuitePreviewCookie(baseURL!)])
   await page.context().storageState({ path: authFile })
 })

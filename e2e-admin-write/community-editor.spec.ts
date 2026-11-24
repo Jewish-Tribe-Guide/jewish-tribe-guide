@@ -14,7 +14,7 @@ import {
 //
 // The "clone from" case seeds its own source community + category directly
 // via the service-role key rather than depending on whatever a real community
-// happens to hold in this shared test project at the moment — that state is
+// happens to hold at the moment — that state is
 // mutated by every other spec in this suite and isn't this test's to assume.
 // ─────────────────────────────────────────────────────────────────────────────
 

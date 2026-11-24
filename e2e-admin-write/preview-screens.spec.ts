@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
+import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // The full-size preview on Home page, a form's question and preview
 // screens, and the superadmin console's New community are screens of their
@@ -17,14 +17,14 @@ const at = (page: Page, path: string, query: string) =>
 
 test('Home page’s full-size preview: Back closes it, Forward and a reload reopen it', async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 })
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/home`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/home`)
   const back = page.getByRole('button', { name: '← Back to editor' })
   await page.getByRole('button', { name: 'Open the preview' }).click({ timeout: 20_000 })
   await expect(back).toBeVisible()
-  await at(page, `/${WRITE_SUITE_COMMUNITY}/admin/home`, '?preview=open')
+  await at(page, `/${TEST_COMMUNITY}/admin/home`, '?preview=open')
 
   await page.goBack()
-  await at(page, `/${WRITE_SUITE_COMMUNITY}/admin/home`, '')
+  await at(page, `/${TEST_COMMUNITY}/admin/home`, '')
   await expect(back).toHaveCount(0)
   await expect(page.getByRole('region', { name: 'Search box' })).toBeVisible()
 
@@ -35,16 +35,16 @@ test('Home page’s full-size preview: Back closes it, Forward and a reload reop
   await expect(back).toBeVisible({ timeout: 20_000 })
   // Its own Back goes to the editor, and the address with it.
   await back.click()
-  await at(page, `/${WRITE_SUITE_COMMUNITY}/admin/home`, '')
+  await at(page, `/${TEST_COMMUNITY}/admin/home`, '')
   await expect(page.getByRole('region', { name: 'Search box' })).toBeVisible()
 })
 
 test('a form’s question and its preview: Back, Forward and a reload land on each', async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 })
   const visible = (l: Locator) => l.and(page.locator(':visible'))
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/forms`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/forms`)
   await visible(page.getByRole('button', { name: 'Add a form' })).click({ timeout: 20_000 })
-  await expect(page).toHaveURL(new RegExp(`/${WRITE_SUITE_COMMUNITY}/admin/forms/form:new$`), { timeout: 20_000 })
+  await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/forms/form:new$`), { timeout: 20_000 })
   const form = new URL(page.url()).pathname
   const formHeading = visible(page.getByRole('heading', { name: 'New form' }))
   await expect(formHeading).toBeVisible()

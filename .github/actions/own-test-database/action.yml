@@ -15,7 +15,7 @@ description: >
 # copy of the test project: a copy taken while other jobs wrote to it caught
 # the integration suite's half-made page (PR 441, Nov 23). It holds only
 # public content, scrubbed (scripts/make-test-seed.mjs). The test server adds
-# `e2e-writes` and its fixtures itself. Needs Docker, so the job runs on a
+# its admins and fixtures itself. Needs Docker, so the job runs on a
 # bare runner, not in a container.
 
 runs:

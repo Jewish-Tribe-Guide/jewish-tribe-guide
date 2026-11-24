@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import { previewSettings } from '../e2e/helpers'
 import { IN_FLIGHT_RENDER_GRACE_MS } from '../src/lib/inFlightRenderGrace'
-import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
+import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The other half of caching.spec.ts.
@@ -51,9 +51,8 @@ test('an admin save reaches the cached public page', async ({ request }) => {
   }
   const authHeaders = { Authorization: `Bearer ${accessToken}` }
 
-  // The write suites' own community (scripts/writeSuiteCommunity.mjs),
-  // never the one the read-only e2e suite reads.
-  const community = WRITE_SUITE_COMMUNITY
+  // The write suites' community (scripts/testCommunity.mjs).
+  const community = TEST_COMMUNITY
 
   const beforeRes = await request.get(`/api/admin/site-settings?community=${community}`, { headers: authHeaders })
   expect(beforeRes.ok(), 'GET /api/admin/site-settings should succeed with the minted admin token').toBe(true)
@@ -120,9 +119,8 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
 
   // /about moved under /[community] (for the header/footer that comes with
   // living there — see AboutPage's own doc).
-  // The write suites' own community (scripts/writeSuiteCommunity.mjs),
-  // never the one the read-only e2e suite reads.
-  const community = WRITE_SUITE_COMMUNITY
+  // The write suites' community (scripts/testCommunity.mjs).
+  const community = TEST_COMMUNITY
 
   const beforeRes = await request.get(`/api/admin/pages?community=${community}`, { headers: authHeaders })
   expect(beforeRes.ok(), 'GET /api/admin/pages should succeed with the minted admin token').toBe(true)
@@ -240,9 +238,8 @@ test('an admin save lands even when /about is mid-regeneration', async ({ reques
   }
   const authHeaders = { Authorization: `Bearer ${accessToken}` }
 
-  // The write suites' own community (scripts/writeSuiteCommunity.mjs),
-  // never the one the read-only e2e suite reads.
-  const community = WRITE_SUITE_COMMUNITY
+  // The write suites' community (scripts/testCommunity.mjs).
+  const community = TEST_COMMUNITY
 
   const pagesRes = await request.get(`/api/admin/pages?community=${community}`, { headers: authHeaders })
   expect(pagesRes.ok()).toBe(true)
@@ -343,9 +340,8 @@ test('two admin saves in quick succession both reach a category page mid-regener
   }
   const authHeaders = { Authorization: `Bearer ${accessToken}` }
 
-  // The write suites' own community (scripts/writeSuiteCommunity.mjs),
-  // never the one the read-only e2e suite reads.
-  const community = WRITE_SUITE_COMMUNITY
+  // The write suites' community (scripts/testCommunity.mjs).
+  const community = TEST_COMMUNITY
 
   const slug = 'cache-roundtrip-seed'
   // The fixture's name, by the UNCACHED admin read and the cached public one.
@@ -498,9 +494,8 @@ test('an already-open tab picks up an admin edit when it regains focus', async (
   }
   const authHeaders = { Authorization: `Bearer ${accessToken}` }
 
-  // The write suites' own community (scripts/writeSuiteCommunity.mjs),
-  // never the one the read-only e2e suite reads.
-  const community = WRITE_SUITE_COMMUNITY
+  // The write suites' community (scripts/testCommunity.mjs).
+  const community = TEST_COMMUNITY
 
   const catsRes = await request.get(`/api/categories?community=${community}`)
   expect(catsRes.ok(), 'GET /api/categories should succeed').toBe(true)

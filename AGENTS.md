@@ -139,9 +139,8 @@ e2e's build is each shard's own database too. The seed is public content
 only, scrubbed, built by `scripts/make-test-seed.mjs` from a backup;
 `make-test-seed.test.ts` fails if a real email or a test leftover is ever
 committed in it, and `ciWorkflow.test.ts` if a job gets the test project's
-keys again. The sharing workarounds below (row claims, the `e2e-writes`
-community, `TEST_PROJECT_TIMEOUT`) are still in the code and come out next
-(tracker item 4).
+keys again. What only sharing needed (row claims, the hidden `e2e-writes`
+community, a 20s `TEST_PROJECT_TIMEOUT` on admin waits) went with it.
 
 Locally it's the same database, made by the same command
 (`scripts/test-db.mjs`, which the action runs too). Needs Docker and about
@@ -343,7 +342,7 @@ directly and then reads them through the site needs the same.
 
 **A test that uses an existing row must put that row into a known state first, and restore it after.** Two of the write suites create their own fixture (a category, a form) and delete it again, so nothing an admin does can reach them. The suites that edit a singleton — the `page` rows, `site_settings` — have no such luxury and must borrow the real record, which makes them the ones that break. `e2e-admin-write/pages-editor.spec.ts` broke three times this way: on a page being retitled, on its body gaining headings (which changed which HTML element the editor's caret landed in), and on a locator that matched a newly-added toolbar. Read what you need from the row, overwrite it with something known, then restore it in `finally`. Never assume what a real page contains.
 
-**The write suites change their own community, never the one e2e reads.** cache-roundtrip and admin-write work in `e2e-writes`, a hidden community in the test project (`scripts/writeSuiteCommunity.mjs`, created by the test server on start), so e2e and its build run beside them instead of after them (Nov 20). In those suites, use `WRITE_SUITE_COMMUNITY` for every path, query and row: an insert with no `community_id` lands in philly by the column's default, and `src/test/testMadePages.test.ts` fails on one. The `page` rows (About, Privacy) have no community and are still shared.
+**The write suites work in philly, as the seed has it** (`TEST_COMMUNITY`, `scripts/testCommunity.mjs`). Until Nov 23 they worked in `e2e-writes`, a hidden copy made on the shared test project so e2e could read philly beside them; with a database per job that copy had nothing left to protect. The test server adds both suites' own admins to philly's list (`ensureTestAdmins`), so each signs in as itself. The `page` rows (About, Privacy) have no community.
 
 **Never pick a page a test made.** A test that wants "a listing category" picks from the seed, through `categories()` in `e2e/helpers.ts` or a `madeByTests` filter (`e2e/testMadePages.ts`): admin-write's files run two at a time, so a page one test made may be mid-rename or mid-delete under another. PR 389 lost three CI runs on Nov 16 to tests that took "the first listing category" and got `cache-roundtrip-seed` mid-rename. `src/test/testMadePages.test.ts` reads every suite's source and fails on an unfiltered pick, or a page a suite makes under a label not in `TEST_MADE_PAGES` (it finds them from `createCategory` calls).
 

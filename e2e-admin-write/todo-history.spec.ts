@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
+import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // To do's open place is a screen of its own (?open=<place>), so Back,
@@ -32,7 +32,7 @@ test.beforeAll(async () => {
   const { data, error } = await getAdminClient()
     .from('submission')
     .insert({
-      community_id: WRITE_SUITE_COMMUNITY,
+      community_id: TEST_COMMUNITY,
       operation: 'create',
       target_type: 'listing',
       target_id: null,
@@ -67,13 +67,13 @@ async function showsList(page: Page) {
 
 async function openTodo(page: Page) {
   await page.setViewportSize({ width: 1280, height: 800 })
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin`)
+  await page.goto(`/${TEST_COMMUNITY}/admin`)
   await expect(row(page)).toBeVisible({ timeout: 30_000 })
 }
 
 async function toPlacesAndReload(page: Page) {
   await page.getByRole('link', { name: 'Places', exact: true }).first().click()
-  await expect(page).toHaveURL(new RegExp(`/${WRITE_SUITE_COMMUNITY}/admin/places`))
+  await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/places`))
   await page.reload()
 }
 
@@ -104,7 +104,7 @@ test('Back to To do’s open place from another page, after a reload there', asy
   await showsPlace(page)
   await toPlacesAndReload(page)
   await page.goBack()
-  await expect(page).toHaveURL(new RegExp(`/${WRITE_SUITE_COMMUNITY}/admin\\?(.*&)?open=`))
+  await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin\\?(.*&)?open=`))
   await showsPlace(page)
 })
 
@@ -116,6 +116,6 @@ test('Back to To do’s list from another page, after a reload there', async ({ 
   await showsList(page)
   await toPlacesAndReload(page)
   await page.goBack()
-  await expect(page).toHaveURL(new RegExp(`/${WRITE_SUITE_COMMUNITY}/admin(\\?|$)`))
+  await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin(\\?|$)`))
   await showsList(page)
 })

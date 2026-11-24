@@ -1,7 +1,6 @@
 import { existsSync } from 'node:fs'
 import { testDatabase } from './scripts/testDatabase.mjs'
 import { defineConfig } from '@playwright/test'
-import { writeSuitePreviewCookie } from './scripts/writeSuiteCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The cache-round-trip suite (e2e-cache/) — a separate Playwright config from
@@ -29,11 +28,6 @@ const PORT = process.env.CACHE_E2E_PORT || '3211'
 // its server on the wrong one without this same line — that's the bug this
 // comment is here so nobody reintroduces.
 process.env.CACHE_E2E_PORT = PORT
-// Only this suite's own server puts its fixture category's name back
-// (run-test-project-server.mjs): the form and admin-write servers, and
-// anyone's local run, start against the same project while this suite is
-// renaming it, and once reset it mid-test (#342, Oct 22).
-process.env.CACHE_ROUNDTRIP_OWNS_FIXTURE = '1'
 const BASE_URL = `http://localhost:${PORT}`
 
 export default defineConfig({
@@ -54,9 +48,7 @@ export default defineConfig({
     ? [['dot'], ['html', { open: 'never', outputFolder: 'playwright-report-cache' }]]
     : 'list',
 
-  // Its community is hidden (scripts/writeSuiteCommunity.mjs); this is the
-  // cookie that opens its public pages, for `page` and `request` alike.
-  use: { baseURL: BASE_URL, storageState: { cookies: [writeSuitePreviewCookie(BASE_URL)], origins: [] } },
+  use: { baseURL: BASE_URL },
 
   projects: [
     { name: 'setup', testMatch: /auth\.setup\.ts/ },

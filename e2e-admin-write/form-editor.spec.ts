@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Locator } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
+import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives FormEditor's real create(+publish)+delete flow through FormsManager
@@ -46,7 +46,7 @@ test('creating and publishing a form through the real editor makes it live, and 
   const visible = (l: Locator) => l.and(page.locator(':visible'))
 
   // Site's Forms tab (the admin redesign's step 4c).
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/admin/forms`)
+  await page.goto(`/${TEST_COMMUNITY}/admin/forms`)
   await visible(page.getByRole('button', { name: 'Add a form' })).click()
 
   const nameInput = visible(page.getByLabel('Name', { exact: true }))

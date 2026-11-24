@@ -16,7 +16,7 @@ import { createClient } from '@supabase/supabase-js'
 import { testDatabase } from './testDatabase.mjs'
 import { ADMIN_WRITE_TEST_ADMIN_EMAIL, CACHE_TEST_ADMIN_EMAIL } from './cacheE2eAdmin.mjs'
 import { FORM_E2E_FORM_ID } from './formE2eConstants.mjs'
-import { WRITE_SUITE_COMMUNITY, ensureWriteSuiteCommunity } from './writeSuiteCommunity.mjs'
+import { TEST_COMMUNITY, ensureTestAdmins } from './testCommunity.mjs'
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local')
 
@@ -31,77 +31,12 @@ try {
 }
 const { url, anonKey, serviceRoleKey } = db
 
-// Next's Cache Components require every generateStaticParams to return at
-// least one result at build time — the listing-detail route
-// ([community]/[slug]/[id]) has one, so `next build` hard-fails against a
-// test project with zero approved listings. The integration suite (which
-// shares this project) always cleans up everything it creates, so the
-// project can genuinely be empty by the time this runs. Rather than
-// requiring a separate manual seeding step, ensure one category + one
-// approved listing exist before every build — cheap to check, and it
-// self-heals regardless of what the integration suite left behind.
-async function ensureMinimalListing(supabase) {
-  const { data: existingCategory } = await supabase.from('category').select('id').eq('community_id', 'philly').limit(1).maybeSingle()
-  if (existingCategory) return
-
-  // Not cache-roundtrip's fixture any more: that one is in the write
-  // suites' own community now (writeSuiteCommunity.mjs).
-  const CATEGORY_ID = 'seed-listings'
-  const { error: categoryError } = await supabase.from('category').upsert({
-    community_id: 'philly',
-    id: CATEGORY_ID,
-    label: 'Cache Round-trip Seed',
-    plural_label: 'Cache Round-trip Seed',
-    icon: '📋',
-    description: 'Minimal content so next build has something to statically generate. Safe to ignore/delete.',
-    fields: [],
-    kind: 'listing',
-    sort_order: 999,
-    upvotes_enabled: false,
-    has_address: true,
-    has_phone: true,
-    capabilities: {},
-  })
-  if (categoryError) throw new Error(`Could not seed minimal category: ${categoryError.message}`)
-
-  const { error: resourceError } = await supabase.from('resource').upsert({
-    id: '00000000-0000-4000-8000-0000e2e5eed1',
-    community_id: 'philly',
-    category: CATEGORY_ID,
-    name: 'Cache Round-trip Seed Listing',
-    address: '1 Test St, Philadelphia, PA',
-    phone: null,
-    details: {},
-    state: {},
-    status: 'approved',
-    reviewed_at: new Date().toISOString(),
-  })
-  if (resourceError) throw new Error(`Could not seed minimal listing: ${resourceError.message}`)
-}
-
-// Dedicated, always-present fixture for e2e-cache/cache-roundtrip.spec.ts's
-// "already-open tab picks up an admin edit" test, which needs a listing
-// category it can safely rename mid-test. It used to borrow whatever
-// category happened to be visible on /all — but integration, cache-roundtrip,
-// form-roundtrip and admin-write all write to and delete from this SAME
-// disposable project, often in parallel, so another job renaming/hiding/
-// deleting that borrowed category out from under it made the test fail with
-// "at least one listing category should be visible on /all to borrow".
-//
-// Unlike ensureMinimalListing above (which only fires when the project is
-// otherwise completely empty), this runs every boot regardless of what else
-// is in the project — the whole point is that this category is never
-// missing. Every write here is a real upsert keyed on a fixed id, not a
-// select-then-insert — the cache-roundtrip and form-roundtrip suites each
-// boot their own instance of this script against the same shared test
-// project, often as parallel CI jobs, and a select-then-insert has a race
-// window between the two: both processes can see "no resource yet" and both
-// insert, which is exactly how this project ended up with two identical
-// "Cache Round-trip Seed Listing" rows (found 2026-09-14, breaking every
-// getByRole('button', { name: ... }) locator that expects exactly one). A
-// fixed id + upsert is atomic at the database level regardless of how many
-// processes call it at once — concurrent upserts to the same id just
-// converge on one row, never two.
+// A page of cache-roundtrip's own, for its "already-open tab picks up an
+// admin edit" test, which renames it mid-test: a borrowed page would be one
+// another test (or e2e/testMadePages.ts's pickers) might be reading. Put
+// back to its starting name on every start, so a run that stopped mid-rename
+// doesn't leave the next one on a renamed page. Upserts on fixed ids, so a
+// restart never makes a second copy.
 const CACHE_ROUNDTRIP_CATEGORY_ID = 'cache-roundtrip-seed'
 // A real UUID, not the category's own text id — `resource.id` is a uuid
 // column. Fixed/hardcoded so every boot, from any process, upserts the same
@@ -109,15 +44,8 @@ const CACHE_ROUNDTRIP_CATEGORY_ID = 'cache-roundtrip-seed'
 const CACHE_ROUNDTRIP_RESOURCE_ID = '00000000-0000-4000-8000-0000cace0001'
 
 async function ensureCacheRoundtripFixtureCategory(supabase) {
-  // Its name is put back only by the cache-roundtrip suite's own server,
-  // which starts before its tests do (CACHE_ROUNDTRIP_OWNS_FIXTURE, set in
-  // playwright.cache.config.ts). Any other server starting against this
-  // project only creates the category if it's missing: a reset from one
-  // landed in the middle of a test renaming it, and the test read its
-  // original name back instead of its own (#342, Oct 22).
-  const ownsFixture = process.env.CACHE_ROUNDTRIP_OWNS_FIXTURE === '1'
   const { error: categoryError } = await supabase.from('category').upsert({
-    community_id: WRITE_SUITE_COMMUNITY,
+    community_id: TEST_COMMUNITY,
     id: CACHE_ROUNDTRIP_CATEGORY_ID,
     label: 'Cache Round-trip Seed',
     plural_label: 'Cache Round-trip Seed',
@@ -130,12 +58,12 @@ async function ensureCacheRoundtripFixtureCategory(supabase) {
     has_address: true,
     has_phone: true,
     capabilities: {},
-  }, { onConflict: 'community_id,id', ignoreDuplicates: !ownsFixture })
+  }, { onConflict: 'community_id,id' })
   if (categoryError) throw new Error(`Could not seed cache-roundtrip fixture category: ${categoryError.message}`)
 
   const { error: resourceError } = await supabase.from('resource').upsert({
     id: CACHE_ROUNDTRIP_RESOURCE_ID,
-    community_id: WRITE_SUITE_COMMUNITY,
+    community_id: TEST_COMMUNITY,
     category: CACHE_ROUNDTRIP_CATEGORY_ID,
     name: 'Cache Round-trip Seed Listing',
     address: '1 Test St, Philadelphia, PA',
@@ -153,7 +81,7 @@ async function ensureCacheRoundtripFixtureCategory(supabase) {
   // src/components/home/sections.tsx). Its own dedicated section, for the
   // same "nothing else ever touches this" reason as the category above.
   const { error: sectionError } = await supabase.from('home_section').upsert({
-    community_id: WRITE_SUITE_COMMUNITY,
+    community_id: TEST_COMMUNITY,
     id: 'cache-roundtrip-seed-section',
     // Deliberately NOT "Cache Round-trip Seed" — the category card below has
     // that exact text too, and the roundtrip test locates the card with
@@ -231,8 +159,7 @@ async function ensureTestForm(supabase) {
 
 async function ensureMinimalContent() {
   const supabase = createClient(url, serviceRoleKey)
-  await ensureMinimalListing(supabase)
-  await ensureWriteSuiteCommunity(supabase)
+  await ensureTestAdmins(supabase)
   await ensureCacheRoundtripFixtureCategory(supabase)
   await ensureTestForm(supabase)
 }
@@ -243,7 +170,7 @@ const PORT = process.env.CACHE_E2E_PORT || '3211'
 // adminAuth.ts's own comment on what's still superadmin-only) check this
 // list directly, never a community's admin_emails. Both suites' own admins
 // are on it; each signs in as its own (see its auth.setup.ts), and both are
-// also listed on the community they change (writeSuiteCommunity.mjs). This
+// also put on the community they change (ensureTestAdmins). This
 // script doesn't know which suite started it, and doesn't need to.
 const adminEmails = [CACHE_TEST_ADMIN_EMAIL, ADMIN_WRITE_TEST_ADMIN_EMAIL].join(',')
 
