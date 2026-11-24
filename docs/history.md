@@ -4,6 +4,67 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## Checks that tell someone (Nov 24)
+
+The user, Nov 24: "we should be making sure our CI and tests are testing
+what we want and notifying us when our standards aren't met." Written up
+as `docs/checks.md`, then its seven gaps (the user's "Yes, all seven"):
+
+- CI's **All checks passed** job passes only when every PR suite did
+  (`ci.yml`'s `all-checks`). `ciWorkflow.test.ts` fails if a suite is left
+  out of its `needs` (5 new tests failed against the old workflow, 1 with
+  form-roundtrip left out). Requiring it is the user's ruleset change.
+- A production smoke failure opens a GitHub issue, or comments on the
+  open one (`prod-smoke-report`).
+- Sundays' speed email to the site owners (`src/lib/speedReport.ts`):
+  web vitals and admin request times from Sentry, against
+  `docs/speed-targets.md`, which now proposes ≤ 1s at p75 for an admin
+  screen and a save. Vercel's Speed Insights has no read API. New code,
+  so its tests had nothing older to fail against; the nightly run's
+  outcome test failed against the old outcome (no speed warning).
+- admin-write's 15s and 20s waits are gone: 60/60 on three runs with
+  expect's 5s. They dated from the shared test project.
+- Sentry's two N+1 issues turned out to be fixed already, by PR 442.
+
+## Shul watches: the same page reads the same way (Nov 24)
+
+The user, Nov 24: the shul watches "came back with new information" and
+changed things wrongly; Sons of Israel and Lower Merion said times were
+new that the listing already had. Four causes, each fixed with a test
+that failed against the old code:
+
+- **A page "changed" every night.** ShulCloud prints today's date on
+  every page ("Tue, November 24, 2026 14 Kislev 5787"), so Sons of
+  Israel's Schedule of Tefillot had a new fingerprint daily and went to
+  the AI again. A line that is only today's date (or the day either
+  side) is now left out before the page is fingerprinted or read
+  (`todaysDateLine.ts`). A line with anything else on it stays.
+- **The AI read the same words differently.** Four nights, four
+  readings: Thursday's 8:15 Shacharis there and gone, Sunday's 8:00
+  dropped, the Sephardic minyan at 8:30 or 9:00. Each one that differed
+  was filed; the Nov 23 approval of one took Thursday 8:15 off the live
+  listing (not restored: a production write). A shul page's readings
+  are now kept on its watch, keyed by the exact words sent and the
+  model, and the same words get the kept reading (`readingMemo.ts`,
+  `WatchCheck.readings`, read by `getReadings` and kept out of what the
+  store hands a browser, like a kosher list's read).
+- **A week read mid-week was set against the usual times.** A calendar
+  read on a Tuesday shows Tuesday on, so it wasn't "whole", and its
+  times came back "Not usual" even when they were exactly the week we
+  held. With a week held, a source showing every day of the part from
+  today on is whole and is compared with that week on the days it shows
+  (`isWhole`, `due` in `shulTimes.ts`). With none held it is set against
+  the usual times as before, so a week is never stored with its first
+  days missing. And a short source no longer reports what the held week
+  already has (Lower Merion's Friday Kabbalas Shabbos).
+- **A change on To do lost its day.** Only changed rows are shown, and
+  they lost their day heading, so Sunday's 8 AM going read "Shacharis
+  8 AM · Going", like the weekdays' and as if nothing changed. A changed
+  row now keeps its heading beside its note (`lit` in `TodoReading.tsx`).
+
+Deploying this changes the fingerprint of every page with a date line
+once, so each is read one more time; after that they stay quiet.
+
 ## Detail behind the open list (moved Nov 22)
 
 The sections that followed the open list in `where-things-stand.md`,

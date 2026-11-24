@@ -35,11 +35,28 @@ async function standIn(page: Page, categoryId: string) {
   return asked
 }
 
+// Without Google's map: moving the page's clock runs the map's own timers
+// too, and they throw inside clock.runFor (a marker's, a map tile's: PR
+// 450's CI and a local run, Nov 24). What's tested here is the search box,
+// which doesn't need the map.
+test.beforeEach(async ({ page }) => {
+  await page.route(/maps\.googleapis\.com/, (route) => route.abort())
+})
+
 /** Stops the page's clock, a second on (pauseAt can't go back, and the
  *  clock runs on while it's asked): from here only `after` moves it. Called
  *  before typing, so the jump can't count toward the pause. */
 async function stopClock(page: Page) {
-  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1_000))
+  // The clock runs on between reading it and pausing it; on a busy machine
+  // by more than the second (a local run, Nov 24), and pauseAt then says
+  // "Cannot fast-forward to the past". Read it again and ask again.
+  for (let tries = 0; ; tries++) {
+    try {
+      return await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1_000))
+    } catch (err) {
+      if (tries >= 4 || !String(err).includes('to the past')) throw err
+    }
+  }
 }
 
 /** Lets the page's clock run `ms`, then gives a read it started a moment to

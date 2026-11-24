@@ -194,7 +194,7 @@ test('a change in To do: a minyan in the box it changes', async ({ page }) => {
 test('a change found on a place in Places: To do’s screen, a minyan in it', async ({ page }) => {
   await page.goto(`/${TEST_COMMUNITY}/admin/places?place=${placeId}&found=${submissions[1]}`)
   const decide = page.getByRole('group', { name: 'Decide' })
-  await expect(decide.getByRole('button', { name: 'Change to 7:15 AM' })).toBeVisible({ timeout: 20_000 })
+  await expect(decide.getByRole('button', { name: 'Change to 7:15 AM' })).toBeVisible()
   await expect(decide.getByRole('button')).toHaveCount(2)
   await expect(page.getByRole('button', { name: 'Edit, then update' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Leave it' })).toHaveCount(0)
@@ -221,8 +221,8 @@ test('Add a place: Find, the form, a row, a source over it', async ({ page }) =>
   const form = visible(page, page.getByRole('button', { name: /^Usual weekday times/ }))
   const row = visible(page, page.getByRole('button', { name: 'Add a minyan' }))
   const over = visible(page, page.getByRole('heading', { name: 'Add a source' }))
-  const at = (query: string) => expect.poll(() => new URL(page.url()).search, { timeout: 20_000 }).toBe(query)
-  await expect(find).toBeVisible({ timeout: 20_000 })
+  const at = (query: string) => expect.poll(() => new URL(page.url()).search).toBe(query)
+  await expect(find).toBeVisible()
 
   await page.getByRole('button', { name: 'Fill it in yourself' }).click()
   await expect(form).toBeVisible()
@@ -248,7 +248,7 @@ test('Add a place: Find, the form, a row, a source over it', async ({ page }) =>
   }
 
   await page.reload()
-  await expect(find).toBeVisible({ timeout: 20_000 })
+  await expect(find).toBeVisible()
   await at('?add=synagogue')
   // And the form, opened again, is an entry again.
   await page.getByRole('button', { name: 'Fill it in yourself' }).click()

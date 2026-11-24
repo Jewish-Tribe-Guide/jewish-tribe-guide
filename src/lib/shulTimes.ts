@@ -167,17 +167,19 @@ function sameWeek(held: readonly DatedTime[], read: readonly DatedTime[], zmanim
 
 const byDate = (a: DatedTime, b: DatedTime) => a.date.localeCompare(b.date)
 
-type InPart = { read: SourceRead; dates: string[]; shown: string[]; times: DatedTime[]; cancelled: Cancellation[] }
+type InPart = { read: SourceRead; dates: string[]; due: string[]; shown: string[]; times: DatedTime[]; cancelled: Cancellation[] }
 
 /** What a reading says about one part: the part's days it shows, its
- *  times and cancellations on them. */
-function inPart(read: SourceRead, part: Part, week: WeekContext['week']): InPart {
+ *  times and cancellations on them. `due`: the part's days from today,
+ *  the ones a source has to show to give it whole (isWhole). */
+function inPart(read: SourceRead, part: Part, week: WeekContext['week'], today: string): InPart {
   const dates = partDates(part, week)
   const shown = dates.filter((d) => d >= read.shows.from && d <= read.shows.to)
   const on = (date: string, tefillah?: Tefillah) => shown.includes(date) && partOf({ date, tefillah }) === part
   return {
     read,
     dates,
+    due: dates.filter((d) => d >= today),
     shown,
     times: read.times.filter((t) => on(t.date, t.tefillah)),
     cancelled: (read.cancelled ?? []).filter((c) => on(c.date, c.tefillah)),
@@ -185,10 +187,20 @@ function inPart(read: SourceRead, part: Part, week: WeekContext['week']): InPart
 }
 
 /** Whether a reading gives a part whole: the shul's schedule, every day of
- *  the part shown, and something said about it. A calendar's empty week
- *  says something when the calendar has a date posted after it. */
-function isWhole(p: InPart): boolean {
-  if (p.read.shape !== 'schedule' || p.shown.length !== p.dates.length) return false
+ *  the part from today shown, and something said about it. A calendar's
+ *  empty week says something when the calendar has a date posted after it.
+ *
+ *  From today: a source read mid-week can't show the days already gone.
+ *  Asking for them made Sons of Israel's calendar, read on a Tuesday, a
+ *  short source, set against the usual times instead of the week we hold,
+ *  so a week the same as ours came back "Posted", with lines like "Not
+ *  usual: Shacharis Thu 8:00am" (Thanksgiving, on our week already; Nov 24).
+ *  Only against a week we hold, though: with none, the days shown would be
+ *  a week with its first days missing, so it is set against the usual
+ *  times as before. */
+function isWhole(p: InPart, heldWeek: boolean): boolean {
+  const needed = heldWeek && p.due.length ? p.due : p.dates
+  if (p.read.shape !== 'schedule' || !needed.every((d) => p.shown.includes(d))) return false
   if (p.times.length || p.cancelled.length) return true
   return p.read.source.kind === 'calendar' && !!p.read.lastPosted && p.read.lastPosted > p.dates.at(-1)!
 }
@@ -219,7 +231,7 @@ function againstUsual(p: InPart, part: Part, ctx: WeekContext) {
 }
 
 function forPart(part: Part, reads: readonly SourceRead[], ctx: WeekContext): Finding {
-  const parts = reads.map((r) => inPart(r, part, ctx.week))
+  const parts = reads.map((r) => inPart(r, part, ctx.week, ctx.today))
   const held = ctx.held.find((h) => h.part === part)
   const timesOf = (p: InPart) => p.times.filter((t) => !p.cancelled.some((c) => cancels(c, t))).sort(byDate)
   const pickOf = (ps: InPart[]) => ps.find((p) => p.read.source === pick(ps.map((x) => x.read.source)))!
@@ -235,7 +247,8 @@ function forPart(part: Part, reads: readonly SourceRead[], ctx: WeekContext): Fi
   const take = (ps: InPart[]): Finding => {
     const p = pickOf(ps)
     const rank = RANK.indexOf(p.read.source.kind)
-    if (held && ps.some((x) => RANK.indexOf(x.read.source.kind) === rank && sameWeek(held.times, timesOf(x), ctx.zmanim))) return { do: 'nothing', part, reason: 'same' }
+    // On the days it shows: the days gone are ours either way.
+    if (held && ps.some((x) => RANK.indexOf(x.read.source.kind) === rank && sameWeek(held.times.filter((t) => x.shown.includes(t.date)), timesOf(x), ctx.zmanim))) return { do: 'nothing', part, reason: 'same' }
     // A week that is only the usual times still goes to the admin, marked
     // so (the Shtiebel's calendar, Nov 19; the user, Nov 20).
     const asUsual = !held && !p.cancelled.length && onlyUsual(p)
@@ -245,7 +258,7 @@ function forPart(part: Part, reads: readonly SourceRead[], ctx: WeekContext): Fi
   // While the shul's newsletter is due to give this part, nothing else is
   // filed for it: the newsletter wins, so one item a part, not two.
   const due = !!ctx.newsletterGives?.includes(part) && ctx.today <= partDates(part, ctx.week)[0]
-  const whole = parts.filter(isWhole)
+  const whole = parts.filter((p) => isWhole(p, !!held))
   const wholeLetter = whole.filter((p) => p.read.source.kind === 'newsletter')
   if (wholeLetter.length) return take(wholeLetter)
   if (whole.length && due) return { do: 'nothing', part, reason: 'waiting' }
@@ -256,7 +269,14 @@ function forPart(part: Part, reads: readonly SourceRead[], ctx: WeekContext): Fi
   if (due) return { do: 'nothing', part, reason: 'waiting' }
 
   const p = pickOf(short)
-  const { extra, different, missing } = againstUsual(p, part, ctx)
+  const against = againstUsual(p, part, ctx)
+  // What our week already has isn't news: Lower Merion's homepage, read
+  // on a Tuesday, listed Thanksgiving's times and Friday's Kabbalas
+  // Shabbos, all in the week we held, as "Not usual" (Nov 24).
+  const ours = (t: DatedTime) => !!held?.times.some((h) => h.date === t.date && sameName(h.tefillah, t.tefillah) && sameTime(h, t, ctx.zmanim[t.date]))
+  const extra = against.extra.filter((t) => !ours(t))
+  const different = against.different.filter((d) => !ours(d.read))
+  const missing = against.missing.filter((x) => !held?.times.some((h) => h.date === x.date))
   const quotes = p.cancelled.map((c) => c.quote)
   // A highlight never removes a minyan: what it leaves out is still on.
   const counted = p.read.shape === 'highlight' ? [] : missing

@@ -2,13 +2,15 @@ name: CI
 
 # Runs the whole test suite automatically instead of relying on someone
 # remembering to. `unit` needs no secrets (lint/typecheck/vitest are all pure
-# — no network, no DB) so it always runs. `integration`, `cache-roundtrip`,
-# `form-roundtrip`, `admin-write` and `e2e` each need their own Supabase
-# project (see the `env:` block in each job for exactly which repo secrets to
-# add, Settings → Secrets and variables → Actions, before they can pass) —
-# `integration`, `cache-roundtrip`, `form-roundtrip`, `admin-write` and `e2e`
-# all write to (or, for `e2e`, only read from) the SAME dedicated, disposable
-# test project (see README "Integration tests").
+# — no network, no DB). `integration`, `cache-roundtrip`, `form-roundtrip`,
+# `admin-write` and `e2e` each start a Supabase of their own on the runner,
+# loaded from the committed seed (.github/actions/own-test-database; see
+# below), so they need no secrets for a database either.
+#
+# `all-checks` passes only when every one of them did, and it is the check
+# `main` requires (docs/checks.md): one name to require, not seven e2e
+# shards, and a suite added later is covered once it is in its `needs`
+# (ciWorkflow.test.ts fails if it isn't).
 #
 # `e2e` used to point at the real production project instead — reasoning
 # being it's read-only, so no harm done. In practice that made every PR's
@@ -26,8 +28,9 @@ name: CI
 # kept for the genuinely useful part of that idea — catching prod
 # data/config drift — without making it a merge gate: it only runs on push
 # to `main` (i.e. after a merge, not as part of one) and every step is
-# `continue-on-error`, so a failure is visible in the Actions tab without
-# blocking anything.
+# `continue-on-error`, so it never blocks anything. A failure opens a GitHub
+# issue (or comments on the one already open), assigned to whoever pushed,
+# so it reaches someone (`prod-smoke-report`).
 #
 # Nothing waits on `unit` any more (Oct 19). The suites against the test
 # project used to start only once lint, typecheck and the unit tests had
@@ -56,7 +59,7 @@ name: CI
 #
 # Each test suite starts a database of its own on its runner (Nov 23,
 # .github/actions/own-test-database), so two runs of a suite, on any
-# branches, never meet. Until then they shared one test project and queued
+# branches, never meet. Until then they shared one hosted test project and queued
 # repo-wide (`test-db-<suite>` groups) so two copies didn't rename the same
 # fixture (PR 400, Nov 19).
 #
@@ -389,3 +392,57 @@ jobs:
           name: playwright-report-prod-smoke-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 14
+
+  prod-smoke-report:
+    name: Report a production smoke failure
+    # Each shard keeps going on a failure (above) and uploads its report
+    # only when its tests failed, so a report in this run is the failure.
+    if: always() && github.event_name == 'push'
+    needs: [e2e-prod-smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ACTOR: ${{ github.actor }}
+      SHARDS: ${{ needs.e2e-prod-smoke.result }}
+    steps:
+      - run: |
+          failed=$(gh api "repos/$GH_REPO/actions/runs/${{ github.run_id }}/artifacts" --paginate \
+            --jq '.artifacts[].name | select(startswith("playwright-report-prod-smoke-")) | ltrimstr("playwright-report-prod-smoke-")' | sort -n | paste -sd, -)
+          if [ -z "$failed" ] && [ "$SHARDS" = success ]; then echo "Production smoke passed."; exit 0; fi
+          title="Production smoke tests are failing"
+          body="The end-to-end suite against the live site failed after ${GITHUB_SHA::7} (shards: ${failed:-none uploaded a report; the run itself was $SHARDS}). Reports: $RUN"
+          open=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$open" ]; then gh issue comment "$open" --body "$body"
+          else gh issue create --title "$title" --assignee "$ACTOR" --body "$body
+
+          Live data or config no longer fits the code, or the live site is broken. Close this when a push to main passes again (docs/checks.md)." || gh issue create --title "$title" --body "$body"
+          fi
+
+  all-checks:
+    name: All checks passed
+    # The one check main requires (see the header). always(), so a failed
+    # or cancelled suite fails this rather than skipping it, which a
+    # required check would read as a pass.
+    if: always()
+    needs: [unit, integration, cache-roundtrip, form-roundtrip, admin-write, e2e-build, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          echo "$RESULTS"
+          for r in $RESULTS; do
+            case "$r" in
+              success) ;;
+              skipped) [ "$EVENT" = push ] || { echo "A suite was skipped on a PR."; exit 1; } ;;
+              *) echo "A suite did not pass: $r"; exit 1 ;;
+            esac
+          done

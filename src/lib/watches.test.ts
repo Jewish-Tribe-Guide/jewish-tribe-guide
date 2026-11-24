@@ -188,9 +188,10 @@ describe('watchHealth', () => {
 })
 
 describe('withoutListRead', () => {
-  it('drops only the list’s kept read', () => {
+  it('drops only the list’s kept read, and a shul page’s kept readings', () => {
     const check: WatchCheck = { at: 'a', what: 'list', from: null, result: 'agrees', read: [], differences: [], queue: null }
     expect(withoutListRead({ ...check, listRead: { updated: null, entries: [1] } })).toEqual(check)
+    expect(withoutListRead({ ...check, readings: { k: { times: [] } } })).toEqual(check)
     expect(withoutListRead(check)).toBe(check)
     expect(withoutListRead(null)).toBeNull()
   })

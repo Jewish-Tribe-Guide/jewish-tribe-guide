@@ -11,15 +11,15 @@ test('hovering a box lights its part of the preview, and Phone shows the phoneâ€
   const frame = page.frameLocator('iframe[title="Preview"]')
   const lit = frame.locator('[data-spot-lit]')
 
-  await page.getByRole('region', { name: 'Top of the page' }).hover({ timeout: 20_000 })
-  await expect(lit).toHaveAttribute('data-spot', 'top', { timeout: 20_000 })
+  await page.getByRole('region', { name: 'Top of the page' }).hover()
+  await expect(lit).toHaveAttribute('data-spot', 'top')
 
   // The preview scrolls to the part; the settings stay under the mouse.
   const cards = page.getByRole('region', { name: 'Cards under the search' })
   await cards.scrollIntoViewIfNeeded()
   const settingsAt = await page.evaluate(() => window.scrollY)
   await cards.hover()
-  await expect(lit.first()).toHaveAttribute('data-spot', /\bcards\b/, { timeout: 15_000 })
+  await expect(lit.first()).toHaveAttribute('data-spot', /\bcards\b/)
   expect(await page.evaluate(() => window.scrollY)).toBe(settingsAt)
 
   // Phone shows the phone's boxes, and the preview as a phone.
@@ -27,7 +27,7 @@ test('hovering a box lights its part of the preview, and Phone shows the phoneâ€
   await expect(page.getByRole('region', { name: 'Cards under the search' })).toHaveCount(0)
   await expect.poll(async () => (await page.locator('iframe[title="Preview"]').boundingBox())?.width).toBeLessThan(500)
   await page.getByRole('region', { name: 'Search box' }).hover()
-  await expect(lit.first()).toHaveAttribute('data-spot', /\btop\b/, { timeout: 15_000 })
+  await expect(lit.first()).toHaveAttribute('data-spot', /\btop\b/)
 })
 
 test('the computer preview shows the whole page, and opens full size on a click', async ({ page }) => {
@@ -35,14 +35,14 @@ test('the computer preview shows the whole page, and opens full size on a click'
   await page.goto(`/${TEST_COMMUNITY}/admin/home`)
   const shown = page.getByRole('button', { name: 'Open the preview' })
   const frame = page.frameLocator('iframe[title="Preview"]')
-  await expect(frame.locator('body')).toBeVisible({ timeout: 20_000 })
+  await expect(frame.locator('body')).toBeVisible()
 
   // The frame is as tall as the page in it, so nothing is cut off: its own
   // window has nothing left to scroll. One screen of 1,100 is 292px here.
-  await expect.poll(async () => (await shown.boundingBox())?.height ?? 0, { timeout: 20_000 }).toBeGreaterThan(300)
+  await expect.poll(async () => (await shown.boundingBox())?.height ?? 0).toBeGreaterThan(300)
   const inside = page.locator('iframe[title="Preview"]')
   await expect
-    .poll(() => inside.evaluate((f: HTMLIFrameElement) => f.contentDocument!.documentElement.scrollHeight - f.contentWindow!.innerHeight), { timeout: 20_000 })
+    .poll(() => inside.evaluate((f: HTMLIFrameElement) => f.contentDocument!.documentElement.scrollHeight - f.contentWindow!.innerHeight))
     .toBeLessThanOrEqual(1)
   // And it settles once the page has drawn, rather than growing with
   // itself: a whole page, not one stretched by its own frame.

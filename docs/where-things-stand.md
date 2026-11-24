@@ -58,6 +58,10 @@ old number can still be looked up. When an item is done, move it to
     The bar for it (Nov 23): behaviour that's predictable on a website
     it has never seen, even if it catches a little less, since every
     special case so far was learned from one Philly shul's site.
+    Since Nov 24 the same words are read the same way (kept readings),
+    a date-only line doesn't make a page new, and a week read mid-week
+    is compared with the week we hold (`docs/history.md`, "Shul
+    watches: the same page reads the same way").
 86. **After 82: rehearse a second city before inviting anyone.** Pick a
     real one (Teaneck, Baltimore), paste its real lists into a hidden
     community, and let it run two weeks with no hand-fixing. Count what
@@ -81,6 +85,12 @@ old number can still be looked up. When an item is done, move it to
     Nov 16 and Nov 22 fixes; home taps 400–456ms (target 200ms).
 
 ### You decide
+
+87. Two settings from `docs/checks.md` (Nov 24), both yours:
+    - turn on Sentry's quota emails (80% and 100%);
+    - add `SENTRY_API_TOKEN` (the read-only one) to the live
+      deployment's settings, for Sundays' speed email.
+    And agree the admin target, ≤ 1s at p75 for a screen and a save.
 
 2.  Copy dev's photos for Eruv, Hospitals, Childcare and Schools (iStock
     links) to live? Live's tiles for those have none of their own.
@@ -109,6 +119,10 @@ old number can still be looked up. When an item is done, move it to
     on it.
 
 ### Mine to fix
+
+89. Main dishes' list is asked for far more than anything else in the
+    admin (about 6,300 sampled requests in 14 days, against 380 for the
+    next): find what keeps asking.
 
 27. The "+" covers part of the third tile in a row on the phone home.
 

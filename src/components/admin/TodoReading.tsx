@@ -36,10 +36,13 @@ function Tag({ children }: { children: ReactNode }) {
 }
 
 /** A box's rows that change something, or all of them when none is
- *  marked: a menu's reading lists every dish, and the rest are as listed. */
+ *  marked: a menu's reading lists every dish, and the rest are as listed.
+ *  A marked row keeps its heading (the day) beside its note: alone, Sons
+ *  of Israel's Sunday 8 AM going read "Shacharis 8 AM", the same as the
+ *  weekdays' (Nov 24). */
 export function lit(b: WaitBox): WaitRow[] {
   const rows = b.groups.flatMap((x) => x.rows)
-  const marked = rows.filter((r) => r.mark !== 'same')
+  const marked = b.groups.flatMap((g) => g.rows.filter((r) => r.mark !== 'same').map((r) => (g.head ? { ...r, sub: [g.head, r.sub].filter(Boolean).join(' · ') } : r)))
   return marked.length > 0 ? marked : rows
 }
 

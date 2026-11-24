@@ -49,6 +49,16 @@ describe('todoAnswerLabels — a job’s reading in the change screens’ words'
     expect(labels(menu(dish('Hot Dogs', 'new'), dish('Falafel', 'gone')))).toEqual(['Update the listing', 'Leave it'])
   })
 
+  // Nov 24: Sons of Israel's Sunday 8 AM, going, showed as "Shacharis
+  // 8 AM" alone, which reads as the weekdays' and as nothing changed.
+  it('a changed row keeps the day it is under', () => {
+    const box = { name: 'Usual weekday times', groups: [
+      { head: 'Sunday', rows: [{ name: 'Shacharis', right: '7 AM', mark: 'same' as const }, { name: 'Shacharis', right: '8 AM', mark: 'gone' as const }] },
+      { head: 'Monday to Friday', rows: [{ name: 'Shacharis', right: '6:45 AM', mark: 'same' as const }] },
+    ] }
+    expect(lit(box)).toEqual([{ name: 'Shacharis', right: '8 AM', sub: 'Sunday', mark: 'gone' }])
+  })
+
   it('an archived place is added back to the guide; a closure keeps its own words', () => {
     expect(labels(group({ kind: 'later', archivedId: 'a' }))).toEqual(['Add to the guide'])
     expect(labels(group({ kind: 'closure' }))).toEqual(['Keep closed', 'Show as open'])

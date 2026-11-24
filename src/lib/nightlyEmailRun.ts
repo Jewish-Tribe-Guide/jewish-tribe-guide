@@ -11,7 +11,9 @@ import { placePath } from './placeLink'
 import { NIGHTLY_JOBS, jobAlert, jobHealth, lateAfterMs, type JobRun } from './jobRuns'
 import { statusChangesSince } from './nightNoteStore'
 import { recentJobRuns } from './jobRunStore'
-import { adminAppUrl, sendNightlyEmail } from './email'
+import { adminAppUrl, sendEmail, sendNightlyEmail } from './email'
+import { getAllowedAdminEmails } from './adminAuth'
+import { buildSpeedEmail, isSpeedReportDay, readWeekSpeedFromSentry } from './speedReport'
 import { buildNightlyEmail, waitingRow, type Night, type StoppedRow, type WaitingRow } from './nightlyEmail'
 import type { Watch } from './watches'
 import { readAll } from '@/lib/readAll'
@@ -168,7 +170,26 @@ async function gatherNight(community: Night['community'] & { timezone: string },
   }
 }
 
-export type NightlyEmailRun = { communities: { slug: string; sent: boolean; waiting: number; stopped: number; error?: string }[] }
+export type NightlyEmailRun = {
+  communities: { slug: string; sent: boolean; waiting: number; stopped: number; error?: string }[]
+  /** The week's speed email to the site owners (Sundays, speedReport.ts). */
+  speed?: { sent: boolean; error?: string }
+}
+
+/** Sundays: the week's speed against the targets, to the site owners
+ *  (SUPERADMIN_EMAILS), who own the site rather than a community. */
+export async function sendSpeedReport(now: Date, deps = { read: readWeekSpeedFromSentry, send: sendEmail, to: getAllowedAdminEmails }): Promise<NightlyEmailRun['speed']> {
+  if (!isSpeedReportDay(now)) return undefined
+  const to = deps.to()
+  if (!to.length) return { sent: false, error: 'SUPERADMIN_EMAILS is empty' }
+  try {
+    await deps.send({ to, ...buildSpeedEmail(await deps.read()) })
+    return { sent: true }
+  } catch (err) {
+    reportServerError('[nightly-email] speed report failed:', err)
+    return { sent: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
 
 /** Every community's email for last night; one failing doesn't stop the rest. */
 export async function sendNightlyEmails(now: Date = new Date()): Promise<NightlyEmailRun> {
@@ -186,5 +207,5 @@ export async function sendNightlyEmails(now: Date = new Date()): Promise<Nightly
       out.push({ slug: c.slug, sent: false, waiting: 0, stopped: 0, error: err instanceof Error ? err.message : String(err) })
     }
   }
-  return { communities: out }
+  return { communities: out, speed: await sendSpeedReport(now) }
 }

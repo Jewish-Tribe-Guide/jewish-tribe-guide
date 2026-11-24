@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Festival } from './festivals'
+import { readingMemo } from './readingMemo'
 import { asRegularTime, clipNote, readRegular, readSchedule, readSunsetTime, readZmanTime, regularMessages, scheduleMessages, tidyRegularReading, tidyScheduleReading } from './scheduleReader'
 
 const sukkos: Festival = {
@@ -545,6 +546,30 @@ describe('reading a shul’s regular times', () => {
     const fetchImpl = vi.fn(async () => Response.json({ choices: [{ message: { content: JSON.stringify({ kind: 'schedule', times: [{ tefillah: 'shacharis', days: ['sat'], time: '9:00', quote: 'Shacharis 9:00' }] }) } }] }))
     const r = await readRegular({ text: POST }, DAYS, 'Mekor Habracha', { apiKey: 'k', fetchImpl: fetchImpl as unknown as typeof fetch, newId: id })
     expect(r.times[0]).toMatchObject({ days: ['sat'], time: '9:00am' })
+  })
+
+  // Sons of Israel, Nov 21–24: the same page, read four nights, came back
+  // with a different minyan missing each time, and each was filed.
+  it('the same words, kept from the last read, get the same reading without asking again', async () => {
+    // Answers that differ, as the AI's did: the quote is the page's own.
+    const answer = (day: string) => Response.json({ choices: [{ message: { content: JSON.stringify({ kind: 'schedule', times: [{ tefillah: 'shacharis', days: [day], time: '9:00', quote: 'Shacharis 9:00' }] }) } }] })
+    const fetchImpl = vi.fn().mockResolvedValueOnce(answer('sun')).mockResolvedValueOnce(answer('mon')).mockResolvedValueOnce(answer('tue'))
+    const opts = { apiKey: 'k', fetchImpl: fetchImpl as unknown as typeof fetch, newId: id }
+    const first = readingMemo(null)
+    expect((await readRegular({ text: POST }, DAYS, 'SOI', { ...opts, memo: first })).times[0].days).toEqual(['sun'])
+    // Read again the next day, the page unchanged: no new answer.
+    const nextDay = readingMemo(first.used())
+    expect((await readRegular({ text: POST }, { ...DAYS, today: '2026-10-14' }, 'SOI', { ...opts, memo: nextDay })).times[0].days).toEqual(['sun'])
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    expect(nextDay.used()).toEqual(first.used())
+    // Other words are read afresh, and only what this read used is kept.
+    const changed = readingMemo(nextDay.used())
+    expect((await readRegular({ text: `${POST}\nKiddush follows` }, DAYS, 'SOI', { ...opts, memo: changed })).times[0].days).toEqual(['mon'])
+    expect(Object.values(changed.used())).toHaveLength(1)
+    expect(Object.keys(changed.used())).not.toEqual(Object.keys(first.used()))
+    // No memo: asked every time, as the paste box is.
+    await readRegular({ text: POST }, DAYS, 'SOI', opts)
+    expect(fetchImpl).toHaveBeenCalledTimes(3)
   })
 })
 

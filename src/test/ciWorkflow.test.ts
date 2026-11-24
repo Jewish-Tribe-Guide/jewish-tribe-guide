@@ -345,3 +345,53 @@ describe('the build cache is saved once, not every run', () => {
     expect(turbopack).not.toMatch(/github\.sha|restore-keys/)
   })
 })
+
+// main requires one check, `all-checks`, which passes only when every PR
+// suite did (docs/checks.md, Nov 24). A suite left out of its `needs` runs
+// on every PR and can be merged past while red, which is how every suite
+// but `unit` was until then.
+describe('one check stands for every suite a PR runs', () => {
+  const body = WORKFLOW.slice(WORKFLOW.indexOf('\njobs:'))
+  const blocks = body.split(/\n {2}(?=[a-z][\w-]*:\n)/).slice(1)
+  const name = (b: string) => b.match(/^([\w-]+):/)![1]
+  const all = blocks.find((b) => name(b) === 'all-checks')
+
+  it('exists, and runs even when a suite fails', () => {
+    expect(all, 'no all-checks job in ci.yml').toBeDefined()
+    expect(all).toMatch(/\n {4}if: always\(\)\n/)
+  })
+
+  it('needs every job a PR runs', () => {
+    const onPr = blocks.map((b) => ({ job: name(b), push: /\n {4}if:[^\n]*event_name == 'push'/.test(b) })).filter((j) => !j.push && j.job !== 'all-checks')
+    const needs = all?.match(/\n {4}needs:\s*\[([^\]]*)\]/)?.[1].split(',').map((s) => s.trim()) ?? []
+    expect(onPr.map((j) => j.job)).toContain('e2e')
+    expect(onPr.map((j) => j.job).filter((j) => !needs.includes(j))).toEqual([])
+  })
+
+  it('fails on anything but a pass, and on a skip on a PR', () => {
+    expect(all).toContain('needs.*.result')
+    expect(all).toMatch(/success\) ;;/)
+    expect(all).toMatch(/skipped\)[^\n]*push/)
+  })
+})
+
+// e2e-prod-smoke never blocks (every step continue-on-error), so its
+// failure reached no one until it opened an issue (Nov 24).
+describe('a production smoke failure reaches someone', () => {
+  const body = WORKFLOW.slice(WORKFLOW.indexOf('\njobs:'))
+  const report = body.split(/\n {2}(?=[a-z][\w-]*:\n)/).find((b) => b.startsWith('prod-smoke-report:'))
+
+  it('a job after the smoke run opens or comments on an issue', () => {
+    expect(report, 'no prod-smoke-report job in ci.yml').toBeDefined()
+    expect(report).toMatch(/needs: \[e2e-prod-smoke\]/)
+    expect(report).toMatch(/if: always\(\) && github\.event_name == 'push'/)
+    expect(report).toContain('issues: write')
+    expect(report).toContain('gh issue create')
+  })
+
+  it('finds a failure by the report each failed shard uploads', () => {
+    const prefix = WORKFLOW.match(/name: (playwright-report-prod-smoke-)\$\{\{ matrix\.shard \}\}/)?.[1]
+    expect(prefix).toBe('playwright-report-prod-smoke-')
+    expect(report).toContain(`startswith("${prefix}")`)
+  })
+})

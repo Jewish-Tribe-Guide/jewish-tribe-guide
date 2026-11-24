@@ -151,6 +151,7 @@ describe('the nightly email’s run, in a line', () => {
       error: 'ues: couldn’t send',
     })
     expect(nightlyEmailOutcome({ communities: [c('philly', true), c('ues', false)] } as never)).toEqual({ ok: true, summary: 'Sent to 1 community', warning: null })
+    expect(nightlyEmailOutcome({ communities: [c('philly', true)], speed: { sent: false, error: 'Sentry answered 401' } } as never)).toEqual({ ok: true, summary: 'Sent to 1 community', warning: 'Speed report: Sentry answered 401' })
   })
 })
 

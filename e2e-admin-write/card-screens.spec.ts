@@ -11,7 +11,7 @@ test('Right now’s screen: Back returns to the boxes, Forward and a reload reop
   await page.setViewportSize({ width: 1400, height: 900 })
   await page.goto(`/${TEST_COMMUNITY}/admin/home`)
   // On a phone the home always has Right now, so its row is always there.
-  await page.getByRole('group', { name: 'Show the page on' }).getByRole('button', { name: 'Phone' }).click({ timeout: 20_000 })
+  await page.getByRole('group', { name: 'Show the page on' }).getByRole('button', { name: 'Phone' }).click()
   await page.getByRole('region', { name: 'Under the search' }).getByRole('button', { name: /Right Now/ }).click()
 
   const screenOf = page.getByTestId('right-now-screen')
@@ -19,9 +19,9 @@ test('Right now’s screen: Back returns to the boxes, Forward and a reload reop
   // router.push writes the address once the server's answer lands. This file
   // sorts first, so in CI that is a cold server's first admin navigation:
   // over 5s on PR 387 (Nov 16), with the screen already showing.
-  await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/home\\?card=rightNow$`), { timeout: 20_000 })
+  await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/home\\?card=rightNow$`))
   // What can answer, once the categories have loaded.
-  await expect(screenOf.getByRole('checkbox').first()).toBeVisible({ timeout: 20_000 })
+  await expect(screenOf.getByRole('checkbox').first()).toBeVisible()
 
   await page.goBack()
   await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/home$`))
@@ -32,7 +32,7 @@ test('Right now’s screen: Back returns to the boxes, Forward and a reload reop
   await expect(screenOf).toBeVisible()
 
   await page.reload()
-  await expect(screenOf).toBeVisible({ timeout: 20_000 })
+  await expect(screenOf).toBeVisible()
   // Its own Back goes to the boxes, and the address with it.
   await screenOf.getByRole('button', { name: 'Back to the cards' }).click()
   await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/home$`))

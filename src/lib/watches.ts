@@ -14,6 +14,7 @@
 import { KEYSTONE_LIST_URL } from './keystoneWatch'
 import type { PartGiven } from './timesParts'
 import type { SourceRead } from './shulTimes'
+import type { Readings } from './readingMemo'
 
 export type WatchKind = 'keystone_list' | 'website'
 
@@ -95,6 +96,10 @@ export type WatchCheck = {
    *  listing both stay as they were, a page that agreed still agrees, and
    *  the daily run dates the listing again without the AI (Oct 23). */
   listedAs?: string
+  /** A shul's page: the AI's readings of it, by the words it was given
+   *  (readingMemo.ts), so the same words are read the same way next time.
+   *  Kept off the watch as the store hands it out: getReadings. */
+  readings?: Readings
   /** A kosher list's: the places on it Google said were permanently
    *  closed, and when, so they aren't asked about again every night
    *  (kosherListRun.ts's knownClosed, Nov 18). */
@@ -111,13 +116,15 @@ export type WatchCheck = {
 
 export type ListRead = { updated: string | null; entries: unknown[] }
 
-/** A check without its list's read: what's sent to a browser. */
+/** A check without its list's read or its readings: what's sent to a
+ *  browser, each read on its own where it's needed. */
 export function withoutListRead(c: WatchCheck): WatchCheck
 export function withoutListRead(c: WatchCheck | null): WatchCheck | null
 export function withoutListRead(c: WatchCheck | null): WatchCheck | null {
-  if (!c?.listRead) return c
+  if (!c?.listRead && !c?.readings) return c
   const rest = { ...c }
   delete rest.listRead
+  delete rest.readings
   return rest
 }
 

@@ -34,9 +34,11 @@ import { hoursSections, readSectionSource, splitSections, type HoursSection, typ
 import { CONTACT_SECTION, contactBoxName, contactFields, googleKeeps, pageContacts, readContacts, type ContactField, type ContactReading, type PageContacts } from '@/lib/contactRead'
 import { confirmFromSource } from '@/lib/sourceConfirm'
 import { readShulPage } from '@/lib/shulPageRead'
-import { otherShulPages, otherShulReads } from '@/lib/watchStore'
+import { getReadings, otherShulPages, otherShulReads } from '@/lib/watchStore'
+import { readingMemo, type ReadingMemo, type Readings } from '@/lib/readingMemo'
 import type { SourceRead } from '@/lib/shulTimes'
 import { withMinyanLinks } from '@/lib/minyanLinks'
+import { withoutTodaysDate } from '@/lib/todaysDateLine'
 import type { MenuReadBudget } from '@/lib/menuWatchRun'
 import type { CategoryConfig } from '@/lib/categories'
 import type { Watch, WatchCheck, WatchOutcome } from '@/lib/watches'
@@ -134,8 +136,10 @@ export async function readListingPage(url: string, opts: { timezone: string; fet
       : null
   entries = await withEventJoins(entries, today, last, opts.fetchImpl)
   // Its WhatsApp groups and Zoom links with their addresses, so the
-  // reader can give a minyan its own (minyanLinks.ts).
-  const text = htmlToText(withMinyanLinks(page.body.replace(/<nav\b[\s\S]*?<\/nav\s*>/gi, ' ')))
+  // reader can give a minyan its own (minyanLinks.ts). Without a line
+  // that only says what day it is, so the page isn't new every night
+  // (todaysDateLine.ts).
+  const text = withoutTodaysDate(htmlToText(withMinyanLinks(page.body.replace(/<nav\b[\s\S]*?<\/nav\s*>/gi, ' '))), today)
   // Its phones and emails, read by code (contactRead.ts): in its words and
   // its tel: and mailto: links, its menus' included.
   const contacts = pageContacts(htmlToText(page.body), page.body)
@@ -262,6 +266,7 @@ export async function readPageFor(
     otherReads = [],
     waiting = [],
     where,
+    memo,
   }: {
     apiKey: string
     communityName: string
@@ -276,11 +281,13 @@ export async function readPageFor(
     otherReads?: readonly SourceRead[]
     /** Weeks waiting in To do: the newsletter's, and other pages'. */
     waiting?: readonly SpecialSchedule[]
+    /** A shul page's kept readings (readingMemo.ts). */
+    memo?: ReadingMemo
   },
 ): Promise<PageReading> {
   const text = source.text?.slice(0, MAX_PAGE_TEXT) ?? null
   // A shul's times: read as sources and decided by the rule (shulTimes.ts).
-  if (reads.kind === 'times') return readShulPage(listing, category, reads.key, { ...source, text }, source.url ?? '', { apiKey, where, now, fetchImpl, others, otherReads, waiting })
+  if (reads.kind === 'times') return readShulPage(listing, category, reads.key, { ...source, text }, source.url ?? '', { apiKey, where, now, fetchImpl, others, otherReads, waiting, memo })
   // Weekly hours: the any-field reader (messageReader.ts), told only of this
   // listing, and only its hours kept.
   const intro = hoursNowIntro(listing.name, category, reads.keys, listing, reads.notes)
@@ -430,7 +437,15 @@ export async function runListingPageWatch(
   const stoodBehind =
     !opts.full && !!watch.pageHash && watch.lastCheck?.queue === 'waiting' && watch.lastCheck.result === 'differs' && !(await pendingSuggestions(watch.communityId, listing.id)).length
   const stillAgrees = watch.lastCheck?.result === 'agrees' && !listingMoved
+  // A shul page's kept readings, read once and only when needed; a check
+  // made without reading again carries them on (readingMemo.ts).
+  let kept: Promise<Readings> | null = null
+  const keptReadings = () => (kept ??= reads.kind === 'times' ? getReadings(watch.communityId, watch.url) : Promise.resolve({}))
   const dated = async (o: WatchOutcome, agrees: boolean): Promise<WatchOutcome> => {
+    if (reads.kind === 'times' && o.check && !o.check.readings) {
+      const had = await keptReadings()
+      if (Object.keys(had).length) o = { ...o, check: { ...o.check, readings: had } }
+    }
     // What it read, and only that (pageReadBoxes): its phone and email too
     // when the page gives them and they agree. Those whatever else differs
     // (the user, Nov 5): the Kosher Grill's page gave its phone as listed
@@ -485,7 +500,7 @@ export async function runListingPageWatch(
       else budget.aiReads--
     }
   }
-  const o = merge(await readAndFile(watch, listing, category, ownReads, source, waitingNow, blocked, { ...opts, apiKey, changed, pageHash, compareOnly, where, communityName: community.name }))
+  const o = merge(await readAndFile(watch, listing, category, ownReads, source, waitingNow, blocked, { ...opts, apiKey, changed, pageHash, compareOnly, where, communityName: community.name, readings: keptReadings }))
   // A compare files nothing, so it isn't the week's read.
   const read = o.check ? { listedAs: listed, ...(reads.kind === 'times' && !compareOnly ? { readWeek: today } : {}) } : {}
   return dated(o.check ? { ...o, check: { ...o.check, ...read } } : o, o.check?.result === 'agrees')
@@ -502,10 +517,29 @@ async function readAndFile(
   source: PageSource,
   waitingNow: readonly Filed[],
   blocked: boolean,
-  opts: { fetchImpl?: typeof fetch; apiKey: string; now?: number; full?: boolean; changed: boolean; pageHash: string; compareOnly?: boolean; where: CommunityPlace; communityName: string },
+  opts: { fetchImpl?: typeof fetch; apiKey: string; now?: number; full?: boolean; changed: boolean; pageHash: string; compareOnly?: boolean; where: CommunityPlace; communityName: string; readings?: () => Promise<Readings> },
+): Promise<WatchOutcome> {
+  // A shul's page: the same words read as they were last time, and what
+  // this read used kept for the next (readingMemo.ts).
+  const memo = reads.kind === 'times' ? readingMemo(await opts.readings?.()) : undefined
+  const o = await readAndFileOnce(watch, listing, category, reads, source, waitingNow, blocked, { ...opts, memo })
+  const used = memo?.used()
+  return o.check && used && Object.keys(used).length ? { ...o, check: { ...o.check, readings: used } } : o
+}
+
+async function readAndFileOnce(
+  watch: Pick<Watch, 'communityId' | 'url' | 'pageHash'>,
+  listing: DirectoryResource,
+  category: CategoryConfig,
+  reads: PageReads,
+  source: PageSource,
+  waitingNow: readonly Filed[],
+  blocked: boolean,
+  opts: { fetchImpl?: typeof fetch; apiKey: string; now?: number; full?: boolean; changed: boolean; pageHash: string; compareOnly?: boolean; where: CommunityPlace; communityName: string; memo?: ReadingMemo },
 ): Promise<WatchOutcome> {
   const { apiKey, changed, pageHash } = opts
   const pending = waitingNow.length > 0
+  const { memo } = opts
 
   let reading: PageReading
   try {
@@ -519,7 +553,7 @@ async function readAndFile(
     })
     const otherReads = reads.kind === 'times' && listing.id ? await otherShulReads(watch.communityId, listing.id, watch.url) : []
     const others = () => listApprovedResources(watch.communityId)
-    reading = await readPageFor(listing, category, reads, source, { apiKey, communityName: opts.communityName, where: opts.where, fetchImpl: opts.fetchImpl, now: opts.now, others, otherReads, waiting })
+    reading = await readPageFor(listing, category, reads, source, { apiKey, communityName: opts.communityName, where: opts.where, fetchImpl: opts.fetchImpl, now: opts.now, others, otherReads, waiting, memo })
   } catch (err) {
     return { ok: false, error: `${changed ? 'The page changed, and the AI' : 'The AI'} couldn’t read it (${err instanceof Error ? err.message : String(err)})` }
   }

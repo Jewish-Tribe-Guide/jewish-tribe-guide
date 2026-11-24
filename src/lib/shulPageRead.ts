@@ -18,6 +18,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import { parseTimeToMinutes, type Minyan, type Tefillah } from '@/lib/davening'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import type { PageSource } from '@/lib/listingPageRun'
+import type { ReadingMemo } from '@/lib/readingMemo'
 
 // ── A shul's page, read for its times (the rebuilt watch, Nov 19) ────────────
 // docs/shul-watch-rebuild.md. The page is read once, as what it is (a
@@ -149,6 +150,7 @@ export async function readShulPage(
     otherReads = [],
     waiting = [],
     newId = () => crypto.randomUUID(),
+    memo,
   }: {
     apiKey: string
     where: CommunityPlace
@@ -158,6 +160,8 @@ export async function readShulPage(
     otherReads?: readonly SourceRead[]
     waiting?: readonly SpecialSchedule[]
     newId?: () => string
+    /** Readings kept from the page's last read (readingMemo.ts). */
+    memo?: ReadingMemo
   },
 ): Promise<ShulPageReading> {
   const { timezone } = where
@@ -202,7 +206,7 @@ export async function readShulPage(
         reads.push({ source: src('calendar'), shape, shows, ...extra, times: [] })
         continue
       }
-      const r = await readRegular(images ? { images } : { text: [CALENDAR_HEADING, ...w.lines].join('\n') }, days(shows.from, shows.to), listing.name, { apiKey, fetchImpl, describe: true })
+      const r = await readRegular(images ? { images } : { text: [CALENDAR_HEADING, ...w.lines].join('\n') }, days(shows.from, shows.to), listing.name, { apiKey, fetchImpl, describe: true, memo })
       const got = fromReading(await notHeldElsewhere(r), src('calendar'), { week: shows, shows, shape, ...extra })
       // The calendar's join links onto its times, by code: a time on a
       // date the calendar links, at that time (calendarJoins).
@@ -214,7 +218,7 @@ export async function readShulPage(
       reads.push({ ...got, times: linked })
     }
   } else {
-    const raw = await readRegular(source.text !== null ? { text: source.text } : { pdf: source.pdf! }, days(span.from, span.to), listing.name, { apiKey, fetchImpl, describe: true })
+    const raw = await readRegular(source.text !== null ? { text: source.text } : { pdf: source.pdf! }, days(span.from, span.to), listing.name, { apiKey, fetchImpl, describe: true, memo })
     const r = onItsWeek(await notHeldElsewhere(raw), { from: today, to: weeks[0].to })
     reads.push(fromReading(r, src(r.complete ? 'schedule' : 'page'), { week: span }))
     // Its usual times, compared as they always were: never a calendar's.

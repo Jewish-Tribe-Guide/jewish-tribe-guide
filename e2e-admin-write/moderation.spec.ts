@@ -205,7 +205,7 @@ test('clicking Approve on a pending listing makes it live', async ({ page }) => 
   // The real signal: back on the list without it once the PATCH resolves.
   // An approval is ~1.2s locally; CI's busier runner took over 5s on Nov 3
   // (PR 373), so the wait is the round trip's, not expect's default.
-  await expect(review).not.toBeVisible({ timeout: 15_000 })
+  await expect(review).not.toBeVisible()
   await expect(page.getByRole('button', { name: `Open ${name}` })).not.toBeVisible()
 
   const { data: resource } = await supabase.from('resource').select('*').eq('name', name).maybeSingle()
@@ -251,7 +251,7 @@ test('opening a card, fixing the name and approving puts the fix live', async ({
 
   await review.getByLabel('Name').fill(fixed)
   await review.getByRole('button', { name: 'Approve with your changes' }).click()
-  await expect(review).not.toBeVisible({ timeout: 15_000 }) // a save, not a redraw: as the approve test above
+  await expect(review).not.toBeVisible()
 
   const { data: resource } = await supabase.from('resource').select('id, status').eq('name', fixed).maybeSingle()
   expect(resource, 'the fixed name should be what went live').not.toBeNull()
@@ -291,7 +291,7 @@ test('clicking Reject with a reason marks the submission rejected and creates no
   await review.getByLabel(/Reason for rejection/).fill('Duplicate of an existing listing.')
   await review.getByRole('button', { name: 'Confirm rejection' }).click()
 
-  await expect(review).not.toBeVisible({ timeout: 15_000 }) // a save, not a redraw: as the approve test above
+  await expect(review).not.toBeVisible()
   await expect(page.getByRole('button', { name: `Open ${name}` })).not.toBeVisible()
 
   const { data: resource } = await supabase.from('resource').select('id').eq('name', name).maybeSingle()
@@ -329,7 +329,7 @@ test('a left-out submission shows up in History, with its reason', async ({ page
   const reason = `Already listed ${randomUUID().slice(0, 8)}`
   await review.getByLabel(/Reason for rejection/).fill(reason)
   await review.getByRole('button', { name: 'Confirm rejection' }).click()
-  await expect(review).not.toBeVisible({ timeout: 15_000 }) // a save, not a redraw: as the approve test above
+  await expect(review).not.toBeVisible()
 
   // The click-through this test actually exists to prove: Reports' History
   // row, then Rejected, and the submission just rejected is on it — the

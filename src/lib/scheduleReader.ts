@@ -5,6 +5,7 @@ import { isGroupLink, linkFromMessage } from './minyanLinks'
 import { isJoinLink } from './calendarFeed'
 import { dateText, type ScheduleDay, type ScheduleMinyan, type SpecialSchedule } from './schedules'
 import type { Festival } from './festivals'
+import type { ReadingMemo } from './readingMemo'
 
 // ── Reading a shul's Yom Tov schedule from what it sent (step 4) ────────────
 // The user's idea, agreed Oct 1: whoever has the shul's message (WhatsApp,
@@ -570,8 +571,21 @@ export async function readRegular(
     fetchImpl = fetch,
     newId = () => crypto.randomUUID(),
     describe = false,
-  }: { apiKey: string; model?: string; fetchImpl?: typeof fetch; newId?: () => string; describe?: boolean },
+    memo,
+  }: {
+    apiKey: string
+    model?: string
+    fetchImpl?: typeof fetch
+    newId?: () => string
+    describe?: boolean
+    /** The watch's kept readings: the same words are given the reading
+     *  they got before (readingMemo.ts). */
+    memo?: ReadingMemo
+  },
 ): Promise<RegularReading & { model: string }> {
-  const raw = await callReader(regularMessages(source, days, shulName, { describe }), { apiKey, model, fetchImpl })
+  const messages = regularMessages(source, days, shulName, { describe })
+  const kept = memo?.recall(messages, model, days.today)
+  const raw = kept !== undefined ? kept : await callReader(messages, { apiKey, model, fetchImpl })
+  if (kept === undefined && raw !== null) memo?.keep(messages, model, days.today, raw)
   return { ...tidyRegularReading(raw, source, days, newId), model }
 }

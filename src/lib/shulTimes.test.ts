@@ -165,9 +165,40 @@ describe('a calendar’s weeks', () => {
     expect(part(fs, 'shabbos')).toMatchObject({ do: 'take' })
     expect(part(fs, 'weekdays')).toMatchObject({ do: 'nothing', reason: 'agrees' })
   })
+
+  // Nov 24: read on a Tuesday, the calendar showed Tue–Sat, the same as the
+  // week we held (Thanksgiving's 8:00 Thursday included). It was counted
+  // short, set against the usual times, and filed as new.
+  it('Sons of Israel: read mid-week, a calendar the same as our week files nothing', () => {
+    const held = weekdayTimes([THU]).concat(t(THU, 'shacharis', '8:00 AM')).sort((a, b) => a.date.localeCompare(b.date))
+    const shown = held.filter((x) => x.date >= TUE)
+    const calendar = read(src('calendar', 'calendar'), 'schedule', { from: TUE, to: SAT }, [...shown, t(SAT, 'shacharis', '9:15 AM')])
+    const fs = weekFrom([calendar], ctx({ today: TUE, usual: USUAL, held: [{ part: 'weekdays', times: held }] }))
+    expect(part(fs, 'weekdays')).toMatchObject({ do: 'nothing', reason: 'same' })
+  })
+
+  it('…and one that differs from our week on the days it shows is taken', () => {
+    const held = weekdayTimes()
+    const calendar = read(src('calendar', 'calendar'), 'schedule', { from: TUE, to: SAT }, [...held.filter((x) => x.date >= TUE && x.date !== THU), t(THU, 'shacharis', '8:00 AM')])
+    const fs = weekFrom([calendar], ctx({ today: TUE, usual: USUAL, held: [{ part: 'weekdays', times: held }] }))
+    expect(part(fs, 'weekdays')).toMatchObject({ do: 'take' })
+  })
 })
 
 describe('a short source', () => {
+  // Nov 24: its homepage, read on a Tuesday, showed Friday's Kabbalas
+  // Shabbos but not Shabbos, so it was a short source, and the times our
+  // week already had came back "Not usual".
+  it('Lower Merion: what our week already has isn’t asked about again', () => {
+    const held = [t(FRI, 'kabbalas_shabbos', '4:25 PM')]
+    const home = read(src('home', 'page'), 'schedule', { from: TUE, to: FRI }, [t(FRI, 'kabbalas_shabbos', '4:25 PM')])
+    expect(part(weekFrom([home], ctx({ today: TUE, usual: USUAL, held: [{ part: 'shabbos', times: held }] })), 'shabbos')).toMatchObject({ do: 'nothing', reason: 'agrees' })
+    const more = read(src('home', 'page'), 'schedule', { from: TUE, to: FRI }, [t(FRI, 'mincha', '12:18 PM'), t(FRI, 'kabbalas_shabbos', '4:25 PM')])
+    const f = part(weekFrom([more], ctx({ today: TUE, usual: USUAL, held: [{ part: 'shabbos', times: held }] })), 'shabbos') as Extract<Finding, { do: 'ask' }>
+    expect(f).toMatchObject({ do: 'ask' })
+    expect([...f.extra, ...f.different.map((d) => d.read)].map((x) => x.time)).toEqual(['12:18 PM'])
+  })
+
   it('Mekor: its homepage’s Friday isn’t looked at beside the newsletter', () => {
     const home = read(src('home', 'page'), 'highlight', { from: FRI, to: FRI }, [t(FRI, 'mincha_maariv', '4:25 PM')])
     const email = read(src('email', 'newsletter'), 'schedule', WEEK, [t(FRI, 'mincha_maariv', '4:30 PM'), t(SAT, 'shacharis', '9:15 AM')])

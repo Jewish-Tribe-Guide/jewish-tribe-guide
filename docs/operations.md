@@ -11,6 +11,8 @@ data back is in `docs/backups.md`.
 | The whole site is down | UptimeRobot, every 5 minutes, on `/philly` | Email to the Jewish Tribe Guide Gmail |
 | A nightly job fails or doesn't run | The nightly email (09:45 UTC) lists every job's run | The nightly email |
 | The nightly email itself doesn't run | Sentry cron monitor `job-nightly-email` | Email from Sentry |
+| The production smoke run fails after a push to `main` | `prod-smoke-report` in CI | A GitHub issue, assigned to whoever pushed |
+| Speed misses its targets (visitors and admin) | The Sundays speed email (`speedReport.ts`, from Sentry) | The site owners (`SUPERADMIN_EMAILS`) |
 | A visitor hits an error | Sentry | `npm run sentry:check`; Sentry's own alert emails |
 | Sentry is over its quota and dropping errors | `npm run sentry:check` fails with "dropped N event(s)" | Only when someone runs it |
 | The database is lost or damaged | Supabase's daily backups (7 days), and our own weekly copy with the photos | A notification on this Mac if the weekly copy fails |
