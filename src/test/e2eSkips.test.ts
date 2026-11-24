@@ -15,19 +15,19 @@ import { describe, expect, it } from 'vitest'
 //   (e2e-prod-smoke) does it skip.
 // - The write suites only ever run on the seed, so they don't skip on data.
 //
-// What's left is a skip that depends on the day or the build, never on the
-// data, listed below with why.
+// What's left is a skip that depends on the build or the browser, never on
+// the data or the day (a test for a kind of day fixes its clock:
+// e2e/fixedDays.ts), listed below with why.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ROOT = join(__dirname, '..', '..')
 const SUITES = ['e2e', 'e2e-admin-write', 'e2e-cache', 'e2e-form']
 
-/** file → the reasons its skips may give. Each is the day, the build, or the
- *  browser: none is about what the data holds. */
+/** file → the reasons its skips may give. Each is the build or the browser:
+ *  none is about what the data holds, or what day it is. */
 const ALLOWED: Record<string, string[]> = {
   'e2e/helpers.ts': ['test.skip(!found, why)'], // needs() itself, off the seed
-  // The day: from Friday afternoon to havdalah the phone home has its own link.
-  'e2e/budgets.spec.ts': ["'the phone shows its own Minyanim link today (Friday to havdalah)'", "'no Turnstile site key at build time"],
+  'e2e/budgets.spec.ts': ["'no Turnstile site key at build time"],
   'e2e/offline.spec.ts': ["'service workers need Chromium'"],
   'e2e/today.spec.ts': ["'the Today home is held back (src/lib/features.ts)'"],
   'e2e/phone-map-row.spec.ts': ["'the tile needs a Maps key in the build'"],

@@ -1,6 +1,7 @@
 import { gzipSync } from 'node:zlib'
 import { expect, test, type Page } from '@playwright/test'
 import { openAddForm, defaultCommunitySlug, largestCategory, previewSettings, ready, needs } from './helpers'
+import { onDay } from './fixedDays'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // What a page actually downloads.
@@ -185,50 +186,53 @@ test.describe('home screen weight', () => {
   // itself, and the computer cards' links prefetched on it: every phone home
   // fetched the shuls page's data and ~150 KB of its code, for a card it
   // never shows (Oct 16). load() refuses prefetches, so this watches them.
-  test('a phone prefetches nothing from the computer-only cards; a computer does', async ({ page, request, isMobile }) => {
-    const community = await defaultCommunitySlug(request)
-    const prefetched: string[] = []
-    page.on('request', (r) => {
-      if (r.headers()['next-router-prefetch']) prefetched.push(decodeURIComponent(r.url()))
-    })
-    // The computer half needs the Next minyan card, which a community can
-    // have Right now in place of (board U1, Nov 14), as the seed's philly
-    // does: added through the admin's Preview, which saves nothing.
-    if (!isMobile) {
-      const davening = { id: 'davening', kind: 'davening', title: '', sortOrder: 50, cardIds: [], width: 'full', sharesRow: false }
-      await previewSettings(page, community, {}, (sections) => [davening, ...sections.filter((s) => s.kind !== 'rightNow')])
-    }
-    await page.goto(isMobile ? `/${community}` : `/${community}?preview=1`)
-    await ready(page)
-    const fromCards = () => prefetched.filter((u) => u.includes('davening=1'))
+  //
+  // On a Tuesday. From Friday to havdalah the phone's own Right now is the
+  // candles card, whose Minyanim link goes to the same ?davening=1 page and
+  // prefetches rightly, so a computer card's prefetch can't be told from it.
+  // It failed every Friday (Nov 13), then skipped from Friday to havdalah
+  // until Nov 24: for a day and a half a week, a PR merged unchecked.
+  test.describe('on a fixed weekday', () => {
+    test.use({ timezoneId: 'America/New_York', serviceWorkers: 'block' })
 
-    if (isMobile) {
-      // From Friday to havdalah the phone's own Right now is the candles
-      // card, whose Minyanim link goes to the same ?davening=1 page and
-      // prefetches rightly, so a computer card's prefetch can't be told
-      // from it: this failed every Friday (Nov 13). Checked the rest of
-      // the week. Decided before waiting for prefetches: the waits below
-      // timed out in CI on Nov 20 and 21 (both inside that window) for a
-      // test that was going to skip anyway.
-      // This used to wait for "any prefetch at all" first, taking the
-      // header's home link prefetching its own page as the sign. That link
-      // only existed because a phone painted the computer's header first; a
-      // phone's header has none since that flash was fixed (Nov 22), and no
-      // link on a phone's home prefetches, so there is nothing to wait for.
-      // The computer half below is the positive control. Next prefetches
-      // when the browser is idle, which a busy CI runner can put off, so
-      // this gives it a few seconds after the page is up.
-      await page.waitForTimeout(4_000)
-      const ownLink = await page.getByTestId('right-now').locator('a[href*="davening=1"]').count()
-      test.skip(ownLink > 0, 'the phone shows its own Minyanim link today (Friday to havdalah)')
-      expect(fromCards(), 'the Next minyan card’s link, on a phone').toEqual([])
-    } else {
-      // The positive control: on a computer the card is real, and its link
-      // prefetches once it's on screen.
-      const card = page.getByTestId('home-next-minyan')
-      await card.scrollIntoViewIfNeeded()
-      await expect.poll(() => fromCards().length, 'the Next minyan card’s link, on a computer').toBeGreaterThan(0)
-    }
+    test('a phone prefetches nothing from the computer-only cards; a computer does', async ({ page, request, isMobile }) => {
+      const community = await defaultCommunitySlug(request)
+      await onDay(page, 'tuesday')
+      const prefetched: string[] = []
+      page.on('request', (r) => {
+        if (r.headers()['next-router-prefetch']) prefetched.push(decodeURIComponent(r.url()))
+      })
+      // The computer half needs the Next minyan card, which a community can
+      // have Right now in place of (board U1, Nov 14), as the seed's philly
+      // does: added through the admin's Preview, which saves nothing.
+      if (!isMobile) {
+        const davening = { id: 'davening', kind: 'davening', title: '', sortOrder: 50, cardIds: [], width: 'full', sharesRow: false }
+        await previewSettings(page, community, {}, (sections) => [davening, ...sections.filter((s) => s.kind !== 'rightNow')])
+      }
+      await page.goto(isMobile ? `/${community}` : `/${community}?preview=1`)
+      await ready(page)
+      const fromCards = () => prefetched.filter((u) => u.includes('davening=1'))
+
+      if (isMobile) {
+        // This used to wait for "any prefetch at all" first, taking the
+        // header's home link prefetching its own page as the sign. That link
+        // only existed because a phone painted the computer's header first; a
+        // phone's header has none since that flash was fixed (Nov 22), and no
+        // link on a phone's home prefetches, so there is nothing to wait for.
+        // The computer half below is the positive control. Next prefetches
+        // when the browser is idle, which a busy CI runner can put off, so
+        // this gives it a few seconds after the page is up.
+        await page.waitForTimeout(4_000)
+        await expect(page.getByTestId('right-now').locator('a[href*="davening=1"]'), 'a Tuesday has no candles card').toHaveCount(0)
+        expect(fromCards(), 'the Next minyan card’s link, on a phone').toEqual([])
+      } else {
+        // The positive control: on a computer the card is real, and its link
+        // prefetches once it's on screen.
+        const card = page.getByTestId('home-next-minyan')
+        await card.scrollIntoViewIfNeeded()
+        await expect.poll(() => fromCards().length, 'the Next minyan card’s link, on a computer').toBeGreaterThan(0)
+      }
+    })
   })
 
   test('images stay light: none over 150 KB, and the total under 600 KB', async ({ page, request }, testInfo) => {

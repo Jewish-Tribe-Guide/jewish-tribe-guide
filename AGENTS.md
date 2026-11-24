@@ -399,10 +399,14 @@ summary block, not the tail.** Two separate traps, both hit in one session
   present, so the exit code is not a substitute either. Grep the whole
   summary block: `grep -E '^\s+[0-9]+ (failed|passed|flaky|skipped)'`.
 
-**No e2e test fails on every local run any more, and one is known flaky:**
-`server-rendering.spec.ts:127` desktop, about one in four (two copies of the
-count text mid-transition). `offline.spec.ts:109` desktop failed once the
-same way (two `<main>`s, Nov 16; 0 of 10 on a repeat). `offline.spec.ts` used to be the other, written
+**No e2e test fails on every local run, and none is known flaky.** The
+last one listed here, server-rendering's list count ("two copies of the
+count text mid-transition", noted Sep 25), was fixed four days later by
+reading the visible heading only; the note stayed until Nov 24, when 40
+runs on the seed came back clean. `offline.spec.ts:109` desktop failed
+once with two `<main>`s mid view transition (Nov 16; 0 of 10 on a
+repeat). A test for a kind of day pins its clock and zmanim
+(`e2e/fixedDays.ts`) rather than skipping on the real one. `offline.spec.ts` used to be the other, written
 off for two months as "the service worker not taking control in time". It
 was a test bug: its wait for an active worker was `page.waitForFunction`
 with an `async` predicate, which Playwright never awaits (the Promise is

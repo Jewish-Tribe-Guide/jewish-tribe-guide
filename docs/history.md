@@ -2415,6 +2415,16 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   it's "Philly Jewish Guide, switch community" now), and routing.spec's
   own copy of the fixed views still had hospitals, a month after the view
   went (`routes.test.ts` now checks the copy).
+- Nov 24 (the user: "Yes, both"), the last of the test gaps:
+  - budgets' phone prefetch check skipped from Friday afternoon to
+    havdalah (a candles card's link prefetches the same page), so for a
+    day and a half a week a PR merged without it. It now runs on a fixed
+    Tuesday, clock and zmanim pinned through `e2e/fixedDays.ts` (shared
+    with phone-home.spec); pinned to Friday, its phone half fails. The day
+    is off `e2eSkips.test.ts`'s allowed list.
+  - The "known flaky" `server-rendering.spec.ts` count test was already
+    fixed on Sep 29 (visible heading only). 40 runs on the seed, 0
+    failures; AGENTS.md's note came out.
 - Nov 23, two admin reads Sentry flagged as N+1s. Main dishes (and Look
   again) read all seven jobs' runs to show one job's: `listJobRuns` takes
   the jobs a page needs (`only`), so each reads one. The kosher job's
