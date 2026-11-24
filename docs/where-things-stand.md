@@ -86,6 +86,11 @@ old number can still be looked up. When an item is done, move it to
 
 ### You decide
 
+87. The gaps in `docs/checks.md` (Nov 24): make the other suites block
+    a merge (1), tell someone when the production smoke run fails (2),
+    an alert when Sentry goes over quota (3) or visitor speed misses its
+    target (4), and an admin speed target (5).
+
 2.  Copy dev's photos for Eruv, Hospitals, Childcare and Schools (iStock
     links) to live? Live's tiles for those have none of their own.
 28. The drawings for asking for location when it helps (the hospital
@@ -113,6 +118,9 @@ old number can still be looked up. When an item is done, move it to
     on it.
 
 ### Mine to fix
+
+88. `docs/checks.md` 6 and 7: drop admin-write's 15s waits and CI's
+    stale header comment; look at Sentry's two N+1 issues.
 
 27. The "+" covers part of the third tile in a row on the phone home.
 

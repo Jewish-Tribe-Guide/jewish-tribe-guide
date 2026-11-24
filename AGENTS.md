@@ -537,6 +537,11 @@ These were all real gaps at one point and are named in old commit history / memo
 email, Sentry's cron monitor, backups) and the owner's short checklist.
 Update it when a watch is added or changes.
 
+# Checks
+
+`docs/checks.md` lists each standard, what checks it and who hears when
+it's missed, with the gaps. Update it when a check or standard changes.
+
 # Speed
 
 `docs/speed-targets.md` holds the targets (≤0.1s to a visible response, ≤1s to
