@@ -4,6 +4,20 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## TypeScript 7 beside 6 (Nov 24)
+
+The package updates: TypeScript 7 (Jul 8) checks the whole project with
+no errors in 3.7s against 6's 19s, but has no API yet, and typescript-eslint
+needs one (it refuses 7.0). So both, as TypeScript's 7.0 announcement
+says: `typescript` is `@typescript/typescript6` (lint, Next's build
+check, anything importing the API) and `@typescript/native` is 7, whose
+`tsc` is `npm run typecheck`. Item 91 collapses it. The rest stayed:
+the Playwright family is held for the menu reader's Chromium (no
+Playwright release matches a `@sparticuz/chromium` build yet: 1.64 wants
+156, 1.65 wants 159, Chromium has 153 and 158), `@types/node` follows
+`.nvmrc`, and the minor updates are Dependabot's weekly PR, most of them
+under a week old.
+
 ## The hooks audit (Nov 24)
 
 63 places switched React's hooks checks off (50 `exhaustive-deps`, 13

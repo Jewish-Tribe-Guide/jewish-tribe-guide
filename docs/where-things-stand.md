@@ -97,6 +97,13 @@ old number can still be looked up. When an item is done, move it to
     Nov 24's change; `docs/speed-targets.md`), against ≤ 1s. And CLS
     (0.19 before Nov 24's footer fix), against 0.1.
 
+91. **When typescript-eslint supports TypeScript 7** (its issue 10940;
+    TS 7.1 brings an API back): drop the `typescript` →
+    `@typescript/typescript6` alias and make `typescript` 7. Until then
+    `npm run typecheck` is TypeScript 7 (`@typescript/native`, ~4s) and
+    lint and `next build`'s own check use 6 (~19s), as TypeScript's 7.0
+    announcement recommends (Nov 24). Both run in CI.
+
 ### You decide
 
 28. The drawings for asking for location when it helps (the hospital
