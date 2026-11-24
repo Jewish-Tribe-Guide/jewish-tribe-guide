@@ -2360,6 +2360,9 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   leftovers dropped (`scripts/make-test-seed.mjs`). The jobs no longer
   get the test project's keys at all, and `ciWorkflow.test.ts` holds
   them to that.
+- Nov 23, form-roundtrip moved to a database of its own too, loaded from
+  the seed like admin-write and cache-roundtrip; its test server adds the
+  form it fills in. No queue and no test-project keys for it any more.
 - Nov 23, two admin reads Sentry flagged as N+1s. Main dishes (and Look
   again) read all seven jobs' runs to show one job's: `listJobRuns` takes
   the jobs a page needs (`only`), so each reads one. The kosher job's

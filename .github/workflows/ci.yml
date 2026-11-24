@@ -149,27 +149,25 @@ jobs:
 
   form-roundtrip:
     name: Form submission (wizard reaches the database)
-    # See "One copy of each test-project suite at a time" above.
+    # Its own database, as admin-write (see that job): Supabase started on
+    # this runner with the tests' starting data, so it neither queues nor
+    # shares the test project with the other jobs. The test server adds the
+    # form it fills in (scripts/run-test-project-server.mjs).
+    # A bare runner for Docker; the suite runs in the Playwright image, as
+    # it fills in and submits the wizard in a real browser.
     if: github.event_name != 'push'
-    concurrency:
-      group: test-db-form-roundtrip
-      cancel-in-progress: false
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.63.0-noble
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
         with:
           next-dist-dir: .next-e2e-3212
-      # Unlike cache-roundtrip, this suite drives a real browser (filling in
-      # and submitting the wizard). Browsers + OS deps are already in the
-      # container image, so no `playwright install` step is needed here.
-      - run: npm run test:form-roundtrip
-        env:
-          TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
-          TEST_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
-          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+      - uses: ./.github/actions/own-test-database
+      - run: >-
+          docker run --rm --network host --ipc host -v "$PWD:/work" -w /work
+          -e CI -e TEST_SUPABASE_URL -e TEST_SUPABASE_ANON_KEY -e TEST_SUPABASE_SERVICE_ROLE_KEY
+          mcr.microsoft.com/playwright:v1.63.0-noble npm run test:form-roundtrip
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

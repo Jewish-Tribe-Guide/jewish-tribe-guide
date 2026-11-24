@@ -176,8 +176,8 @@ describe('test-project suites never run two copies at once', () => {
   const field = (block: string, re: RegExp) => block.match(re)?.[1].trim() ?? ''
 
   it('finds the test-project jobs at all', () => {
-    expect(usesTestProject.length).toBeGreaterThanOrEqual(3)
-    expect(Object.keys(jobs).filter(ownDatabase).length).toBeGreaterThanOrEqual(2)
+    expect(usesTestProject.length).toBeGreaterThanOrEqual(2)
+    expect(Object.keys(jobs).filter(ownDatabase).length).toBeGreaterThanOrEqual(3)
   })
 
   for (const name of usesTestProject) {
