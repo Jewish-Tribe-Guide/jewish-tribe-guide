@@ -9,6 +9,29 @@ notifying us when our standards aren't met."
 The live site's own health (down, nightly jobs, backups, the domain) is
 in `docs/operations.md`. The speed numbers are in `docs/speed-targets.md`.
 
+## Healthy, in seven lines (agreed Nov 24)
+
+The bar for "a good, healthy system", so there is an end to it (the
+user: "I just want a good, healthy system while I have the time and
+energy"). Work that moves one of these is worth doing; anything else
+waits until real work touches it or real visitors ask for it. Once a
+line is met, the checks below keep it, and the monthly health review
+(`docs/where-things-stand.md`, item 90) brings back only what slipped.
+
+| # | Healthy means | Today (Nov 24) |
+| --- | --- | --- |
+| 1 | The site is up, and someone hears when it isn't | Met: UptimeRobot, the nightly email (`docs/operations.md`) |
+| 2 | What it shows is right, with its source and date | Met: the watches, the AI rules in `docs/how-we-work.md` |
+| 3 | Fast enough for real visitors, against `docs/speed-targets.md` | Mostly: the Dec 6 read confirms it (item 81) |
+| 4 | Errors are seen | Once Sentry's quota resets (~Nov 30) and its quota emails are on (item 87) |
+| 5 | A change can't quietly break something | Met: tests, CI and lint gate every merge (below) |
+| 6 | Data can be got back | Met: daily and weekly backups (`docs/backups.md`) |
+| 7 | A second city runs with no code written for it | Not met: the shul review (item 82), then a rehearsal (item 86) |
+
+Spend spare time on what gets harder once people use the site (7 above
+all); leave what is as easy later (splitting big files, casts, polish)
+for when real work reaches it.
+
 ## The code, before it merges
 
 `main` requires **All checks passed** (`all-checks`, since Nov 24, the
