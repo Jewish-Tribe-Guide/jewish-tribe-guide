@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Request as PwRequest } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { changedByTests } from '../e2e/suiteRows'
+import { madeByTests } from '../e2e/testMadePages'
 import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,12 +72,11 @@ test('a category page opens from the list without asking the server', async ({ p
   // A page with places on it, by its name in the list.
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   const { data: rows } = await supabase.from('category').select('id, plural_label').eq('community_id', WRITE_SUITE_COMMUNITY).eq('kind', 'listing').order('plural_label')
-  // Never one a test is changing (e2e/suiteRows.ts): cache-roundtrip
-  // renames `cache-roundtrip-seed` over and over, and picked first
-  // alphabetically (PR 389's CI, Nov 16), the page changed under the click
-  // and was asked for again.
-  const target = rows!.find((r) => !changedByTests(r))!
-  expect(target, 'a category no other suite writes to').toBeTruthy()
+  // Never one a test made (e2e/testMadePages.ts): picked first
+  // alphabetically, `cache-roundtrip-seed` was mid-rename under the click
+  // (PR 389's CI, Nov 16), and admin-write's own pages come and go.
+  const target = rows!.find((r) => !madeByTests(r))!
+  expect(target, 'a category no test made').toBeTruthy()
   const path = `/${WRITE_SUITE_COMMUNITY}/admin/categories/cat:${target.id}`
 
   // Its address, loaded behind the list. Without that there's nothing to

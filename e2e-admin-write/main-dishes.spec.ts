@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { changedByTests } from '../e2e/suiteRows'
+import { madeByTests } from '../e2e/testMadePages'
 import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ async function dishField() {
   expect(missing?.message ?? null, 'needs migration 065 (menu_reading) on the test project').toBeNull()
   const { data: cats } = await supabase.from('category').select('id, fields').eq('community_id', WRITE_SUITE_COMMUNITY)
   return (cats as { id: string; fields: Field[] }[])
-    .filter((c) => !changedByTests(c))
+    .filter((c) => !madeByTests(c))
     .flatMap((c) => (c.fields ?? []).filter((f) => f.type === 'tags' && f.showCountInHeader && /\bdish$/i.test(f.countLabel ?? '')).map((f) => ({ c, f })))
     .at(0)
 }

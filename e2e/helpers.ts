@@ -3,7 +3,7 @@ import { listingActions } from '../src/lib/listingView'
 import { minyanimPage } from '../src/lib/davening'
 import type { CategoryConfig } from '../src/lib/categories'
 import type { DirectoryResource } from '../src/types'
-import { changedByTests } from './suiteRows'
+import { madeByTests } from './testMadePages'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers.
@@ -101,10 +101,10 @@ export type Category = {
 export async function categories(request: APIRequestContext, community: string): Promise<Category[]> {
   const body = await apiGet(request, `/api/categories?community=${community}`)
   if (!body.ok) throw new Error('Could not read categories')
-  // Never one another suite is changing right now (e2e/suiteRows.ts): every
-  // test here picks from this list, and a page mid-rename fails whichever
+  // Never one a test made (e2e/testMadePages.ts): every test here picks
+  // from this list, and a page a test beside it is renaming fails whichever
   // test picked it (PR 389's CI, Nov 16).
-  return (body.categories as Category[]).filter((c) => !changedByTests(c))
+  return (body.categories as Category[]).filter((c) => !madeByTests(c))
 }
 
 /** The page Minyanim by time opens on, by the app's own rule

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { changedByTests } from './suiteRows'
+import { madeByTests } from './testMadePages'
 import { openAdmin } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,7 +58,7 @@ test.describe('admin console', () => {
   test('the Categories tab lists the real configured categories', async ({ page, request }) => {
     const res = await request.get('/api/categories')
     const body = await res.json()
-    const listingCategory = (body.categories as { id: string; kind: string; pluralLabel: string }[]).find((c) => c.kind === 'listing' && !changedByTests(c))
+    const listingCategory = (body.categories as { id: string; kind: string; pluralLabel: string }[]).find((c) => c.kind === 'listing' && !madeByTests(c))
     test.skip(!listingCategory, 'no listing-kind category configured')
 
     await openAdmin(page, '/philly/admin/categories')
@@ -72,7 +72,7 @@ test.describe('admin console', () => {
   test('opening a category’s editor shows its own real saved name, without saving anything', async ({ page, request }) => {
     const res = await request.get('/api/categories')
     const body = await res.json()
-    const listingCategory = (body.categories as { id: string; kind: string; pluralLabel: string }[]).find((c) => c.kind === 'listing' && !changedByTests(c))
+    const listingCategory = (body.categories as { id: string; kind: string; pluralLabel: string }[]).find((c) => c.kind === 'listing' && !madeByTests(c))
     test.skip(!listingCategory, 'no listing-kind category configured')
 
     await openAdmin(page, '/philly/admin/categories')

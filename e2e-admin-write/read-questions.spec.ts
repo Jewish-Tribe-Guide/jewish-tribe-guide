@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { changedByTests } from '../e2e/suiteRows'
+import { madeByTests } from '../e2e/testMadePages'
 import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,7 +45,7 @@ async function seedReading() {
   // Any filterable pick-list with an option, on any category.
   const { data: cats } = await supabase.from('category').select('id, plural_label, fields').eq('community_id', WRITE_SUITE_COMMUNITY)
   const found = (cats as { id: string; plural_label: string; fields: Field[] }[])
-    .filter((c) => !changedByTests(c))
+    .filter((c) => !madeByTests(c))
     .flatMap((c) => (c.fields ?? []).filter((f) => f.type === 'select' && f.filterable && f.options?.length).map((f) => ({ c, f })))
     .at(0)
   test.skip(!found, 'no filterable pick-list on the test project')
