@@ -17,11 +17,8 @@ import { categoryWithListings, defaultCommunity, ready, settled } from './helper
 // in the page's width on every system.
 test.use({ launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] } })
 
-test.describe('full-width bands are the page’s width, scrollbar and all', () => {
-  test.beforeEach(({ isMobile }) => {
-    test.skip(isMobile, 'a phone’s scrollbars take no room')
-  })
-
+// A phone’s scrollbars take no room.
+test.describe('full-width bands are the page’s width, scrollbar and all', { tag: '@desktop' }, () => {
   async function expectFits(page: import('@playwright/test').Page, bands: string[]) {
     await ready(page)
     // Added once the page is up, so the bands must also follow a scrollbar

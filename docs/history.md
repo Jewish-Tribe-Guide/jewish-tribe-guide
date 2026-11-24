@@ -2392,6 +2392,29 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   the seed has it; the test server adds their two admins. What's left
   is within one run: admin-write's files run two at a time, so a test
   still never picks a page another test made (`e2e/testMadePages.ts`).
+- Nov 23, after 4 (the user: "anything else that we used as
+  workarounds?"): the skips came out. A test for one screen size is
+  tagged `@desktop` or `@mobile` and the other project leaves it out
+  (`grepInvert`), so it no longer counts toward the 7 shards (one shard
+  had skipped 46 tests, another 15). A test that needs something in the
+  data calls `needs()` (`e2e/helpers.ts`): with `E2E_SEEDED=1`, as CI's
+  e2e shards run, a missing one fails; in `e2e-prod-smoke` it still
+  skips. What the seed lacked is in `scripts/seed-test-fixtures.sql`
+  (a second visible community, a grouped category, a validated night),
+  loaded after the seed. The write suites
+  `expect` their data; the home-card drag tests add and join cards in
+  the editor (unsaved) instead of skipping on the seed's layout. The
+  migration checks for long-applied migrations and the 20–30s admin
+  waits sized for the shared project went too. `src/test/e2eSkips.test.ts`
+  fails on a skip by size, or any skip not on its short list (the day,
+  the build, the browser). The 7 shards stay: they're for wall-clock
+  time with one worker each, not a sharing workaround. Running what
+  used to skip found two bugs: the community switcher's
+  `aria-label="Switch community"` hid the name it shows (axe's
+  label-content-name-mismatch, on any site with two visible communities;
+  it's "Philly Jewish Guide, switch community" now), and routing.spec's
+  own copy of the fixed views still had hospitals, a month after the view
+  went (`routes.test.ts` now checks the copy).
 - Nov 23, two admin reads Sentry flagged as N+1s. Main dishes (and Look
   again) read all seven jobs' runs to show one job's: `listJobRuns` takes
   the jobs a page needs (`only`), so each reads one. The kosher job's

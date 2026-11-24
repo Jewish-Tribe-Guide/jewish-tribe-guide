@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { categories, defaultCommunity, ready, type Category } from './helpers'
+import { categories, defaultCommunity, ready, type Category, needs } from './helpers'
 
 // The count over a category's list ("7 listings") sits the same distance
 // above the first row on every category page (the user, Oct 20: a gap under
@@ -36,7 +36,7 @@ test('the listing count sits as close to the list without a map as with one', as
   const community = await defaultCommunity(page)
   const noMap = await withListings(page, community, false)
   const withMap = await withListings(page, community, true)
-  test.skip(!noMap || !withMap, 'needs a category with listings on each side')
+  needs(noMap && withMap, 'needs a category with listings on each side')
   const without = await gapUnderHeading(page, community, noMap!)
   const withIt = await gapUnderHeading(page, community, withMap!)
   expect(Math.abs(without - withIt), `${noMap!.label}: ${without}px under the count; ${withMap!.label}: ${withIt}px`).toBeLessThanOrEqual(4)

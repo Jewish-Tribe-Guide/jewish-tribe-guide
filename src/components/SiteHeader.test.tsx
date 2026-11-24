@@ -58,7 +58,7 @@ describe('SiteHeader — a single community', () => {
     )
 
     expect(screen.getByText('Test Directory')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Switch community' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /switch community/i })).not.toBeInTheDocument()
 
     await user.click(screen.getByText('Test Directory'))
     expect(onGoHome).toHaveBeenCalledTimes(1)
@@ -78,7 +78,7 @@ describe('SiteHeader — several communities', () => {
       { community: philly, communities: [philly, baltimore] },
     )
 
-    const switcher = screen.getByRole('button', { name: 'Switch community' })
+    const switcher = screen.getByRole('button', { name: /switch community/i })
     await user.click(switcher)
 
     expect(screen.getByRole('button', { name: /Baltimore/ })).toBeInTheDocument()
@@ -93,7 +93,7 @@ describe('SiteHeader — several communities', () => {
       { community: philly, communities: [philly, baltimore] },
     )
 
-    await user.click(screen.getByRole('button', { name: 'Switch community' }))
+    await user.click(screen.getByRole('button', { name: /switch community/i }))
     await user.click(screen.getByRole('button', { name: /Baltimore/ }))
 
     expect(mockRouter.push).toHaveBeenCalledWith('/baltimore')
@@ -129,7 +129,7 @@ describe('SiteHeader — several communities', () => {
     )
 
     expect(screen.getByText('Preview Name')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Switch community' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /switch community/i })).not.toBeInTheDocument()
   })
 })
 
@@ -350,7 +350,7 @@ describe('SiteHeader — a tab’s own page', () => {
 
   it('several communities: the switcher keeps the community’s name', () => {
     render({ communities: [makeCommunity({ slug: 'philly', name: 'Philadelphia' }), makeCommunity({ slug: 'baltimore', name: 'Baltimore' })] })
-    expect(screen.getByRole('button', { name: 'Switch community' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /switch community/i })).toBeInTheDocument()
     expect(screen.queryByTestId('header-tab-title')).not.toBeInTheDocument()
   })
 })

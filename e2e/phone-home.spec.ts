@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { categories, defaultCommunity, listingCounts, ready } from './helpers'
+import { categories, defaultCommunity, listingCounts, ready, needs } from './helpers'
 
 // The phone home (the user, Oct 17), on a real build, at a fixed moment for
 // each kind of day: who keeps the guide right at the top (and the sheet it
@@ -57,8 +57,7 @@ async function openHome(page: Page, day: keyof typeof DAYS) {
   return community
 }
 
-test.describe('on a phone', () => {
-  test.skip(({ isMobile }) => !isMobile, 'the phone home')
+test.describe('on a phone', { tag: '@mobile' }, () => {
 
   test('who keeps it right, at the top, opening how it’s kept up', async ({ page }) => {
     const community = await openHome(page, 'tuesday')
@@ -182,7 +181,7 @@ test.describe('on a phone', () => {
     await expect(page.getByTestId('today-candles')).toBeVisible()
     const card = page.getByTestId('shabbos-shopping')
     const buttons = card.getByRole('link')
-    test.skip((await buttons.count()) === 0, 'no store in the test project lists a Shabbos shopping item')
+    needs((await buttons.count()) > 0, 'no store in the test project lists a Shabbos shopping item')
     for (const link of await buttons.all()) {
       await expect(link).toHaveAttribute('href', new RegExp(`^/${community}/[^/?]+\\?openNow=1&has_[^=&]+=[^&]+$`))
     }
@@ -266,8 +265,7 @@ test.describe('on a phone', () => {
 
 // The computer has a Right now of its own since board U1 (Nov 14), wide,
 // under Explore; the phone's stays hidden.
-test('on a computer, none of the phone’s: the photo band home, Right now its own wide one', async ({ page, isMobile }) => {
-  test.skip(!!isMobile, 'the computer’s home')
+test('on a computer, none of the phone’s: the photo band home, Right now its own wide one', { tag: '@desktop' }, async ({ page }) => {
   await openHome(page, 'tuesday')
   await expect(page.getByTestId('trust-band')).toBeHidden()
   await expect(page.getByTestId('category-tiles')).toBeHidden()

@@ -93,8 +93,7 @@ test('a Tuesday at lunchtime: no candles card, no shopping', async ({ page }) =>
   if (await open.count()) await expect(open.getByRole('heading')).toHaveText('Lunch, open now')
 })
 
-test('Browse: on a phone, a short row ending in All, to the Browse page and its tab', async ({ page, isMobile }) => {
-  test.skip(!isMobile, 'the row and the tabs are a phone’s')
+test('Browse: on a phone, a short row ending in All, to the Browse page and its tab', { tag: '@mobile' }, async ({ page }) => {
   const community = await openToday(page, 'tuesday')
   const row = page.getByTestId('today-browse-row')
   await expect(row.getByRole('link', { name: 'All ›' })).toHaveAttribute('href', `/${community}/browse`)
@@ -108,8 +107,7 @@ test('Browse: on a phone, a short row ending in All, to the Browse page and its 
   await expect(page).toHaveURL(new RegExp(`/${community}$`))
 })
 
-test('Browse on desktop: every category beside the answers', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'the list is desktop’s')
+test('Browse on desktop: every category beside the answers', { tag: '@desktop' }, async ({ page }) => {
   await openToday(page, 'tuesday')
   const list = page.getByTestId('today-browse')
   await expect(list).toBeVisible()

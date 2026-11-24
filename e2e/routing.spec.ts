@@ -1,11 +1,13 @@
 import { expect, test } from '@playwright/test'
-import { categories, categoryWithListings, categoryWithMapPoints, defaultCommunity, previewSettings, serverMarkup, ready } from './helpers'
+import { categories, categoryWithListings, categoryWithMapPoints, defaultCommunity, previewSettings, serverMarkup, ready, needs } from './helpers'
 
-// hospitals/eruv/zmanim — see FIXED_VIEW_KINDS in src/lib/routes.ts. Kept in
-// sync by hand rather than imported: these are the literal strings the home
-// screen's cards link to (src/components/home/sections.tsx), and the point of
-// this test is that those two independent places still agree.
-const FIXED_VIEW_KINDS: Record<string, string> = { hospitals: 'medical', eruv: 'eruv', zmanim: 'zmanim' }
+// eruv/zmanim — see FIXED_VIEW_KINDS in src/lib/routes.ts. Kept in sync by
+// hand rather than imported: these are the literal strings the home screen's
+// cards link to (src/components/home/sections.tsx), and the point of this
+// test is that those two independent places still agree. routes.test.ts
+// fails when they don't (hospitals stayed here a month after its view went,
+// unnoticed because the test skipped).
+const FIXED_VIEW_KINDS: Record<string, string> = { eruv: 'eruv', zmanim: 'zmanim' }
 
 // The routing migration — every screen getting its own URL — was the largest
 // change this codebase has had and had no automated coverage. These are the
@@ -221,7 +223,7 @@ test.describe('URLs', () => {
     }) => {
       const community = await defaultCommunity(page)
       const category = (await categories(request, community)).find((c) => c.kind === kind)
-      test.skip(!category, `no ${kind}-kind category configured for ${community}`)
+      needs(category, `no ${kind}-kind category configured for ${community}`)
       if (!category) return
 
       const response = await page.goto(`/${community}/${slug}`)
@@ -243,7 +245,7 @@ test.describe('URLs', () => {
     const community = await defaultCommunity(page)
     const cats = await categories(request, community)
     const eruv = cats.find((c) => c.kind === 'eruv')
-    test.skip(!eruv, `no eruv-kind category configured for ${community}`)
+    needs(eruv, `no eruv-kind category configured for ${community}`)
     if (!eruv) return
 
     // The classic home screen has the full category index — desktop's
@@ -307,12 +309,11 @@ test.describe('URLs', () => {
     await expect(link).toHaveAttribute('href', `/${community}/privacy`)
   })
 
-  test('the privacy policy is linked from the footer', async ({ page, isMobile }) => {
+  test('the privacy policy is linked from the footer', { tag: '@desktop' }, async ({ page }) => {
     // Desktop-only by design — a phone here is an app shell with a bottom tab
     // bar, and a document footer under one reads as a website. Mobile reaches
     // the policy through PrivacyNote instead (see the test above), which is
-    // what makes this skip legitimate rather than a hole.
-    test.skip(isMobile, 'no footer on mobile — see the PrivacyNote test above')
+    // why it runs on the computer only rather than being a hole.
 
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)

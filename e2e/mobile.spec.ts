@@ -5,8 +5,7 @@ import { categoryWithGeocodedListings, categoryWithHoursField, defaultCommunity,
 // breakpoint, so the desktop project can't cover them at all. Mobile is also
 // the primary way this site is used — someone standing in a hospital with a
 // phone — which makes it the worse place to have no coverage.
-test.describe('mobile', () => {
-  test.skip(({ isMobile }) => !isMobile, 'mobile viewport only')
+test.describe('mobile', { tag: '@mobile' }, () => {
 
   test('the tab bar is present and navigates', async ({ page }) => {
     const community = await defaultCommunity(page)

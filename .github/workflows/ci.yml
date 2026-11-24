@@ -309,7 +309,7 @@ jobs:
           } >> "$GITHUB_ENV"
       - run: >-
           docker run --rm --network host --ipc host -v "$PWD:/work" -w /work
-          -e CI -e E2E_PREBUILT=1
+          -e CI -e E2E_SEEDED=1 -e E2E_PREBUILT=1
           -e NEXT_PUBLIC_SUPABASE_URL -e NEXT_PUBLIC_SUPABASE_ANON_KEY -e SUPABASE_SERVICE_ROLE_KEY
           -e SUPERADMIN_EMAILS -e INBOX_EMAILS -e NEXT_PUBLIC_TURNSTILE_SITE_KEY
           -e NEXT_PUBLIC_GOOGLE_MAPS_API_KEY -e NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID -e NEXT_PUBLIC_SUPABASE_STORAGE_URL

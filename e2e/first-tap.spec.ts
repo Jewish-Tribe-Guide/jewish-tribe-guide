@@ -10,8 +10,7 @@ import { categoryWithListings, defaultCommunitySlug, ready } from './helpers'
 // Asserted on order, not time, so a slow CI runner can't flake it: in no
 // frame is the sheet on screen without the place in it.
 
-test('the first tap on a place shows the place with its sheet, never an empty sheet', async ({ page, request, isMobile }) => {
-  test.skip(!isMobile, 'a phone opens a place in a sheet')
+test('the first tap on a place shows the place with its sheet, never an empty sheet', { tag: '@mobile' }, async ({ page, request }) => {
   const community = await defaultCommunitySlug(request)
   const { category } = await categoryWithListings(request, community)
 

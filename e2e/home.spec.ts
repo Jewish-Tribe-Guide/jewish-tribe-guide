@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { defaultCommunity, previewSettings, ready } from './helpers'
+import { defaultCommunity, previewSettings, ready, needs } from './helpers'
 
 // "Explore by Category" (CategoryTileRow, desktop only): photo tiles, five
 // across in two rows (board W7l, Nov 15) — the first 9 cards and an "All categories" tile
@@ -7,8 +7,7 @@ import { defaultCommunity, previewSettings, ready } from './helpers'
 // expanded) goes back. Whether there's an "All categories" tile at all is
 // read from the page rather than hardcoded: admins add and remove
 // categories.
-test.describe('home — Browse everything grid', () => {
-  test.skip(({ isMobile }) => isMobile, 'desktop-only feature (hidden below the desktop breakpoint)')
+test.describe('home — Browse everything grid', { tag: '@desktop' }, () => {
 
   test('caps at 9 photo tiles, five across in two rows, with "All categories" last; it expands to every tile', async ({ page }) => {
     const community = await defaultCommunity(page)
@@ -25,10 +24,9 @@ test.describe('home — Browse everything grid', () => {
     // 10 tiles or fewer hides "All categories" (CategoryTileRow). Counted from
     // the tiles, not the category list, which also holds the Map, the
     // Zmanim page and hidden categories.
-    if ((await more.count()) === 0) {
-      expect(await tiles.count()).toBeLessThanOrEqual(10)
-      test.skip(true, '10 tiles or fewer, so there is no "All categories" tile to test')
-    }
+    const hasMore = (await more.count()) > 0
+    if (!hasMore) expect(await tiles.count()).toBeLessThanOrEqual(10)
+    needs(hasMore, '10 tiles or fewer, so there is no "All categories" tile to test')
 
     expect(await tiles.count()).toBe(9)
     // Two rows of five: the first five tiles share a top, the sixth starts

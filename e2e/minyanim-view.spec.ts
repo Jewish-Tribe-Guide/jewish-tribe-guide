@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categories, defaultCommunity, ready } from './helpers'
+import { categories, defaultCommunity, ready, needs } from './helpers'
 
 // The Minyanim view, reached from Synagogues' "Synagogue | Minyan"
 // switch (Nov 11; the green "Minyanim by time" row before), is a step Back
@@ -24,7 +24,7 @@ test('the Minyanim view is a step: Back returns to the shuls, Forward and a relo
       break
     }
   }
-  test.skip(!shuls, 'no listing keeps minyan times')
+  needs(shuls, 'no listing keeps minyan times')
 
   const byTime = switchEl.getByRole('button', { name: 'Minyan' })
   const view = page.getByTestId('minyanim-view')

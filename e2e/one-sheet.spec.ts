@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categories, categoryAddButton, categoryWithListings, defaultCommunity, ready } from './helpers'
+import { categories, categoryAddButton, categoryWithListings, defaultCommunity, ready, needs } from './helpers'
 
 // One sheet at a time on a phone (Oct 10): Edit under a listing's box used
 // to slide a second sheet up over the listing's. Now it takes the listing's
@@ -7,8 +7,7 @@ import { categories, categoryAddButton, categoryWithListings, defaultCommunity, 
 // That last part is only visible in a real browser: the edit's code loading
 // the first time hid the listing for a moment, which reset its scroll.
 // Read-only: it opens the edit and goes back without sending.
-test('Edit under a listing’s box takes the listing’s place, and Back returns to it where it was', async ({ page, request, isMobile }) => {
-  test.skip(!isMobile, 'The listing is a sheet only on a phone')
+test('Edit under a listing’s box takes the listing’s place, and Back returns to it where it was', { tag: '@mobile' }, async ({ page, request }) => {
   const community = await defaultCommunity(page)
   // A shul with usual Shabbos times: its "Usual Shabbos times" box has an Edit.
   let found: { category: string; id: string; name: string } | null = null
@@ -25,7 +24,7 @@ test('Edit under a listing’s box takes the listing’s place, and Back returns
       break
     }
   }
-  test.skip(!found, 'No shul with usual Shabbos times')
+  needs(found, 'No shul with usual Shabbos times')
 
   await page.goto(`/${community}/${found!.category}?item=${found!.id}`)
   await ready(page)
@@ -52,8 +51,7 @@ test('Edit under a listing’s box takes the listing’s place, and Back returns
 // because which element a drag starts in is hit-testing jsdom doesn't do.
 // Whether iOS's own selection handles then behave can only be seen on a
 // phone.
-test('dragging across the box’s text selects it, and leaves the sheet where it is', async ({ page, request, isMobile }) => {
-  test.skip(!isMobile, 'The box is a sheet only on a phone')
+test('dragging across the box’s text selects it, and leaves the sheet where it is', { tag: '@mobile' }, async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const { category } = await categoryWithListings(request, community)
   await page.goto(`/${community}/${category.id}`)

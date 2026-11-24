@@ -5,8 +5,7 @@ import { defaultCommunity, largestCategory, ready } from './helpers'
 // as iPhone lists do (the user, Oct 16): a tap on another row does only
 // that, and doesn't also open that row's listing. A real browser, because
 // which element a touch lands on is hit-testing jsdom doesn't do.
-test('phone: with a row swiped open, a tap on another row only closes it', async ({ page, request, isMobile }) => {
-  test.skip(!isMobile, 'Rows swipe on a phone')
+test('phone: with a row swiped open, a tap on another row only closes it', { tag: '@mobile' }, async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const { category } = await largestCategory(request, community)
   await page.goto(`/${community}/${category.id}`)
@@ -38,8 +37,7 @@ test('phone: with a row swiped open, a tap on another row only closes it', async
 // The same on a computer (the user, Oct 16), where the swipe is a
 // trackpad's: a click on another row only puts the open one away, and so
 // does a scroll. Real wheel events through real hit-testing.
-test('computer: with a row swiped open, a click on another row or a scroll only closes it', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'the computer’s sidebar')
+test('computer: with a row swiped open, a click on another row or a scroll only closes it', { tag: '@desktop' }, async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
   await ready(page)

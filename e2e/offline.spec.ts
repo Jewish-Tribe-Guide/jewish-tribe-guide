@@ -26,7 +26,7 @@ import { categoryWithListings, defaultCommunity, ready } from './helpers'
 test.describe.configure({ mode: 'serial' })
 
 test.skip(({ browserName }) => browserName !== 'chromium', 'service workers need Chromium')
-test.skip(({ isMobile }) => !!isMobile, 'the worker is not viewport-dependent')
+// Every test here is tagged @desktop: it runs in that project only.
 
 /** Waits for the worker to be not just registered but *controlling* the page —
  *  a registered worker that hasn't taken over yet caches nothing, so asserting
@@ -78,7 +78,7 @@ async function cachedUrls(page: import('@playwright/test').Page): Promise<string
   })
 }
 
-test.describe('service worker', () => {
+test.describe('service worker', { tag: '@desktop' }, () => {
   test('registers and takes control of the page', async ({ page }) => {
     const community = await defaultCommunity(page)
     await ready(page)
@@ -246,7 +246,7 @@ test.describe('service worker', () => {
   })
 })
 
-test.describe('the service worker never caches personal data', () => {
+test.describe('the service worker never caches personal data', { tag: '@desktop' }, () => {
   // These pages carry submitted names, phone numbers and hospital rooms. The
   // rule is in isCacheable() in public/sw.js; this proves the rule is actually
   // reached, which reading the function cannot.

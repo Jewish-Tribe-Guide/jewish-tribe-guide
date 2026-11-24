@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, listingWithFourActions, openListingEditor, ready, settled } from './helpers'
+import { categoryWithHoursField, categoryWithListings, largestCategory, defaultCommunity, listingWithFourActions, openListingEditor, ready, settled, needs } from './helpers'
 import { madeByTests } from './testMadePages'
 
 // A screen opens at once; its address follows when Next's navigation to it
@@ -12,8 +12,7 @@ const ADDRESS_WAIT = 15_000
 // it (ListingColumn); a phone opens it in a bottom sheet, the one Add and
 // Edit use (MobileSheet). Neither expands inline.
 
-test.describe('listing detail — desktop', () => {
-  test.skip(({ isMobile }) => isMobile, 'desktop viewport only')
+test.describe('listing detail — desktop', { tag: '@desktop' }, () => {
 
   test('clicking a listing opens it in the list’s column, not a dialog', async ({ page, request }) => {
     const community = await defaultCommunity(page)
@@ -278,7 +277,7 @@ test.describe('listing detail — desktop', () => {
           break
         }
       }
-      test.skip(!found, 'No category has closed groups')
+      needs(found, 'No category has closed groups')
 
       const rowsId = (await page.locator('button[aria-expanded="false"][aria-controls]').first().getAttribute('aria-controls'))!
       const heading = page.locator(`button[aria-controls="${rowsId}"]`)
@@ -310,7 +309,7 @@ test.describe('listing detail — desktop', () => {
     await expect(column.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
     const bar = column.getByTestId('listing-column-bar')
     await expect(bar).toBeVisible()
-    test.skip((await column.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
+    needs((await column.getByRole('button', { name: 'Edit listing' }).count()) > 0, `${category.id} can't be edited`)
 
     await openListingEditor(page, column)
     await expect(page.getByTestId('editor-list')).toBeVisible()
@@ -323,8 +322,7 @@ test.describe('listing detail — desktop', () => {
   })
 })
 
-test.describe('listing detail — mobile', () => {
-  test.skip(({ isMobile }) => !isMobile, 'mobile viewport only')
+test.describe('listing detail — mobile', { tag: '@mobile' }, () => {
 
   // The listing opens in the same sheet Add and Edit use, not inline. Here
   // rather than only in the unit tests because the parts that matter need
@@ -567,7 +565,7 @@ test('Request removal, beside Edit, is its own screen, and Back returns to the l
   }
   // Offered wherever the listing can be edited (removal requests are on
   // for every category here).
-  test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
+  needs((await listing.getByRole('button', { name: 'Edit listing' }).count()) > 0, `${category.id} can't be edited`)
 
   await openRemoval()
   await expect(page.getByRole('button', { name: /^(Confirm removal request|Verifying…)$/ })).toBeVisible()
@@ -599,7 +597,7 @@ test('the editor is an address of its own: a reload, Back, Forward, and Back fro
   const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
   const name = listing.getByRole('heading', { name: item.name, exact: true })
   await expect(name).toBeVisible()
-  test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
+  needs((await listing.getByRole('button', { name: 'Edit listing' }).count()) > 0, `${category.id} can't be edited`)
   const editing = () => new URL(page.url()).searchParams.get('editing')
   const editor = page.getByTestId('editor-list')
 
@@ -642,7 +640,7 @@ test('Request removal from the bar is an address of its own: a reload, and Back 
   const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
   const name = listing.getByRole('heading', { name: item.name, exact: true })
   await expect(name).toBeVisible()
-  test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
+  needs((await listing.getByRole('button', { name: 'Edit listing' }).count()) > 0, `${category.id} can't be edited`)
   const editing = () => new URL(page.url()).searchParams.get('editing')
   const removal = page.getByRole('heading', { name: 'Request removal' })
 
@@ -665,8 +663,7 @@ test('Request removal from the bar is an address of its own: a reload, and Back 
 // stepped back one entry, onto the listing's own: the sheet shut on an
 // address naming it, so the next Back did nothing anyone could see and a
 // reload opened the listing again.
-test('phone: closing the sheet with its editor open goes back to the list, address and all', async ({ page, request, isMobile }) => {
-  test.skip(!isMobile, 'the sheet is the phone’s')
+test('phone: closing the sheet with its editor open goes back to the list, address and all', { tag: '@mobile' }, async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const { category, item } = await categoryWithHoursField(request, community)
 
@@ -676,7 +673,7 @@ test('phone: closing the sheet with its editor open goes back to the list, addre
   await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
   const listing = page.getByRole('dialog', { name: item.name })
   await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
-  test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
+  needs((await listing.getByRole('button', { name: 'Edit listing' }).count()) > 0, `${category.id} can't be edited`)
   await openListingEditor(page, listing)
   await expect(page.getByTestId('editor-list')).toBeVisible()
   await expect.poll(() => new URL(page.url()).searchParams.get('editing')).toBe(`${item.id}~listing`)
@@ -706,7 +703,7 @@ test('Back steps out of an open row of the editor, not out of editing', async ({
   await expect(listing).toBeVisible()
   await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
   const suggest = listing.getByRole('button', { name: 'Edit listing' })
-  test.skip((await suggest.count()) === 0, `${category.id} can't be edited`)
+  needs((await suggest.count()) > 0, `${category.id} can't be edited`)
   await openListingEditor(page, listing)
   const list = page.getByTestId('editor-list')
   await expect(list).toBeVisible()
@@ -721,7 +718,7 @@ test('Back steps out of an open row of the editor, not out of editing', async ({
 
   // A row holding a list opens on a screen of its own.
   const screenRow = page.locator('[data-opens="screen"]').first()
-  test.skip((await screenRow.count()) === 0, `${item.name} has no row on a screen of its own`)
+  needs((await screenRow.count()) > 0, `${item.name} has no row on a screen of its own`)
   await screenRow.click()
   await expect(page.locator('[data-testid^="editor-open-"]')).toBeVisible()
   await expect(list).toHaveCount(0)
@@ -745,12 +742,12 @@ test('a row’s own screen starts at its top, and Back returns to the row', asyn
     await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
     const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
     await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
-    test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
+    needs((await listing.getByRole('button', { name: 'Edit listing' }).count()) > 0, `${category.id} can't be edited`)
     await openListingEditor(page, listing)
     await expect(page.getByTestId('editor-list')).toBeVisible()
     // A filled row, or one under "Not on the listing yet".
     const rows = page.locator('[data-opens="screen"]')
-    test.skip((await rows.count()) === 0, `${item.name} has no row on a screen of its own`)
+    needs((await rows.count()) > 0, `${item.name} has no row on a screen of its own`)
 
     // Read down to the end of the list first, as someone checking it has:
     // the sheet's own scroll region on a phone, the page on desktop.
@@ -793,7 +790,7 @@ test('a long note grows its box rather than scrolling inside it', async ({ page,
   await page.getByRole('button', { name: `Show details for ${item.name}` }).first().click()
   const listing = isMobile ? page.getByRole('dialog', { name: item.name }) : page.getByTestId('listing-column')
   await expect(listing.getByRole('heading', { name: item.name, exact: true })).toBeVisible()
-  test.skip((await listing.getByRole('button', { name: 'Edit listing' }).count()) === 0, `${category.id} can't be edited`)
+  needs((await listing.getByRole('button', { name: 'Edit listing' }).count()) > 0, `${category.id} can't be edited`)
   await openListingEditor(page, listing)
   await expect(page.getByTestId('editor-list')).toBeVisible()
   // Whichever row opening in place holds a note: About, or one of the
@@ -806,7 +803,7 @@ test('a long note grows its box rather than scrolling inside it', async ({ page,
     if (await box.count()) break
     await open.getByRole('button', { name: 'Done' }).click()
   }
-  test.skip((await box.count()) === 0, `${category.id} has no note opening in place`)
+  needs((await box.count()) > 0, `${category.id} has no note opening in place`)
   await box.fill(Array.from({ length: 10 }, (_, i) => `Line ${i + 1} of a long note`).join('\n'))
   await expect.poll(() => box.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1)
 })
@@ -820,12 +817,12 @@ test('an eruv’s editor is an address of its own: a reload, Back and Forward', 
   await ready(page)
   const row = page.getByTestId('eruv-row').first()
   await expect(row.or(page.getByTestId('eruv-none'))).toBeVisible()
-  test.skip((await row.count()) === 0, 'no eruvim listed')
+  needs((await row.count()) > 0, 'no eruvim listed')
   await row.click()
   const opened = isMobile ? page.getByRole('dialog') : page.getByTestId('eruv-column')
   await expect(opened).toBeVisible()
   const edit = opened.getByRole('button', { name: 'Edit listing' })
-  test.skip((await edit.count()) === 0, 'the eruv can’t be edited')
+  needs((await edit.count()) > 0, 'the eruv can’t be edited')
   const item = new URL(page.url()).searchParams.get('item')
   const editing = () => new URL(page.url()).searchParams.get('editing')
   const editor = page.getByTestId('eruv-editing')

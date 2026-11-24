@@ -154,8 +154,7 @@ test.describe('saved places', () => {
   // left 36px under it where the photo has 45, so the Places heading started
   // inside the photo, half hidden under it. A computer only: a phone has no
   // photo. Positional, so here rather than in jsdom.
-  test('on a computer, what’s saved starts below the photo, not under it', async ({ page, request }, testInfo) => {
-    test.skip(testInfo.project.name !== 'desktop', 'a phone has no photo')
+  test('on a computer, what’s saved starts below the photo, not under it', { tag: '@desktop' }, async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const listing = await mappableListing(request, community)
     await seedPinned(page, { id: listing.id, categoryId: listing.category })

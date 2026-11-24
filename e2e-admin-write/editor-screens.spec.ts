@@ -40,8 +40,7 @@ async function makePage(page: Page, visible: (l: Locator) => Locator): Promise<{
   await visible(page.getByRole('button', { name: 'Make your own page' })).click()
   await visible(page.getByLabel('Name', { exact: true })).fill(name)
   await visible(page.getByRole('button', { name: 'Create category' })).click()
-  // Saving is several database round trips.
-  await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
+  await expect(visible(page.getByRole('status'))).toHaveText('Saved.')
   await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/categories/cat:e2e-screens-[^/?]+$`))
   return { name, editor: new URL(page.url()).pathname }
 }
@@ -78,19 +77,19 @@ test('a page’s screens are history entries: Back, Forward and reload land on e
   await page.goForward()
   await expect(title(/^Hours/)).toBeVisible()
   await page.reload()
-  await expect(title(/^Hours/)).toBeVisible({ timeout: 30_000 })
+  await expect(title(/^Hours/)).toBeVisible()
   await at(look)
   await visible(page.getByRole('button', { name: `Add to ${name}` })).click()
   await expect(thePage).toBeVisible()
   await at('')
   await visible(page.getByRole('button', { name: 'Save' })).click()
-  await expect(visible(page.getByRole('status'))).toHaveText('Saved.', { timeout: 30_000 })
+  await expect(visible(page.getByRole('status'))).toHaveText('Saved.')
 
   // A field's own screen.
   await openHours()
   await at('?field=hours')
   await page.reload()
-  await expect(title(/^Hours/)).toBeVisible({ timeout: 30_000 })
+  await expect(title(/^Hours/)).toBeVisible()
   await page.goBack()
   await expect(thePage).toBeVisible()
   await page.goForward()
@@ -114,7 +113,7 @@ test('a page’s screens are history entries: Back, Forward and reload land on e
   await visible(page.getByRole('button', { name: 'See the whole page' })).click()
   await at('?field=hours&preview=1')
   await page.reload()
-  await expect(visible(page.getByRole('button', { name: '← Back to editor' }))).toBeVisible({ timeout: 30_000 })
+  await expect(visible(page.getByRole('button', { name: '← Back to editor' }))).toBeVisible()
   await page.goBack()
   await expect(title(/^Hours/)).toBeVisible()
   await page.goBack()
@@ -125,7 +124,7 @@ test('a page’s screens are history entries: Back, Forward and reload land on e
   await visible(page.getByRole('link', { name: /^Places/ })).click()
   await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/places$`))
   await page.goBack()
-  await expect(title(/^Hours/)).toBeVisible({ timeout: 30_000 })
+  await expect(title(/^Hours/)).toBeVisible()
   await at('?field=hours')
   await page.goBack()
   await expect(thePage).toBeVisible()
@@ -150,7 +149,7 @@ test('Back out of a page with unsaved changes asks; No stays with them, Yes leav
   // Into the page from the list, as an admin gets there: by then the
   // router's own Back listener has long been there.
   await visible(page.getByRole('button', { name: '‹ Category pages' })).click()
-  await visible(page.getByRole('button', { name })).click({ timeout: 30_000 })
+  await visible(page.getByRole('button', { name })).click()
   await expect(page).toHaveURL(new RegExp(`${editor}$`))
   const upvotes = visible(page.getByRole('radiogroup', { name: 'Can visitors upvote places?' }))
   await upvotes.getByRole('radio', { checked: false }).click()
@@ -169,5 +168,5 @@ test('Back out of a page with unsaved changes asks; No stays with them, Yes leav
   page.once('dialog', (d) => void d.accept())
   await page.goBack()
   await expect.poll(() => new URL(page.url()).pathname).toBe(`/${TEST_COMMUNITY}/admin/categories`)
-  await expect(visible(page.getByRole('button', { name: '+ New category page' }))).toBeVisible({ timeout: 30_000 })
+  await expect(visible(page.getByRole('button', { name: '+ New category page' }))).toBeVisible()
 })

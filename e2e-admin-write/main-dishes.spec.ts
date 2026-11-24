@@ -13,9 +13,8 @@ import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 // dish added by hand stays. Edit is the listing's own dishes editor, saved
 // straight to the listing.
 // The reading is inserted straight into menu_reading, and every AI read the
-// page starts is answered here: no test ever calls the AI. Needs migration
-// 065 on the test project, and a category with a list of dishes (Food's
-// "Main dishes").
+// page starts is answered here: no test ever calls the AI. Uses the seed's
+// category with a list of dishes (Food's "Main dishes").
 //
 // Its own listing, made here and deleted after, so nothing an admin does
 // to the real ones can reach it.
@@ -50,13 +49,15 @@ test.afterEach(async () => {
 
 async function dishField() {
   const supabase = getAdminClient()
-  const { error: missing } = await supabase.from('menu_reading').select('resource_id').limit(1)
-  expect(missing?.message ?? null, 'needs migration 065 (menu_reading) on the test project').toBeNull()
   const { data: cats } = await supabase.from('category').select('id, fields').eq('community_id', TEST_COMMUNITY)
-  return (cats as { id: string; fields: Field[] }[])
+  const found = (cats as { id: string; fields: Field[] }[])
     .filter((c) => !madeByTests(c))
     .flatMap((c) => (c.fields ?? []).filter((f) => f.type === 'tags' && f.showCountInHeader && /\bdish$/i.test(f.countLabel ?? '')).map((f) => ({ c, f })))
     .at(0)
+  // The seed has one (Food's Main dishes): its own database, so none is a
+  // failure, not a skip.
+  expect(found, 'no category with a list of dishes in the seed').toBeTruthy()
+  return found!
 }
 
 /** The page reads nothing as it opens (Oct 22: the morning's
@@ -107,9 +108,7 @@ async function openPlace(page: Page, shows: string) {
 
 test('Use this: the dish the menu no longer names comes off, the new one goes on, one added by hand stays', async ({ page }) => {
   const supabase = getAdminClient()
-  const found = await dishField()
-  test.skip(!found, 'no category with a list of dishes on the test project')
-  const { c, f } = found!
+  const { c, f } = await dishField()
 
   // Shawarma and Tofu were found on its menu before; Laffa was added by hand.
   const details = { website: 'https://menu.example.invalid', [f.key]: ['Shawarma', 'Tofu', 'Laffa'], itemMenu: { [f.key]: { Shawarma: earlier, Tofu: earlier } } }
@@ -190,9 +189,7 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
 
 test('Edit: the listing’s own dishes editor, started from the menu’s list, saved to the listing', async ({ page }) => {
   const supabase = getAdminClient()
-  const found = await dishField()
-  test.skip(!found, 'no category with a list of dishes on the test project')
-  const { c, f } = found!
+  const { c, f } = await dishField()
 
   const details = { website: 'https://menu.example.invalid', [f.key]: ['Shawarma'], itemMenu: { [f.key]: { Shawarma: earlier } } }
   expect((await supabase.from('resource').insert({ id, community_id: TEST_COMMUNITY, category: c.id, name, status: 'approved', details })).error).toBeNull()
@@ -241,9 +238,7 @@ test('Edit: the listing’s own dishes editor, started from the menu’s list, s
 // resolves, so no AI is ever asked).
 test('a menu that can’t be read: Stop reading it, read again, then its menu link given', async ({ page }) => {
   const supabase = getAdminClient()
-  const found = await dishField()
-  test.skip(!found, 'no category with a list of dishes on the test project')
-  const { c } = found!
+  const { c } = await dishField()
 
   expect((await supabase.from('resource').insert({ id, community_id: TEST_COMMUNITY, category: c.id, name, status: 'approved', details: { website: 'https://menu.example.invalid' } })).error).toBeNull()
   expect(

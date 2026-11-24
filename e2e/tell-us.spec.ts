@@ -84,8 +84,7 @@ test('the browser’s Back and Forward walk the box’s steps, a row’s Back ke
 // the screen's edge; the box now opens at its content's height. And it was
 // taken off the page the moment it closed, its dimmed backdrop with it, in
 // one frame; it slides and fades away now, as a listing does.
-test.describe('the box on a phone', () => {
-  test.skip(({ isMobile }) => !isMobile, 'mobile viewport only')
+test.describe('the box on a phone', { tag: '@mobile' }, () => {
 
   test('opens tall enough to show Find the place, and no taller', async ({ page }) => {
     // A phone with Safari's bars showing: shorter than the emulated screen.

@@ -7,8 +7,7 @@ import {
   type Category,
   defaultCommunity,
   ready,
-  serverMarkup,
-} from './helpers'
+  serverMarkup, needs } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // These lock in the server-rendering work. I reported that as done once when it
@@ -239,7 +238,7 @@ test.describe('the time is the browser’s, not the build’s', () => {
     const community = await defaultCommunity(page)
     const all = (await categories(request, community)) as (Category & { detailFields?: { type: string }[] })[]
     const shuls = all.find((c) => c.detailFields?.some((f) => f.type === 'minyanim'))
-    test.skip(!shuls, 'This community keeps no minyan times')
+    needs(shuls, 'This community keeps no minyan times')
     const markup = serverMarkup(await (await request.get(`/${community}/${shuls!.id}`)).text())
     expect(markup).not.toMatch(/(Shacharis|Mincha|Maariv) \d|No davening times listed|Nothing today or tomorrow|Shabbos only|Shabbos: (Fri|Sat) \d/)
   })

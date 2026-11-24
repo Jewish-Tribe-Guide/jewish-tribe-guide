@@ -24,7 +24,7 @@ import { categories, categoryWithListings, defaultCommunity } from './helpers'
 
 // API behaviour doesn't depend on the viewport; running it twice would only
 // slow the suite down.
-test.skip(({ isMobile }) => !!isMobile, 'not viewport-dependent')
+// Every test here is tagged @desktop: it runs in that project only.
 
 const NO_SUCH_ID = '00000000-0000-0000-0000-000000000000'
 
@@ -77,7 +77,7 @@ const INBOX_ROUTES: Guarded[] = [
   { method: 'delete', path: `/api/inbox/${NO_SUCH_ID}` },
 ]
 
-test.describe('every admin and inbox route refuses an anonymous caller', () => {
+test.describe('every admin and inbox route refuses an anonymous caller', { tag: '@desktop' }, () => {
   for (const { method, path } of [...ADMIN_ROUTES, ...INBOX_ROUTES]) {
     test(`${method.toUpperCase()} ${path}`, async ({ request }) => {
       const res = await request[method](path, { data: {}, failOnStatusCode: false })
@@ -91,7 +91,7 @@ test.describe('every admin and inbox route refuses an anonymous caller', () => {
   }
 })
 
-test.describe('a forged token is refused too', () => {
+test.describe('a forged token is refused too', { tag: '@desktop' }, () => {
   // The 401s above would also be produced by a route that simply ignores the
   // Authorization header. This proves the token is actually validated.
   for (const { method, path } of [
@@ -113,7 +113,7 @@ test.describe('a forged token is refused too', () => {
 // refuses input it can't use before it reaches the database, which is also
 // what lets this suite call them without writing anything: every request
 // here is one the route turns away up front.
-test.describe('the one-tap write endpoints refuse what they can’t use', () => {
+test.describe('the one-tap write endpoints refuse what they can’t use', { tag: '@desktop' }, () => {
   test('"Mark as current" on something that isn’t a listing id', async ({ request }) => {
     for (const method of ['post', 'delete'] as const) {
       const res = await request[method]('/api/resource/not-a-listing/confirm', { failOnStatusCode: false })
@@ -137,7 +137,7 @@ test.describe('the one-tap write endpoints refuse what they can’t use', () => 
 // The question reader calls OpenAI and writes what it read. A test run must
 // do neither: every test server sets QUESTION_READER=off, and this is what
 // holds it to that. If it ever answers anything else, the suite is spending.
-test('the question reader is off on a test server', async ({ request }) => {
+test('the question reader is off on a test server', { tag: '@desktop' }, async ({ request }) => {
   const res = await request.post('/api/ask/read?community=philly', { data: { question: 'meat near me' } })
   expect(res.status()).toBe(200)
   expect(await res.json()).toEqual({ ok: false, reason: 'off' })
@@ -147,7 +147,7 @@ test('the question reader is off on a test server', async ({ request }) => {
 // lookup per destination, and nothing in the app had called it for a long
 // time. It stayed reachable by anyone who found it. Removed; if it comes back
 // it should come back with a caller and this test changed on purpose.
-test('the old paid travel-time endpoint is gone', async ({ request }) => {
+test('the old paid travel-time endpoint is gone', { tag: '@desktop' }, async ({ request }) => {
   const res = await request.post('/api/travel', {
     data: { origin: { lat: 0, lng: 0 }, destinations: [] },
     failOnStatusCode: false,
@@ -155,7 +155,7 @@ test('the old paid travel-time endpoint is gone', async ({ request }) => {
   expect(res.status()).toBe(404)
 })
 
-test.describe('the dev login shortcut', () => {
+test.describe('the dev login shortcut', { tag: '@desktop' }, () => {
   // It mints a real admin session with no email round-trip. It refuses unless
   // NODE_ENV !== 'production' AND DEV_ADMIN_BYPASS_SECRET is set — and the e2e
   // suite runs a production build, which is exactly the condition that must
@@ -175,7 +175,7 @@ test.describe('the dev login shortcut', () => {
   })
 })
 
-test.describe('the public content APIs', () => {
+test.describe('the public content APIs', { tag: '@desktop' }, () => {
   test('categories answer with the shape the client and the tests both read', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const res = await request.get(`/api/categories?community=${community}`)
@@ -254,7 +254,7 @@ test.describe('the public content APIs', () => {
   })
 })
 
-test.describe('security headers', () => {
+test.describe('security headers', { tag: '@desktop' }, () => {
   // Configured in next.config.ts. A header set there is easy to drop in a
   // refactor and impossible to notice by looking at the site.
   test('are present on a page response', async ({ page, request }) => {

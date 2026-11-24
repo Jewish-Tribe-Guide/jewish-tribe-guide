@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categories, categoryWithListings, defaultCommunity } from './helpers'
+import { categories, categoryWithListings, defaultCommunity, needs } from './helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cache Components, from the outside.
@@ -20,9 +20,9 @@ import { categories, categoryWithListings, defaultCommunity } from './helpers'
 // everybody who loads the page next.
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.skip(({ isMobile }) => !!isMobile, 'caching is not viewport-dependent')
+// Every test here is tagged @desktop: it runs in that project only.
 
-test.describe('the content screens are served from the cache', () => {
+test.describe('the content screens are served from the cache', { tag: '@desktop' }, () => {
   test('the home screen is prerendered, not rendered per visitor', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const res = await request.get(`/${community}`)
@@ -72,11 +72,11 @@ test.describe('the content screens are served from the cache', () => {
   })
 })
 
-test.describe('the cache keeps things apart', () => {
+test.describe('the cache keeps things apart', { tag: '@desktop' }, () => {
   test('each category gets its own cache entry', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const listingCategories = (await categories(request, community)).filter((c) => c.kind === 'listing')
-    test.skip(listingCategories.length < 2, 'needs two categories to compare')
+    needs(listingCategories.length >= 2, 'needs two categories to compare')
 
     const etags = await Promise.all(
       listingCategories.map(async (c) => (await request.get(`/${community}/${c.id}`)).headers()['etag']),
@@ -89,7 +89,7 @@ test.describe('the cache keeps things apart', () => {
     const res = await request.get('/api/communities')
     const body = await res.json()
     const slugs: string[] = (body.communities ?? []).map((c: { slug: string }) => c.slug)
-    test.skip(slugs.length < 2, 'only one community is configured')
+    needs(slugs.length >= 2, 'only one community is configured')
 
     const etags = await Promise.all(
       slugs.map(async (slug) => (await request.get(`/${slug}`)).headers()['etag']),
@@ -98,7 +98,7 @@ test.describe('the cache keeps things apart', () => {
   })
 })
 
-test.describe('nothing per-visitor is ever cached', () => {
+test.describe('nothing per-visitor is ever cached', { tag: '@desktop' }, () => {
   // A Set-Cookie on a cached, CDN-shareable response is served to the next
   // visitor too. Nothing on these screens should be setting one at all.
   test('a cached page sets no cookies', async ({ page, request }) => {
@@ -153,7 +153,7 @@ test.describe('nothing per-visitor is ever cached', () => {
   })
 })
 
-test.describe('the "/" redirect', () => {
+test.describe('the "/" redirect', { tag: '@desktop' }, () => {
   // Covered as a redirect in routing.spec.ts. Here the concern is different:
   // a cached redirect would pin every visitor to whichever community was
   // resolved first, including anyone with a different one remembered.

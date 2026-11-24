@@ -25,8 +25,7 @@ async function scrollAndOpen(page: Page, list: Locator, top: number) {
   throw new Error('no place in view in the list')
 }
 
-test('phone: Back from a place puts the sheet’s list where it was', async ({ page, isMobile }) => {
-  test.skip(!isMobile, 'the phone’s sheet')
+test('phone: Back from a place puts the sheet’s list where it was', { tag: '@mobile' }, async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
   await ready(page)
@@ -41,8 +40,7 @@ test('phone: Back from a place puts the sheet’s list where it was', async ({ p
   await expect.poll(() => list.evaluate((el) => el.scrollTop), 'the list is where it was').toBe(400)
 })
 
-test('phone: lowered after scrolling, the sheet is only its line', async ({ page, isMobile }) => {
-  test.skip(!isMobile, 'the phone’s sheet')
+test('phone: lowered after scrolling, the sheet is only its line', { tag: '@mobile' }, async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
   await ready(page)
@@ -65,8 +63,7 @@ test('phone: lowered after scrolling, the sheet is only its line', async ({ page
   expect(l.y, 'none of the list shows under the line').toBeGreaterThanOrEqual(s.y + s.height - 0.5)
 })
 
-test('computer: Back from a place puts the sidebar’s list where it was', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'the computer’s sidebar')
+test('computer: Back from a place puts the sidebar’s list where it was', { tag: '@desktop' }, async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
   await ready(page)
