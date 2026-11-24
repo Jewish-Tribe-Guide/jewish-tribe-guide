@@ -42,7 +42,7 @@ notification settings allow it (not checked from here).
 | Sentry actually recording errors (not over quota) | `npm run sentry:check` | **Only whoever runs it.** Sentry was blind Nov 13–22 this way |
 | Visitor speed: LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1 at p75 | Sentry's web vitals (Speed Insights has no read API) | The site owners, every Sunday (`speedReport.ts`) |
 | Server speed problems (N+1 calls, slow requests) | Sentry performance issues | Sentry's new-issue email. The two "N+1 API Call" issues of Nov 23 were fixed by PR 442 the same night |
-| Admin speed: a screen's data and a save, ≤ 1s at p75 (proposed) | Sentry's request timings for `/api/admin` | The site owners, every Sunday, with the visitor numbers |
+| Admin speed: a screen's data and a save, ≤ 1s at p75 (agreed Nov 24) | Sentry's request timings for `/api/admin` | The site owners, every Sunday, with the visitor numbers |
 | The security policy's reports | Sentry (`report-uri`), listed by `sentry:check` | Only whoever runs it |
 
 ## The gaps, and what closed them (Nov 24)
@@ -60,8 +60,8 @@ notification settings allow it (not checked from here).
 4. **Visitor speed had a target but no alert.** The weekly speed email.
    Needs `SENTRY_API_TOKEN` on the live deployment (the user's).
 5. **Admin speed had no target.** ≤ 1s at p75 for a screen and for a
-   save, proposed in `docs/speed-targets.md` and in the weekly email.
-   **Open until the user agrees the number.**
+   save, in `docs/speed-targets.md` and the weekly email. Agreed by the
+   user Nov 24. Closed.
 6. **Leftovers from the shared test database.** admin-write's 15s and
    20s waits are gone (60/60, three runs, on expect's 5s); `ci.yml`'s
    header no longer describes the shared project.

@@ -12,8 +12,8 @@ rather than a feeling. Agreed Nov 16.
 | Largest Contentful Paint | ≤ 2.5s at p75 | Google's "good" line (Core Web Vitals). |
 | Interaction to Next Paint | ≤ 200ms at p75 | Same. |
 | Cumulative Layout Shift | ≤ 0.1 at p75 | Same. |
-| Admin: a screen's data arriving (`GET /api/admin/…`) | ≤ 1s at p75 | **Proposed Nov 24, waiting on the user's OK.** The same second as a visitor's answer: an admin is a visitor doing a job. |
-| Admin: a save answering (`POST`/`PATCH`/`DELETE /api/admin/…`) | ≤ 1s at p75 | **Proposed Nov 24, as above.** |
+| Admin: a screen's data arriving (`GET /api/admin/…`) | ≤ 1s at p75 | Agreed Nov 24 (the user). The same second as a visitor's answer: an admin is a visitor doing a job. |
+| Admin: a save answering (`POST`/`PATCH`/`DELETE /api/admin/…`) | ≤ 1s at p75 | Agreed Nov 24, as above. |
 
 p75 is measured over real visitors, not on a developer's laptop.
 
