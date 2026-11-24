@@ -94,6 +94,12 @@ test.describe('accessibility', () => {
 
     await page.goto(`/${community}/${category.id}/${listingSlug(item)}`)
     await ready(page)
+    // The listing drawn, not the moment a phone swaps in its own layout:
+    // checked then, 3 runs in 15 found no main heading (Nov 24).
+    // (On a computer the page's heading is the category, the listing's name
+    // the one under it.)
+    await expect(page.getByRole('heading', { name: item.name }).filter({ visible: true }).first()).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1 }).filter({ visible: true }).first()).toBeVisible()
     await expectNoViolations(page)
   })
 

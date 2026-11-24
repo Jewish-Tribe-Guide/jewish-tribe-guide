@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs'
+import { seedStorageUrl } from '../../scripts/seedStorage.mjs'
 import { describe, expect, it } from 'vitest'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -185,10 +186,8 @@ describe('every suite has a database of its own', () => {
   // image budget fails on full-size originals. A new seed from another
   // project, with the setting left behind, fails here instead.
   it('e2e is told where the seed’s photos are stored', () => {
-    const seed = readdirSync('supabase/seed/tables').map((f) => readFileSync(`supabase/seed/tables/${f}`, 'utf-8')).join('\n')
-    const hosts = [...new Set(seed.match(/https:\/\/[a-z0-9]+\.supabase\.co(?=\/storage\/)/g) ?? [])]
-    expect(hosts).toHaveLength(1)
-    expect(jobs['e2e-build']).toContain(`NEXT_PUBLIC_SUPABASE_STORAGE_URL: ${hosts[0]}\n`)
+    // The same reading test:e2e:seed sets it from.
+    expect(jobs['e2e-build']).toContain(`NEXT_PUBLIC_SUPABASE_STORAGE_URL: ${seedStorageUrl()}\n`)
   })
 
   // On the seed, what a test needs is there (scripts/seed-test-fixtures.sql),

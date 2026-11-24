@@ -95,6 +95,8 @@ npm run test:cache-roundtrip  # proves an admin save actually reaches the cached
 npm run test:form-roundtrip   # fills in and submits a real intake wizard (e2e-form/)
 npm run test:admin-write      # signs in and drives /admin for real: approve/reject, category/form CRUD (e2e-admin-write/)
 npm run test:all            # unit + e2e only — the four suites above need `npm run test:db` first and run separately/in CI
+npm run test:e2e:seed       # e2e on the local seeded database, as CI's shards run it (starts and seeds it; extra args go to Playwright)
+npm run test:everything     # every suite above, on the seed, reseeding between them; a summary at the end (~20 min)
 ```
 
 The last four run against a **local Supabase of their own** (`npm run test:db` starts one; CI starts one per job), specifically so they're free to write and delete real rows — unlike everything in `e2e/`. See each suite's own `e2e-*/auth.setup.ts` for the mechanism.
@@ -153,13 +155,14 @@ npm run test:db
 starts it if it isn't running and loads the seed (about 15 seconds once
 the images are pulled). `npm run test:db -- seed` loads the seed again, for
 a clean start; `npm run test:db -- stop` removes it. The write suites find
-it on their own. For e2e, set the app's own `NEXT_PUBLIC_SUPABASE_*` and
-`SUPABASE_SERVICE_ROLE_KEY` to it (`npx supabase@3.1.0 status -o env`), and
-`NEXT_PUBLIC_SUPABASE_STORAGE_URL` to the host the seed's photos are on
-(ci.yml has it), or the home page's image budget fails on full-size
-originals, and `E2E_SEEDED=1`, as CI's shards do, so a test missing its
-data fails rather than skips (below). Seed first, then build: the build
-prerenders What changed from whatever the database held.
+it on their own. For e2e, `npm run test:e2e:seed` (`scripts/test-e2e-seed.mjs`)
+seeds the database, then builds and runs against it with what CI's shards
+set: its address and keys, `NEXT_PUBLIC_SUPABASE_STORAGE_URL` (the one host
+the seed's photos are on, read from the seed by `scripts/seedStorage.mjs`,
+which ci.yml must match) and `E2E_SEEDED=1`, so a test missing its data
+fails rather than skips (below). It refuses while a dev server holds port
+3000. Seeding comes before the build on purpose: the build prerenders What
+changed from whatever the database held.
 
 ### A wait can never outlast the test budget above it (closed)
 
@@ -470,6 +473,7 @@ None of those show up in `tsc`, `eslint`, or a passing build. Several looked fin
   there with its reason (the day, the build, the browser).
 - **Derive expectations from the running app**, don't hardcode content. `e2e/helpers.ts` reads the real categories and listings from the API. An assertion on `"ACME Markets"` fails when an admin edits a listing, and a suite that cries wolf gets ignored.
 - **Assert on server HTML** (`request.get()`) when the claim is about server rendering. A `page` assertion passes either way, because the client would fill it in.
+- **Don't wait out a timer; move the page's clock** (Nov 24). A throttle, a pause or a debounce in the page is a `setTimeout` or a `Date.now()`: `page.clock.install()` before the page loads, then `fastForward` or `runFor`. The timer is the real one, so the test still proves it. Something arriving (a response, a script) is waited for, not slept through. `src/test/e2eFixedWaits.test.ts` fails on any `waitForTimeout` over 4s; five such waits had made two of the seven CI shards twice as long as the rest.
 - Don't use `waitForLoadState('networkidle')` — the map, zmanim and geolocation keep connections open, so it never settles. Use `ready()` from the helpers.
 - **Open an admin page with `openAdmin()`** (`e2e/helpers.ts`): it waits until the page says who's signed in and has loaded, so a test's checks start on the page. Admin waits keep expect's 5s: with a database per job, sign-in takes ~0.1s (on the old shared project it took 3–4s, and the suites carried a 20s `TEST_PROJECT_TIMEOUT` for it until Nov 23).
 - **Nothing in `e2e/` may write to the database.** The suite runs against whichever project `NEXT_PUBLIC_SUPABASE_URL` points to — its own seeded local database in CI's required `e2e` job, dev locally, or real production in the separate, non-blocking `e2e-prod-smoke` CI job — so a test that submits a listing leaves a row in that project's moderation queue for a human to clear either way. `api.spec.ts` posts to the write endpoints deliberately, but only unauthenticated and only with ids that cannot exist — a pass means each one was refused before it reached the database.

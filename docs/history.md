@@ -2425,6 +2425,33 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   - The "known flaky" `server-rendering.spec.ts` count test was already
     fixed on Sep 29 (visible heading only). 40 runs on the seed, 0
     failures; AGENTS.md's note came out.
+- Nov 24 (the user: "do 1 and 2"), the test process:
+  - One command each: `npm run test:e2e:seed` runs e2e as CI's shards
+    do (seeds the local database, sets its keys, the seed's photo host
+    and `E2E_SEEDED=1`; refuses while a dev server holds port 3000), and
+    `npm run test:everything` runs all six suites with a reseed between
+    write suites and a summary at the end. The photo host is read from
+    the seed (`scripts/seedStorage.mjs`), and `ciWorkflow.test.ts` checks
+    ci.yml against the same reading.
+  - Even shards. Playwright has no public way to weight shards (they're
+    slices by count), so the slow tests were made fast instead: their time
+    was fixed waits. Refresh-on-return's 11s throttle (address-on-return,
+    return-to-app, listing-detail, cache-roundtrip) is now passed with
+    `page.clock.fastForward`; the reader's 2.5s pause (search-reader, 8
+    tests) with `clock.runFor`; CSP's two 6s waits wait for the network to
+    go quiet (2s, capped at 6s); category-editor's 6s waits for its
+    delayed response. search-reader 23s → 4.7s, return-to-app 12.8s →
+    1.8s, listing-detail's 14.5s → 3.1s, address-on-return 15s → 5s.
+    search-reader also stops the clock while typing (an installed clock
+    runs on in real time, and under the full suite read early once):
+    80/80 at `--repeat-each=10`. Red first: search-reader 8 of 8 failed
+    with a 1.5s pause, return-to-app
+    failed with the throttle removed, csp 10 failed with a late request.
+    `src/test/e2eFixedWaits.test.ts` fails on any `waitForTimeout` over
+    4s (1 failed with return-to-app's old wait put back).
+  - accessibility.spec's listing check on a phone ran before the phone
+    layout drew the listing, 3 in 15 with no main heading; it waits for
+    the listing's heading and an h1 now (40/40).
 - Nov 23, two admin reads Sentry flagged as N+1s. Main dishes (and Look
   again) read all seven jobs' runs to show one job's: `listJobRuns` takes
   the jobs a page needs (`only`), so each reads one. The kosher job's

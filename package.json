@@ -28,10 +28,12 @@
     "sync-dev-from-prod": "node --env-file=.env.local scripts/sync-dev-from-prod.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:e2e:seed": "node scripts/test-e2e-seed.mjs",
     "test:cache-roundtrip": "playwright test --config playwright.cache.config.ts",
     "test:form-roundtrip": "playwright test --config playwright.form.config.ts",
     "test:admin-write": "playwright test --config playwright.admin-write.config.ts",
-    "test:all": "vitest run && playwright test"
+    "test:all": "vitest run && playwright test",
+    "test:everything": "node scripts/test-everything.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "11.15.0",

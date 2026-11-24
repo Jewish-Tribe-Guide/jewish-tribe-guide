@@ -475,6 +475,7 @@ test.describe('listing detail — mobile', { tag: '@mobile' }, () => {
       (url) => url.pathname === '/api/content-version',
       (route) => route.fulfill({ json: { ok: true, version: 'changed-by-listing-detail-spec' } }),
     )
+    await page.clock.install()
 
     await page.goto(`/${community}/${category.id}/${item.id}`)
     await ready(page)
@@ -484,8 +485,9 @@ test.describe('listing detail — mobile', { tag: '@mobile' }, () => {
     await expect(listing).toHaveCount(0)
     await expect.poll(() => new URL(page.url()).pathname).toBe(`/${community}/${category.id}`)
 
-    // Past RefreshContentOnReturn's ten-second throttle, counted from load.
-    await page.waitForTimeout(11_000)
+    // Past RefreshContentOnReturn's ten-second throttle, counted from load:
+    // the page's clock is moved on rather than waited out.
+    await page.clock.fastForward(11_000)
     const refreshed = page.waitForResponse(
       (r) => r.request().headers()['rsc'] === '1' && !r.request().headers()['next-router-prefetch'],
       { timeout: 10_000 },
