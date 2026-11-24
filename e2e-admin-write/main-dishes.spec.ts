@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
+import { TEST_PROJECT_TIMEOUT } from '../e2e/helpers'
 import { changedByTests } from '../e2e/suiteRows'
 import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
 
@@ -170,12 +171,19 @@ test('Use this: the dish the menu no longer names comes off, the new one goes on
   expect(reading?.decided_by).toBeTruthy()
 
   // And the listing says so.
-  await page.goto(`/${WRITE_SUITE_COMMUNITY}/${c.id}/${id}`)
   // Visible only: until the page has measured the screen, the listing is
   // drawn for a phone and a computer both, one hidden by CSS (the first
   // paint, Nov 22), and a strict-mode match on both fails at once.
   const dishes = page.getByTestId('listing-items').filter({ visible: true })
-  await expect(dishes).toContainText('Main dishes · 3', { timeout: 20_000 })
+  // Waits for Falafel, the dish the save added: "Main dishes · 3" was true
+  // before the save too (Shawarma, Tofu, Laffa), so it passed on a page the
+  // cache still served from before and the menu link below failed (Nov 23).
+  // The cache can serve that page for a reload or two after the save.
+  await expect(async () => {
+    await page.goto(`/${WRITE_SUITE_COMMUNITY}/${c.id}/${id}`)
+    await expect(dishes).toContainText('Falafel', { timeout: 3_000 })
+  }).toPass({ timeout: TEST_PROJECT_TIMEOUT })
+  await expect(dishes).toContainText('Main dishes · 3')
   await expect(dishes.getByRole('link', { name: 'Full menu' })).toHaveAttribute('href', sourceUrl)
 })
 

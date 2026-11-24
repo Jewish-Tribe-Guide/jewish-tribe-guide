@@ -9,6 +9,9 @@
 //   RESTORE_URL=https://<new>.supabase.co RESTORE_KEY=<its service role key> \
 //     node --env-file=.env.local scripts/restore.mjs backups/prod-<ref>-<time> --replace
 //   ... --no-files        (rows only)
+//   ... --skip-broken-links  leave out rows that point at a row the copy
+//                         doesn't have (test leftovers), and count them;
+//                         for a test copy, never a real restore
 //   ... --replace         empty the new project's tables first: the
 //                         migrations seed a few (community, eruv, page,
 //                         watch, content_stamp), and the backup is the truth
@@ -112,6 +115,34 @@ export function restoreTables(tables, insert) {
   })
 }
 
+/** For a copy of a project that holds rows pointing at nothing (dev's and
+ *  the test project's leftovers, migration 113): the tables restoreTables
+ *  couldn't finish, a row at a time, in passes, so a row whose parent is
+ *  itself in one of these tables still goes in once the parent has. Rows
+ *  that never find theirs are left out. `insertOne(table, row)` resolves to
+ *  null or { code, message } and must ignore a row already there (a chunk
+ *  that went in before the table stopped). Resolves to { skipped: Map of
+ *  table → rows left out, failed: { name, why } | null } (any error but a
+ *  missing parent stops at once). */
+export async function restoreSkippingBrokenLinks(tables, insertOne) {
+  let pending = tables.flatMap((t) => t.rows.map((row) => ({ name: t.name, row })))
+  for (;;) {
+    const waiting = []
+    for (const item of pending) {
+      const failed = await insertOne(item.name, item.row)
+      if (!failed) continue
+      if (failed.code !== '23503') return { skipped: new Map(), failed: { name: item.name, why: failed.message } }
+      waiting.push(item)
+    }
+    if (!waiting.length || waiting.length === pending.length) {
+      const skipped = new Map()
+      for (const w of waiting) skipped.set(w.name, (skipped.get(w.name) ?? 0) + 1)
+      return { skipped, failed: null }
+    }
+    pending = waiting
+  }
+}
+
 async function filesUnder(dir) {
   const out = []
   for (const e of await readdir(dir, { withFileTypes: true })) {
@@ -183,6 +214,25 @@ async function main() {
     return { code: body.code ?? String(res.status), message: body.message ?? `HTTP ${res.status}` }
   })
   for (const name of done) console.log(`  ${name.padEnd(28)} ${manifest.tables[name]}`)
+  if (left.length && process.argv.includes('--skip-broken-links')) {
+    const unfinished = tables.filter((t) => left.some((l) => l.name === t.name))
+    const { skipped, failed } = await restoreSkippingBrokenLinks(unfinished, async (name, row) => {
+      const res = await fetch(`${rest}/${name}`, {
+        method: 'POST',
+        headers: { ...headers, prefer: 'return=minimal,resolution=ignore-duplicates' },
+        body: JSON.stringify([row]),
+      })
+      if (res.ok) return null
+      const body = await res.json().catch(() => ({}))
+      return { code: body.code ?? String(res.status), message: body.message ?? `HTTP ${res.status}` }
+    })
+    if (failed) throw new Error(`${failed.name}: ${failed.why}`)
+    for (const t of unfinished) {
+      const n = skipped.get(t.name) ?? 0
+      console.log(`  ${t.name.padEnd(28)} ${t.rows.length - n}${n ? `  (${n} pointing at nothing, left out)` : ''}`)
+    }
+    left.length = 0
+  }
   for (const l of left) console.error(`  ✗ ${l.name}: ${l.why}`)
 
   let failedFiles = 0
@@ -212,7 +262,7 @@ async function main() {
     console.error(`\n⚠ ${left.length} table(s) and ${failedFiles} file(s) didn't restore (above).`)
     process.exit(1)
   }
-  console.log('\n✓ Restored.')
+  console.log('\n✓ Restored. Now run scripts/reset-sequences.sql in its SQL editor: the copied ids are ahead of its id counters.')
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

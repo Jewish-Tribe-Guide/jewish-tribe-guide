@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 import { WRITE_SUITE_COMMUNITY } from '../scripts/writeSuiteCommunity.mjs'
+import { TEST_PROJECT_TIMEOUT } from '../e2e/helpers'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // To do keeps your spot (the user, Nov 2: "when I scroll on to do and then
@@ -166,7 +167,8 @@ test('dragging the line between the list and the place sets the list’s width, 
 
   await page.reload()
   await expect(page).toHaveURL(/[?&]open=/)
-  await expect(page.getByRole('separator', { name: 'Resize To do and the place' })).toBeVisible()
+  // A reload signs in and loads To do again, on the shared test project.
+  await expect(page.getByRole('separator', { name: 'Resize To do and the place' })).toBeVisible({ timeout: TEST_PROJECT_TIMEOUT })
   await expect.poll(listWidth, { message: 'the width wasn’t kept' }).toBe(wide)
 
   // Double-click: back to the usual width.

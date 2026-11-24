@@ -55,7 +55,7 @@ function jobsRunningPlaywright(): Array<{ job: string; script: string; hasContai
     const job = block.match(/^([\w-]+):/)![1]
     for (const m of block.matchAll(/npm run (test:[\w-]+)/g)) {
       if (testDirFor(m[1])) {
-        out.push({ job, script: m[1], hasContainer: /\n\s*container:\s*\S/.test(block) })
+        out.push({ job, script: m[1], hasContainer: /\n\s*container:\s*\S/.test(block) || /docker run[\s\S]*?mcr\.microsoft\.com\/playwright:v/.test(block) })
       }
     }
   }
@@ -78,7 +78,8 @@ describe('CI runs every browser-driving suite where a browser exists', () => {
         expect(
           hasContainer,
           `${dir} has a test taking the \`page\` fixture, so job "${job}" needs the ` +
-            `Playwright container image — without it CI fails with "Executable doesn't exist".`,
+            `Playwright container image (as the job's container, or run with \`docker run … mcr.microsoft.com/playwright:v…\`) — ` +
+            `without it CI fails with "Executable doesn't exist".`,
         ).toBe(true)
       } else {
         expect(hasContainer, `${dir} needs no browser; "${job}" can stay on a bare runner`).toBe(false)
@@ -159,11 +160,26 @@ describe('test-project suites never run two copies at once', () => {
       .slice(1)
       .map((b) => [b.match(/^([\w-]+):/)![1], b] as const),
   )
-  const usesTestProject = Object.keys(jobs).filter((n) => /secrets\.TEST_SUPABASE_/.test(jobs[n]))
+  // A job with a database of its own (.github/actions/own-test-database)
+  // only reads the test project, for its copy, so it needn't queue.
+  const ownDatabase = (n: string) => jobs[n].includes('uses: ./.github/actions/own-test-database')
+  const usesTestProject = Object.keys(jobs).filter((n) => /secrets\.TEST_SUPABASE_/.test(jobs[n]) && !ownDatabase(n))
+
+  for (const name of Object.keys(jobs).filter(ownDatabase)) {
+    it(`${name} hands the test project's keys only to the copy`, () => {
+      // Every secrets.TEST_SUPABASE_* line is an input of the action: one
+      // in a step's env would point the suite back at the shared project.
+      for (const line of jobs[name].split('\n').filter((l) => /secrets\.TEST_SUPABASE_/.test(l))) {
+        expect(line.trim(), name).toMatch(/^test-supabase-(url|service-role-key): \$\{\{ secrets\.TEST_SUPABASE_(URL|SERVICE_ROLE_KEY) \}\}$/)
+      }
+      expect(jobs[name], `${name} starts Supabase, which needs Docker: no container`).not.toMatch(/\n {4}container:/)
+    })
+  }
   const field = (block: string, re: RegExp) => block.match(re)?.[1].trim() ?? ''
 
   it('finds the test-project jobs at all', () => {
-    expect(usesTestProject.length).toBeGreaterThanOrEqual(5)
+    expect(usesTestProject.length).toBeGreaterThanOrEqual(4)
+    expect(Object.keys(jobs).filter(ownDatabase).length).toBeGreaterThanOrEqual(1)
   })
 
   for (const name of usesTestProject) {

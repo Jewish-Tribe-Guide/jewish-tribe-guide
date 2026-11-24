@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHUNK, columnsFrom, fitRows, inPasses, movedFiles, refuseTarget, restoreTables } from './restore.mjs'
+import { CHUNK, columnsFrom, fitRows, inPasses, movedFiles, refuseTarget, restoreSkippingBrokenLinks, restoreTables } from './restore.mjs'
 
 describe('refuseTarget', () => {
   const backupFrom = 'https://live.supabase.co'
@@ -99,5 +99,35 @@ describe('fitRows', () => {
 
   it('reads the columns from the project’s own description', () => {
     expect(columnsFrom({ definitions: { page: { properties: { slug: {}, body: {} } } } }).get('page')).toEqual(new Set(['slug', 'body']))
+  })
+})
+
+describe('restoreSkippingBrokenLinks', () => {
+  // A stand-in database: a row goes in when its parent (if any) is in.
+  const db = () => {
+    const have = new Set<string>()
+    const insertOne = async (name: string, row: { id: string; parent?: string }) => {
+      if (row.parent && !have.has(row.parent)) return { code: '23503', message: 'points at nothing' }
+      have.add(`${name}:${row.id}`)
+      return null
+    }
+    return { have, insertOne }
+  }
+
+  it('puts in rows whose parent comes later in the same pass, and leaves out orphans', async () => {
+    const { have, insertOne } = db()
+    const tables = [
+      { name: 'resource', rows: [{ id: 'r1', parent: 'category:c1' }, { id: 'r2', parent: 'category:gone' }] },
+      { name: 'category', rows: [{ id: 'c1' }, { id: 'c2', parent: 'community:gone' }] },
+    ]
+    const { skipped, failed } = await restoreSkippingBrokenLinks(tables, insertOne)
+    expect(failed).toBeNull()
+    expect([...have].sort()).toEqual(['category:c1', 'resource:r1'])
+    expect(Object.fromEntries(skipped)).toEqual({ resource: 1, category: 1 })
+  })
+
+  it('stops at any other error', async () => {
+    const { failed } = await restoreSkippingBrokenLinks([{ name: 'a', rows: [{ id: '1' }] }], async () => ({ code: '42501', message: 'denied' }))
+    expect(failed).toEqual({ name: 'a', why: 'denied' })
   })
 })

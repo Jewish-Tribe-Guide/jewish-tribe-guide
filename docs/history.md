@@ -2323,6 +2323,33 @@ Taken off `where-things-stand.md` with their numbers, as they read there.
   The app was right. The test fixture now has a fixed date. Caught by
   logging the screen at the failure (1 run in ~25 under coverage, 3 at
   once); a clock ticking 1ms per submission failed it every time.
+- Nov 23, the week's CI failures sorted (the user: lots of GitHub emails):
+  57 failed runs Nov 16–23, 72 failed admin-write and e2e jobs over ~40
+  tests. Many were a branch's own break, fixed before it merged; one run
+  on `claude/foreign-keys` failed five tests on a real 500. The repeat
+  ones were mostly one thing: every CI job signs in to the one test
+  project at once, and its sign-in check (`/api/admin/whoami`, Supabase's
+  auth server) took 3–4s in the failing traces, where a single check
+  takes ~0.1s and thirty at once ~1s. The admin Home page tests (3),
+  To do's reload and Teach/Unteach each gave it expect's 5s. Admin pages
+  now open through `openAdmin()`, and waits on a save or a re-read get
+  `TEST_PROJECT_TIMEOUT` (20s). `phone-map-row` had walked into another
+  suite's leftover categories ("Timing …", "Integration Test …"), already
+  claimed or gone. Approve (15s) and Main dishes' locator were already
+  fixed one by one.
+- Nov 23, admin-write got a database of its own in CI, the standard
+  way (Supabase's CLI on the runner), not one shared with every other
+  job, dev and the previews. All 112 migrations built it; the test
+  project's rows were copied in, leaving out 64 that point at nothing
+  (13 categories of long-deleted test communities, and what hangs off
+  them: `restore.mjs --skip-broken-links`). Two things the move found:
+  a restored copy keeps its ids but not its id counters, so the next
+  `activity` row collided with a copied one (`reset-sequences.sql`, now
+  in `docs/backups.md`'s restore steps too); and Main dishes' "Use this"
+  test waited for "Main dishes · 3", true before the save as well, so
+  it passed on a page the cache still served from before and failed on
+  the menu link (it now waits for the added dish: failed once in two
+  full runs before, 4 of 4 after).
 - 84. Done Nov 23 (the user's yes): the menu watches of four sites that
   refuse the reader were turned off on live: 20th Street Pizza, Stephen's
   Cafe and Authentic Kosher Chinese (Cloudflare's "prove you're a person"

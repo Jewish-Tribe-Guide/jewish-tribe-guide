@@ -1,4 +1,4 @@
-import type { Locator, Page, APIRequestContext } from '@playwright/test'
+import { expect, type Locator, type Page, type APIRequestContext } from '@playwright/test'
 import { listingActions } from '../src/lib/listingView'
 import { minyanimPage } from '../src/lib/davening'
 import type { CategoryConfig } from '../src/lib/categories'
@@ -410,4 +410,24 @@ export async function apiCallsForThisDocument(page: Page): Promise<string[]> {
       .filter((name) => name.startsWith(`${location.origin}/api/`))
       .map((name) => name.replace(location.origin, '')),
   )
+}
+
+/** How long a wait on a round trip to the test project may take: an admin
+ *  page saying who's signed in (/api/admin/whoami, a check against
+ *  Supabase's auth server) and reading its content, or an admin's save
+ *  coming back. In CI every job's browsers sign in to the
+ *  one test project at once: one check is ~0.1s alone and ~1s thirty at a
+ *  time, and the e2e shards' whoami took 3-4s (Nov 21-23 traces), so the
+ *  first look on an admin page outran its 5s. Waits on the page itself
+ *  keep expect's 5s. The live site has its own
+ *  project and no such crowd. */
+export const TEST_PROJECT_TIMEOUT = 20_000
+
+/** Opens an admin page and waits until it has said who's signed in and
+ *  loaded what it shows, so the test's own checks start on the page rather
+ *  than on its loading line. */
+export async function openAdmin(page: Page, path: string): Promise<void> {
+  await page.goto(path)
+  await expect(page.getByText(/^Signed in as /).first()).toBeAttached({ timeout: TEST_PROJECT_TIMEOUT })
+  await expect(page.getByText(/^Loading/)).toHaveCount(0, { timeout: TEST_PROJECT_TIMEOUT })
 }
