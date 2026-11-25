@@ -24,6 +24,10 @@ import { jobsChangedBy, type Jobs } from './useWatchJobs'
 import { kindsOf } from './WatchKinds'
 import { useStepsInAddress } from './useStepsInAddress'
 import { useAdminApi } from './useAdminApi'
+import ReadFrom from './ReadFrom'
+import { listingReadFrom } from './readFromFacts'
+import { editSubmission } from '@/lib/editSubmission'
+import { MENU_LINK_KEY } from '@/lib/menuLink'
 
 // A listing as an admin sees it, wherever it's opened from: Places, or a job's
 // row with nothing waiting (boards Listing6, States6, Menu5, Change5, Stopped6,
@@ -514,6 +518,17 @@ export default function PlaceListing({
     }
   }
 
+  /** A Read from row's Save: one field of the listing, saved as an admin's
+   *  edit, and the editor starting again from it. */
+  async function saveField(key: string, url: string) {
+    await api.send('PATCH', `/api/admin/listings/${place.id}`, { payload: editSubmission(category!, item, { [key]: url }) }, 'Could not save it.')
+    const got = await api.get<{ item: DirectoryResource }>(`/api/admin/watches/google?item=${place.id}`, 'Could not open its listing.')
+    setItem(got.item)
+    setEditorRound((r) => r + 1)
+  }
+  const readFrom = loaded ? listingReadFrom(place.id, jobs, category, item as Record<string, unknown>) : null
+  const websiteKey = websiteKeyOf(category)
+
   const watched = menuChange ? kindsOf(jobs, adminBase(community), now)?.kinds.flatMap((k) => k.places).find((p) => p.id === place.id) : undefined
   return (
     <div>
@@ -547,6 +562,20 @@ export default function PlaceListing({
         onClose={onClose}
         splitContact
         patch={patch}
+        top={
+          readFrom && (
+            <ReadFrom
+              key={`${place.id}-${editorRound}`}
+              placeId={place.id}
+              token={token}
+              {...readFrom}
+              saveWebsite={(url) => saveField(websiteKey!, url)}
+              saveMenu={(url) => saveField(MENU_LINK_KEY, url)}
+              linkEmail={async (w) => void (await post('/api/admin/watches', { action: 'link', id: w.id, resourceId: place.id }))}
+              onChanged={() => reload()}
+            />
+          )
+        }
         overlay={
           screen && {
             title: screen.title,

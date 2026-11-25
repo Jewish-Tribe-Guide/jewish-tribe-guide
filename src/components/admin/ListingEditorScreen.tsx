@@ -23,9 +23,12 @@ export default function ListingEditorScreen({
   overlay,
   backLabel = 'Back',
   history = true,
+  top,
   ...editor
 }: {
   heading: string
+  /** Under the title, while no row or screen is open: a place's Read from. */
+  top?: ReactNode
   overlay?: { title: string; back: () => void; node: ReactNode } | null
   backLabel?: string
   /** Off for a preview beside the page, or one opened on a field: an open
@@ -45,6 +48,7 @@ export default function ListingEditorScreen({
   return (
     <div className="flex flex-col gap-4">
       <AdminBack back={{ label: step || overlay ? 'Back' : backLabel, onClick: back }} title={title} />
+      {!step && !overlay && top}
       {overlay?.node}
       <div className={overlay ? 'hidden' : ''}>
         <ListingEditor {...editor} onClose={onClose} onStep={onStep} reopen={reopen} />

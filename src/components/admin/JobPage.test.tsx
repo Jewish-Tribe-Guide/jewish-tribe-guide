@@ -65,7 +65,7 @@ describe('a Watches row, opened (board W4)', () => {
   })
 
   it('a job that didn’t run says so instead', async () => {
-    serve([view({ fixes: [{ id: 'times', why: 'Didn’t run since Nov 20', whole: true } as NightKindView['fixes'][number]], tracked: TIMES.tracked })])
+    serve([view({ fixes: [{ name: 'Minyan times', page: '', why: 'Didn’t run since Nov 20', whole: true }], tracked: TIMES.tracked })])
     show('times')
     expect(await screen.findByText('Didn’t run since Nov 20')).toBeInTheDocument()
   })

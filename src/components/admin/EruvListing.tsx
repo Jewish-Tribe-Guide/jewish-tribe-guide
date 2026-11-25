@@ -22,6 +22,8 @@ import { sourceActions, type Attempt } from './sourceActions'
 import type { Jobs } from './useWatchJobs'
 import { shortUrl } from './watchText'
 import EruvMapPreview from './EruvMapPreview'
+import ReadFrom from './ReadFrom'
+import { eruvReadFrom } from './readFromFacts'
 import { partNames } from '@/lib/eruvLine'
 import { ownEruvFields, readEruvDetails, withEruvFields } from '@/lib/eruvFields'
 import { ownWords } from '@/lib/eruvSuggestion'
@@ -318,6 +320,23 @@ export default function EruvListing({
   return (
     <div className="flex flex-col gap-4">
       <AdminBack back={{ label: screen || openRow ? 'Back' : backLabel, onClick: back }} title={title} />
+      {!screen && !openRow && (
+        <ReadFrom
+          placeId={eruv.id}
+          token={token}
+          {...eruvReadFrom(eruv, jobs)}
+          saveWebsite={async (url) => {
+            await save({ website: url })
+            setDraft((d) => ({ ...d, website: url }))
+          }}
+          // The sender is the eruv's from now on: its emails are read for its status.
+          linkEmail={async (w) => {
+            await save({ statusEmail: w.sender })
+            await post('/api/admin/watches', { action: 'remove', id: w.id })
+          }}
+          onChanged={reload}
+        />
+      )}
       {screen ? (
         <SourceScreen
           {...screen.props}

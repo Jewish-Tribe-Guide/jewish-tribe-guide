@@ -365,6 +365,18 @@ describe('PlacePage', () => {
       for (const job of jobs) expect(job).not.toMatch(/\d/)
     })
 
+    // Board W3, Nov 25: what it's read from, at the top, each with its own way to fill it.
+    it('opens with Read from: its website, its emails and Google', async () => {
+      await listingPage({ job: withTimes, places: [row({ website: 'https://kesher.example' })] })
+      const box = screen.getByRole('region', { name: 'Read from' })
+      expect(within(box).getByTestId('read-from-website')).toHaveTextContent('kesher.example · every night')
+      expect(within(box).getByTestId('read-from-emails')).toHaveTextContent('Its emails')
+      expect(within(box).getByTestId('read-from-google')).toHaveTextContent('Matched')
+      // A row opened, it gives way to the row.
+      await userEvent.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Website')!.closest('button')!)
+      expect(screen.queryByRole('region', { name: 'Read from' })).toBeNull()
+    })
+
     it('its row opened says where it’s read, and Change saves another page or stops it', async () => {
       await listingPage({ job: withTimes })
       const user = userEvent.setup()
@@ -639,6 +651,19 @@ describe('an eruv', () => {
     })
   afterEach(() => {
     posts.length = 0
+  })
+
+  it('Read from: its website, its status page, and Google not for an eruv; Change saves on the eruv', async () => {
+    await eruvPage('lm')
+    const box = screen.getByRole('region', { name: 'Read from' })
+    expect(within(box).getByTestId('read-from-website')).toHaveTextContent('lowermerioneruv.org · every night')
+    expect(within(box).getByTestId('read-from-emails')).toHaveTextContent('From lowermerioneruv.org/status')
+    expect(within(box).getByTestId('read-from-google')).toHaveTextContent('Not for an eruv')
+    const row = within(box).getByTestId('read-from-website')
+    await userEvent.click(within(row).getByRole('button', { name: 'Change' }))
+    await userEvent.type(within(row).getByLabelText('Its website'), 'lmeruv.org')
+    await userEvent.click(within(row).getByRole('button', { name: 'Save' }))
+    expect(posts).toContainEqual(['/api/admin/eruvim', { action: 'save', id: 'lm', edit: { website: 'lmeruv.org' } }])
   })
 
   // Nov 1, boards EruvListing6, EruvStatus5.
