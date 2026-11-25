@@ -83,6 +83,13 @@ export function dropListed(update: TimesUpdate, current: readonly Minyan[], sche
   return { ...update, rows: update.rows.filter((r) => r.status !== 'new' || !listed(r)) }
 }
 
+/** The listing's minyan stays where the page gives that tefillah that day
+ *  only in words (a time it can't read as one): the page still has it. */
+export function keepUnread(update: TimesUpdate, inWords: readonly { tefillah: Tefillah; days: readonly string[] }[]): TimesUpdate {
+  const said = (r: TimesUpdate['rows'][number]) => inWords.some((t) => t.days.includes(r.day) && sameMinyanName(t.tefillah, r.tefillah))
+  return { ...update, rows: update.rows.map((r) => (r.status === 'gone' && said(r) ? { ...r, status: 'kept' as const } : r)) }
+}
+
 /** What a page with no date says that a page with one says otherwise,
  *  taken out: the page with the date wins (the user, Oct 22, on Sons of
  *  Israel: its calendar gives this Saturday's Shacharis at 9:00, its
@@ -222,8 +229,16 @@ export async function readShulPage(
     const r = onItsWeek(await notHeldElsewhere(raw), { from: today, to: weeks[0].to })
     reads.push(fromReading(r, src(r.complete ? 'schedule' : 'page'), { week: span }))
     // Its usual times, compared as they always were: never a calendar's.
-    const undated = r.times.filter((t) => !t.date)
-    if (r.kind === 'schedule' && undated.length) usualUpdate = compareTimes(minyanim, { ...r, times: undated }, { season, zmanim: info.zmanim })
+    // Only those it can give as a time, a clock's or a rule from a zman: a
+    // time in words ("concurrent to the main sanctuary's schedule",
+    // "within 5 minutes of candle-lighting") can't be shown on the
+    // listing, and filed it took the place of Sons of Israel's Teen Mincha
+    // at 45 min before sunset and Maariv at 5 min before Havdalah (Nov 25).
+    // The listing's own times for those stay (keepUnread).
+    const asTime = (t: (typeof r.times)[number]) => !!t.anchor || Number.isFinite(parseTimeToMinutes(t.time))
+    const undated = r.times.filter((t) => !t.date && asTime(t))
+    const inWords = r.times.filter((t) => !t.date && !asTime(t))
+    if (r.kind === 'schedule' && undated.length) usualUpdate = keepUnread(compareTimes(minyanim, { ...r, times: undated }, { season, zmanim: info.zmanim }), inWords)
   }
 
   const changes: string[] = []

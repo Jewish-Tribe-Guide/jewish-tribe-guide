@@ -573,6 +573,132 @@ describe('reading a shul’s regular times', () => {
   })
 })
 
+// Nov 25, the shul watch's night: Lower Merion's homepage and Sons of
+// Israel's calendar and Tefillot page, as the AI read them that night.
+describe('what the watch read wrong on Nov 25', () => {
+  it('Lower Merion: every time on a line of several is kept', () => {
+    const text = "This Week's Davening Times\nThursday, October 8th\nShacharit: 7:00 AM/8:00 AM\nFriday, October 9th\nShacharit: 7:00 AM /8:00 AM/9:00 AM (Beit Midrash)"
+    const r = tidyRegularReading(
+      {
+        kind: 'week',
+        from: '2026-10-08',
+        to: '2026-10-09',
+        times: [
+          { tefillah: 'shacharis', date: '2026-10-08', time: '7:00 AM', quote: 'Shacharit: 7:00 AM' },
+          { tefillah: 'shacharis', date: '2026-10-08', time: '8:00 AM', quote: 'Shacharit: 8:00 AM' },
+          { tefillah: 'shacharis', date: '2026-10-09', time: '7:00 AM', quote: 'Shacharit: 7:00 AM' },
+          { tefillah: 'shacharis', date: '2026-10-09', time: '8:00 AM', quote: 'Shacharit: 8:00 AM' },
+          { tefillah: 'shacharis', date: '2026-10-09', time: '9:00 AM', quote: '9:00 AM (Beit Midrash)' },
+        ],
+      },
+      { text },
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => `${t.date} ${t.time}`)).toEqual(['2026-10-08 7:00 AM', '2026-10-08 8:00 AM', '2026-10-09 7:00 AM', '2026-10-09 8:00 AM', '2026-10-09 9:00 AM'])
+  })
+
+  it('…but a quote still has to be one line’s words, in order', () => {
+    const text = 'Shacharit: 7:00 AM/8:00 AM\nMincha: 9:00 PM'
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          { tefillah: 'shacharis', days: ['mon'], time: '9:00 AM', quote: 'Shacharit: 9:00 AM' },
+          { tefillah: 'shacharis', days: ['mon'], time: '8:00 AM', quote: '8:00 AM Shacharit' },
+        ],
+      },
+      { text },
+      DAYS,
+      id,
+    )
+    expect(r.times).toEqual([])
+  })
+
+  it('Sons of Israel: two minyanim at one time on a calendar stay two, by name', () => {
+    const text = 'Calendar\n9:00am Sephardic Minyan\n9:00am Main Sanctuary Minyan\n4:00pm Teen Minyan\n4:00pm Mincha'
+    const r = tidyRegularReading(
+      {
+        kind: 'week',
+        from: '2026-10-10',
+        to: '2026-10-10',
+        times: [
+          { tefillah: 'shacharis', date: '2026-10-10', time: '9:00am', quote: '9:00am Sephardic Minyan' },
+          { tefillah: 'shacharis', date: '2026-10-10', time: '9:00am', quote: '9:00am Main Sanctuary Minyan' },
+          { tefillah: 'mincha', date: '2026-10-10', time: '4:00pm', quote: '4:00pm Teen Minyan', notes: 'Join for Mincha, stay for special Seudah Shlishit just for teens.' },
+          { tefillah: 'mincha', date: '2026-10-10', time: '4:00pm', quote: '4:00pm Mincha', notes: 'Mincha on Shabbat when there is Seudah Shlishit' },
+        ],
+      },
+      { text },
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => [t.time, t.notes])).toEqual([
+      ['9:00am', 'Sephardic Minyan'],
+      ['9:00am', 'Main Sanctuary Minyan'],
+      ['4:00pm', 'Join for Mincha, stay for special Seudah Shlishit just for teens.'],
+      ['4:00pm', 'Mincha on Shabbat when there is Seudah Shlishit'],
+    ])
+  })
+
+  it('…while a usual time given twice (summary and detail) is still one', () => {
+    const text = 'Weekdays: 8:15am\nOur 8:15 weekday Shacharit operates in partnership with Politz Day School.'
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          { tefillah: 'shacharis', days: ['mon', 'tue'], time: '8:15am', quote: 'Weekdays: 8:15am' },
+          { tefillah: 'shacharis', days: ['mon', 'tue', 'wed'], time: '8:15am', quote: 'Our 8:15 weekday Shacharit' },
+        ],
+      },
+      { text },
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => t.days)).toEqual([['mon', 'tue', 'wed']])
+  })
+
+  it('Sons of Israel: a weekday evening time isn’t Friday’s when Friday night has its own', () => {
+    const text = 'Weekdays: Approximately 15 minutes before shkiah.\nFriday: In the summer, Mincha followed by Kabbalat Shabbat takes place at 7:00pm.'
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          { tefillah: 'mincha_maariv', days: ['mon', 'tue', 'wed', 'thu', 'fri'], time: 'Approximately 15 minutes before shkiah', quote: 'Approximately 15 minutes before shkiah.' },
+          { tefillah: 'mincha', days: ['fri'], time: '7:00pm', season: 'summer', quote: 'Mincha followed by Kabbalat Shabbat takes place at 7:00pm.' },
+        ],
+      },
+      { text },
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => [t.tefillah, t.days])).toEqual([
+      ['mincha_maariv', ['mon', 'tue', 'wed', 'thu']],
+      ['mincha', ['fri']],
+    ])
+  })
+
+  it('…and stays Friday’s when Friday night isn’t given apart, or it’s an early Mincha', () => {
+    const text = 'Weekdays: Mincha 1:30pm\nMincha/Maariv 15 min before sunset\nFriday: Kabbalat Shabbat 7:00pm'
+    const r = tidyRegularReading(
+      {
+        kind: 'schedule',
+        times: [
+          { tefillah: 'mincha', days: ['mon', 'fri'], time: '1:30pm', quote: 'Weekdays: Mincha 1:30pm' },
+          { tefillah: 'mincha_maariv', days: ['mon', 'fri'], time: '15 min before sunset', quote: 'Mincha/Maariv 15 min before sunset' },
+        ],
+      },
+      { text },
+      DAYS,
+      id,
+    )
+    expect(r.times.map((t) => t.days)).toEqual([
+      ['mon', 'fri'],
+      ['mon', 'fri'],
+    ])
+  })
+})
+
 // Oct 27, Sons of Israel's Shabbos Mincha: "…Weekly at the same time as
 // Shabbat Mincha at SOI. For", a note cut at 120 characters mid-sentence.
 describe('clipNote', () => {

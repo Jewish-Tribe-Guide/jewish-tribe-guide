@@ -251,6 +251,45 @@ describe('weekChanges', () => {
     expect(weekChanges([had], [week('new', had.minyanim)]).weeks).toEqual([])
   })
 
+  // Nov 25, Lower Merion: the listing's one week, Nov 22 – 28, read again
+  // and filed as its two parts, weekdays and Shabbos. Neither half has the
+  // old week's dates, so To do showed each half all new.
+  it('a week filed in parts is compared with the listing’s copy of those days', () => {
+    const span = (id: string, from: string, to: string, minyanim: SpecialSchedule['minyanim'], parts?: SpecialSchedule['parts']): SpecialSchedule => ({ ...week(id, minyanim), from, to, ...(parts ? { parts } : {}) })
+    const had = span('old', '2026-11-22', '2026-11-28', [
+      minyan('1', 'shacharis', '2026-11-23', '7:00am'),
+      minyan('2', 'shacharis', '2026-11-27', '7:00am'),
+      minyan('3', 'mincha', '2026-11-27', '4:20pm'),
+      minyan('4', 'shacharis', '2026-11-28', '9:00am'),
+    ])
+    const weekdays = span('wd', '2026-11-22', '2026-11-27', [minyan('1', 'shacharis', '2026-11-23', '7:00am'), minyan('2', 'shacharis', '2026-11-27', '7:00am')], ['weekdays'])
+    const shabbos = span('sh', '2026-11-27', '2026-11-28', [minyan('3', 'mincha', '2026-11-27', '4:20pm'), minyan('4', 'shacharis', '2026-11-28', '9:00am')], ['shabbos'])
+    expect(weekChanges([had], [weekdays, shabbos])).toEqual({ weeks: [], gone: [] })
+    // One change in the Shabbos half: that, and nothing of the weekdays'
+    // Friday Shacharis taken off.
+    const later = { ...shabbos, minyanim: [shabbos.minyanim[0], minyan('4', 'shacharis', '2026-11-28', '9:15am')] }
+    const { weeks } = weekChanges([had], [weekdays, later])
+    expect(weeks).toHaveLength(1)
+    expect(weeks[0]).toMatchObject({ had: 2, same: 1 })
+    expect(weeks[0].rows.map((r) => [r.what, r.status, r.when, r.was])).toEqual([
+      ['Mincha', 'same', '4:20 PM', null],
+      ['Shacharis', 'changed', '9:15 AM', '9 AM'],
+    ])
+  })
+
+  // Lower Merion's as filed on Nov 25: each part on the old week's own
+  // dates, so it matched that week, and every day of the other part
+  // showed as taken off.
+  it('a part on the week’s own dates is compared with that part of it', () => {
+    const had = { ...week('old', [minyan('1', 'shacharis', '2026-10-26', '7:00am'), minyan('2', 'shacharis', '2026-10-30', '7:00am'), minyan('3', 'kabbalas_shabbos', '2026-10-30', '5:30pm'), minyan('4', 'shacharis', '2026-10-31', '9:00am')]) }
+    const shabbos = { ...week('sh', [minyan('3', 'kabbalas_shabbos', '2026-10-30', '5:30pm'), minyan('4', 'shacharis', '2026-10-31', '9:15am')]), parts: ['shabbos' as const] }
+    const { weeks } = weekChanges([had], [shabbos])
+    expect(weeks[0].rows.map((r) => [r.what, r.status])).toEqual([
+      ['Kabbalas Shabbos', 'same'],
+      ['Shacharis', 'changed'],
+    ])
+  })
+
   it('a minyan whose sign-up or link changes is changed, saying so', () => {
     const had = week('w', [minyan('1', 'shacharis', '2026-10-26', '7:15am')])
     const read = week('w', [{ ...minyan('1', 'shacharis', '2026-10-26', '7:15am'), signUp: { link: 'https://chat.whatsapp.com/MI' } }])

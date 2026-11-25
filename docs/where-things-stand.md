@@ -61,7 +61,9 @@ old number can still be looked up. When an item is done, move it to
     Since Nov 24 the same words are read the same way (kept readings),
     a date-only line doesn't make a page new, and a week read mid-week
     is compared with the week we hold (`docs/history.md`, "Shul
-    watches: the same page reads the same way").
+    watches: the same page reads the same way"). Since Nov 25, five
+    more general rules from that night's findings (`docs/history.md`,
+    "Shul watches: what Nov 25 read wrong").
 86. **After 82: rehearse a second city before inviting anyone.** Pick a
     real one (Teaneck, Baltimore), paste its real lists into a hidden
     community, and let it run two weeks with no hand-fixing. Count what

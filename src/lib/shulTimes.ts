@@ -101,11 +101,25 @@ export type Finding =
       quotes: string[]
     }
 
-/** A time's part: Friday night and Shabbos are Shabbos; Friday morning is
- *  a weekday. */
-export function partOf({ date, tefillah }: { date: string; tefillah?: Tefillah }): Part {
-  const day = weekdayOf(date)
-  return day === 'sat' || (day === 'fri' && tefillah !== 'shacharis') ? 'shabbos' : 'weekdays'
+/** Before this, a Friday Mincha is the day's, not Shabbos's: Lower
+ *  Merion's "Mincha Gedolah: 12:18 PM" went on its Shabbos (Nov 25). An
+ *  early Kabbalas Shabbos, even in winter, isn't before 3:00 PM. */
+const FRIDAY_SHABBOS_FROM = 14 * 60
+
+/** Whether a Friday time is Shabbos's: Friday night is, Friday morning and
+ *  an early-afternoon Mincha at a clock time aren't. */
+export function fridayIsShabbos({ tefillah, time, anchor }: { tefillah?: Tefillah; time?: string; anchor?: ZmanAnchor }): boolean {
+  if (tefillah === 'shacharis') return false
+  if (tefillah !== 'mincha' || anchor || time === undefined) return true
+  const at = parseTimeToMinutes(time)
+  return !Number.isFinite(at) || at >= FRIDAY_SHABBOS_FROM
+}
+
+/** A time's part: Friday night and Shabbos are Shabbos; Friday morning,
+ *  and an early Friday Mincha, are the weekdays' (fridayIsShabbos). */
+export function partOf(t: { date: string; tefillah?: Tefillah; time?: string; anchor?: ZmanAnchor }): Part {
+  const day = weekdayOf(t.date)
+  return day === 'sat' || (day === 'fri' && fridayIsShabbos(t)) ? 'shabbos' : 'weekdays'
 }
 
 /** A part's dates in the week: Sunday to Friday, or Friday and Shabbos. */
@@ -175,14 +189,14 @@ type InPart = { read: SourceRead; dates: string[]; due: string[]; shown: string[
 function inPart(read: SourceRead, part: Part, week: WeekContext['week'], today: string): InPart {
   const dates = partDates(part, week)
   const shown = dates.filter((d) => d >= read.shows.from && d <= read.shows.to)
-  const on = (date: string, tefillah?: Tefillah) => shown.includes(date) && partOf({ date, tefillah }) === part
+  const on = (t: { date: string; tefillah?: Tefillah; time?: string; anchor?: ZmanAnchor }) => shown.includes(t.date) && partOf(t) === part
   return {
     read,
     dates,
     due: dates.filter((d) => d >= today),
     shown,
-    times: read.times.filter((t) => on(t.date, t.tefillah)),
-    cancelled: (read.cancelled ?? []).filter((c) => on(c.date, c.tefillah)),
+    times: read.times.filter(on),
+    cancelled: (read.cancelled ?? []).filter(on),
   }
 }
 
@@ -211,7 +225,7 @@ const cancels = (c: Cancellation, t: DatedTime) => c.date === t.date && (!c.tefi
  *  what's extra or at another time, and the usual minyanim it leaves out
  *  on the days it shows. */
 function againstUsual(p: InPart, part: Part, ctx: WeekContext) {
-  const usualOn = (date: string) => ctx.usual.filter((m) => m.days.includes(weekdayOf(date)) && partOf({ date, tefillah: m.tefillah }) === part)
+  const usualOn = (date: string) => ctx.usual.filter((m) => m.days.includes(weekdayOf(date)) && partOf({ date, tefillah: m.tefillah, time: m.time, anchor: m.anchor }) === part)
   const accounted = new Set<string>()
   const key = (date: string, m: Minyan) => `${date} ${m.id}`
   const extra: DatedTime[] = []
