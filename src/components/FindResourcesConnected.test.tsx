@@ -94,4 +94,26 @@ describe('FindResourcesConnected', () => {
     expect(window.location.search).toBe('?form=create')
     expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
   })
+
+  // Closing tells Next's router (Nov 25): the state goes without Next's
+  // `__NA` mark, which Next would take as its own and leave its router
+  // reading ?form=create, so a link back to it opened nothing.
+  it('closing the form changes the address without Next’s own mark, so the router hears it', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
+    window.history.replaceState({ __NA: true, keep: 1 }, '', '/philly/grocery?form=create')
+    setMockSearchParams({ form: 'create' })
+    const replace = vi.spyOn(window.history, 'replaceState')
+    renderWithProviders(<FindResourcesConnected view="grocery" listings={[]} anchor={anchor} onUp={vi.fn()} />, {
+      content: { categories: [grocery] },
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+
+    const [state, , url] = replace.mock.calls.at(-1)!
+    expect(url).toBe('/philly/grocery')
+    expect(state).toEqual({ keep: 1 })
+    expect(mockRouter.push).not.toHaveBeenCalled()
+    replace.mockRestore()
+  })
 })
