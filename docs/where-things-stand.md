@@ -143,13 +143,6 @@ old number can still be looked up. When an item is done, move it to
     owner's console (Communities). Harmless meanwhile; nothing relies
     on it.
 
-### Mine to fix
-
-93. **Later (the user, Nov 25):** a "Set up a newsletter inbox" step on
-    a new community's admin checklist. Philly reads its shuls'
-    newsletters through a community Gmail and the Gmail script
-    (newsletter_setup); a new community has no way to know that yet.
-
 ### Waiting on others
 
 79. Sons of Israel's newsletter has sent nothing.

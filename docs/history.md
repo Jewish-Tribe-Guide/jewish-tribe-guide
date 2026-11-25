@@ -4,6 +4,34 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## Set up your guide, after New community (Nov 25)
+
+The user, once New community picked the name: "Name was already decided
+on set up… There is no big line under header… I think email set up is
+big." To do's checklist (`src/lib/setup.ts`) is now:
+
+- **Your logo**, not "Name and logo": the name is chosen in New
+  community.
+- **A second admin**, unchanged.
+- **The newsletter inbox** (closes item 93): opens Watches ›
+  Newsletters, and ticks once the Gmail script has checked in
+  (`newsletter_setup.checked_at`). Read, never made: the Newsletters page
+  makes the row and its key. A database without the table counts as not
+  done.
+- **Your first category**, unchanged.
+
+"The home page's words" went: the phone home has no big line, the
+computer's has no line under it, and New community writes the big line
+from the city.
+
+On dev, Philly now shows 3 of 4: dev's `newsletter_setup` row has no
+check-in. Live wasn't read; if its script has never checked in there,
+Philly's admins will see the checklist again with that one step.
+
+Tests: `setup.test.ts`, the To do checklist's in
+`ModerationQueue.test.tsx` and `useTodo.test.ts`; 9 failed against the
+old steps.
+
 ## New community: pick the city, and a starter pack (Nov 25)
 
 Boards 1, 2f and 3 of the new-community drawing, as the user approved
