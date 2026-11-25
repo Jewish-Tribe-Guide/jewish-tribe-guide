@@ -99,3 +99,10 @@ export function keptCurrent(categories: readonly Cat[], kinds: readonly NightKin
   }
   return rows
 }
+
+/** A job page's title: its Kept current row's name ("Eruv up or down").
+ *  Google keeps two rows, so its page keeps the job's own name. */
+export function jobTitle(id: NightKindId, name: string): string {
+  const rows = SPECS.filter((s) => s.job === id)
+  return rows.length === 1 ? rows[0].name : name
+}
