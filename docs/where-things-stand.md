@@ -117,6 +117,10 @@ old number can still be looked up. When an item is done, move it to
 
 ### You do
 
+94. Run migration 116, dev then live:
+    [`supabase/migrations/20240101000116_community_email.sql`](../supabase/migrations/20240101000116_community_email.sql)
+    (adds `community.contact_email`). Then save Philly's address on
+    Settings › Team › Community email.
 87. Settings, a few minutes each (the user will do them, Nov 24):
     - Sentry: turn on the quota emails, 80% and 100% (Settings →
       Account → Notifications → Quota);

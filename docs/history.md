@@ -4,6 +4,34 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## The community email, and Watches as what's kept current (Nov 25)
+
+Boards E1–E3 and W1–W4 (canvas TXWUmY6wTJyDKsB27Q6XV4), the user: "Build
+it all", then "Build as described" for adding a source from W3.
+
+- **The community email (E1–E3).** A community has one Gmail of its own
+  (`community.contact_email`, migration 116), not any admin's. Replies to
+  the site's emails go to it, then the first admin. Settings › Team has
+  its box; `/admin/<c>/team/email` walks through making it and setting up
+  the newsletter script (moved there from Watches › Newsletters). Until
+  116 runs or an address is saved, the Gmail the script runs in stands
+  for it, so Philly's replies go there once that script has checked in.
+- **Watches (W1, W2):** one row per job, saying what it keeps current
+  (`src/lib/keptCurrent.ts`). The old "needs fixing" sentence and the
+  Look again, Add a watch and How watches work links went; their routes
+  still exist.
+- **A row, opened (W4):** "Nothing to read" (why, in amber) and "Read"
+  (what from), from `src/lib/jobPlaceRows.ts`. Minyan times lists only
+  shuls as missing a source: a restaurant with minyanim is listed once
+  read, never as missing (dev listed 88 places before). A job turned off
+  shows "Turn it back on".
+- **A place's Read from box (W3):** on the Places listing and an eruv's
+  page, a row per source (`src/lib/readFrom.ts`, `ReadFrom.tsx`). An
+  empty row adds its source: the website and menu link inline, emails by
+  signing up as the community email (Copy address) or Link it for an
+  email already in, Google with Find it. Kosher lists and Refuah are
+  shown only; they are added on their Watches row.
+
 ## Set up your guide, after New community (Nov 25)
 
 The user, once New community picked the name: "Name was already decided
