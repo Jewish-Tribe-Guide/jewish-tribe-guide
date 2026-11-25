@@ -297,7 +297,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     }
     if (line.setUpGmail) {
       out.push(
-        <a key="gmail" href={`${adminBase(community)}/watches/newsletters`} target="_blank" rel="noopener noreferrer" className={LINE_LINK}>
+        <a key="gmail" href={`${adminBase(community)}/team/email`} target="_blank" rel="noopener noreferrer" className={LINE_LINK}>
           Set it up
         </a>,
       )

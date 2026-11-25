@@ -503,7 +503,7 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
         <SourceWords line={{ text: `${source}’s ${r.on} email didn’t say` }} controls={[change]} />
       ) : r?.state === 'no-gmail' ? (
         <>
-          <SourceWords line={{ text: 'The guide’s Gmail isn’t set up' }} controls={[<a key="gmail" href={`${adminBase(community)}/watches/newsletters`} target="_blank" rel="noopener noreferrer" className={LINE_LINK}>Set it up</a>]} />
+          <SourceWords line={{ text: 'The guide’s Gmail isn’t set up' }} controls={[<a key="gmail" href={`${adminBase(community)}/team/email`} target="_blank" rel="noopener noreferrer" className={LINE_LINK}>Set it up</a>]} />
           <SourceWords line={{ text: page, when: 'within the hour' }} controls={[change]} />
         </>
       ) : r?.state === 'failed' ? (

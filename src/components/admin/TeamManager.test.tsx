@@ -26,6 +26,10 @@ async function renderAndWaitForList(adminEmails: string[] = ['jane@example.com']
   mockList(adminEmails, myNotify, myReviewNotify)
   const view = renderWithProviders(<TeamManager token="tok" me="me@example.com" />, { community: { slug: 'ues' } })
   await waitFor(() => expect(screen.queryByText('Loading team…')).toBeNull())
+  // The Community email box's own read, done on mount: the tests below count
+  // only what pressing something sends.
+  await waitFor(() => expect(fetchJson).toHaveBeenCalledWith('/api/admin/community-email?community=ues', expect.anything(), expect.anything()))
+  vi.mocked(fetchJson).mockClear()
   return view
 }
 
@@ -161,5 +165,30 @@ describe('TeamManager', () => {
       expect(await screen.findByText('Could not update your notification preference.')).toBeInTheDocument()
       expect(screen.getByRole('switch', { name: label })).toHaveAttribute('aria-checked', String(on))
     })
+  })
+})
+
+describe('TeamManager, the community email (board E2)', () => {
+  async function withOwn(own: Record<string, unknown>) {
+    vi.mocked(fetchJson).mockImplementation(async (url) => (String(url).includes('community-email') ? own : {}))
+    mockList(['me@example.com'])
+    renderWithProviders(<TeamManager token="tok" me="me@example.com" />, { community: { slug: 'ues' } })
+    return screen.findByRole('region', { name: 'Community email' })
+  }
+
+  it('above the admins: the address, what it’s for, and Change', async () => {
+    const box = await withOwn({ email: 'ues.guide@gmail.com', canSave: true, checkedAt: '2026-11-25T10:00:00Z', lastEmailAt: '2026-11-25T09:00:00Z' })
+    expect(box).toHaveTextContent('ues.guide@gmail.com')
+    expect(box).toHaveTextContent('Replies to the site’s emails')
+    expect(screen.getByRole('link', { name: 'Change' })).toHaveAttribute('href', '/ues/admin/team/email')
+    expect(screen.getByRole('link', { name: /The shuls’ and eruvs’ emails.*Last one Nov 25/ })).toHaveAttribute('href', '/ues/admin/team/email')
+    const regions = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))
+    expect(regions.indexOf('Community email')).toBeLessThan(regions.indexOf('Admins'))
+  })
+
+  it('not set up: Set it up', async () => {
+    const box = await withOwn({ email: null, canSave: true, checkedAt: null, lastEmailAt: null })
+    expect(box).toHaveTextContent('Not set up yet')
+    expect(screen.getByRole('link', { name: /Set it up/ })).toHaveAttribute('href', '/ues/admin/team/email')
   })
 })

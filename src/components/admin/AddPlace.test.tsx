@@ -345,7 +345,7 @@ describe('Add a place', () => {
       renderAdd()
       await giveEmail(user)
       await readEmail(user)
-      expect(await screen.findByRole('link', { name: 'Set it up' })).toHaveAttribute('href', expect.stringContaining('/watches/newsletters'))
+      expect(await screen.findByRole('link', { name: 'Set it up' })).toHaveAttribute('href', expect.stringContaining('/team/email'))
     })
 
     it('found: fills in, and says the day it was sent (EmailFound14)', async () => {

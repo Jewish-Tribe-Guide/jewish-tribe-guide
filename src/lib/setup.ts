@@ -7,8 +7,10 @@
 // chosen when the community is made, so the first step is the logo alone;
 // "The home page's words" went (the phone home has no big line, the
 // computer's has no line under it, and New community writes the big line
-// from the city); and the newsletter inbox came in, since shuls' emails
-// are how much of the schedules stay current. The board's "Kosher lists
+// from the city); and the community email came in (board E1): the guide's
+// own Gmail, for replies and the shuls' and eruvs' emails, which are how
+// much of the schedules stay current. A second admin is last: they may all
+// have been added when the community was made. The board's "Kosher lists
 // to watch" is still left out: a new community has no way to add one yet.
 
 /** What's saved, as GET /api/admin/setup reads it. */
@@ -17,8 +19,9 @@ export type SetupState = {
   logo: boolean
   /** How many can sign in to this community's admin. */
   admins: number
-  /** The guide's Gmail script has checked in at least once. */
-  newsletters: boolean
+  /** The community email is saved and the newsletter script in it has
+   *  checked in at least once: both halves of its page. */
+  communityEmail: boolean
   /** Categories, and places on the site in any of them. */
   categories: number
   places: number
@@ -29,8 +32,7 @@ export type SetupStep = { key: string; name: string; line: string; href: string;
 export function setupSteps(s: SetupState, base: string): SetupStep[] {
   return [
     { key: 'logo', name: 'Your logo', line: 'At the top of every page', href: `${base}/home`, done: s.logo },
-    { key: 'admins', name: 'A second admin', line: 'Someone to share the deciding', href: `${base}/team`, done: s.admins >= 2 },
-    { key: 'newsletters', name: 'The newsletter inbox', line: 'A Gmail that reads the shuls’ emails', href: `${base}/watches/newsletters`, done: s.newsletters },
+    { key: 'communityEmail', name: 'The community email', line: 'A Gmail for replies and the shuls’ and eruvs’ emails', href: `${base}/team/email`, done: s.communityEmail },
     {
       key: 'category',
       name: 'Your first category',
@@ -39,6 +41,7 @@ export function setupSteps(s: SetupState, base: string): SetupStep[] {
       href: s.categories === 0 ? `${base}/categories/cat:new` : `${base}/places`,
       done: s.categories > 0 && s.places > 0,
     },
+    { key: 'admins', name: 'A second admin', line: 'Someone to share the deciding', href: `${base}/team`, done: s.admins >= 2 },
   ]
 }
 

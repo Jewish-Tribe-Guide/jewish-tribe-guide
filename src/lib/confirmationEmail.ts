@@ -1,5 +1,6 @@
 import { sendEmail, escapeHtml } from './email'
 import { getCommunityAdminEmails, getCommunityNotifyRecipients } from './communityStore'
+import { getCommunityEmail } from './communityEmailStore'
 import type { SubmissionPayload } from './requests'
 import type { SubmissionRow, CategorySubmissionPayload, ResourceSubmission } from '@/types'
 
@@ -18,9 +19,9 @@ function isSandbox(): boolean {
  *  baltimorejewishguide@gmail.com, not Philly's address, once Baltimore has
  *  its own admin_emails configured.
  *
- *  replyTo: the first entry of that community's own admin_emails — the
- *  closest thing this app has to "the community's own contact address"
- *  without a dedicated field for it. Falls back to the site-wide
+ *  replyTo: the community email (communityEmailStore.ts, boards E1-E3,
+ *  Nov 25), the guide's own Gmail. Without one, the first entry of that
+ *  community's own admin_emails, as before it existed. Falls back to the site-wide
  *  RESEND_REPLY_TO/NOTIFICATION_TO env vars for a community with none
  *  configured yet, same fallback notificationRecipients() in email.ts uses
  *  for the admin notification's own recipient list.
@@ -30,8 +31,12 @@ function isSandbox(): boolean {
  *  notifications on" the way the admin console's own toggle describes it,
  *  so a submitter's reply doesn't need a human to separately forward it. */
 async function communityContact(communitySlug: string): Promise<{ replyTo?: string; bcc?: string[] }> {
-  const adminEmails = await getCommunityAdminEmails(communitySlug)
-  const replyTo = adminEmails[0] || process.env.RESEND_REPLY_TO || process.env.NOTIFICATION_TO || undefined
+  const [own, adminEmails] = await Promise.all([
+    // Never stops the email going: without it, the first admin.
+    getCommunityEmail(communitySlug).catch(() => null),
+    getCommunityAdminEmails(communitySlug),
+  ])
+  const replyTo = own?.email || adminEmails[0] || process.env.RESEND_REPLY_TO || process.env.NOTIFICATION_TO || undefined
   const bcc = (await getCommunityNotifyRecipients(communitySlug)) ?? []
   return { replyTo, bcc }
 }

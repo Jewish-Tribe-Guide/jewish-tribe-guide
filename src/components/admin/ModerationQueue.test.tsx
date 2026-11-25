@@ -632,7 +632,7 @@ describe('ModerationQueue — an address picked from Google', () => {
 // each step ticked by what's saved, and the nav's number takes in the
 // steps left.
 describe('ModerationQueue — Set up your guide', () => {
-  const SETUP = { logo: true, admins: 2, newsletters: false, categories: 0, places: 0 }
+  const SETUP = { logo: true, admins: 2, communityEmail: false, categories: 0, places: 0 }
 
   function renderWithSetup(setup: typeof SETUP, items: EnrichedSubmission[] = []) {
     vi.mocked(fetch).mockImplementation(async (url, init) => (init?.method === 'PATCH' ? new Response(JSON.stringify({ ok: true }), { status: 200 }) : ({ ...fakeResponse(200), url: String(url) } as Response)))
@@ -649,11 +649,11 @@ describe('ModerationQueue — Set up your guide', () => {
     const rows = within(box).getAllByRole('link')
     expect(rows.map((r) => [r.textContent, r.getAttribute('data-done')])).toEqual([
       ['Your logoDone', 'true'],
-      ['A second adminDone', 'true'],
-      ['The newsletter inboxA Gmail that reads the shuls’ emails', 'false'],
+      ['The community emailA Gmail for replies and the shuls’ and eruvs’ emails', 'false'],
       ['Your first categoryPick a kind, then add its places', 'false'],
+      ['A second adminDone', 'true'],
     ])
-    expect(rows.map((r) => r.getAttribute('href')!.replace(/^.*\/admin/, ''))).toEqual(['/home', '/team', '/watches/newsletters', '/categories/cat:new'])
+    expect(rows.map((r) => r.getAttribute('href')!.replace(/^.*\/admin/, ''))).toEqual(['/home', '/team/email', '/categories/cat:new', '/team'])
     expect(screen.getByText('Nothing else to do.')).toBeInTheDocument()
     expect(screen.queryByText('Nothing to do')).toBeNull()
   })
@@ -667,14 +667,14 @@ describe('ModerationQueue — Set up your guide', () => {
 
   // The Searches page opens from Reports, Feedback from the nav.
   it('leads nowhere else: not Watches, every search or Feedback', async () => {
-    renderWithSetup({ logo: true, admins: 3, newsletters: true, categories: 4, places: 20 })
+    renderWithSetup({ logo: true, admins: 3, communityEmail: true, categories: 4, places: 20 })
     expect(await screen.findByText('Nothing to do')).toBeInTheDocument()
     expect(screen.getByText('Every place was read this morning')).toBeInTheDocument()
     expect(screen.queryAllByRole('link')).toEqual([])
   })
 
   it('is gone once all four are done', async () => {
-    renderWithSetup({ logo: true, admins: 3, newsletters: true, categories: 4, places: 20 })
+    renderWithSetup({ logo: true, admins: 3, communityEmail: true, categories: 4, places: 20 })
     expect(await screen.findByText('Nothing to do')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Set up your guide' })).toBeNull()
   })

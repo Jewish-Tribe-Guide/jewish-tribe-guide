@@ -9,13 +9,12 @@ import { pageFrom } from '@/lib/placeLink'
 import { AdminBack, AdminBox, AdminCount, AdminField, AdminRow, adminInputClass } from './AdminUI'
 import { useAdminApi } from './useAdminApi'
 
-// ── Watches → Newsletters (admin drawings 18 and 18b, Oct 29) ───────────────
-// Shul newsletters come in through a Google Apps Script in the guide's own
-// Gmail. Set up here: the script is handed out with this community's own
-// key in it (newsletterScript.ts), four steps beside it, and a line that
-// says whether it's running, from the hour it last checked in. Under it the
-// newsletters it reads, each with its shul: one is added here, a sender
-// not linked to a shul is linked in place.
+// ── The shuls' and eruvs' emails (admin drawings 18 and 18b, Oct 29) ────────
+// They come in through a Google Apps Script in the community email's Gmail.
+// Setting that up moved to the Community email page (board E3, Nov 25,
+// CommunityEmailPage.tsx), which opens this list: the emails it reads, each
+// with its place. One is added here; a sender not linked to a place is
+// linked in place, or from the place's own Read from box.
 
 type Place = { id: string; name: string; categoryLabel: string }
 export type NewslettersLoaded = {
@@ -29,177 +28,9 @@ export type NewslettersLoaded = {
   places: Place[]
 }
 
-/** The script checks in every hour: three hours without, it has stopped. */
-export const STOPPED_AFTER_MS = 3 * 60 * 60 * 1000
-
 const SMALL_BUTTON = 'rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
 const BUTTON = 'min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-[0.90625rem] font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50'
 const PRIMARY = 'min-h-11 rounded-lg bg-primary px-4 text-[0.90625rem] font-semibold text-white hover:opacity-90 disabled:opacity-50'
-
-/** "3:00 PM" today, else "Oct 27, 3:00 PM". */
-export function checkedWhen(iso: string, now: number): string {
-  const at = new Date(iso)
-  const time = at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  return at.toDateString() === new Date(now).toDateString() ? time : `${at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${time}`
-}
-
-/** The script's first lines, as the page shows them: the site, the
- *  community and the key, shortened. */
-export function scriptPreview(script: string): string {
-  return script
-    .split('\n')
-    .filter((l) => /^var (SITE|COMMUNITY|KEY) = /.test(l))
-    .map((l) => l.replace(/^(var KEY = ')(.{7}).+(.{4})'$/, '$1$2…$3\''))
-    .join('\n')
-}
-
-function Status({ data, now, onSetUp, onUpdate }: { data: NewslettersLoaded; now: number; onSetUp: () => void; onUpdate: () => void }) {
-  if (!data.checkedAt) {
-    return (
-      <div className="flex items-center gap-3 rounded-[10px] border border-slate-200 bg-white px-4 py-3.5">
-        <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-400" />
-        <span className="flex-1 text-[0.9375rem] font-semibold text-slate-900">Not set up yet</span>
-      </div>
-    )
-  }
-  const stopped = now - Date.parse(data.checkedAt) > STOPPED_AFTER_MS
-  const where = data.account ?? 'the guide’s Gmail'
-  return (
-    <div className={`flex flex-wrap items-center gap-3 rounded-[10px] border px-4 py-3 ${stopped ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white'}`}>
-      <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${stopped ? 'bg-amber-600' : 'bg-green-700'}`} />
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[0.9375rem] font-semibold text-slate-900 [overflow-wrap:anywhere]">{stopped ? `Stopped checking ${where}` : `Checking ${where}`}</span>
-        <span className={`text-[0.8125rem] ${stopped ? 'font-semibold text-amber-800' : 'text-slate-600'}`}>Last checked {checkedWhen(data.checkedAt, now)} · Read now {data.readNow ? 'on' : 'off'}</span>
-      </span>
-      {stopped || !data.readNow ? (
-        <button type="button" onClick={onSetUp} className={BUTTON}>
-          Set up
-        </button>
-      ) : (
-        data.script && (
-          <button type="button" onClick={onUpdate} className={BUTTON}>
-            Update the script
-          </button>
-        )
-      )}
-    </div>
-  )
-}
-
-function Step({ n, title, line, children }: { n: number; title: React.ReactNode; line?: string; children?: React.ReactNode }) {
-  return (
-    <li className="flex gap-3 border-b border-slate-100 px-4 py-3.5 last:border-b-0">
-      <span aria-hidden="true" className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-blue-50 text-sm font-bold text-primary">
-        {n}
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-1 pt-0.5">
-        <span className="text-[0.9375rem] font-semibold text-slate-900">{title}</span>
-        {line && <span className="text-[0.84375rem] text-slate-600">{line}</span>}
-        {children}
-      </span>
-    </li>
-  )
-}
-
-/** The script's first lines and its Copy button. */
-function CopyScript({ script }: { script: string }) {
-  const [copied, setCopied] = useState<boolean | null>(null)
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(script)
-      setCopied(true)
-    } catch {
-      setCopied(false)
-    }
-  }
-  return (
-    <>
-      <span className="mt-1.5 flex flex-wrap items-center gap-2.5">
-        <code className="min-w-0 flex-[1_1_320px] overflow-hidden whitespace-pre rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[0.78125rem] leading-relaxed text-slate-700">
-          {scriptPreview(script)}
-        </code>
-        <button type="button" onClick={() => void copy()} className={PRIMARY}>
-          {copied ? 'Copied' : 'Copy the script'}
-        </button>
-      </span>
-      {copied === false && <span className="text-[0.8125rem] text-red-700">Couldn’t copy. Try again.</span>}
-    </>
-  )
-}
-
-// A running script is a copy of scripts/newsletter-apps-script.js from when
-// it was pasted. When that file changes (Nov 20: it sends Gmail's verdict on
-// who sent an email), the new one goes over the old in the same project, as
-// a new version of the same deployment, so its link and key stay.
-function UpdateScript({ script }: { script: string }) {
-  return (
-    <AdminBox title="Update the script">
-      <ol className="m-0 list-none p-0">
-        <Step n={1} title="Copy the script">
-          <CopyScript script={script} />
-        </Step>
-        <Step
-          n={2}
-          title={
-            <a href="https://script.google.com/home" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-              Open script.google.com ↗
-            </a>
-          }
-          line="Open the guide’s project, paste over what’s there, Save"
-        />
-        <Step n={3} title="Deploy a new version" line="Deploy, Manage deployments, the pencil, New version" />
-      </ol>
-    </AdminBox>
-  )
-}
-
-function SetUp({ script, onLink }: { script: string; onLink: (url: string) => Promise<string | null> }) {
-  const [link, setLink] = useState('')
-  const [linkError, setLinkError] = useState<string | null>(null)
-  const [trying, setTrying] = useState(false)
-  async function tryLink() {
-    setTrying(true)
-    setLinkError(await onLink(link.trim()))
-    setTrying(false)
-  }
-  return (
-    <AdminBox title="Set it up">
-      <ol className="m-0 list-none p-0">
-        <Step n={1} title="Make a Gmail for the guide" line="Sign it up for each shul’s newsletter" />
-        <Step n={2} title="Copy the script">
-          <CopyScript script={script} />
-        </Step>
-        <Step
-          n={3}
-          title={
-            <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-              Open script.google.com ↗
-            </a>
-          }
-          line="New project, then paste over what’s there"
-        />
-        <Step n={4} title="Run install" line="Pick install, press Run, then Allow" />
-        <Step n={5} title="Deploy it" line="Deploy, New deployment, Web app, access Anyone" />
-        <Step n={6} title="Paste its link">
-          <span className="mt-1.5 flex flex-wrap items-center gap-2.5">
-            <input
-              type="url"
-              aria-label="Its web app link"
-              placeholder="Its web app link"
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-              className={`${adminInputClass} min-w-0 flex-[1_1_260px]`}
-            />
-            <button type="button" disabled={trying || !link.trim()} onClick={() => void tryLink()} className={PRIMARY}>
-              {trying ? 'Trying it…' : 'Save'}
-            </button>
-          </span>
-          {linkError && <span className="text-[0.8125rem] font-semibold text-red-700">{linkError}</span>}
-        </Step>
-      </ol>
-    </AdminBox>
-  )
-}
 
 function LinkSender({ places, busy, onLink, onIgnore }: { places: Place[]; busy: boolean; onLink: (id: string) => void; onIgnore: () => void }) {
   const [name, setName] = useState('')
@@ -268,15 +99,10 @@ export default function NewslettersPage({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [setUpAgain, setSetUpAgain] = useState(false)
-  const [updating, setUpdating] = useState(false)
-  // Read once a load; the page is reloaded to refresh.
-  const [now, setNow] = useState(() => Date.now())
 
   const load = useCallback(async () => {
     try {
       setData(await api.get<NewslettersLoaded>('/api/admin/watches/newsletters', 'Couldn’t load the newsletters.'))
-      setNow(Date.now())
       setLoadError(null)
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Couldn’t load the newsletters.')
@@ -299,32 +125,13 @@ export default function NewslettersPage({ token }: { token: string }) {
     }
   }
 
-  const back = <AdminBack back={{ label: 'Watches', href: `${base}/watches` }} title="Shul emails" />
+  const back = <AdminBack back={{ label: 'Community email', href: `${base}/team/email` }} title="The shuls’ and eruvs’ emails" />
   if (loadError) return <div className="space-y-3.5">{back}<p className="text-sm text-red-700">{loadError}</p></div>
   if (!data) return <div className="space-y-3.5">{back}<p className="text-sm text-muted">Loading…</p></div>
 
-  async function saveLink(url: string): Promise<string | null> {
-    try {
-      await api.post('/api/admin/watches/newsletters', { url }, 'That link didn’t answer. Check access is set to Anyone.')
-      setSetUpAgain(false)
-      await load()
-      return null
-    } catch (err) {
-      return err instanceof Error ? err.message : 'That link didn’t answer. Check access is set to Anyone.'
-    }
-  }
-
-  const showSteps = data.script && (!data.checkedAt || setUpAgain)
   return (
     <div className="space-y-3.5">
       {back}
-      {data.available ? (
-        <Status data={data} now={now} onSetUp={() => setSetUpAgain((s) => !s)} onUpdate={() => setUpdating((u) => !u)} />
-      ) : (
-        <p className="rounded-[10px] border border-slate-200 bg-white px-4 py-3.5 text-[0.9375rem] text-slate-600">Shul emails can’t be set up here yet.</p>
-      )}
-      {showSteps && <SetUp script={data.script!} onLink={saveLink} />}
-      {!showSteps && updating && data.script && <UpdateScript script={data.script} />}
       {error && <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <AdminBox
         title="Emails"
