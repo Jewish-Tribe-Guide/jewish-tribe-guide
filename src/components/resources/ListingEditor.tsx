@@ -345,6 +345,8 @@ export default function ListingEditor({
   const challenged = !adminSubmit && !adminSave && !preview
   const verifying = challenged && sender.verifying
   const [openId, setOpenId] = useState<string | null>(null)
+  // The row last opened from "Not on the listing yet" (see `stays`).
+  const [openedEmpty, setOpenedEmpty] = useState<string | null>(null)
   // A step inside a row (a minyan, a person): its title and Back, and
   // which field it belongs to, so the row shows only that one.
   const [child, setChild] = useState<(EditorStep & { key: string; row?: string }) | null>(null)
@@ -418,7 +420,10 @@ export default function ListingEditor({
   // list (the dishes, a week of hours, the minyanim) on its own screen
   // (agreed Oct 11, canvas page "editorlook").
   const inPlace = row !== null && opensInPlace(row)
-  const closeRow = () => setOpenId(null)
+  const closeRow = () => {
+    setOpenId(null)
+    setOpenedEmpty(null)
+  }
   const step: EditorStep | null = removalOpen ? null : (child ?? (row ? (inPlace ? { back: closeRow } : { title: rowTitle(row), back: closeRow }) : null))
   // The host asks for Back through a function that stays the same, so
   // the latest step's own Back is kept in a ref, set after each render.
@@ -635,8 +640,17 @@ export default function ListingEditor({
       {rowBody(r)}
     </EditorOpenCard>
   )
-  const filled = rows.filter((r) => !rowIsEmpty(r, values) || needed(r))
-  const empty = rows.filter((r) => rowIsEmpty(r, values) && !needed(r))
+  // A row opened from "Not on the listing yet" stays there while it's open
+  // (the user, Nov 25: picking a Store Type jumped the card up the list
+  // under their finger). Done puts it where it now belongs.
+  const stays = inPlace && openId === openedEmpty ? openId : null
+  // A row whose every field waits on another answer has nothing to fill
+  // in yet ("+ Delivery" opened empty until Store Type is Scheduled
+  // Deliveries, Nov 25): it isn't offered until that answer is given.
+  const waiting = (r: EditorRow) =>
+    r.kind === 'fields' && !r.part && !rowHas(r, 'address') && !rowHas(r, 'phone') && r.fields.length > 0 && !r.fields.some(visible)
+  const filled = rows.filter((r) => r.id !== stays && (!rowIsEmpty(r, values) || needed(r)))
+  const empty = rows.filter((r) => r.id === stays || (rowIsEmpty(r, values) && !needed(r) && !waiting(r)))
   const listScreen = (
     <div className="space-y-4" data-testid="editor-list">
       {creating && fromGoogle && !adminSubmit && <p className="-mt-1 text-[0.875rem] text-muted">Filled in from Google</p>}
@@ -650,7 +664,10 @@ export default function ListingEditor({
           return (
             <li key={r.id}>
               <EditorRowCard
-                onOpen={() => setOpenId(r.id)}
+                onOpen={() => {
+                  setOpenedEmpty(null)
+                  setOpenId(r.id)
+                }}
                 testId={`editor-row-${r.id}`}
                 opens={opensInPlace(r) ? 'here' : 'screen'}
                 changed={isChanged}
@@ -683,7 +700,12 @@ export default function ListingEditor({
               {inPlace && r.id === openId ? (
                 openInPlace(r)
               ) : (
-                <EditorAddLine onOpen={() => setOpenId(r.id)} testId={`editor-add-${r.id}`} opens={opensInPlace(r) ? 'here' : 'screen'} title={r.title} />
+                <EditorAddLine
+                  onOpen={() => {
+                    setOpenedEmpty(r.id)
+                    setOpenId(r.id)
+                  }}
+                  testId={`editor-add-${r.id}`} opens={opensInPlace(r) ? 'here' : 'screen'} title={r.title} />
               )}
             </li>
           ))}

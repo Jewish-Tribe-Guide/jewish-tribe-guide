@@ -619,3 +619,32 @@ describe('ListingEditor — the admin console', () => {
     expect(await screen.findByTestId('editor-sent')).toBeInTheDocument()
   })
 })
+
+describe('ListingEditor — Not on the listing yet (Nov 25)', () => {
+  // As the real Food has it: Delivery a box of its own, both its fields
+  // asked only once Store Type is Scheduled Deliveries.
+  const food = { ...FOOD, listingParts: { boxes: [{ title: 'Delivery', fields: ['delivery_details', 'delivery_whatsapp_group'] }] } }
+  const addLine = (title: string) => within(screen.getByTestId('editor-list')).queryByRole('button', { name: title })
+
+  it('a row whose fields wait on another answer isn’t offered until it’s given', async () => {
+    const u = user()
+    renderEditor({ item: undefined, category: food })
+    expect(addLine('Delivery')).toBeNull()
+    await u.click(addLine('Store Type')!)
+    await u.click(screen.getByRole('button', { name: 'Scheduled Deliveries' }))
+    await u.click(done())
+    await u.click(addLine('Delivery')!)
+    expect(screen.getByLabelText('Delivery Details')).toBeInTheDocument()
+  })
+
+  it('a row opened from there stays there while open, and moves up on Done', async () => {
+    const u = user()
+    renderEditor({ item: undefined, category: food })
+    await u.click(addLine('Store Type')!)
+    await u.click(screen.getByRole('button', { name: 'Restaurant' }))
+    const card = screen.getByTestId('editor-open-kind')
+    expect(card.compareDocumentPosition(screen.getByText('Not on the listing yet')) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
+    await u.click(done())
+    expect(screen.getByTestId('editor-row-kind').compareDocumentPosition(screen.getByText('Not on the listing yet')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
