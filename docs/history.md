@@ -31,6 +31,12 @@ it all", then "Build as described" for adding a source from W3.
   signing up as the community email (Copy address) or Link it for an
   email already in, Google with Find it. Kosher lists and Refuah are
   shown only; they are added on their Watches row.
+- **Adding a place, two fixes (the user, Nov 25):** "+ Delivery" opened
+  an empty card, since both its fields wait on Store Type being Scheduled
+  Deliveries; a row whose fields all wait on another answer now isn't
+  offered until it's given. And a row opened from "Not on the listing
+  yet" stays there while open, instead of jumping up the list the moment
+  something is picked; Done moves it.
 
 ## Set up your guide, after New community (Nov 25)
 
