@@ -90,10 +90,23 @@ function weekWhat(f: Finding, today: string): string | null {
   })
   if (!changed.length) return null
   const week = [...changed].sort((a, b) => a.from.localeCompare(b.from))[0]
-  const was = f.times.currentSchedules.find((c) => sameWeek(c, week))
   const name = weekName(week, today)
-  if (!was) return name
-  const lines = changed.flatMap((w) => readWeekLines(f.times!.currentSchedules.find((c) => sameWeek(c, w)), w))
+  // Its days as one week, before and after, whatever schedules hold them:
+  // a week filed a part at a time is one week to the admin, and each part
+  // set against the old week whole counted every time of the other part
+  // as gone (Lower Merion, Nov 25: "51 changes").
+  const from = changed.map((w) => w.from).sort()[0]
+  const to = changed.map((w) => w.to).sort().at(-1)!
+  const together = (ws: readonly SpecialSchedule[]): SpecialSchedule => ({
+    ...week,
+    from,
+    to,
+    whole: undefined,
+    minyanim: ws.filter((w) => w.kind === 'week' && w.from <= to && w.to >= from).flatMap((w) => w.minyanim),
+  })
+  // A week the listing hasn't got yet: the week alone.
+  if (!f.times.currentSchedules.some((w) => w.kind === 'week' && w.from <= to && w.to >= from)) return name
+  const lines = readWeekLines(together(f.times.currentSchedules), together(f.times.proposedSchedules))
   if (lines.length && lines.every(isNoteLine)) return lines.length === 1 ? 'A note changed' : `${lines.length} notes changed`
   return lines.length ? `${name}, ${plural(lines.length, 'change', 'changes')}` : name
 }

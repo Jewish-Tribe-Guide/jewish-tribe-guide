@@ -507,6 +507,38 @@ describe('runListingPageWatch: a shul’s page of times', () => {
       expect(shabbos.details.minyanim).toEqual([minyan, expect.objectContaining({ tefillah: 'shacharis', days: ['sat'], time: '9:00am' })])
     })
 
+    // Nov 25, Sons of Israel's Tefillot page: "Maariv takes place within 5
+    // minutes of the time for Havdalah", and its Teen Mincha/Maariv
+    // "concurrent to the main sanctuary's schedule", filed in place of
+    // the listing's times from Havdalah and sunset.
+    it('a usual time in words, not a clock or a rule, isn’t filed', async () => {
+      shabbosRead(
+        { ...sat('h', 'within 5 minutes of the time for Havdalah'), tefillah: 'maariv' },
+        { ...sat('c', 'concurrent to the main sanctuary’s schedule for Mincha and Maariv'), tefillah: 'mincha_maariv' },
+      )
+      expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ filed: 1 })
+      expect(m.submitListingUpdate.mock.calls.map(([, , p]) => p.source.part.part)).toEqual(['weekday'])
+      // Nor does the listing's own minyan come off for it: the page still
+      // has its Teen Mincha, in words.
+      m.submitListingUpdate.mockClear()
+      const teen = { id: 't', tefillah: 'mincha', days: ['sat'], time: '45 min before Sunset', anchor: 'sunset', offsetMinutes: -45, notes: 'Teen Mincha' }
+      const main = { ...teen, id: 'u', notes: 'Followed by Seudah Shlishit.' }
+      m.getResourceRowById.mockResolvedValue({ ...shul, details: { minyanim: [minyan, main, teen] } })
+      // A whole schedule, as its Tefillot page is: what it leaves out goes.
+      const whole = [
+        { ...sat('s', '45 min before Sunset'), tefillah: 'mincha', anchor: 'sunset', offsetMinutes: -45, notes: 'Followed by Seudah Shlishit.' },
+        { ...sat('c', 'concurrent to the main sanctuary’s schedule for Mincha and Maariv'), tefillah: 'mincha_maariv' },
+      ]
+      m.readShulWeek.mockResolvedValue({ update: { ...moved, complete: true, rows: [...moved.rows, ...whole] }, model: 'cheap' })
+      await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })
+      expect(m.submitListingUpdate.mock.calls.map(([, , p]) => p.source.part.part)).toEqual(['weekday'])
+      m.getResourceRowById.mockResolvedValue(shul)
+      // A rule from a zman is a time.
+      m.submitListingUpdate.mockClear()
+      shabbosRead({ ...sat('r', '5 min before Havdalah'), tefillah: 'maariv', anchor: 'havdalah', offsetMinutes: -5 } as ReturnType<typeof sat>)
+      expect(await runListingPageWatch(changed, undefined, { apiKey: 'k', now: NOW })).toMatchObject({ filed: 2 })
+    })
+
     it('a part waiting from another page holds back only that part, unless this page gives more of it', async () => {
       m.pending = [shabbosPart([{ id: 'a', tefillah: 'shacharis', days: ['sat'], time: '9:00am' }, { id: 'b', tefillah: 'mincha', days: ['sat'], time: '5:00pm' }])]
       shabbosRead(sat('n', '8:30am'))
