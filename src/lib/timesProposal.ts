@@ -2,7 +2,8 @@ import { TEFILLAH_LABELS, TEFILLAH_ORDER, formatDays, joinText, signUpText, type
 import { minyanimForBox } from './minyanimBox'
 import { PART_ORDER, clockMinutes, noteText, shabbosPartOf, timeText } from './minyanText'
 import { dateText, scheduleDayText, type ScheduleMinyan, type SpecialSchedule } from './schedules'
-import { seasonFromNotes, weekdayOf } from './scheduleUpdate'
+import { scheduleDayDates, seasonFromNotes, weekdayOf } from './scheduleUpdate'
+import { partOf } from './shulTimes'
 
 // ── What a shul's website proposes its times should be (the user, Oct 21) ───
 // "Show what the reader proposes the new listing should be and how it
@@ -379,9 +380,27 @@ const byClock = (a: ScheduleMinyan, b: ScheduleMinyan) => (clockMinutes(a.time) 
 const dayLabel = (on: string) => (isDate(on) ? shortDay(on) : scheduleDayText(on))
 
 /** The listing's own copy of a week: the same schedule, or one on the
- *  same dates (the same week read again under a new id). */
-const ownCopy = (current: readonly SpecialSchedule[], s: SpecialSchedule) =>
-  current.find((c) => c.id === s.id) ?? current.find((c) => c.from === s.from && c.to === s.to && (c.kind ?? null) === (s.kind ?? null))
+ *  same dates (the same week read again under a new id), or else what
+ *  the listing's weeks hold on its days: a week filed in parts, weekdays
+ *  and Shabbos, against the one week the listing has (Lower Merion's and
+ *  Sons of Israel's, Nov 25, showed each half all new, or the other
+ *  half's days taken off). A part is compared with that part only.
+ *  `from`, the listing's schedules it was taken from. */
+function ownCopy(current: readonly SpecialSchedule[], s: SpecialSchedule): { copy: SpecialSchedule; from: string[] } | undefined {
+  const same = current.find((c) => c.id === s.id) ?? current.find((c) => c.from === s.from && c.to === s.to && (c.kind ?? null) === (s.kind ?? null))
+  const over = same ? [same] : current.filter((c) => (c.kind ?? null) === (s.kind ?? null) && c.from <= s.to && c.to >= s.from)
+  if (!over.length) return undefined
+  const ours = (date: string, m: ScheduleMinyan) =>
+    (!!same || (date >= s.from && date <= s.to)) && (!s.parts || s.parts.includes(partOf({ date, tefillah: m.tefillah, time: m.time, anchor: m.anchor })))
+  if (same && (!s.parts || same.parts?.every((p) => s.parts!.includes(p)))) return { copy: same, from: [same.id] }
+  const minyanim = over.flatMap((c) =>
+    c.minyanim.flatMap((m) => {
+      const on = m.on.filter((d) => scheduleDayDates(d, c).some((date) => ours(date, m)))
+      return on.length ? [{ ...m, on }] : []
+    }),
+  )
+  return { copy: { ...(same ?? s), minyanim }, from: over.map((c) => c.id) }
+}
 
 /** Each day's minyanim of one tefillah: "2026-10-26 shacharis". */
 function byDayTefillah(s: SpecialSchedule): Map<string, ScheduleMinyan[]> {
@@ -404,8 +423,9 @@ export function weekChanges(current: readonly SpecialSchedule[], proposed: reado
   const weeks = proposed
     .filter((s) => !had.has(plain(s)))
     .flatMap((s): WeekChange[] => {
-      const own = ownCopy(current, s)
-      if (own) mine.add(own.id)
+      const found = ownCopy(current, s)
+      for (const id of found?.from ?? []) mine.add(id)
+      const own = found?.copy
       const dates = `${dateText(s.from)}${s.to !== s.from ? ` – ${dateText(s.to)}` : ''}`
       const title = s.kind === 'week' ? `This week’s schedule, ${dates}` : `${s.name}, ${dates}`
       const total = s.minyanim.reduce((n, m) => n + m.on.length, 0)

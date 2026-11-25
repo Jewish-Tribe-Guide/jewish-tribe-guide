@@ -41,6 +41,15 @@ not a shul's:
   against the old week whole (26 + 25). A kept half now spans its own
   days, and the email counts a week's changes across its schedules
   together.
+- **To do showed a part's times all new.** It found the listing's copy
+  of a week by its id or the very same dates, so a Shabbos half (Fri–Sat)
+  against the listing's Sun–Sat week had none, and every time in it was
+  "New", and the old week was listed as taken off (Sons of Israel's).
+  Lower Merion's halves kept the old week's dates, matched it whole, and
+  the other half's days showed taken off. A week now compares with what
+  the listing's weeks hold on its days, for its part (`ownCopy` in
+  `timesProposal.ts`). Replayed on the two pending findings: Sons of
+  Israel's Wed–Fri shows nothing to change, its Shabbos two changes.
 
 Replayed from the readings kept on the watches (no AI, read-only):
 Lower Merion's homepage files one weekdays week with every time, and
