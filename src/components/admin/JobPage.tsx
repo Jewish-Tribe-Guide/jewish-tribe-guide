@@ -234,7 +234,11 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
     }
   }
   const places = job.id === 'times' ? jobs.times?.places : job.id === 'hours' ? jobs.hours?.places : null
-  const { missing, read } = jobPlaceRows(job.id, { tracked: job.tracked, places, eruvim: job.id === 'eruvs' ? jobs.eruvim?.eruvim : null })
+  // Minyan times lists only shuls as missing a source (a restaurant can keep minyanim).
+  const shulCategories = new Set((jobs.categories ?? []).filter((c) => kindOf(c) === 'shuls').map((c) => c.id))
+  const categoryOf = new Map((jobs.places ?? []).map((p) => [p.id, p.category]))
+  const listsMissing = (placeId: string) => job.id !== 'times' || !jobs.places || shulCategories.has(categoryOf.get(placeId) ?? '')
+  const { missing, read } = jobPlaceRows(job.id, { tracked: job.tracked, places, eruvim: job.id === 'eruvs' ? jobs.eruvim?.eruvim : null }, listsMissing)
   const shown = all ? read : read.slice(0, READ_SHOWN)
   const opens = (p: string) => page(pageFrom(p, `job/${job.id}`))
   const row = (r: JobPlaceRow, tone: string) =>

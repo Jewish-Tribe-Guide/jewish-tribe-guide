@@ -41,8 +41,8 @@ function serve(kinds: NightKindView[], off: string[] = [], more: (url: string) =
     if (got) return got
     if (String(url).includes('/api/admin/watches/runs')) return { available: true, kinds, off }
     if (String(url).includes('/api/admin/watches/hours') && String(url).includes('job=times')) return { name: 'Shul times', places: SHULS }
-    if (String(url).includes('/api/admin/categories')) return { categories: [] }
-    if (String(url).includes('/api/admin/listings')) return { places: [] }
+    if (String(url).includes('/api/admin/categories')) return { categories: [{ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] }] }
+    if (String(url).includes('/api/admin/listings')) return { places: SHULS.map((p) => ({ id: p.id, name: p.name, category: 'synagogue', status: 'approved' })) }
     throw new Error('down')
   })
 }

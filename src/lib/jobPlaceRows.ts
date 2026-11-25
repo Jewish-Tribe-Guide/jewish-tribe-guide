@@ -26,6 +26,10 @@ const byName = (a: JobPlaceRow, b: JobPlaceRow) => a.name.localeCompare(b.name)
 export function jobPlaceRows(
   id: NightKindId,
   from: { tracked: readonly TrackedSource[]; places?: readonly JobHoursPlace[] | null; eruvim?: readonly JobEruv[] | null },
+  /** Of a job's places, those Nothing to read lists: Minyan times covers
+   *  any category with minyanim (a restaurant's), but only a shul with
+   *  nothing to read is missing anything. One read is listed whatever. */
+  listsMissing: (id: string) => boolean = () => true,
 ): JobPlaceLists {
   const missing: JobPlaceRow[] = []
   const read: JobPlaceRow[] = []
@@ -33,13 +37,13 @@ export function jobPlaceRows(
     for (const p of from.places) {
       const row = { key: p.id, name: p.name, page: placePath(p.id) }
       if (p.off) {
-        missing.push({ ...row, line: 'Turned off for this place' })
+        if (listsMissing(p.id)) missing.push({ ...row, line: 'Turned off for this place' })
         continue
       }
       const site = p.pages.some((x) => x.watch.active) && !p.reason
       const emails = (p.newsletters ?? []).some((w) => w.active && !!w.pageChangedAt)
       if (site || emails) read.push({ ...row, line: fromWords(site, emails) })
-      else missing.push({ ...row, line: plain(p.reason ?? 'No website') })
+      else if (listsMissing(p.id)) missing.push({ ...row, line: plain(p.reason ?? 'No website') })
     }
   } else if (id === 'eruvs' && from.eruvim) {
     for (const e of from.eruvim) {

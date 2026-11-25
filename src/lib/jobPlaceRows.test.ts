@@ -29,6 +29,13 @@ describe('a Watches row, opened: Nothing to read and Read', () => {
     expect(read[0].page).toBe('place/c')
   })
 
+  it('a restaurant with minyanim the job covers: listed once read, never as missing', () => {
+    const places = [shul({ id: 'pizza', name: 'Pizza' }), shul({ id: 'deli', name: 'Deli', pages: [page()] }), shul({ id: 'leyv', name: 'Leyv' })]
+    const { missing, read } = jobPlaceRows('times', { tracked: [], places }, (id) => id === 'leyv')
+    expect(missing.map((r) => r.name)).toEqual(['Leyv'])
+    expect(read.map((r) => r.name)).toEqual(['Deli'])
+  })
+
   it('a place turned off, and one whose pages are all stopped, read nothing', () => {
     const { missing, read } = jobPlaceRows('hours', { tracked: [], places: [shul({ off: true, pages: [page()] }), shul({ id: 'y', name: 'Y', pages: [page(false)] })] })
     expect(read).toEqual([])
