@@ -22,29 +22,6 @@ const ago = (days: number) => new Date(NOW - days * 86_400_000).toISOString()
 const SHUL = { id: 'shul-1', name: 'Lower Merion Synagogue', categoryLabel: 'Synagogue', reads: 'times', job: 'Shul times' }
 const MIKVAH = { id: 'mikvah-1', name: 'Mikvah Ohel Rivkah', categoryLabel: 'Mikvah', reads: 'hours' }
 
-function watch(over: Partial<Watch>): Watch {
-  return {
-    id: 'w',
-    communityId: 'philly',
-    kind: 'website',
-    url: 'https://example.org/',
-    resourceId: null,
-    label: null,
-    active: true,
-    createdAt: ago(10),
-    createdBy: null,
-    lastRunAt: ago(0.1),
-    lastOkAt: ago(0.1),
-    lastError: null,
-    failingSince: null,
-    lastFiled: null,
-    pageHash: 'h',
-    pageChangedAt: null,
-    lastCheck: null,
-    ...over,
-  }
-}
-
 type Post = { url: string; body: Record<string, unknown> }
 const posts: Post[] = []
 
