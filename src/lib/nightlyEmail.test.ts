@@ -61,6 +61,16 @@ describe('a place’s row', () => {
     expect(findingWhat(weekFinding([was], [two]), TODAY).what).toBe('This week’s times, 2 changes')
   })
 
+  // Nov 25: Lower Merion's week was filed in two, its Shabbos half and its
+  // new weekdays, and each was set against the old week whole: "51
+  // changes" for two times added.
+  it('a week filed in parts counts its changes once, as one week', () => {
+    const was = week('2026-11-08', '2026-11-14', [m('2026-11-09', 'shacharis', '7:00am'), m('2026-11-13', 'kabbalas_shabbos', '4:15pm')], 'old')
+    const shabbos = { ...week('2026-11-13', '2026-11-14', [m('2026-11-13', 'kabbalas_shabbos', '4:15pm')], 'half'), parts: ['shabbos' as const] }
+    const weekdays = { ...week('2026-11-08', '2026-11-13', [m('2026-11-09', 'shacharis', '7:00am'), { ...m('2026-11-09', 'shacharis', '8:00am'), id: 'new' }], 'new'), parts: ['weekdays' as const] }
+    expect(findingWhat(weekFinding([was], [shabbos, weekdays]), TODAY).what).toBe('This week’s times, 1 change')
+  })
+
   it('a week the listing hasn’t got yet: the week alone', () => {
     const next = week('2026-11-15', '2026-11-21', [m('2026-11-20', 'mincha', '4:15pm')])
     expect(findingWhat(weekFinding([], [next]), TODAY).what).toBe('Next week’s times')
