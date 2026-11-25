@@ -48,7 +48,7 @@ describe('CommunityEmailPage', () => {
     expect(await screen.findByRole('link', { name: /Make a Gmail for the guide/ })).toHaveAttribute('href', 'https://accounts.google.com/signup')
     expect(screen.getByText('Not anyone’s own')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Team/ })).toHaveAttribute('href', '/test-community/admin/team')
-    const box = screen.getByRole('region', { name: 'Read the shuls’ and eruvs’ emails' })
+    const box = screen.getByRole('region', { name: 'Read the newsletters' })
     expect(within(box).getAllByRole('listitem').map((s) => s.textContent)).toEqual([
       '3Sign it up for each shul’s and eruv’s emails',
       expect.stringMatching(/^4Copy the script/),
@@ -71,7 +71,7 @@ describe('CommunityEmailPage', () => {
 
   it('address saved: the script steps from 1, and they work', async () => {
     show(own({ email: 'g@gmail.com' }), script())
-    const box = await screen.findByRole('region', { name: 'Read the shuls’ and eruvs’ emails' })
+    const box = await screen.findByRole('region', { name: 'Read the newsletters' })
     expect(within(box).getAllByRole('listitem')[0].textContent).toBe('1Sign it up for each shul’s and eruv’s emails')
     expect(screen.queryByRole('link', { name: /Make a Gmail/ })).toBeNull()
     expect(screen.getByLabelText('Its address')).toHaveValue('g@gmail.com')
@@ -94,9 +94,9 @@ describe('CommunityEmailPage', () => {
     expect(await screen.findByText('Checking riverton.guide@gmail.com')).toBeInTheDocument()
     expect(screen.getByText(/^Last checked /)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /The shuls’ and eruvs’ emails/ })).toHaveAttribute('href', '/test-community/admin/watches/newsletters')
-    expect(screen.queryByRole('region', { name: 'Read the shuls’ and eruvs’ emails' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Read the newsletters' })).toBeNull()
     await userEvent.setup().click(screen.getByRole('button', { name: 'Set up' }))
-    expect(screen.getByRole('region', { name: 'Read the shuls’ and eruvs’ emails' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Read the newsletters' })).toBeInTheDocument()
   })
 
   it('says when it has stopped checking in', async () => {
@@ -107,7 +107,7 @@ describe('CommunityEmailPage', () => {
   it('without migration 090, says the emails can’t be set up yet', async () => {
     show(own({ email: 'g@gmail.com' }), script({ available: false, script: null }))
     expect(await screen.findByText('The shuls’ and eruvs’ emails can’t be set up here yet.')).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Read the shuls’ and eruvs’ emails' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Read the newsletters' })).toBeNull()
   })
 
   it('Read now on: the script can still be copied again, to update the running one (Nov 21)', async () => {
@@ -118,7 +118,7 @@ describe('CommunityEmailPage', () => {
     await user.click(screen.getByRole('button', { name: 'Update the script' }))
     const box = screen.getByRole('region', { name: 'Update the script' })
     expect(within(box).getByText(/New version/)).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Read the shuls’ and eruvs’ emails' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Read the newsletters' })).toBeNull()
   })
 
   it('Paste its link: tried at once, and says if it doesn’t answer', async () => {
@@ -130,7 +130,7 @@ describe('CommunityEmailPage', () => {
       return load(url, init, message)
     })
     await user.type(await screen.findByLabelText('Its web app link'), 'https://script.google.com/macros/s/AKfy/exec')
-    const box = screen.getByRole('region', { name: 'Read the shuls’ and eruvs’ emails' })
+    const box = screen.getByRole('region', { name: 'Read the newsletters' })
     await user.click(within(box).getByRole('button', { name: 'Save' }))
     expect(await screen.findByText('That link didn’t answer. Check access is set to Anyone.')).toBeInTheDocument()
   })

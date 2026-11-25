@@ -154,7 +154,7 @@ function ReadEmails({ script, from, off, onLink }: { script: string; from: numbe
   }
   return (
     <div className={off ? 'opacity-55' : ''} inert={off}>
-      <AdminBox title="Read the shuls’ and eruvs’ emails">
+      <AdminBox title="Read the newsletters">
         <ol className="m-0 list-none p-0">
           <Step n={from} dim={off} title="Sign it up for each shul’s and eruv’s emails" />
           <Step n={from + 1} dim={off} title="Copy the script">
