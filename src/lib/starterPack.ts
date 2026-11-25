@@ -24,8 +24,6 @@ import { STARTER_KINDS, STARTER_LISTING_IDS } from './starterPackContents'
 // them stays behind, since resource_tag isn't touched.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { STARTER_LISTING_IDS, STARTER_KINDS } from './starterPackContents'
-
 /** The field whose choices are a city's certifiers. */
 const HECHSHER_FIELD = 'kosherCert'
 
