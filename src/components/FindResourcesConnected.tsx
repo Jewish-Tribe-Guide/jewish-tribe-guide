@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import FindResources, { type FindResourcesProps } from './FindResources'
 import type { ParamsOpts } from './resources/GenericDirectory'
+import { replaceAddress } from '@/lib/replaceAddress'
 
 type Props = Omit<
   FindResourcesProps,
@@ -68,7 +69,11 @@ export default function FindResourcesConnected(props: Props) {
     // half of that). router.push stays for the item/form
     // navigations below — those DO need Next's own history/back-button
     // integration, which this sync deliberately opts out of.
-    if (opts?.replace) window.history.replaceState(window.history.state, '', url)
+    // Closing a form tells the router (replaceAddress): it otherwise still
+    // reads ?form=create, so a link back to it is no change and the page,
+    // kept alive between visits, opens nothing (Nov 25).
+    if (opts?.replace && opts.router) replaceAddress(url)
+    else if (opts?.replace) window.history.replaceState(window.history.state, '', url)
     // A step Back undoes, with no navigation either: the page already shows
     // it. Named in the state so the page's own back can tell it took one.
     else if (opts?.step) window.history.pushState({ ...window.history.state, step: opts.step }, '', url)

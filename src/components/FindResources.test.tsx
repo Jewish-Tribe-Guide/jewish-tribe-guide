@@ -181,6 +181,30 @@ describe('FindResources — a real listing category', () => {
     expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
   })
 
+  // The user, Nov 25: Suggest a listing on the computer home opened Food's
+  // Add the first time and not the second. Next keeps the category page
+  // alive between visits, so it mounts once; closing Add changed the
+  // address behind the router's back, which still read ?form=create, so
+  // coming back to ?form=create was no change and nothing opened. Closing
+  // now tells the router, and a link back to ?form=create opens it again.
+  it('a page kept alive opens Add again when a link brings it back to ?form=create', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
+    const page = (form: string | null) => <FindResources view="grocery" listings={[]} anchor={anchor} onUp={vi.fn()} searchForm={form} onParamsChange={onParamsChange} />
+    const { rerenderWithProviders } = renderWithProviders(page('create'), { content: { categories: [grocery] } })
+    expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(onParamsChange).toHaveBeenCalledWith({ form: null }, { replace: true, router: true })
+    expect(screen.queryByLabelText('Find the place')).not.toBeInTheDocument()
+
+    // The router now reads the address without ?form, then the link lands.
+    rerenderWithProviders(page(null))
+    rerenderWithProviders(page('create'))
+    expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
+  })
+
   // Mobile: a bottom sheet over the still-mounted directory, matching
   // Edit/Report instead of navigating away from the list entirely.
   it('on mobile, resolves a deep-linked create to a sheet over the still-mounted directory', () => {
@@ -346,7 +370,7 @@ describe('FindResources — a real listing category', () => {
 
     await user.click(screen.getByRole('button', { name: 'stub cancel' }))
 
-    expect(onParamsChange).toHaveBeenCalledWith({ form: null, item: null }, { replace: true })
+    expect(onParamsChange).toHaveBeenCalledWith({ form: null, item: null }, { replace: true, router: true })
   })
 
   // Root cause of the bug the previous test's own doc describes: while a
@@ -394,7 +418,7 @@ describe('FindResources — a real listing category', () => {
     // Add has no Cancel of its own: its dialog's Close.
     await user.click(within(screen.getByRole('dialog', { name: /^Add a / })).getByRole('button', { name: 'Close' }))
 
-    expect(onParamsChange).toHaveBeenCalledWith({ form: null }, { replace: true })
+    expect(onParamsChange).toHaveBeenCalledWith({ form: null }, { replace: true, router: true })
   })
 })
 

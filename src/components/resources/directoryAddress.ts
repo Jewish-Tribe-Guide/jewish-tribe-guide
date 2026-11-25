@@ -6,10 +6,14 @@ import { itemName } from '@/lib/itemNames'
 import { sameItem } from '@/lib/itemFilter'
 
 /** How a change to the address is recorded. `replace`: in place, no step.
+ *  `router`, with it: Next's router is told too (replaceAddress), so a link
+ *  back to the address it had is a change the page sees; for a one-off
+ *  (closing a form), never for the searches and Filters, which re-render
+ *  the page when the router is told.
  *  `step`: a step the browser's Back undoes, named in history.state so the
  *  page's own way back can take that same step (the Minyanim view, Oct 6).
  *  Neither: a navigation of its own. */
-export type ParamsOpts = { replace?: boolean; step?: string }
+export type ParamsOpts = { replace?: boolean; router?: boolean; step?: string }
 
 /** A question the Filters were read from (`read=1`), and what it turned on
  *  there: taken off again when the question is edited or cleared. */

@@ -4,6 +4,20 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## Suggest a listing opened Add only the first time (Nov 25)
+
+The user, on the computer: Suggest a listing, then a category, opened
+that page with Add; the second time it opened the page and nothing.
+Next keeps a page alive between visits, so `FindResources` didn't mount
+again and its `?form=` seed ran once. Closing the form took `?form=`
+off with a raw `replaceState` that kept Next's `__NA` mark, so the
+router still read `?form=create`, and the link back to it was no change
+it passed on. Closing now tells the router (`setParams` with
+`router: true`, through `replaceAddress`), and a `?form=` the page sees
+arrive opens the form. Searches and Filters still change the address
+without telling the router, as before. Checked in the browser: three
+rounds of Suggest, Food, Close, Back, Add opened each time.
+
 ## Shul watches: what Nov 25 read wrong (Nov 25)
 
 The user: Lower Merion's and Sons of Israel's findings "still seem

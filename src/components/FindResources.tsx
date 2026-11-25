@@ -232,6 +232,10 @@ export default function FindResources({
   if (formParam !== formParamSeen) {
     setFormParamSeen(formParam)
     if (formParam === null) setActionSubject(null)
+    // A link back to ?form= on a page Next kept alive between visits: it
+    // doesn't mount again, so the form opens here (Nov 25, Suggest a
+    // listing's second time).
+    else if (actionFromUrl) setActionSubject(actionFromUrl)
   }
 
   const action = actionSubject
@@ -318,7 +322,8 @@ export default function FindResources({
         form: null,
         ...(action?.mode === 'edit' ? { item: null } : {}),
       },
-      { replace: true },
+      // The router told, so a link back to ?form= is a change (above).
+      { replace: true, router: true },
     )
   }
 
