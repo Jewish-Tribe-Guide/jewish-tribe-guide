@@ -647,4 +647,23 @@ describe('ListingEditor — Not on the listing yet (Nov 25)', () => {
     await u.click(done())
     expect(screen.getByTestId('editor-row-kind').compareDocumentPosition(screen.getByText('Not on the listing yet')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
+
+  it('Remove takes back out what was put in, and the row is a + line again', async () => {
+    const u = user()
+    renderEditor({ item: undefined, category: food })
+    await u.click(addLine('Store Type')!)
+    await u.click(screen.getByRole('button', { name: 'Restaurant' }))
+    await u.click(within(screen.getByTestId('editor-open-kind')).getByRole('button', { name: 'Remove' }))
+    expect(screen.queryByTestId('editor-open-kind')).toBeNull()
+    expect(screen.queryByTestId('editor-row-kind')).toBeNull()
+    await u.click(addLine('Store Type')!)
+    expect(screen.getByRole('button', { name: 'Restaurant' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('a row already on the listing has no Remove', async () => {
+    const u = user()
+    renderEditor({ category: food })
+    await u.click(row('kind'))
+    expect(within(screen.getByTestId('editor-open-kind')).queryByRole('button', { name: 'Remove' })).toBeNull()
+  })
 })

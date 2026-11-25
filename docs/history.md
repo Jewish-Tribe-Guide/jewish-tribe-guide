@@ -37,6 +37,8 @@ it all", then "Build as described" for adding a source from W3.
   offered until it's given. And a row opened from "Not on the listing
   yet" stays there while open, instead of jumping up the list the moment
   something is picked; Done moves it.
+  Such a row also has **Remove** beside Done: it takes back out what was
+  put in and closes it. A row already on the listing has no Remove.
 
 ## Set up your guide, after New community (Nov 25)
 

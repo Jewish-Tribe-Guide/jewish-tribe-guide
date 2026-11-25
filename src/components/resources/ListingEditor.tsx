@@ -347,6 +347,9 @@ export default function ListingEditor({
   const [openId, setOpenId] = useState<string | null>(null)
   // The row last opened from "Not on the listing yet" (see `stays`).
   const [openedEmpty, setOpenedEmpty] = useState<string | null>(null)
+  // What it held when opened, for its Remove (the user, Nov 25: a field
+  // opened just to look was hard to take off again).
+  const openedWith = useRef<{ details: Record<string, unknown>; address: string; phone: string } | null>(null)
   // A step inside a row (a minyan, a person): its title and Back, and
   // which field it belongs to, so the row shows only that one.
   const [child, setChild] = useState<(EditorStep & { key: string; row?: string }) | null>(null)
@@ -636,7 +639,14 @@ export default function ListingEditor({
   // A short row, open: its fields inside its card, Done under them. Its
   // heading closes it too.
   const openInPlace = (r: EditorRow) => (
-    <EditorOpenCard cardRef={openCard} testId={`editor-open-${r.id}`} title={rowTitle(r)} tags={tags(r)} onClose={closeRow} source={rowSource ? { line: rowSource(r, changed.has(r.id)) } : undefined}>
+    <EditorOpenCard
+      cardRef={openCard}
+      testId={`editor-open-${r.id}`}
+      title={rowTitle(r)}
+      tags={tags(r)}
+      onClose={closeRow}
+      onRemove={r.id === stays ? () => removeRow(r) : undefined}
+      source={rowSource ? { line: rowSource(r, changed.has(r.id)) } : undefined}>
       {rowBody(r)}
     </EditorOpenCard>
   )
@@ -649,6 +659,16 @@ export default function ListingEditor({
   // Deliveries, Nov 25): it isn't offered until that answer is given.
   const waiting = (r: EditorRow) =>
     r.kind === 'fields' && !r.part && !rowHas(r, 'address') && !rowHas(r, 'phone') && r.fields.length > 0 && !r.fields.some(visible)
+  // Remove: the row back as it was when its + line was opened, and closed.
+  function removeRow(r: EditorRow) {
+    const was = openedWith.current
+    if (was) {
+      for (const f of r.fields) setDetail(f.key, was.details[f.key])
+      if (rowHas(r, 'address')) draft.setAddress(was.address)
+      if (rowHas(r, 'phone')) draft.setPhone(was.phone)
+    }
+    closeRow()
+  }
   const filled = rows.filter((r) => r.id !== stays && (!rowIsEmpty(r, values) || needed(r)))
   const empty = rows.filter((r) => r.id === stays || (rowIsEmpty(r, values) && !needed(r) && !waiting(r)))
   const listScreen = (
@@ -702,6 +722,7 @@ export default function ListingEditor({
               ) : (
                 <EditorAddLine
                   onOpen={() => {
+                    openedWith.current = { details, address: draft.address, phone: draft.phone }
                     setOpenedEmpty(r.id)
                     setOpenId(r.id)
                   }}

@@ -70,7 +70,32 @@ export function EditorRowCard({
  *  them. Its heading closes it too. With `source` (admin's listing) the card
  *  holds only the fields: the line saying where they come from sits on the
  *  gray under it, then a solid Done, as on the row's own screen. */
-export function EditorOpenCard({ title, tags, onClose, children, cardRef, testId, source }: { title: ReactNode; tags?: ReactNode; onClose: () => void; children: ReactNode; cardRef?: Ref<HTMLDivElement>; testId: string; source?: { line: ReactNode } }) {
+export function EditorOpenCard({
+  title,
+  tags,
+  onClose,
+  onRemove,
+  children,
+  cardRef,
+  testId,
+  source,
+}: {
+  title: ReactNode
+  tags?: ReactNode
+  onClose: () => void
+  /** A row opened from "Not on the listing yet": Remove, beside Done,
+   *  takes what was put in back out and closes it. */
+  onRemove?: () => void
+  children: ReactNode
+  cardRef?: Ref<HTMLDivElement>
+  testId: string
+  source?: { line: ReactNode }
+}) {
+  const remove = onRemove && (
+    <button type="button" onClick={onRemove} className="h-11 shrink-0 cursor-pointer px-3 text-[0.9375rem] font-bold text-red-700">
+      Remove
+    </button>
+  )
   const card = 'space-y-4 rounded-2xl border-[1.5px] border-slate-400 bg-white px-4 pt-2.5 pb-4 shadow-sm'
   const inside = (
     <>
@@ -87,18 +112,24 @@ export function EditorOpenCard({ title, tags, onClose, children, cardRef, testId
       <div ref={cardRef} data-testid={testId} className="scroll-my-4 space-y-2 pb-2">
         <div className={card}>{inside}</div>
         {source.line && <div className="px-0.5">{source.line}</div>}
-        <button type="button" onClick={onClose} className={`${SUBMIT_PILL} mt-2`}>
-          Done
-        </button>
+        <div className="mt-2 flex items-center gap-2">
+          {remove}
+          <button type="button" onClick={onClose} className={`${SUBMIT_PILL} min-w-0 flex-1`}>
+            Done
+          </button>
+        </div>
       </div>
     )
   }
   return (
     <div ref={cardRef} data-testid={testId} className={`scroll-my-4 ${card}`}>
       {inside}
-      <button type="button" onClick={onClose} className="h-11 w-full cursor-pointer rounded-full border border-slate-300 bg-white text-[0.9375rem] font-bold text-primary">
-        Done
-      </button>
+      <div className="flex items-center gap-2">
+        {remove}
+        <button type="button" onClick={onClose} className="h-11 min-w-0 flex-1 cursor-pointer rounded-full border border-slate-300 bg-white text-[0.9375rem] font-bold text-primary">
+          Done
+        </button>
+      </div>
     </div>
   )
 }
