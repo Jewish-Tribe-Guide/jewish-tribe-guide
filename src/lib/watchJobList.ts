@@ -4,7 +4,7 @@ import { isCategorySyncEligible } from './categories'
 import { hoursJobCategories, ownSiteCategories } from './hoursJob'
 import type { NightKindId } from './jobRuns'
 import { isKosherJobCategory } from './kosherJob'
-import { NIGHT_KINDS, type KindFix, type NightKindView } from './nightKinds'
+import { NIGHT_KINDS, type NightKindView } from './nightKinds'
 import { kindOf } from './placeKinds'
 
 // ── Which jobs a community sees (the user, Oct 31) ──────────────────────────
@@ -27,7 +27,7 @@ export const JOB_STEPS: Partial<Record<NightKindId, string>> = {
   hospitals: 'Add each hospital’s Refuah page',
 }
 
-function hasPlacesFor(id: NightKindId, categories: readonly Cat[]): boolean {
+export function hasPlacesFor(id: NightKindId, categories: readonly Cat[]): boolean {
   const live = categories.filter((c) => c.active !== false)
   const places = live.filter((c) => c.kind === 'listing')
   switch (id) {
@@ -88,26 +88,6 @@ function blank(id: NightKindId, name: string): NightKindView {
   return { id, name, about: kind.about, when: null, count: 'Not run yet', trouble: null, misses: [], tracked: [], nights: [], fixes: [], lastAt: null, schedule: '' }
 }
 
-/** Needs fixing, whatever jobs say the same: one job's run failing is every
- *  kind it reads, so those are one line. */
-export function needsFixing(jobs: readonly Pick<NightKindView, 'id' | 'name' | 'fixes'>[]): KindFix[] {
-  const whole = new Map<string, { names: string[]; page: string }>()
-  const fixes: KindFix[] = []
-  for (const j of jobs) {
-    for (const f of j.fixes) {
-      if (!f.whole) {
-        fixes.push(f)
-        continue
-      }
-      const line = whole.get(f.why)
-      if (line) line.names.push(j.name)
-      else whole.set(f.why, { names: [j.name], page: f.page })
-    }
-  }
-  const lines = [...whole].map(([why, { names, page }]): KindFix => ({ name: names.length > 2 ? `${names.slice(0, 2).join(', ')} and ${names.length - 2} more` : names.join(' and '), why, page, whole: true }))
-  return [...lines, ...fixes]
-}
-
 /** What a job's row says of its last run: "Last night", "Yesterday",
  *  "Sunday", "Oct 12". */
 export function lastRunWord(iso: string, now: number, nightly: boolean): string {
@@ -120,11 +100,4 @@ export function lastRunWord(iso: string, now: number, nightly: boolean): string 
   if (!nightly && day(at) === day(now - 86_400_000)) return 'Yesterday'
   if (hours < 7 * 24) return new Date(at).toLocaleDateString('en-US', { weekday: 'long', ...zone })
   return new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...zone })
-}
-
-/** The sentence at the top of the page. */
-export function watchesSentence(jobs: readonly Pick<NightKindView, 'lastAt'>[], fixes: number): { tone: 'new' | 'good' | 'bad'; text: string } {
-  if (fixes > 0) return { tone: 'bad', text: `${fixes} ${fixes === 1 ? 'thing needs' : 'things need'} fixing. The rest is fine.` }
-  if (!jobs.some((j) => j.lastAt)) return { tone: 'new', text: 'Watches read the web each night and bring you what changed.' }
-  return { tone: 'good', text: 'All fine. Nothing to fix.' }
 }

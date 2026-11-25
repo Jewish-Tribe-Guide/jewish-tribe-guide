@@ -8,7 +8,7 @@
 // Pure: the job, its page and To do all read it. The rows are look_again's
 // (migration 092, lookAgainStore.ts).
 
-import { jobHealth, NIGHTLY_JOBS, type JobRun } from './jobRuns'
+import type { JobRun } from './jobRuns'
 
 export type LookKind = 'eruv' | 'menu' | 'google'
 
@@ -207,17 +207,3 @@ export type LookAgainLoaded = { available: boolean; items: LookItem[]; leftOut: 
 /** Look again's run, per community, for the Watches tab's line. */
 export type LookAgainRun = { skipped: string } | { communities: readonly { community: string; tried: number; found: number; failed: number; left: number }[] }
 
-/** Needs fixing on the Watches tab, in the words the other jobs' are:
- *  its last run failed, was cut off, or it stopped running. */
-export function lookAgainFix(runs: readonly JobRun[], now: number): { name: string; why: string; page: string } | null {
-  const health = jobHealth(NIGHTLY_JOBS.find((j) => j.id === 'look-again')!, runs, now)
-  const why =
-    health.state === 'late'
-      ? `Didn’t run since ${day(health.since)}`
-      : health.state === 'failed'
-        ? 'Last run failed'
-        : health.state === 'cut off'
-          ? 'Last run stopped before it finished'
-          : null
-  return why ? { name: 'Look again', why, page: 'job/look-again' } : null
-}
