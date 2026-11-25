@@ -47,7 +47,8 @@ them ("Yes, build it"). The site owner's New community (`/admin`):
   create could leave out the one just made. The public reads stay
   cached.
 - Migration 115 deletes the home rows nothing draws any more and
-  narrows the kinds; not run anywhere yet (where-things-stand, 92).
+  narrows the kinds. The user ran it on Nov 25 (item 92), before the
+  PR reached live, which is safe: no code reads or writes those kinds.
 
 Not as drawn: no "Communities" heading over the list (the page's own
 heading and tab say it); the city list shows Google's "MD, USA" where the

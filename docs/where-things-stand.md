@@ -142,14 +142,6 @@ old number can still be looked up. When an item is done, move it to
 85. UES (made up, on dev only, 2 listings): delete it in the site
     owner's console (Communities). Harmless meanwhile; nothing relies
     on it.
-92. Say yes (or no) to migration
-    `supabase/migrations/20240101000115_retired_home_rows.sql`, after the
-    New community PR is live: on dev, then live. It deletes the home
-    rows nothing draws any more (live: "Update Listings Card", "Prayer &
-    Shabbat Times", "Popular right now"; dev: "Prayer & Shabbat Times" in
-    philly, baltimore and e2e-writes) and refuses those kinds from then
-    on. Until it runs, nothing is wrong: the starter pack already leaves
-    them behind.
 
 ### Mine to fix
 
