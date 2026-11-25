@@ -130,7 +130,14 @@ export async function listCommunities(): Promise<Community[]> {
   'use cache'
   cacheTag(TAGS.communities)
   cacheLife('days')
+  return readCommunities()
+}
 
+/** Every community, read now rather than from the cache: the site owner's
+ *  Communities list (Nov 25), which lands straight after a create and must
+ *  show the one just made. The cached copy is stale-while-revalidate, so
+ *  its first read after a save can be the old list. */
+export async function readCommunities(): Promise<Community[]> {
   // A failed read throws, and is never cached (Nov 20, the health sweep).
   // It used to return the one community in the config, and 'use cache'
   // kept that for days: one Supabase blip and every other community's
@@ -449,6 +456,21 @@ export async function listCommunityPreviewTokens(): Promise<Record<string, strin
     out[row.slug] = row.preview_token
   }
   return out
+}
+
+/** How many places each community shows (approved listings), for the
+ *  Communities list's "0 places" (board 3, Nov 25). One count per
+ *  community: a handful of them, and no rows read. */
+export async function listCommunityPlaceCounts(slugs: string[]): Promise<Record<string, number>> {
+  const supabase = getAdminClient()
+  const counts = await Promise.all(
+    slugs.map(async (slug) => {
+      const { count, error } = await supabase.from('resource').select('id', { count: 'exact', head: true }).eq('community_id', slug).eq('status', 'approved')
+      if (error) throw new Error(`Failed to count ${slug}'s places: ${error.message}`)
+      return [slug, count ?? 0] as const
+    }),
+  )
+  return Object.fromEntries(counts)
 }
 
 /** One community's preview token — what PATCH /api/admin/communities/:slug

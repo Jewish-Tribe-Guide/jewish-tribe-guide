@@ -5,7 +5,7 @@ change of Claude account (artifacts and Claude's own notes stay with the old
 account). Update it in the same commit as the work that changes it. How
 the user likes to work is in `docs/how-we-work.md`.
 
-Last updated: Nov 23, 2026.
+Last updated: Nov 25, 2026.
 
 Finished work moved out on Nov 21: every "Done …" section is in
 `docs/history.md`, in the order it was here. On Nov 22 the long sections
@@ -142,8 +142,21 @@ old number can still be looked up. When an item is done, move it to
 85. UES (made up, on dev only, 2 listings): delete it in the site
     owner's console (Communities). Harmless meanwhile; nothing relies
     on it.
+92. Say yes (or no) to migration
+    `supabase/migrations/20240101000115_retired_home_rows.sql`, after the
+    New community PR is live: on dev, then live. It deletes the home
+    rows nothing draws any more (live: "Update Listings Card", "Prayer &
+    Shabbat Times", "Popular right now"; dev: "Prayer & Shabbat Times" in
+    philly, baltimore and e2e-writes) and refuses those kinds from then
+    on. Until it runs, nothing is wrong: the starter pack already leaves
+    them behind.
 
 ### Mine to fix
+
+93. **Later (the user, Nov 25):** a "Set up a newsletter inbox" step on
+    a new community's admin checklist. Philly reads its shuls'
+    newsletters through a community Gmail and the Gmail script
+    (newsletter_setup); a new community has no way to know that yet.
 
 ### Waiting on others
 

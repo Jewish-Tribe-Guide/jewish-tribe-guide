@@ -9,53 +9,20 @@ import type { Community } from '@/lib/communityStore'
 import { readFileSync } from 'fs'
 import { mockRouter } from '@/test/nextNavigationMock'
 
-// The "New Community" flow's client-side validation (submit() in
-// CommunityManager.tsx) was exercised only by the e2e happy path, which
-// never touches the error branches — required fields, lat/lng range, hex
-// color shape. Mirrors CategoryEditor.test.tsx's shape/mocking pattern:
-// fetchJson/parseOkJson mocked (this component uses parseOkJson directly
-// against a raw fetch() for its GET load, and fetchJson for the POST), no
-// provider stack needed since this component reads no content/community
-// context.
+// /admin's Communities and New community (Nov 25, boards 1, 2f and 3).
+// fetchJson/parseOkJson mocked: the list loads through a raw fetch() and
+// parseOkJson; everything else (Google's cities, create, publish, delete)
+// goes through fetchJson, answered here by address.
 
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => mockRouter, usePathname: () => '/admin', useSearchParams: () => new URLSearchParams() }))
-
-// Same stub pattern ListingEditor.test.tsx uses for the same component — a
-// real AddressInput needs Google Maps loaded, which this test env has no
-// business doing. The stub's button simulates picking "Baltimore, MD, USA"
-// with real-ish Baltimore coordinates, exactly the shape a real selection
-// hands back (onChange with the formatted address, then onCoords).
-vi.mock('@/components/intake/AddressInput', () => ({
-  default: ({
-    value,
-    onChange,
-    onCoords,
-  }: {
-    value: string
-    onChange: (v: string) => void
-    onCoords?: (c: { lat: number; lng: number } | null) => void
-  }) => (
-    <div>
-      <input aria-label="City, State" value={value} onChange={(e) => onChange(e.target.value)} />
-      <button
-        type="button"
-        onClick={() => {
-          onChange('Baltimore, MD, USA')
-          onCoords?.({ lat: 39.2904, lng: -76.6122 })
-        }}
-      >
-        simulate city select
-      </button>
-    </div>
-  ),
-}))
 
 type TestCommunity = Community & {
   adminEmails: string[]
   notifyMutedEmails: string[]
   notifyReviewEmails: string[]
   previewToken: string | null
+  placeCount?: number
 }
 
 function makeCommunity(overrides: Partial<TestCommunity> = {}): TestCommunity {
@@ -83,35 +50,77 @@ function makeCommunity(overrides: Partial<TestCommunity> = {}): TestCommunity {
   }
 }
 
+const philly = makeCommunity({ slug: 'philly', name: 'Philadelphia', isDefault: true, visible: true, adminEmails: ['a@x.org', 'b@x.org', 'c@x.org'], placeCount: 150 })
+const ues = makeCommunity({
+  slug: 'ues',
+  name: 'Upper East Side',
+  region: 'Manhattan',
+  isDefault: false,
+  visible: false,
+  adminEmails: ['jane@example.com', 'sam@example.com'],
+  previewToken: 'super-secret-token',
+  placeCount: 4,
+})
+
 function mockList(communities: TestCommunity[]) {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true } as Response))
   vi.mocked(parseOkJson).mockResolvedValue({ communities })
 }
 
-async function renderAndWaitForList(communities: TestCommunity[] = [makeCommunity()]) {
+async function renderAndWaitForList(communities: TestCommunity[] = [philly]) {
   mockList(communities)
   render(<CommunityManager token="tok" />)
-  await screen.findByText('Every community this site hosts.')
+  await screen.findByRole('button', { name: 'New community' })
 }
 
-// Fills every field submit() requires, so a test overriding a single field
-// can isolate exactly one validation branch. Region/lat/lng are filled by
-// hand (under "More details") rather than via the city picker, so this
-// stays independent of that auto-fill behavior — see the "city picker"
-// tests below for that. Deliberately leaves mission blank (no
-// longer required — it defaults at submit time) and theme/background
-// colors at their (valid) component defaults.
-async function fillValidForm(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText(/^name$/i), 'Baltimore Jewish Community')
-  await user.click(screen.getByRole('button', { name: /show more details/i }))
-  await user.type(screen.getByLabelText(/^region$/i), 'Baltimore')
-  await user.type(screen.getByLabelText(/map center latitude/i), '39.369')
-  await user.type(screen.getByLabelText(/map center longitude/i), '-76.715')
+function cardFor(slug: string): HTMLElement {
+  const card = document.querySelector<HTMLElement>(`[data-community-slug="${slug}"]`)
+  if (!card) throw new Error(`no card for ${slug}`)
+  return card
+}
+
+const CITIES = [
+  { placeId: 'p-md', city: 'Baltimore', area: 'MD, USA' },
+  { placeId: 'p-oh', city: 'Baltimore', area: 'OH, USA' },
+]
+const PLACES: Record<string, object> = {
+  'p-md': { city: 'Baltimore', area: 'Maryland', lat: 39.29, lng: -76.61, timezone: 'America/New_York' },
+  'p-oh': { city: 'Baltimore', area: 'Ohio', lat: 39.84, lng: -82.6, timezone: 'America/New_York' },
+}
+
+// Google's answers, and whatever a test sets for the writes.
+let writes: (url: string, init: RequestInit) => unknown
+function answerGoogle() {
+  vi.mocked(fetchJson).mockImplementation(async (url: string, init?: RequestInit) => {
+    const u = new URL(url, 'http://x')
+    if (u.pathname === '/api/admin/cities') {
+      const placeId = u.searchParams.get('placeId')
+      if (placeId) return { ok: true, city: PLACES[placeId] }
+      return { ok: true, cities: CITIES }
+    }
+    return writes(url, init ?? {})
+  })
+}
+
+function callsTo(path: string) {
+  return vi.mocked(fetchJson).mock.calls.filter(([url]) => String(url).startsWith(path))
+}
+
+async function openNew(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'New community' }))
+  return screen.findByRole('combobox', { name: 'Which city?' })
+}
+
+async function pickBaltimore(user: ReturnType<typeof userEvent.setup>) {
+  const box = await openNew(user)
+  await user.type(box, 'Balti')
+  await user.click(await screen.findByRole('option', { name: 'Baltimore, MD, USA' }))
+  await screen.findByRole('button', { name: 'Create Baltimore' })
 }
 
 beforeEach(() => {
-  vi.mocked(fetchJson).mockResolvedValue({ community: makeCommunity({ slug: 'baltimore' }) })
-  // The router writes the address, as Next's does (New community has one).
+  writes = () => ({ community: makeCommunity({ slug: 'baltimore', isDefault: false }) })
+  answerGoogle()
   window.history.replaceState({}, '', '/admin')
   mockRouter.push.mockImplementation((url: string) => window.history.pushState({}, '', url))
   mockRouter.replace.mockImplementation((url: string) => window.history.replaceState({}, '', url))
@@ -124,605 +133,309 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe('CommunityManager — the community list', () => {
-  it('renders every community from GET /api/admin/communities, with "Default" only on the flagged row', async () => {
-    await renderAndWaitForList([
-      makeCommunity({ slug: 'philly', name: 'Philadelphia', isDefault: true }),
-      makeCommunity({ slug: 'ues', name: 'Upper East Side', isDefault: false }),
-    ])
-
-    expect(screen.getByText('Philadelphia')).toBeInTheDocument()
-    expect(screen.getByText('Upper East Side')).toBeInTheDocument()
-    expect(screen.getAllByText('Default')).toHaveLength(1)
-    expect(vi.mocked(global.fetch)).toHaveBeenCalledWith(
-      '/api/admin/communities',
-      expect.objectContaining({ headers: { Authorization: 'Bearer tok' } }),
-    )
+describe('CommunityManager — the list (board 3)', () => {
+  it('shows the default community as one row to its admin: name, address, admins, Live', async () => {
+    await renderAndWaitForList([philly, ues])
+    const row = cardFor('philly')
+    expect(row.tagName).toBe('A')
+    expect(row).toHaveAttribute('href', adminBase('philly'))
+    expect(row).toHaveTextContent('Philadelphia')
+    expect(row).toHaveTextContent('/philly · 3 admins')
+    expect(within(row).getByText('Live')).toBeInTheDocument()
+    expect(within(row).queryByRole('button')).toBeNull()
+    expect(vi.mocked(global.fetch)).toHaveBeenCalledWith('/api/admin/communities', expect.objectContaining({ headers: { Authorization: 'Bearer tok' } }))
   })
 
-  it('links each community to its own admin console', async () => {
-    await renderAndWaitForList([makeCommunity({ slug: 'ues', name: 'Upper East Side' })])
-
-    expect(screen.getByRole('link', { name: /upper east side/i })).toHaveAttribute('href', adminBase('ues'))
+  it('gives another community its facts and buttons: Open its admin, Copy preview link, Publish', async () => {
+    await renderAndWaitForList([philly, ues])
+    const card = cardFor('ues')
+    expect(card).toHaveTextContent('/ues · 2 admins · 4 places')
+    expect(within(card).getByText('Hidden')).toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: 'Open its admin' })).toHaveAttribute('href', adminBase('ues'))
+    expect(within(card).getByRole('button', { name: 'Copy preview link' })).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Publish' })).toBeInTheDocument()
   })
 
-  // This is what actually removes the "browse into another community's
-  // console" capability for a regular per-community admin: GET
-  // /api/admin/communities is superadmin-gated (unlike the public
-  // /api/communities this used to call), so a 401 here means a plain
-  // access-denied message instead of the list-of-communities-with-links.
+  it('marks the community just made (?made=)', async () => {
+    window.history.replaceState({}, '', '/admin?made=ues')
+    await renderAndWaitForList([philly, ues, makeCommunity({ slug: 'bos', name: 'Boston', isDefault: false })])
+    expect(cardFor('ues')).toHaveAttribute('data-just-made', 'true')
+    expect(cardFor('ues').className).toContain('border-primary')
+    expect(cardFor('bos')).not.toHaveAttribute('data-just-made')
+    // At the top, above the default community (board 3).
+    expect([...document.querySelectorAll('[data-community-slug]')].map((el) => el.getAttribute('data-community-slug'))).toEqual(['ues', 'philly', 'bos'])
+  })
+
+  // GET /api/admin/communities is superadmin-gated: a community's own admin
+  // gets a plain line, not the list.
   it('shows an access-denied message instead of the list when the endpoint 401s', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401 } as Response))
     render(<CommunityManager token="tok" />)
-
-    expect(
-      await screen.findByText('Only the site owner can create or browse other communities.'),
-    ).toBeInTheDocument()
-    expect(screen.queryByText('Every community this site hosts.')).not.toBeInTheDocument()
+    expect(await screen.findByText('Only the site owner can create or browse other communities.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'New community' })).not.toBeInTheDocument()
     expect(parseOkJson).not.toHaveBeenCalled()
   })
 })
 
-describe('CommunityManager — new community form', () => {
+describe('CommunityManager — New community (boards 1 and 2f)', () => {
   // Nov 18: it was only state, so the browser's Back left the console.
-  it('is a screen of its own: Back closes it, Forward and a reload open it, Cancel goes back', async () => {
+  it('is a screen of its own: Back closes it, Forward and a reload open it, ‹ Communities goes back', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: '+ New community' }))
+    await openNew(user)
     await waitFor(() => expect(window.location.search).toBe('?step=new'))
 
     act(() => history.back())
-    expect(await screen.findByText('Every community this site hosts.')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'New community' })).toBeInTheDocument()
     act(() => history.forward())
     expect(await screen.findByRole('heading', { name: 'New community' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: /Communities/ }))
     await waitFor(() => expect(window.location.search).toBe(''))
-    expect(screen.getByText('Every community this site hosts.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New community' })).toBeInTheDocument()
 
     cleanup()
     window.history.replaceState({}, '', '/admin?step=new')
-    mockList([makeCommunity()])
+    mockList([philly])
     render(<CommunityManager token="tok" />)
-    expect(await screen.findByRole('heading', { name: 'New community' })).toBeInTheDocument()
+    expect(await screen.findByRole('combobox', { name: 'Which city?' })).toBeInTheDocument()
   })
 
-  it('auto-derives the slug from the name, and stops once the slug is edited directly', async () => {
+  it('asks Google for cities as you type, and fills the rest in from the one picked', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
+    const box = await openNew(user)
+    await user.type(box, 'Balti')
 
-    await user.type(screen.getByLabelText(/^name$/i), 'Baltimore Jewish Community')
-    expect(screen.getByLabelText(/url slug/i)).toHaveValue('baltimore-jewish-community')
+    const options = await screen.findAllByRole('option')
+    expect(options.map((o) => o.getAttribute('aria-label'))).toEqual(['Baltimore, MD, USA', 'Baltimore, OH, USA'])
+    expect(callsTo('/api/admin/cities?q=').at(-1)![0]).toBe('/api/admin/cities?q=Balti')
 
-    await user.clear(screen.getByLabelText(/url slug/i))
-    await user.type(screen.getByLabelText(/url slug/i), 'bmore')
-    await user.type(screen.getByLabelText(/^name$/i), '!')
-    // Slug stays exactly what was typed — further name edits no longer touch it.
-    expect(screen.getByLabelText(/url slug/i)).toHaveValue('bmore')
+    await user.click(options[0]!)
+    expect(await screen.findByText('Baltimore, Maryland')).toBeInTheDocument()
+    expect(screen.getByText('Eastern Time · map starts downtown')).toBeInTheDocument()
+    expect(screen.getByLabelText('Name')).toHaveValue('Baltimore Jewish Guide')
+    expect(screen.getByText('/baltimore')).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Starter pack' })).toHaveAttribute('aria-checked', 'true')
+    const pack = screen.getByRole('list', { name: 'In the starter pack' })
+    expect(within(pack).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Synagogues', 'Food', 'Grocery', 'Mikvah', 'Eruv', 'Candle Lighting', 'Map'])
+    expect(screen.getByRole('button', { name: 'Create Baltimore' })).toBeInTheDocument()
   })
 
-  it.each([
-    ['name', /^name$/i, 'Name is required.'],
-    ['region', /^region$/i, /Region is required/],
-  ] as const)('blocks save with "%s" missing', async (_field, labelPattern, message) => {
+  it('picks with the arrow keys and Enter', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
-
-    await fillValidForm(user)
-    await user.clear(screen.getByLabelText(labelPattern))
-
-    await user.click(screen.getByRole('button', { name: /create community/i }))
-
-    expect(screen.getByText(message)).toBeInTheDocument()
-    expect(fetchJson).not.toHaveBeenCalled()
+    const box = await openNew(user)
+    await user.type(box, 'Balti')
+    await screen.findAllByRole('option')
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(await screen.findByText('Baltimore, Ohio')).toBeInTheDocument()
   })
 
-  it('leaving mission blank still creates the community, with generated defaults', async () => {
+  it('says so when Google isn’t answering, rather than showing no cities', async () => {
+    vi.mocked(fetchJson).mockRejectedValue(new Error('Google isn’t answering. Try again.'))
     const user = userEvent.setup()
     await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
-
-    await fillValidForm(user)
-    await user.click(screen.getByRole('button', { name: /create community/i }))
-
-    await waitFor(() => expect(fetchJson).toHaveBeenCalled())
-    const call = vi.mocked(fetchJson).mock.calls[0]!
-    const body = JSON.parse((call[1] as RequestInit).body as string)
-    expect(body).not.toHaveProperty('tagline')
-    expect(body.mission).toBe('A guide to the Baltimore Jewish community.')
+    await user.type(await openNew(user), 'Balti')
+    expect(await screen.findByText('Google isn’t answering. Try again.')).toBeInTheDocument()
   })
 
-  it('parses a comma-separated admin emails field into an array', async () => {
+  it('Change goes back to Which city?', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
-
-    await fillValidForm(user)
-    const adminEmailsField = screen.getByLabelText(/admin emails/i)
-    await user.clear(adminEmailsField)
-    await user.type(adminEmailsField, 'jane@example.com, sam@example.com')
-    await user.click(screen.getByRole('button', { name: /create community/i }))
-
-    await waitFor(() => expect(fetchJson).toHaveBeenCalled())
-    const call = vi.mocked(fetchJson).mock.calls[0]!
-    const body = JSON.parse((call[1] as RequestInit).body as string)
-    expect(body.adminEmails).toEqual(['jane@example.com', 'sam@example.com'])
+    await pickBaltimore(user)
+    await user.click(screen.getByRole('button', { name: 'Change' }))
+    expect(screen.getByRole('combobox', { name: 'Which city?' })).toBeInTheDocument()
   })
 
-  it('blocks save when the slug is cleared', async () => {
+  it('creates it with the city, the name, its address, who runs it and the pack, then lands on the list marking it', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
+    await pickBaltimore(user)
 
-    await fillValidForm(user)
-    await user.clear(screen.getByLabelText(/url slug/i))
+    await user.clear(screen.getByLabelText('Name'))
+    await user.type(screen.getByLabelText('Name'), 'Jewish Baltimore')
+    await user.click(screen.getByRole('button', { name: 'Edit its address' }))
+    await user.clear(screen.getByLabelText(/Its address/))
+    await user.type(screen.getByLabelText(/Its address/), 'bmore')
 
-    await user.click(screen.getByRole('button', { name: /create community/i }))
+    const email = screen.getByLabelText('Add an admin’s email')
+    await user.type(email, 'not-an-email')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(screen.getByText('That isn’t an email address.')).toBeInTheDocument()
+    await user.clear(email)
+    await user.type(email, 'Rivka.Levin@example.com{Enter}')
+    await user.type(email, 'sam@example.com')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(screen.getByText('RL')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Remove sam@example.com' }))
 
-    expect(screen.getByText('URL slug is required.')).toBeInTheDocument()
-    expect(fetchJson).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('switch', { name: 'Starter pack' }))
+    expect(screen.queryByRole('list', { name: 'In the starter pack' })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Create Baltimore' }))
+    await waitFor(() => expect(callsTo('/api/admin/communities')).toHaveLength(1))
+    const [url, init] = callsTo('/api/admin/communities')[0]!
+    expect(url).toBe('/api/admin/communities')
+    expect((init as RequestInit).method).toBe('POST')
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      slug: 'bmore',
+      name: 'Jewish Baltimore',
+      city: { city: 'Baltimore', area: 'Maryland', lat: 39.29, lng: -76.61 },
+      adminEmails: ['rivka.levin@example.com'],
+      starterPack: false,
+    })
   })
 
-  it('rejects a latitude outside -90..90', async () => {
+  it('counts an email typed but not yet added', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
-
-    await fillValidForm(user)
-    await user.clear(screen.getByLabelText(/map center latitude/i))
-    await user.type(screen.getByLabelText(/map center latitude/i), '200')
-
-    await user.click(screen.getByRole('button', { name: /create community/i }))
-
-    expect(screen.getByText(/Map center latitude must be a number between -90 and 90/)).toBeInTheDocument()
-    expect(fetchJson).not.toHaveBeenCalled()
+    await pickBaltimore(user)
+    await user.type(screen.getByLabelText('Add an admin’s email'), 'jane@example.com')
+    await user.click(screen.getByRole('button', { name: 'Create Baltimore' }))
+    await waitFor(() => expect(callsTo('/api/admin/communities')).toHaveLength(1))
+    const body = JSON.parse((callsTo('/api/admin/communities')[0]![1] as RequestInit).body as string)
+    expect(body).toMatchObject({ adminEmails: ['jane@example.com'], starterPack: true, slug: 'baltimore' })
   })
 
-  it('rejects a longitude outside -180..180', async () => {
+  it('shows what the server refused, and stays on the screen', async () => {
+    writes = () => {
+      throw new Error('A community with that address already exists.')
+    }
     const user = userEvent.setup()
     await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
-
-    await fillValidForm(user)
-    await user.clear(screen.getByLabelText(/map center longitude/i))
-    await user.type(screen.getByLabelText(/map center longitude/i), '200')
-
-    await user.click(screen.getByRole('button', { name: /create community/i }))
-
-    expect(screen.getByText(/Map center longitude must be a number between -180 and 180/)).toBeInTheDocument()
-    expect(fetchJson).not.toHaveBeenCalled()
+    await pickBaltimore(user)
+    await user.click(screen.getByRole('button', { name: 'Create Baltimore' }))
+    expect(await screen.findByText('A community with that address already exists.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Create Baltimore' })).toBeEnabled()
   })
 
-  it('rejects a malformed brand color', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
-
-    await fillValidForm(user)
-    await user.clear(screen.getByLabelText(/brand color/i))
-    await user.type(screen.getByLabelText(/brand color/i), 'blue')
-
-    await user.click(screen.getByRole('button', { name: /create community/i }))
-
-    expect(screen.getByText('Brand color must be a hex value like #1d4ed8.')).toBeInTheDocument()
-    expect(fetchJson).not.toHaveBeenCalled()
-  })
-
-  it('rejects a malformed background color', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
-
-    await fillValidForm(user)
-    await user.clear(screen.getByLabelText(/background color/i))
-    await user.type(screen.getByLabelText(/background color/i), 'not-a-color')
-
-    await user.click(screen.getByRole('button', { name: /create community/i }))
-
-    expect(screen.getByText('Background color must be a hex value like #f8fafc.')).toBeInTheDocument()
-    expect(fetchJson).not.toHaveBeenCalled()
-  })
-
-  // Landing in the new console is a plain load: router.push got its response
-  // and sat on the form, no error, in 4 of 7 runs of test:admin-write (and on
+  // Landing through the client router after a create got its response and
+  // sat on the form, no error, in 4 of 7 runs of test:admin-write (and on
   // main in CI). jsdom can't watch a load; that suite proves the landing.
-  it('never goes back to the client router to land in the new console', () => {
+  it('never goes back to the client router to land after creating', () => {
     expect(readFileSync('src/components/admin/CommunityManager.tsx', 'utf8')).not.toContain('useRouter')
   })
-
-  it('submits the right JSON shape', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
-
-    await fillValidForm(user)
-    await user.click(screen.getByRole('button', { name: /create community/i }))
-
-    await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
-    const call = vi.mocked(fetchJson).mock.calls[0]!
-    expect(call[0]).toBe('/api/admin/communities')
-    const init = call[1] as RequestInit
-    expect(init.method).toBe('POST')
-    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok')
-    const body = JSON.parse(init.body as string)
-    expect(body).toMatchObject({
-      slug: 'baltimore-jewish-community',
-      name: 'Baltimore Jewish Community',
-      mission: 'A guide to the Baltimore Jewish community.',
-      region: 'Baltimore',
-      mapCenter: { lat: 39.369, lng: -76.715 },
-      cloneFrom: null,
-    })
-  })
-
-  it('sends the selected clone source instead of null when "Clone from" is chosen', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList([makeCommunity({ slug: 'philly', name: 'Philadelphia' })])
-    await user.click(screen.getByRole('button', { name: /new community/i }))
-
-    await fillValidForm(user)
-    await user.selectOptions(screen.getByLabelText(/starting content/i), 'philly')
-    await user.click(screen.getByRole('button', { name: /create community/i }))
-
-    await waitFor(() => expect(fetchJson).toHaveBeenCalled())
-    const call = vi.mocked(fetchJson).mock.calls[0]!
-    const body = JSON.parse((call[1] as RequestInit).body as string)
-    expect(body.cloneFrom).toBe('philly')
-  })
-
-  it('shows a server-side error inline and does not navigate', async () => {
-    vi.mocked(fetchJson).mockRejectedValue(new Error('"baltimore" is already in use by another community.'))
-    const user = userEvent.setup()
-    await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
-
-    await fillValidForm(user)
-    await user.click(screen.getByRole('button', { name: /create community/i }))
-
-    expect(await screen.findByText('"baltimore" is already in use by another community.')).toBeInTheDocument()
-    // The form is still there, not swapped back to the list view.
-    expect(screen.getByRole('button', { name: /create community/i })).toBeInTheDocument()
-  })
 })
-
-describe('CommunityManager — the city picker auto-fills the rest of the form', () => {
-  it('fills name, slug, region, map center and mission from a single city pick', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
-
-    await user.click(screen.getByRole('button', { name: /simulate city select/i }))
-    await user.click(screen.getByRole('button', { name: /create community/i }))
-
-    await waitFor(() => expect(fetchJson).toHaveBeenCalled())
-    const call = vi.mocked(fetchJson).mock.calls[0]!
-    const body = JSON.parse((call[1] as RequestInit).body as string)
-    expect(body).toMatchObject({
-      name: 'Baltimore Jewish Guide',
-      slug: 'baltimore',
-      region: 'Baltimore',
-      mapCenter: { lat: 39.2904, lng: -76.6122 },
-      timezone: 'America/New_York',
-      mission: 'A guide to Jewish Baltimore — community resources for residents and visitors.',
-    })
-  })
-
-  it('never overwrites a name already typed by hand', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
-
-    await user.type(screen.getByLabelText(/^name$/i), 'My Custom Community Name')
-    await user.click(screen.getByRole('button', { name: /simulate city select/i }))
-
-    expect(screen.getByLabelText(/^name$/i)).toHaveValue('My Custom Community Name')
-    // The slug still derives from the (untouched) slug field's own source —
-    // the hand-typed name, not the city.
-    expect(screen.getByLabelText(/url slug/i)).toHaveValue('my-custom-community-name')
-  })
-
-  it('never overwrites region/mission already typed by hand', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
-    await user.click(screen.getByRole('button', { name: /show more details/i }))
-
-    await user.type(screen.getByLabelText(/^region$/i), 'Custom Region')
-    await user.type(screen.getByLabelText(/^mission$/i), 'Custom mission.')
-
-    await user.click(screen.getByRole('button', { name: /simulate city select/i }))
-    await user.click(screen.getByRole('button', { name: /create community/i }))
-
-    await waitFor(() => expect(fetchJson).toHaveBeenCalled())
-    const call = vi.mocked(fetchJson).mock.calls[0]!
-    const body = JSON.parse((call[1] as RequestInit).body as string)
-    expect(body.region).toBe('Custom Region')
-    expect(body.mission).toBe('Custom mission.')
-    // Map center and timezone aren't hand-typed here, so the pick still sets them.
-    expect(body.mapCenter).toEqual({ lat: 39.2904, lng: -76.6122 })
-  })
-
-  it('opens "More details" automatically when submitting without a city picked', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList()
-    await user.click(screen.getByRole('button', { name: /new community/i }))
-
-    await user.type(screen.getByLabelText(/^name$/i), 'Baltimore Jewish Community')
-    await user.click(screen.getByRole('button', { name: /create community/i }))
-
-    // Region/lat/lng live under the collapsed panel — the errors pointing at
-    // them are useless if that panel isn't also opened for the admin.
-    expect(screen.getByLabelText(/^region$/i)).toBeInTheDocument()
-    expect(screen.getByText(/Region is required/)).toBeInTheDocument()
-  })
-})
-
-// The whole card — name/badges/link and Delete on top, everything else
-// (Publish/Unpublish, the preview link, the Admins roster) behind one
-// "Show"/"Hide" toggle. Shared by every describe below that needs to reach
-// past that toggle, since it replaced what used to be two separate
-// disclosures (the row's own always-visible actions, and Admins' own nested
-// one) with a single one at the card level.
-function cardFor(name: RegExp): HTMLElement {
-  return screen.getByRole('link', { name }).parentElement!.parentElement!
-}
-
-async function openCard(user: ReturnType<typeof userEvent.setup>, card: HTMLElement) {
-  await user.click(within(card).getByRole('button', { name: /^show /i }))
-}
 
 describe('CommunityManager — deleting a community', () => {
-  const philly = makeCommunity({ slug: 'philly', name: 'Philadelphia', isDefault: true })
-  // region overridden — makeCommunity defaults it to 'Philadelphia', which
-  // would otherwise make this row's own link text ("/ues · Philadelphia")
-  // match a `/philadelphia/i` query meant for the philly row alone.
-  const ues = makeCommunity({ slug: 'ues', name: 'Upper East Side', region: 'Manhattan', isDefault: false })
-
   it('offers no delete option for the default community', async () => {
-    const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
-    await openCard(user, cardFor(/philadelphia/i))
-
-    // There IS a "Delete" button on the page (Upper East Side's, once
-    // opened) — just not on the default community's own card.
-    expect(within(cardFor(/philadelphia/i)).queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
-  })
-
-  // On the card itself: behind Show, nobody could find it (the user, Oct 31).
-  it('offers a delete option for a non-default community, without opening its card', async () => {
-    await renderAndWaitForList([philly, ues])
-    const card = cardFor(/upper east side/i)
-    expect(within(card).getByRole('button', { name: /^delete$/i })).toBeInTheDocument()
+    expect(within(cardFor('philly')).queryByRole('button', { name: /delete/i })).toBeNull()
+    expect(within(cardFor('ues')).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
   it('requires retyping the exact slug before "Delete forever" is enabled', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
-    await openCard(user, cardFor(/upper east side/i))
+    await user.click(within(cardFor('ues')).getByRole('button', { name: 'Delete' }))
+    expect(screen.getByText((_c, el) => el?.tagName === 'P' && /permanently deletes[\s\S]*Upper East Side/.test(el.textContent ?? ''))).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /^delete$/i }))
-    expect(
-      // A function matcher, not a string/regex — the warning text is split
-      // across a plain text node and a nested <span> (the bolded name), so
-      // no single text node contains the whole sentence for RTL's default
-      // per-text-node matching to find.
-      screen.getByText(
-        (_content, el) =>
-          el?.tagName === 'P' &&
-          /permanently deletes[\s\S]*Upper East Side[\s\S]*every listing, category, form, and submission/.test(
-            el.textContent ?? '',
-          ),
-      ),
-    ).toBeInTheDocument()
-
-    const deleteForeverButton = screen.getByRole('button', { name: /delete forever/i })
-    expect(deleteForeverButton).toBeDisabled()
-
-    const confirmInput = screen.getByLabelText(/type.*to confirm/i)
-    await user.type(confirmInput, 'wrong-slug')
-    expect(deleteForeverButton).toBeDisabled()
-
-    await user.clear(confirmInput)
-    await user.type(confirmInput, 'ues')
-    expect(deleteForeverButton).toBeEnabled()
+    const deleteForever = screen.getByRole('button', { name: /delete forever/i })
+    expect(deleteForever).toBeDisabled()
+    const confirm = screen.getByLabelText(/type.*to confirm/i)
+    await user.type(confirm, 'wrong-slug')
+    expect(deleteForever).toBeDisabled()
+    await user.clear(confirm)
+    await user.type(confirm, 'ues')
+    expect(deleteForever).toBeEnabled()
   })
 
   it('Cancel backs out of the confirmation without deleting', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
-    await openCard(user, cardFor(/upper east side/i))
-
-    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+    await user.click(within(cardFor('ues')).getByRole('button', { name: 'Delete' }))
     await user.type(screen.getByLabelText(/type.*to confirm/i), 'ues')
     await user.click(screen.getByRole('button', { name: /^cancel$/i }))
-
     expect(screen.queryByText(/permanently deletes/i)).not.toBeInTheDocument()
     expect(fetchJson).not.toHaveBeenCalled()
   })
 
-  it('sends the confirmed slug to DELETE /api/admin/communities/:slug and does a full reload on success', async () => {
+  it('sends the confirmed slug to DELETE /api/admin/communities/:slug', async () => {
+    writes = () => ({ ok: true })
     const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
-    await openCard(user, cardFor(/upper east side/i))
-    vi.mocked(fetchJson).mockResolvedValueOnce({ ok: true })
-    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+    await user.click(within(cardFor('ues')).getByRole('button', { name: 'Delete' }))
     await user.type(screen.getByLabelText(/type.*to confirm/i), 'ues')
     await user.click(screen.getByRole('button', { name: /delete forever/i }))
 
-    // The success path calls window.location.reload() (see confirmDelete's
-    // own comment on why: a real, full reload, not a soft re-fetch — jsdom
-    // doesn't support stubbing location.reload directly, so this waits for
-    // the DELETE call it's meant to prove happened first) rather than
-    // asserting the reload call itself.
     await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
-    const call = vi.mocked(fetchJson).mock.calls[0]!
-    expect(call[0]).toBe('/api/admin/communities/ues')
-    const init = call[1] as RequestInit
-    expect(init.method).toBe('DELETE')
-    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok')
-    expect(JSON.parse(init.body as string)).toEqual({ confirmSlug: 'ues' })
+    const [url, init] = vi.mocked(fetchJson).mock.calls[0]!
+    expect(url).toBe('/api/admin/communities/ues')
+    expect((init as RequestInit).method).toBe('DELETE')
+    expect(((init as RequestInit).headers as Record<string, string>).Authorization).toBe('Bearer tok')
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ confirmSlug: 'ues' })
   })
 
   it('shows a server-side error inline and leaves the community in the list', async () => {
-    vi.mocked(fetchJson).mockRejectedValue(new Error('The default community cannot be deleted.'))
+    writes = () => {
+      throw new Error('The default community cannot be deleted.')
+    }
     const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
-    await openCard(user, cardFor(/upper east side/i))
-
-    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+    await user.click(within(cardFor('ues')).getByRole('button', { name: 'Delete' }))
     await user.type(screen.getByLabelText(/type.*to confirm/i), 'ues')
     await user.click(screen.getByRole('button', { name: /delete forever/i }))
-
     expect(await screen.findByText('The default community cannot be deleted.')).toBeInTheDocument()
-    // Still in the list — the card (and its own link to the admin console)
-    // is still there, even though the confirmation panel — which repeats
-    // the name in its own warning text — is still open since the delete
-    // failed. cardFor itself would throw on more than one match, so its
-    // success here already proves there's exactly one link.
-    expect(cardFor(/upper east side/i)).toBeInTheDocument()
-  })
-
-  // The live site used to hide every delete button; the user asked for
-  // delete there too (Oct 29). Still never on the default community.
-  it('shows Delete on the live site, except on the default community', async () => {
-    vi.stubEnv('NEXT_PUBLIC_VERCEL_ENV', 'production')
-    const user = userEvent.setup()
-    await renderAndWaitForList([philly, ues])
-    await openCard(user, cardFor(/philadelphia/i))
-    await openCard(user, cardFor(/upper east side/i))
-
-    expect(screen.getAllByRole('button', { name: /^delete$/i })).toHaveLength(1)
-    expect(screen.queryByText(/communities can.t be deleted on the live site/i)).not.toBeInTheDocument()
+    expect(cardFor('ues')).toBeInTheDocument()
   })
 })
 
-describe('CommunityManager — the hidden-community preview link', () => {
-  function stubClipboard(writeText: (text: string) => Promise<void>) {
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
-  }
-
+describe('CommunityManager — the hidden community’s preview link', () => {
   afterEach(() => {
     delete (navigator as { clipboard?: unknown }).clipboard
   })
 
-  const philly = makeCommunity({ slug: 'philly', name: 'Philadelphia', isDefault: true, visible: true })
-  const ues = {
-    ...makeCommunity({ slug: 'ues', name: 'Upper East Side', region: 'Manhattan', isDefault: false, visible: false }),
-    previewToken: 'super-secret-token',
-  }
-
-  it('shows no preview link for a visible community', async () => {
-    const user = userEvent.setup()
+  it('offers no preview link for a live community', async () => {
     await renderAndWaitForList([philly, { ...ues, visible: true }])
-    await openCard(user, cardFor(/upper east side/i))
-    expect(screen.queryByDisplayValue(/access=/)).not.toBeInTheDocument()
+    expect(within(cardFor('ues')).queryByRole('button', { name: /preview link/i })).toBeNull()
+    expect(within(cardFor('ues')).getByRole('button', { name: 'Unpublish' })).toBeInTheDocument()
   })
 
-  it('shows the ?access= link for a hidden community', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList([philly, ues])
-    await openCard(user, cardFor(/upper east side/i))
-    const input = screen.getByDisplayValue(/\/ues\?access=super-secret-token$/) as HTMLInputElement
-    expect(input).toHaveAttribute('readOnly')
-  })
-
-  it('copies the link and shows confirmation on click', async () => {
-    // userEvent.setup() installs its own clipboard stub (for its paste/copy
-    // simulation), so stubClipboard has to run AFTER it or user-event's
-    // stub silently wins — same trap useShareLink.test.tsx avoids by using
-    // fireEvent instead of userEvent for its clipboard tests.
+  it('copies the ?access= link and says so', async () => {
+    // userEvent.setup() installs its own clipboard; ours goes on after it.
     const user = userEvent.setup()
     const writeText = vi.fn().mockResolvedValue(undefined)
-    stubClipboard(writeText)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     await renderAndWaitForList([philly, ues])
-    await openCard(user, cardFor(/upper east side/i))
-
-    await user.click(screen.getByRole('button', { name: /copy link/i }))
-
+    await user.click(within(cardFor('ues')).getByRole('button', { name: 'Copy preview link' }))
     expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\/ues\?access=super-secret-token$/))
-    expect(await screen.findByRole('button', { name: /copied!/i })).toBeInTheDocument()
+    expect(await within(cardFor('ues')).findByRole('button', { name: 'Copied' })).toBeInTheDocument()
+  })
+
+  it('shows the link to copy by hand when the clipboard says no', async () => {
+    const user = userEvent.setup()
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) }, configurable: true })
+    await renderAndWaitForList([philly, ues])
+    await user.click(within(cardFor('ues')).getByRole('button', { name: 'Copy preview link' }))
+    expect((await screen.findByLabelText<HTMLInputElement>('Preview link')).value).toMatch(/\/ues\?access=super-secret-token$/)
   })
 })
 
 describe('CommunityManager — publishing a community', () => {
-  const philly = makeCommunity({ slug: 'philly', name: 'Philadelphia', isDefault: true, visible: true })
-  const ues = makeCommunity({ slug: 'ues', name: 'Upper East Side', region: 'Manhattan', isDefault: false, visible: false })
-
-  it('labels a visible community "Live" and a hidden one "Hidden"', async () => {
-    await renderAndWaitForList([philly, ues])
-
-    expect(within(cardFor(/philadelphia/i)).getByText('Live')).toBeInTheDocument()
-    expect(within(cardFor(/upper east side/i)).getByText('Hidden')).toBeInTheDocument()
-  })
-
-  it('shows the still-reachable-by-URL note only for a hidden community', async () => {
+  it('PATCHes visible:true and flips the card to Live on Publish', async () => {
+    writes = () => ({ community: { ...ues, visible: true, previewToken: null } })
     const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
-    await openCard(user, cardFor(/philadelphia/i))
-    await openCard(user, cardFor(/upper east side/i))
-
-    expect(within(cardFor(/philadelphia/i)).queryByText(/not on the switcher or sitemap/i)).not.toBeInTheDocument()
-    expect(within(cardFor(/upper east side/i)).getByText(/not on the switcher or sitemap/i)).toBeInTheDocument()
-  })
-
-  it('offers "Publish" for a hidden community and "Unpublish" for a visible one', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList([philly, ues])
-    await openCard(user, cardFor(/philadelphia/i))
-    await openCard(user, cardFor(/upper east side/i))
-
-    expect(within(cardFor(/philadelphia/i)).getByRole('button', { name: /^unpublish$/i })).toBeInTheDocument()
-    expect(within(cardFor(/upper east side/i)).getByRole('button', { name: /^publish$/i })).toBeInTheDocument()
-  })
-
-  it('PATCHes visible:true and flips the row to "Live" on Publish', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList([philly, ues])
-    await openCard(user, cardFor(/upper east side/i))
-    vi.mocked(fetchJson).mockResolvedValueOnce({ community: { ...ues, visible: true, previewToken: null } })
-
-    await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /^publish$/i }))
+    await user.click(within(cardFor('ues')).getByRole('button', { name: 'Publish' }))
 
     await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
-    const call = vi.mocked(fetchJson).mock.calls[0]!
-    expect(call[0]).toBe('/api/admin/communities/ues')
-    const init = call[1] as RequestInit
-    expect(init.method).toBe('PATCH')
-    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok')
-    expect(JSON.parse(init.body as string)).toEqual({ visible: true })
-
-    expect(await within(cardFor(/upper east side/i)).findByText('Live')).toBeInTheDocument()
+    const [url, init] = vi.mocked(fetchJson).mock.calls[0]!
+    expect(url).toBe('/api/admin/communities/ues')
+    expect((init as RequestInit).method).toBe('PATCH')
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ visible: true })
+    expect(await within(cardFor('ues')).findByText('Live')).toBeInTheDocument()
+    expect(within(cardFor('ues')).queryByRole('button', { name: 'Copy preview link' })).toBeNull()
   })
 
-  it('shows a server-side error inline and leaves the community\'s visibility unchanged', async () => {
-    vi.mocked(fetchJson).mockRejectedValue(new Error('Could not update visibility.'))
+  it('shows a server-side error inline and leaves the community’s visibility unchanged', async () => {
+    writes = () => {
+      throw new Error('Could not update visibility.')
+    }
     const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
-    await openCard(user, cardFor(/upper east side/i))
-
-    await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /^publish$/i }))
-
+    await user.click(within(cardFor('ues')).getByRole('button', { name: 'Publish' }))
     expect(await screen.findByText('Could not update visibility.')).toBeInTheDocument()
-    expect(within(cardFor(/upper east side/i)).getByText('Hidden')).toBeInTheDocument()
-  })
-})
-
-// Who can sign in is each community's own Team tab now (the admin
-// redesign's step 5): a card says how many, and links there.
-describe('CommunityManager — admins', () => {
-  const ues = makeCommunity({ slug: 'ues', name: 'Upper East Side', region: 'Manhattan', adminEmails: ['jane@example.com', 'sam@example.com'] })
-
-  it('links each community to its own Team tab, with no list to change here', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList([ues])
-    const card = cardFor(/upper east side/i)
-    expect(within(card).getByText(/2 admins/)).toBeInTheDocument()
-    await openCard(user, card)
-
-    expect(within(card).getByRole('link', { name: 'Change who can sign in' })).toHaveAttribute('href', '/ues/admin/team')
-    expect(within(card).queryByText('jane@example.com')).toBeNull()
-    expect(within(card).queryByRole('button', { name: /remove/i })).toBeNull()
+    expect(within(cardFor('ues')).getByText('Hidden')).toBeInTheDocument()
   })
 })

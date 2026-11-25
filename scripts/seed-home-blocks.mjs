@@ -42,7 +42,6 @@ const supabase = createClient(url, serviceRoleKey, { auth: { persistSession: fal
 const BUILT_INS = [
   { id: 'browse', kind: 'browse', title: 'Categories Card', sort_order: -500, card_ids: [] },
   { id: 'davening', kind: 'davening', title: 'Davening Times Card', sort_order: -400, card_ids: [] },
-  { id: 'listings', kind: 'listings', title: 'Update Listings Card', sort_order: -300, card_ids: [] },
   { id: 'map', kind: 'map', title: 'Map Card', sort_order: -200, card_ids: [] },
   // Deliberately huge sort_orders, not just "after the earlier built-ins" —
   // they need to sort after every category section too (those start at

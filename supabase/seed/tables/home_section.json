@@ -129,16 +129,5 @@
   "kind": "suggest",
   "width": "full",
   "shares_row": false
- },
- {
-  "id": "zmanim",
-  "title": "Prayer & Shabbat Times",
-  "sort_order": 100,
-  "card_ids": [],
-  "created_at": "2026-08-18T18:06:58.935003+00:00",
-  "community_id": "philly",
-  "kind": "zmanim",
-  "width": "full",
-  "shares_row": false
  }
 ]

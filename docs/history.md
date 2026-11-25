@@ -4,6 +4,65 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## New community: pick the city, and a starter pack (Nov 25)
+
+Boards 1, 2f and 3 of the new-community drawing, as the user approved
+them ("Yes, build it"). The site owner's New community (`/admin`):
+
+- **Which city?** Google's cities as you type, through our own
+  `/api/admin/cities` (`src/lib/googleCities.ts`, the Maps server key;
+  the browser key is refused on localhost). Picked, the city fills in
+  the rest: a card ("Baltimore, Maryland · Eastern Time · map starts
+  downtown") with Change, the name ("Baltimore Jewish Guide"), its
+  address with Edit, the time zone (`tz-lookup`) and where the map
+  starts. The old form's More details (mission, region, colours,
+  lat/lng) went: the mission is written from the city, the colours are
+  the site's own, and all of it stays editable in the community's
+  Settings.
+- **Who runs it:** a list with Add and ×, instead of a comma-separated
+  box. An address typed and not added still counts.
+- **Starter pack,** on unless switched off (`src/lib/starterPack.ts`):
+  Synagogues, Food, Grocery, Mikvah, Eruv, Candle Lighting and the Map,
+  copied from the default community (Philly), with its home (Right now,
+  Suggest, the email signup and the groups trimmed to those pages), its
+  tabs and desktop menu, and its food words. Left behind: places,
+  forms, the logo and photos, the outside links (mikvah.org at
+  Philly's coordinates), and the hechshers (the user: "hechshers should
+  be empty"). Schools, Hospitals and Hotels are out ("Not every
+  community has hospitals like that"). The headline's "Philadelphia"
+  becomes the new city. It replaces Clone from, which copied a whole
+  community's pages and home.
+- **A change to an earlier rule:** the old clone never copied
+  crowdsourced vocabulary. The pack copies the food words (slugs and
+  labels only, not which places carry them), so item search knows
+  "challah" on day one.
+- **The list after Create** (board 3): the new community at the top,
+  outlined, Hidden, "/baltimore · 1 admin · 0 places", with Open its
+  admin, Copy preview link and Publish. The default community is one
+  row to its admin. Delete stays, quietly, on the others; the
+  "Change who can sign in" link and the hidden-community note went
+  (Open its admin, then Team).
+- **The list reads the communities fresh** (`readCommunities`): the
+  cached list is stale-while-revalidate, so its first read after a
+  create could leave out the one just made. The public reads stay
+  cached.
+- Migration 115 deletes the home rows nothing draws any more and
+  narrows the kinds; not run anywhere yet (where-things-stand, 92).
+
+Not as drawn: no "Communities" heading over the list (the page's own
+heading and tab say it); the city list shows Google's "MD, USA" where the
+board wrote "Maryland" (the card says "Maryland"); Create lands on the
+list rather than in the new console. The grocery page's description
+("…near the hospital") is copied as Philly wrote it.
+
+Tests: `CommunityManager.test.tsx` rewritten (21 of 23 failed against
+the old screen), the route's (7 of 8 against the old route, and the
+fresh-list test 1 of 1 against the cached read), `starterPack.test.ts`
+(2 of 7 without the clearing and the retired-row filter),
+`googleCities.test.ts`, the cities route's (2 of 4 without the time zone and the 502); `community-editor.spec.ts` drives it with
+Google answered at our route, the pack included. Checked in the browser
+on desktop and phone against the boards.
+
 ## Suggest a listing opened Add only the first time (Nov 25)
 
 The user, on the computer: Suggest a listing, then a category, opened

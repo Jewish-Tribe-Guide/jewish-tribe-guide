@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { expect, test, type Locator } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 import {
   ADMIN_WRITE_TEST_ADMIN_EMAIL,
@@ -7,15 +7,10 @@ import {
 } from '../scripts/cacheE2eAdmin.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Drives CommunityManager's real create flow — creating a community through
-// the actual admin UI, both "start empty" and "clone from an existing
-// community". Same disposable test Supabase project as the rest of this
-// suite (see playwright.admin-write.config.ts).
-//
-// The "clone from" case seeds its own source community + category directly
-// via the service-role key rather than depending on whatever a real community
-// happens to hold at the moment — that state is
-// mutated by every other spec in this suite and isn't this test's to assume.
+// Drives CommunityManager's real create flow — New community through the
+// actual admin UI, with the starter pack off and on (the pack copies from the
+// seed's default community, philly) — and deleting one. Same local test
+// database as the rest of this suite (see playwright.admin-write.config.ts).
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getAdminClient() {
@@ -27,7 +22,7 @@ function getAdminClient() {
 // Tracked by slug — every row this suite creates, cleaned up in reverse
 // dependency order (categories/home_sections before the community row
 // itself, since there's no FK cascade — community_id is a plain text
-// column, same reasoning cloneCommunityContent's own comment gives).
+// column, as removeUnfinishedCommunity's own comment gives).
 const pendingSlugs: string[] = []
 
 test.afterEach(async () => {
@@ -36,73 +31,76 @@ test.afterEach(async () => {
     await supabase.from('resource').delete().eq('community_id', slug)
     await supabase.from('category').delete().eq('community_id', slug)
     await supabase.from('home_section').delete().eq('community_id', slug)
+    await supabase.from('site_settings').delete().eq('community_id', slug)
+    await supabase.from('tag').delete().eq('community_id', slug)
     await supabase.from('community').delete().eq('slug', slug)
   }
 })
 
 const visible = (page: import('@playwright/test').Page, locator: Locator) => locator.and(page.locator(':visible'))
 
-// Mission/region/timezone/map center/colors live under a collapsed
-// "More details" disclosure now (see CommunityManager.tsx's own comment on
-// why — none of it is required to create a community, since it starts
-// unpublished either way). This suite still fills them in by hand rather
-// than relying on the city picker's auto-fill, so it stays independent of
-// Google Places being reachable in CI.
-async function openMoreDetails(page: import('@playwright/test').Page) {
-  await visible(page, page.getByRole('button', { name: /show more details/i })).click()
+// New community asks Google for cities through our own /api/admin/cities
+// (Nov 25), which the page answers here: the suite stays independent of
+// Google being reachable, or a key being set, in CI.
+async function answerForGoogle(page: Page) {
+  await page.route('**/api/admin/cities?**', (route) => {
+    const url = new URL(route.request().url())
+    if (url.searchParams.get('placeId')) {
+      return route.fulfill({ json: { ok: true, city: { city: 'Testville', area: 'Pennsylvania', lat: 39.95, lng: -75.16, timezone: 'America/New_York' } } })
+    }
+    return route.fulfill({ json: { ok: true, cities: [{ placeId: 'p-testville', city: 'Testville', area: 'PA, USA' }] } })
+  })
 }
 
-// Create, then a full load of the new console. 7–8.5s for the whole delete
-// test locally, and the create step alone overran 10s on a CI runner (PR 387,
-// Nov 16; main on Nov 14 too).
+// Create lands back on the list, the new community marked. A full load, and
+// the create itself overran 10s on a CI runner (PR 387, Nov 16).
 const CREATED = 30_000
 
-test('creating a community through the real UI, starting empty, makes it live with no redeploy', async ({ page, request }) => {
+/** Makes a community through New community, as the site owner would. */
+async function createThroughUI(page: Page, { name, slug, starterPack }: { name: string; slug: string; starterPack: boolean }) {
+  await answerForGoogle(page)
+  await page.goto('/admin')
+  await visible(page, page.getByRole('button', { name: 'New community' })).click()
+  await page.getByRole('combobox', { name: 'Which city?' }).fill('Testv')
+  await page.getByRole('option', { name: 'Testville, PA, USA' }).click()
+  await expect(page.getByLabel('Name')).toHaveValue('Testville Jewish Guide')
+  await page.getByLabel('Name').fill(name)
+  // The address follows the city; the test's own keeps cleanup exact.
+  await page.getByRole('button', { name: 'Edit its address' }).click()
+  await page.getByLabel(/Its address/).fill(slug)
+  if (!starterPack) await page.getByRole('switch', { name: 'Starter pack' }).click()
+  await page.getByRole('button', { name: 'Create Testville' }).click()
+  await expect(page).toHaveURL(new RegExp(`/admin\\?made=${slug}$`), { timeout: CREATED })
+  const card = page.locator(`[data-community-slug="${slug}"]`)
+  await expect(card).toHaveAttribute('data-just-made', 'true')
+  return card
+}
+
+test('a community made with the starter pack off starts hidden, with only the screens every community has', async ({ page, request }) => {
   const slug = `e2e-fresh-${randomUUID().slice(0, 8)}`
   pendingSlugs.push(slug)
   const name = `E2E Fresh ${slug}`
 
-  await page.goto('/admin')
-  await visible(page, page.getByRole('button', { name: '+ New community' })).click()
-
-  await page.getByLabel('Name').fill(name)
-  // Slug auto-derives from the name; the generated one won't match our
-  // randomUUID-based fixture, so overwrite it to keep cleanup exact.
-  await page.getByLabel('URL slug').fill(slug)
-  await openMoreDetails(page)
-  await page.getByLabel('Mission').fill('A guide to a brand-new disposable test community.')
-  await page.getByLabel('Region').fill('Testville')
-  await page.getByLabel('Map center latitude').fill('39.95')
-  await page.getByLabel('Map center longitude').fill('-75.16')
-  // "Start empty" is the default selection — no change needed.
-
-  await visible(page, page.getByRole('button', { name: 'Create community' })).click()
-
-  // Successful creation redirects into the new community's own admin console.
-  await expect(page).toHaveURL(new RegExp(`/${slug}/admin$`), { timeout: CREATED })
+  const card = await createThroughUI(page, { name, slug, starterPack: false })
+  await expect(card).toContainText(name)
+  await expect(card).toContainText('Hidden')
+  await expect(card.getByRole('link', { name: 'Open its admin' })).toHaveAttribute('href', `/${slug}/admin`)
+  await expect(card.getByRole('button', { name: 'Copy preview link' })).toBeVisible()
 
   const supabase = getAdminClient()
-  const { data: created } = await supabase.from('community').select('slug, name, admin_emails').eq('slug', slug).maybeSingle()
+  const { data: created } = await supabase.from('community').select('name, region, timezone, admin_emails, visible').eq('slug', slug).maybeSingle()
   expect(created, 'the community should exist in the database after Create').not.toBeNull()
-  expect(created!.name).toBe(name)
+  expect(created).toMatchObject({ name, region: 'Testville', timezone: 'America/New_York', visible: false })
 
   // Every superadmin (SUPERADMIN_EMAILS, computed for this run by
   // run-test-project-server.mjs the same way auth.setup.ts's own session
-  // is) should be folded in automatically — the "Admin emails" field above
-  // was never filled in, so a community whose admin_emails came out empty
-  // would otherwise lock every superadmin out of the console it just
-  // created (see the create route's own comment). Not read from
-  // process.env.SUPERADMIN_EMAILS here — that's set inside the webServer's
-  // own child process (run-test-project-server.mjs), not visible to this
-  // Playwright test process — so it's recomputed the same way instead.
-  // Both suites' admins: run-test-project-server.mjs lists both, whichever
-  // suite started it.
-  const expectedSuperadmins = [CACHE_TEST_ADMIN_EMAIL, ADMIN_WRITE_TEST_ADMIN_EMAIL]
-  for (const email of expectedSuperadmins) {
+  // is) is folded in, so none is locked out of what they just made. Both
+  // suites' admins: the server lists both, whichever suite started it.
+  for (const email of [CACHE_TEST_ADMIN_EMAIL, ADMIN_WRITE_TEST_ADMIN_EMAIL]) {
     expect(created!.admin_emails).toContain(email)
   }
 
-  // Live immediately — no redeploy, no manual cache warmup.
+  // Live to whoever has the link — no redeploy, no manual cache warmup.
   const publicRes = await request.get(`/${slug}`)
   expect(publicRes.status()).toBe(200)
 
@@ -112,88 +110,36 @@ test('creating a community through the real UI, starting empty, makes it live wi
   expect(categories).toHaveLength(3)
 })
 
-test('cloning from an existing community carries its categories over', async ({ page }) => {
-  // The stale-communities-list poll below can alone take up to 30s (see its
-  // own comment) — Playwright's 30s default test timeout leaves nothing left
-  // over to actually fill in and submit the second form afterward.
-  test.setTimeout(75_000)
+test('the starter pack copies the default’s pack pages, home and tabs, with no places, photos or hechshers', async ({ page }) => {
+  const slug = `e2e-pack-${randomUUID().slice(0, 8)}`
+  pendingSlugs.push(slug)
 
-  const sourceSlug = `e2e-clone-src-${randomUUID().slice(0, 8)}`
-  const targetSlug = `e2e-clone-dst-${randomUUID().slice(0, 8)}`
-  pendingSlugs.push(sourceSlug, targetSlug)
-  const sourceName = `E2E Clone Source ${sourceSlug}`
+  await createThroughUI(page, { name: `E2E Pack ${slug}`, slug, starterPack: true })
 
-  // The source community is created through the real UI (not a direct DB
-  // insert) specifically so its own creation goes through
-  // revalidatePublicContent() — otherwise the cached GET /api/communities
-  // the second creation's "Clone from…" dropdown reads wouldn't know this
-  // community exists yet, and there'd be nothing to select below.
-  await page.goto('/admin')
-  await visible(page, page.getByRole('button', { name: '+ New community' })).click()
-  await page.getByLabel('Name').fill(sourceName)
-  await page.getByLabel('URL slug').fill(sourceSlug)
-  await openMoreDetails(page)
-  await page.getByLabel('Mission').fill('Source community for a clone test.')
-  await page.getByLabel('Region').fill('Testville')
-  await page.getByLabel('Map center latitude').fill('39.95')
-  await page.getByLabel('Map center longitude').fill('-75.16')
-  await visible(page, page.getByRole('button', { name: 'Create community' })).click()
-  await expect(page).toHaveURL(new RegExp(`/${sourceSlug}/admin$`), { timeout: CREATED })
-
-  // One category, seeded directly — cloneCommunityContent reads categories
-  // with an uncached query, so this needs no cache-busting of its own.
   const supabase = getAdminClient()
-  const { error: categoryErr } = await supabase.from('category').insert({
-    id: 'grocery',
-    community_id: sourceSlug,
-    label: 'Grocery Store',
-    plural_label: 'Grocery Stores',
-    icon: '🛒',
-    kind: 'listing',
-  })
-  expect(categoryErr).toBeNull()
+  const { data: categories } = await supabase.from('category').select('id, kind, card_image_url, fields').eq('community_id', slug)
+  expect((categories ?? []).map((c) => c.id).sort()).toEqual(['eruv-information', 'grocery', 'map', 'mikvah', 'restaurant', 'synagogue', 'zmanim'])
+  expect((categories ?? []).every((c) => c.card_image_url === null)).toBe(true)
+  const food = (categories ?? []).find((c) => c.id === 'restaurant')!
+  const hechsher = (food.fields as { key: string; options?: unknown[] }[]).find((f) => f.key === 'kosherCert')
+  if (hechsher) expect(hechsher.options).toEqual([])
 
-  // The communities list (GET /api/communities → listCommunities(), 'use
-  // cache', cacheLife('days')) is stale-while-revalidate: the source's own
-  // creation called revalidateTag(TAGS.communities, 'max') a moment ago, but
-  // that marks the entry stale rather than purging it — the very next read
-  // can still get served the pre-creation snapshot while a fresh one
-  // regenerates behind it (same mechanism AGENTS.md documents for the
-  // cache-roundtrip /about flake). CommunityManager only fetches once per
-  // mount, so Playwright's own retry-the-same-DOM behavior on selectOption
-  // below can't out-wait a stale first load — only a fresh navigation can.
-  // Poll with real reloads instead of trusting the first one.
-  await expect(async () => {
-    await page.goto('/admin')
-    // Scoped to the community-list card's own link, not just any text match
-    // — the admin's own community switcher also renders this name as an
-    // <option>, which a plain getByText matches too and makes ambiguous.
-    await expect(page.getByRole('link', { name: sourceName })).toBeVisible({ timeout: 2_000 })
-  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000, 3_000] })
+  const { data: sections } = await supabase.from('home_section').select('id, kind, card_ids').eq('community_id', slug)
+  expect(sections!.length).toBeGreaterThan(0)
+  const packIds = new Set((categories ?? []).map((c) => c.id))
+  for (const section of sections!) {
+    expect(['zmanim', 'shabbat', 'featured', 'listings']).not.toContain(section.kind)
+    for (const id of (section.card_ids as string[]) ?? []) expect(packIds.has(id), `${section.id} shows ${id}`).toBe(true)
+  }
 
-  const name = `E2E Clone Target ${targetSlug}`
-  await visible(page, page.getByRole('button', { name: '+ New community' })).click()
+  const { data: settings } = await supabase.from('site_settings').select('name, desktop_hero_headline, logo_url').eq('community_id', slug).maybeSingle()
+  expect(settings).toMatchObject({ name: `E2E Pack ${slug}`, logo_url: null })
+  expect(settings!.desktop_hero_headline ?? '').not.toContain('Philadelphia')
 
-  await page.getByLabel('Name').fill(name)
-  await page.getByLabel('URL slug').fill(targetSlug)
-  await openMoreDetails(page)
-  await page.getByLabel('Mission').fill('A guide to a cloned disposable test community.')
-  await page.getByLabel('Region').fill('Testville')
-  await page.getByLabel('Map center latitude').fill('39.95')
-  await page.getByLabel('Map center longitude').fill('-75.16')
-  await page.getByLabel('Starting content').selectOption({ label: `Clone from ${sourceName}` })
-
-  await visible(page, page.getByRole('button', { name: 'Create community' })).click()
-  await expect(page).toHaveURL(new RegExp(`/${targetSlug}/admin$`), { timeout: CREATED })
-
-  const { data: clonedCategory } = await supabase
-    .from('category')
-    .select('id, label')
-    .eq('community_id', targetSlug)
-    .eq('id', 'grocery')
-    .maybeSingle()
-  expect(clonedCategory, 'the source category should have been cloned onto the new community').not.toBeNull()
-  expect(clonedCategory!.label).toBe('Grocery Store')
+  const { count: tags } = await supabase.from('tag').select('slug', { count: 'exact', head: true }).eq('community_id', slug)
+  expect(tags).toBeGreaterThan(0)
+  const { count: places } = await supabase.from('resource').select('id', { count: 'exact', head: true }).eq('community_id', slug)
+  expect(places).toBe(0)
 })
 
 test('deleting a community through the real UI removes it and everything in it', async ({ page }) => {
@@ -208,17 +154,7 @@ test('deleting a community through the real UI removes it and everything in it',
   // /api/admin/communities read instead of sitting behind
   // cacheLife('days')'s stale-while-revalidate window with nothing to ever
   // invalidate it.
-  await page.goto('/admin')
-  await visible(page, page.getByRole('button', { name: '+ New community' })).click()
-  await page.getByLabel('Name').fill(name)
-  await page.getByLabel('URL slug').fill(slug)
-  await openMoreDetails(page)
-  await page.getByLabel('Mission').fill('A guide to a disposable test community, about to be deleted.')
-  await page.getByLabel('Region').fill('Testville')
-  await page.getByLabel('Map center latitude').fill('39.95')
-  await page.getByLabel('Map center longitude').fill('-75.16')
-  await visible(page, page.getByRole('button', { name: 'Create community' })).click()
-  await expect(page).toHaveURL(new RegExp(`/${slug}/admin$`), { timeout: CREATED })
+  await createThroughUI(page, { name, slug, starterPack: false })
 
   // A category + listing, added directly — there's something real to prove
   // gets swept along with the community, beyond what the creation flow
@@ -243,20 +179,10 @@ test('deleting a community through the real UI removes it and everything in it',
   })
   expect(resourceErr).toBeNull()
 
-  // Same staleness reasoning as the clone test's second poll — the
-  // just-created community's own revalidation happened a moment ago and
-  // marks the entry stale rather than purging it, so the very next read can
-  // still serve the pre-creation snapshot while a fresh one regenerates.
-  await expect(async () => {
-    await page.goto('/admin')
-    await expect(page.getByRole('link', { name })).toBeVisible({ timeout: 2_000 })
-  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000, 3_000] })
-
-  // Delete is on the card itself, without opening it (the user, Oct 31:
-  // nobody could find it behind Show).
-  const card = page.getByRole('link', { name }).locator('..').locator('..')
-  // exact: true — the Show toggle's own name holds "E2E Delete …" too.
-  await visible(page, card.getByRole('button', { name: 'Delete', exact: true })).click()
+  // The list reads the communities fresh (Nov 25), so a load shows it.
+  await page.reload()
+  const card = page.locator(`[data-community-slug="${slug}"]`)
+  await card.getByRole('button', { name: 'Delete', exact: true }).click()
   await page.getByLabel(`Type ${slug} to confirm`).fill(slug)
   // Waited for explicitly rather than inferred from the UI settling — this
   // is the one action in this whole file whose success can't be re-derived
@@ -275,14 +201,10 @@ test('deleting a community through the real UI removes it and everything in it',
   ])
   expect(deleteRes.status(), 'DELETE /api/admin/communities/:slug should succeed').toBe(200)
 
-  // The reload lands back on this same page; same stale-while-revalidate
-  // reasoning as the poll above applies to it too (revalidatePublicContent()
-  // marks the cached list stale rather than purging it), so confirm with a
-  // poll rather than trusting the reload's own first paint.
-  await expect(async () => {
-    await page.goto('/admin')
-    await expect(page.getByRole('link', { name })).not.toBeVisible({ timeout: 2_000 })
-  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000, 3_000] })
+  // The reload lands back on this same page, which reads the list fresh.
+  await page.goto('/admin')
+  await expect(page.getByRole('button', { name: 'New community' })).toBeVisible()
+  await expect(page.locator(`[data-community-slug="${slug}"]`)).toHaveCount(0)
 
   const { data: communityRow } = await supabase.from('community').select('slug').eq('slug', slug).maybeSingle()
   expect(communityRow, 'the community row should be gone').toBeNull()
