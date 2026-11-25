@@ -54,10 +54,11 @@ describe('CommunityEmailPage', () => {
       expect.stringMatching(/^4Copy the script/),
       '5Open script.google.com ↗Signed in as the guide’s Gmail. New project, then paste',
       '6Run install, then DeployWeb app, access Anyone',
-      expect.stringMatching(/^7Paste its link/),
+      expect.stringMatching(/^7Copy the Web app URL/),
     ])
     expect(within(box).getByRole('button', { name: 'Copy the script' })).toBeDisabled()
-    expect(within(box).getByLabelText('Its web app link')).toBeDisabled()
+    expect(within(box).getByLabelText('Web app URL')).toBeDisabled()
+    expect(within(box).getByLabelText('Web app URL')).toHaveAttribute('placeholder', 'https://script.google.com/macros/s/…/exec')
   })
 
   it('saves its address', async () => {
@@ -121,7 +122,7 @@ describe('CommunityEmailPage', () => {
     expect(screen.queryByRole('region', { name: 'Read the newsletters' })).toBeNull()
   })
 
-  it('Paste its link: tried at once, and says if it doesn’t answer', async () => {
+  it('Copy the Web app URL: tried at once, and says if it doesn’t answer', async () => {
     const user = userEvent.setup()
     show(own({ email: 'g@gmail.com' }), script())
     const load = vi.mocked(fetchJson).getMockImplementation()!
@@ -129,7 +130,7 @@ describe('CommunityEmailPage', () => {
       if (init?.method === 'POST') throw new Error('That link didn’t answer. Check access is set to Anyone.')
       return load(url, init, message)
     })
-    await user.type(await screen.findByLabelText('Its web app link'), 'https://script.google.com/macros/s/AKfy/exec')
+    await user.type(await screen.findByLabelText('Web app URL'), 'https://script.google.com/macros/s/AKfy/exec')
     const box = screen.getByRole('region', { name: 'Read the newsletters' })
     await user.click(within(box).getByRole('button', { name: 'Save' }))
     expect(await screen.findByText('That link didn’t answer. Check access is set to Anyone.')).toBeInTheDocument()

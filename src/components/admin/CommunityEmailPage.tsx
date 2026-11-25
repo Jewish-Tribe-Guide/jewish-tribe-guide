@@ -171,12 +171,12 @@ function ReadEmails({ script, from, off, onLink }: { script: string; from: numbe
             line="Signed in as the guide’s Gmail. New project, then paste"
           />
           <Step n={from + 3} dim={off} title="Run install, then Deploy" line="Web app, access Anyone" />
-          <Step n={from + 4} dim={off} title="Paste its link">
+          <Step n={from + 4} dim={off} title="Copy the Web app URL">
             <span className="mt-1.5 flex flex-wrap items-center gap-2.5">
               <input
                 type="url"
-                aria-label="Its web app link"
-                placeholder="Its web app link"
+                aria-label="Web app URL"
+                placeholder="https://script.google.com/macros/s/…/exec"
                 value={link}
                 disabled={off}
                 onChange={(e) => setLink(e.target.value)}
