@@ -6,6 +6,7 @@ import { isJoinLink } from './calendarFeed'
 import { dateText, type ScheduleDay, type ScheduleMinyan, type SpecialSchedule } from './schedules'
 import type { Festival } from './festivals'
 import type { ReadingMemo } from './readingMemo'
+import { fridayIsShabbos } from './shulTimes'
 
 // ── Reading a shul's Yom Tov schedule from what it sent (step 4) ────────────
 // The user's idea, agreed Oct 1: whoever has the shul's message (WhatsApp,
@@ -397,6 +398,37 @@ export function heldAsNote(line: string | null, notes: string | null): string | 
   return add.length ? [...add, notes].filter(Boolean).join('; ') : notes
 }
 
+/** Whether a quote is the message's own words: as written, or, where a
+ *  line gives several times ("Shacharit: 7:00 AM/8:00 AM"), that line's
+ *  words in order with the other times left out. Lower Merion's homepage,
+ *  Nov 25: the AI quoted its second Shacharis as "Shacharit: 8:00 AM",
+ *  words not in the text as written, and each line's second and third
+ *  times were dropped. Only within one line, so a time still has to be
+ *  beside its own words. */
+export function quotedIn(written: string, quote: string): boolean {
+  const q = plain(quote)
+  if (!q) return false
+  if (` ${plain(written)} `.includes(` ${q} `)) return true
+  const want = q.split(' ')
+  return written.split('\n').some((line) => {
+    if (line.length > 200) return false
+    const have = plain(line).split(' ')
+    let i = 0
+    for (const w of have) if (w === want[i]) i++
+    return i === want.length
+  })
+}
+
+/** "9:00am Sephardic Minyan": its name, the quote without its time, when
+ *  that leaves a short name. */
+function nameInQuote(quote: string): string | null {
+  const name = quote
+    .replace(/\b\d{1,2}(?::\d{2})?\s*(?:[ap]\.?\s*m\b\.?)?/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s:,;–—-]+|[\s:,;–—-]+$/g, '')
+  return name && name.length <= 40 && /[a-z]/i.test(name) ? name : null
+}
+
 /** The message's line a time was read from, when it's one service's line
  *  (a calendar's): a paragraph about several says nothing of one. */
 function lineOf(written: string | null, quote: string): string | null {
@@ -432,7 +464,7 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
     const date = typeof x.date === 'string' && DATE_RE.test(x.date) && x.date >= today && x.date <= yearOn ? x.date : undefined
     const weekdays = [...new Set((Array.isArray(x.days) ? x.days : []).filter(isWeekday))]
     if (!tefillah || !time || !quote || (!date && weekdays.length === 0)) continue
-    if (text !== null && !text.includes(` ${plain(quote)} `)) continue
+    if (written !== null && !quotedIn(written, quote)) continue
     if (date && !onDayNamed(date, quote)) continue
     // A time's season goes where the rest of the guide reads it, its note
     // ("Winter only", seasonFromNotes), unless the note already says.
@@ -459,7 +491,19 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
     // time on all the days either gives, not a second minyan.
     const at = asRegularTime(tefillah, time)
     // Not across seasons: 7:00 PM in summer and in winter is two times.
-    const twin = times.find((o) => o.tefillah === tefillah && o.date === date && o.time === at.time && o.anchor === at.anchor && o.offsetMinutes === at.offsetMinutes && seasonNote(o.notes) === seasonNote(notes ?? undefined))
+    // Nor two lines of one date: a calendar lists each minyan once, so
+    // Sons of Israel's "9:00am Sephardic Minyan" and "9:00am Main
+    // Sanctuary Minyan" are two (Nov 25: they were one, with no name).
+    const twin = times.find(
+      (o) =>
+        o.tefillah === tefillah &&
+        o.date === date &&
+        (!date || o.quote === quote) &&
+        o.time === at.time &&
+        o.anchor === at.anchor &&
+        o.offsetMinutes === at.offsetMinutes &&
+        seasonNote(o.notes) === seasonNote(notes ?? undefined),
+    )
     if (twin) {
       twin.days = [...new Set([...twin.days, ...(date ? [] : weekdays)])]
       if (signUp) twin.signUp = true
@@ -486,6 +530,8 @@ export function tidyRegularReading(raw: unknown, source: ScheduleSource, { today
     })
   }
   joinEvening(times)
+  namedApart(times)
+  fridayOnItsOwn(times)
   const dated = times.filter((t) => t.date).map((t) => t.date!).sort()
   let kind: RegularReading['kind'] = body.kind === 'week' ? 'week' : 'schedule'
   let from = typeof body.from === 'string' && ahead.has(body.from) ? body.from : (dated.find((d) => ahead.has(d)) ?? null)
@@ -529,7 +575,10 @@ function joinEvening(times: ReadRegularTime[]): void {
   const groups = new Map<string, ReadRegularTime[]>()
   for (const t of times) if (EVENING.includes(t.tefillah)) groups.set(at(t), [...(groups.get(at(t)) ?? []), t])
   for (const group of groups.values()) {
-    if (group.length < 2 || !group.some((t) => t.tefillah !== 'kabbalas_shabbos')) continue
+    // Two of one tefillah at one time are two minyanim, not one Mincha &
+    // Maariv: Sons of Israel's Teen Minyan and its Mincha, both 4:00pm
+    // (Nov 25).
+    if (new Set(group.map((t) => t.tefillah)).size < 2 || !group.some((t) => t.tefillah !== 'kabbalas_shabbos')) continue
     const [keep, ...rest] = group
     const notes = [keep.notes, group.some((t) => t.tefillah === 'kabbalas_shabbos') && !/kabbal/i.test(keep.notes ?? '') ? 'with Kabbalas Shabbos' : null].filter(Boolean).join('- ')
     Object.assign(keep, {
@@ -542,6 +591,35 @@ function joinEvening(times: ReadRegularTime[]): void {
       ...(!keep.where && rest.some((t) => t.where) ? { where: rest.find((t) => t.where)!.where } : {}),
     })
     for (const t of rest) times.splice(times.indexOf(t), 1)
+  }
+}
+
+/** Two minyanim at one time on one date, told apart by their names: one
+ *  with no note takes its name from its line ("Sephardic Minyan"), so the
+ *  week keeps both rather than one time with nothing to say which. */
+function namedApart(times: ReadRegularTime[]): void {
+  const at = (t: ReadRegularTime) => JSON.stringify([t.date, t.tefillah, t.time, t.anchor ?? null, t.offsetMinutes ?? null])
+  const count = new Map<string, number>()
+  for (const t of times) if (t.date) count.set(at(t), (count.get(at(t)) ?? 0) + 1)
+  for (const t of times) {
+    if (!t.date || t.notes || (count.get(at(t)) ?? 0) < 2) continue
+    const name = nameInQuote(t.quote)
+    if (name) t.notes = name
+  }
+}
+
+/** A usual evening time for several days, Friday among them, isn't
+ *  Friday's when the message gives Friday night its own time: Sons of
+ *  Israel's "Weekdays: Approximately 15 minutes before shkiah" came back
+ *  Monday to Friday, beside its Friday "Mincha followed by Kabbalat
+ *  Shabbat" (Nov 25). An early Mincha that isn't Shabbos's stays
+ *  (fridayIsShabbos). */
+function fridayOnItsOwn(times: ReadRegularTime[]): void {
+  const friday = (t: ReadRegularTime) => !t.date && EVENING.includes(t.tefillah) && fridayIsShabbos(t)
+  if (!times.some((t) => friday(t) && t.days.length === 1 && t.days[0] === 'fri')) return
+  for (const t of [...times]) {
+    if (!friday(t) || t.days.length < 2 || !t.days.includes('fri')) continue
+    t.days = t.days.filter((d) => d !== 'fri')
   }
 }
 

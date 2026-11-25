@@ -87,6 +87,9 @@ describe('a finding as the week put on the listing', () => {
     expect(schedules.find((s) => s.id === 'letter')).toBe(letter)
     const kept = schedules.find((s) => s.parts?.[0] === 'weekdays')!
     expect(kept.minyanim.map((x) => x.on)).toEqual([[MON]])
+    // Its own part's days only (Nov 25: Lower Merion's kept half spanned
+    // the whole week beside the new one).
+    expect([kept.from, kept.to]).toEqual([SUN, FRI])
     expect(schedules.find((s) => s.parts?.[0] === 'shabbos')!.minyanim.map((x) => x.time)).toEqual(['9:30 AM', '4:15 PM'])
   })
 })

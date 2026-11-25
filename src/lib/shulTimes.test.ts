@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan, Tefillah } from './davening'
 import type { ReadRegularTime, RegularReading } from './scheduleUpdate'
-import { calendarListsUsual, fromReading, pick, sameNote, weekFrom, type DatedTime, type Finding, type Part, type SourceKind, type SourceRead, type WeekContext } from './shulTimes'
+import { calendarListsUsual, fromReading, partOf, pick, sameNote, weekFrom, type DatedTime, type Finding, type Part, type SourceKind, type SourceRead, type WeekContext } from './shulTimes'
 
 // Each case here is a real one (docs/shul-watch-rebuild.md, "Steps" 3 and
 // "Cases from live"), from the Nov 5–19 To do items and the newsletters
@@ -193,10 +193,21 @@ describe('a short source', () => {
     const held = [t(FRI, 'kabbalas_shabbos', '4:25 PM')]
     const home = read(src('home', 'page'), 'schedule', { from: TUE, to: FRI }, [t(FRI, 'kabbalas_shabbos', '4:25 PM')])
     expect(part(weekFrom([home], ctx({ today: TUE, usual: USUAL, held: [{ part: 'shabbos', times: held }] })), 'shabbos')).toMatchObject({ do: 'nothing', reason: 'agrees' })
+    // Nov 25: its Friday "Mincha Gedolah: 12:18 PM" is Friday's, a
+    // weekday's, not Shabbos's: Shabbos still agrees.
     const more = read(src('home', 'page'), 'schedule', { from: TUE, to: FRI }, [t(FRI, 'mincha', '12:18 PM'), t(FRI, 'kabbalas_shabbos', '4:25 PM')])
-    const f = part(weekFrom([more], ctx({ today: TUE, usual: USUAL, held: [{ part: 'shabbos', times: held }] })), 'shabbos') as Extract<Finding, { do: 'ask' }>
-    expect(f).toMatchObject({ do: 'ask' })
-    expect([...f.extra, ...f.different.map((d) => d.read)].map((x) => x.time)).toEqual(['12:18 PM'])
+    const fs = weekFrom([more], ctx({ today: TUE, usual: USUAL, held: [{ part: 'shabbos', times: held }] }))
+    expect(part(fs, 'shabbos')).toMatchObject({ do: 'nothing', reason: 'agrees' })
+  })
+
+  it('Lower Merion: a Friday Mincha at midday is the weekdays’, one at a Shabbos time is Shabbos’s', () => {
+    expect(partOf({ date: FRI, tefillah: 'mincha', time: '12:18 PM' })).toBe('weekdays')
+    expect(partOf({ date: FRI, tefillah: 'mincha', time: '1:45 PM' })).toBe('weekdays')
+    expect(partOf({ date: FRI, tefillah: 'mincha', time: '4:25 PM' })).toBe('shabbos')
+    expect(partOf({ date: FRI, tefillah: 'mincha', time: '10 min before Sunset', anchor: 'sunset' })).toBe('shabbos')
+    expect(partOf({ date: FRI, tefillah: 'mincha' })).toBe('shabbos')
+    expect(partOf({ date: FRI, tefillah: 'kabbalas_shabbos', time: '1:00 PM' })).toBe('shabbos')
+    expect(partOf({ date: FRI, tefillah: 'shacharis', time: '7:00 AM' })).toBe('weekdays')
   })
 
   it('Mekor: its homepage’s Friday isn’t looked at beside the newsletter', () => {

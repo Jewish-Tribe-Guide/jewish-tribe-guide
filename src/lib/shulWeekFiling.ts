@@ -83,7 +83,7 @@ export function newsletterGives(schedules: readonly SpecialSchedule[], today: st
 
 /** The usual minyanim of a part on a date. */
 function usualOn(usual: readonly Minyan[], date: string, part: Part): Minyan[] {
-  return usual.filter((m) => m.days.includes(weekdayOf(date)) && partOf({ date, tefillah: m.tefillah }) === part)
+  return usual.filter((m) => m.days.includes(weekdayOf(date)) && partOf({ date, tefillah: m.tefillah, time: m.time, anchor: m.anchor }) === part)
 }
 
 const COMBINED: readonly Tefillah[] = ['mincha_maariv', 'kabbalas_shabbos']
@@ -180,13 +180,18 @@ const sameSchedule = (a: SpecialSchedule, b: SpecialSchedule) => {
 }
 
 /** One part of a schedule: a website week that spoke for both, kept for
- *  the part it isn't being replaced in. */
-function onlyPart(s: SpecialSchedule, part: Part, newId: () => string): SpecialSchedule | null {
+ *  the part it isn't being replaced in, over that part's days only. Kept
+ *  over the whole week, Lower Merion's Shabbos half and its new weekdays
+ *  were both Nov 22–27, and each was counted against the old week whole:
+ *  "51 changes" in the nightly email (Nov 25). */
+function onlyPart(s: SpecialSchedule, part: Part, week: { from: string; to: string }, newId: () => string): SpecialSchedule | null {
   const minyanim = s.minyanim.flatMap((m) => {
-    const on = m.on.filter((d) => scheduleDayDates(d, s).some((date) => partOf({ date, tefillah: m.tefillah }) === part))
+    const on = m.on.filter((d) => scheduleDayDates(d, s).some((date) => partOf({ date, tefillah: m.tefillah, time: m.time, anchor: m.anchor }) === part))
     return on.length ? [{ ...m, on }] : []
   })
-  return minyanim.length || s.whole ? { ...s, id: newId(), parts: [part], minyanim } : null
+  const days = partDates(part, week).filter((d) => d >= s.from && d <= s.to)
+  if (!days.length || (!minyanim.length && !s.whole)) return null
+  return { ...s, id: newId(), parts: [part], from: days[0], to: days.at(-1)!, minyanim }
 }
 
 /**
@@ -225,7 +230,7 @@ export function withFindings(
     const mine = covering(out, f.part, ctx.week).filter((s) => s.postedBy === 'website')
     if (mine.length === 1 && sameSchedule(mine[0], next)) continue
     const other = PARTS.find((p) => p !== f.part)!
-    const keep = mine.flatMap((s) => (speaksFor(s, other) && s.from <= partDates(other, ctx.week).at(-1)! && s.to >= partDates(other, ctx.week)[0] ? [onlyPart(s, other, newId)] : [])).filter((s): s is SpecialSchedule => !!s)
+    const keep = mine.flatMap((s) => (speaksFor(s, other) && s.from <= partDates(other, ctx.week).at(-1)! && s.to >= partDates(other, ctx.week)[0] ? [onlyPart(s, other, ctx.week, newId)] : [])).filter((s): s is SpecialSchedule => !!s)
     out = [...out.filter((s) => !mine.includes(s)), ...keep, next]
     lines[next.id] = findingLines(f)
   }

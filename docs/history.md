@@ -4,6 +4,59 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## Shul watches: what Nov 25 read wrong (Nov 25)
+
+The user: Lower Merion's and Sons of Israel's findings "still seem
+wrong", and the nightly email said 51 changes for Lower Merion. The AI's
+answers kept on the watches showed it had read the pages right; the
+code after it lost or merged what it read. Each fix is a general rule,
+not a shul's:
+
+- **Several times on one line.** "Shacharit: 7:00 AM/8:00 AM": the AI
+  quoted the second as "Shacharit: 8:00 AM", words not in the text as
+  written, so the check that a time is beside its own words dropped it
+  (Wednesday's 8:00, Thursday's 8:30, Friday's 8:00). A quote now
+  passes when it is one line's words in order (`quotedIn`).
+- **Two minyanim at one time.** A calendar's "9:00am Sephardic Minyan"
+  and "9:00am Main Sanctuary Minyan" were taken for one time given
+  twice, and the Teen Minyan's 4:00 Mincha and the shul's 4:00 Mincha
+  were joined as a Mincha & Maariv. Two lines of one date stay two, and
+  one with no note takes its name from its line (`namedApart`); two of
+  one tefillah are never a Mincha & Maariv (`joinEvening`).
+- **Friday's early Mincha is a weekday's.** "Mincha Gedolah: 12:18 PM"
+  went in the Shabbos part. A Friday Mincha at a clock time before 2:00
+  PM is the weekdays' (`fridayIsShabbos`), as how-we-work's "the
+  weekdays (Friday morning included)" means.
+- **A weekday evening time isn't Friday's when Friday night has its
+  own.** "Weekdays: 15 minutes before shkiah" came back Monday to
+  Friday beside the page's own Friday night (`fridayOnItsOwn`).
+- **A usual time in words isn't filed.** "Within 5 minutes of
+  candle-lighting" and the Teen Minyan's "concurrent to the main
+  sanctuary's schedule" took the place of the listing's times from
+  candle lighting, Havdalah and sunset. A usual time the watch can't
+  read as a clock or a rule from a zman is left out, and the listing's
+  minyan for that tefillah that day stays (`keepUnread`).
+- **51 changes.** Lower Merion's week was split, its Shabbos half kept
+  over the whole week beside the new weekdays, and the email set each
+  against the old week whole (26 + 25). A kept half now spans its own
+  days, and the email counts a week's changes across its schedules
+  together.
+- **To do showed a part's times all new.** It found the listing's copy
+  of a week by its id or the very same dates, so a Shabbos half (Fri–Sat)
+  against the listing's Sun–Sat week had none, and every time in it was
+  "New", and the old week was listed as taken off (Sons of Israel's).
+  Lower Merion's halves kept the old week's dates, matched it whole, and
+  the other half's days showed taken off. A week now compares with what
+  the listing's weeks hold on its days, for its part (`ownCopy` in
+  `timesProposal.ts`). Replayed on the two pending findings: Sons of
+  Israel's Wed–Fri shows nothing to change, its Shabbos two changes.
+
+Replayed from the readings kept on the watches (no AI, read-only):
+Lower Merion's homepage files one weekdays week with every time, and
+leaves Shabbos alone; Sons of Israel's Tefillot page files nothing; its
+calendar's Shabbos keeps four minyanim, named. The three findings filed
+that night were made by the old code.
+
 ## TypeScript 7 beside 6 (Nov 24)
 
 The package updates: TypeScript 7 (Jul 8) checks the whole project with
