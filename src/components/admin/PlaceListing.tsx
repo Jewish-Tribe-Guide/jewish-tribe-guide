@@ -188,9 +188,6 @@ export type SourceScreenProps = {
   onTried: () => Promise<void> | void
 }
 
-/** A source's screen as a line's control opens it: its title and what it asks. */
-export type SourceSpec = { title: string; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> }
-
 /** Change, and Add a source: where it's read from, filled in; Save, or Start
  *  reading once it's stopped, which reads at once and says if it couldn't. */
 export function SourceScreen({ label, value: first, button: words, attempt: firstAttempt, stop, extra, placeholder, failedAtFirst = false, onDone, onTried }: SourceScreenProps) {
