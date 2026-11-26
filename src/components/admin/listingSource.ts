@@ -49,7 +49,9 @@ export type SourceLine = {
   read?: ReadNow
 }
 
-export type RowSource = { job: string; amber: boolean; line: SourceLine; also?: SourceLine }
+/** `unchecked`: a job has it, but every page it reads is failing, so
+ *  nothing is keeping it right now; its sticker says Not checked. */
+export type RowSource = { job: string; amber: boolean; line: SourceLine; also?: SourceLine; unchecked?: boolean }
 
 /** What a row calls the source behind a job. A kosher list goes by its own
  *  name, from its line. */
@@ -134,11 +136,17 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
   ]
     .map((p) => p.watch)
     .find((w) => w.active)
-  const website = (at?: string | null): RowSource => ({ job: nameOf('sites'), amber: false, line: { text: 'Its website', url: own?.url ?? null, when: (at ?? own?.lastOkAt) ? day((at ?? own?.lastOkAt)!) : null } })
+  const website = (at?: string | null): RowSource => ({ job: nameOf('sites'), amber: false, ...(own?.failingSince ? { unchecked: true } : {}), line: { text: 'Its website', url: own?.url ?? null, when: (at ?? own?.lastOkAt) ? day((at ?? own?.lastOkAt)!) : null } })
 
   /** A shul's or mikvah's row: the box the page gives, else a page it has,
-   *  else stopped, else nothing. */
+   *  else stopped, else nothing. Every page it reads failing (Kesher's
+   *  "won't open", Nov 25), it's not being checked, whatever reads it. */
   function pagesRow(job: 'times' | 'hours', key: string | null): RowSource {
+    const row = pagesRowSource(job, key)
+    const active = jobs[job]?.places.find((p) => p.id === id)?.pages.filter((p) => p.watch.active) ?? []
+    return !row.amber && active.length > 0 && active.every((p) => p.watch.failingSince) ? { ...row, unchecked: true } : row
+  }
+  function pagesRowSource(job: 'times' | 'hours', key: string | null): RowSource {
     if (off(job)) return nothing()
     const place = jobs[job]?.places.find((p) => p.id === id)
     // Turned off, its pages are still there and aren't being read.

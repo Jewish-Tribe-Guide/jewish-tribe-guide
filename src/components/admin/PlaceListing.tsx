@@ -1,5 +1,6 @@
 'use client'
 
+import { stickerOf, type LineState } from './rowSticker'
 import { Fragment, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { EnrichedSubmission } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
@@ -99,11 +100,18 @@ export function ArchivedPlace({ place, category, token, onDone, send: own }: { p
   )
 }
 
-/** On the right of a row: the job that keeps it. */
-export function RowJob({ source }: { source: Pick<RowSource, 'job' | 'amber'> }) {
+/** On the right of a row, and in its header once open: whether something
+ *  keeps it current (rowSticker). The job itself is the source line's to
+ *  name; `data-job` keeps it for tests. */
+export function RowJob({ source, checking }: { source: Pick<RowSource, 'job' | 'amber' | 'unchecked'> & { lines?: { text: string; state?: LineState }[] }; checking?: boolean }) {
+  const sticker = checking ? stickerOf({ job: source.job, amber: false, lines: [{ text: '…', state: 'checking' }] }) : stickerOf(source)
   return (
-    <span className={`max-w-[40%] shrink-0 text-right text-[0.8125rem] leading-snug ${source.amber ? 'text-amber-800' : 'text-slate-600'}`} data-testid="row-job">
-      {source.job}
+    <span
+      className={`shrink-0 rounded-full px-2.5 py-0.5 text-[0.78125rem] font-bold whitespace-nowrap ${sticker.tone === 'green' ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}
+      data-testid="row-job"
+      data-job={source.job}
+    >
+      {sticker.text}
     </span>
   )
 }
@@ -595,7 +603,7 @@ export default function PlaceListing({
         rowAside={(row: EditorRow) => {
           rowsSeen.current.set(row.id, row)
           const source = sources?.(row)
-          return source ? <RowJob source={source} /> : null
+          return source ? <RowJob source={source} checking={!!source.line.read && reading === JSON.stringify(source.line.read)} /> : null
         }}
         rowSource={rowSource}
         adminSave={{

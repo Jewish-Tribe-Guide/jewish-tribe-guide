@@ -35,7 +35,7 @@ import { useListingDraft, type ListingDraft } from './useListingDraft'
 import { useListingSubmit, useTurnstileActive, type SendVia } from './useListingSubmit'
 import { PlusIcon } from '@/components/icons'
 import { SUBMIT_PILL } from './submitPill'
-import { ChangedTag, EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCard, EditorSent, editorFieldLabel, editorInputClass } from './editorParts'
+import { ChangedTag, EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCard, EditorSent, RowSourceFoot, editorFieldLabel, editorInputClass } from './editorParts'
 
 // ── Suggest an edit, the whole listing (agreed Oct 11, canvas page "editor") ─
 // The listing's own boxes, in the listing's order, one row each: its
@@ -643,7 +643,12 @@ export default function ListingEditor({
       cardRef={openCard}
       testId={`editor-open-${r.id}`}
       title={rowTitle(r)}
-      tags={tags(r)}
+      tags={
+        <>
+          {tags(r)}
+          {rowAside?.(r)}
+        </>
+      }
       onClose={closeRow}
       onRemove={r.id === stays ? () => removeRow(r) : undefined}
       source={rowSource ? { line: rowSource(r, changed.has(r.id)) } : undefined}>
@@ -942,8 +947,13 @@ export default function ListingEditor({
   // A row holding a list, open on its own screen, in the same white card.
   const rowScreen = row && !inPlace ? (
     <div className="space-y-4" data-testid={`editor-open-${row.id}`}>
-      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">{rowBody(row)}</div>
-      {!child && rowSource && <div className="-mt-2 px-0.5">{rowSource(row, changed.has(row.id))}</div>}
+      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+        {rowBody(row)}
+        {/* Where it's kept from, small, under a thin line in the same box
+            (board L2, Nov 25); the sticker beside it, as the screen's
+            heading is the row's title. */}
+        {!child && rowSource && <RowSourceFoot sticker={rowAside?.(row)}>{rowSource(row, changed.has(row.id))}</RowSourceFoot>}
+      </div>
       {!child &&
         foot(
           <div className="space-y-1">

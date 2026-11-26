@@ -1,3 +1,4 @@
+import type { LineState } from './rowSticker'
 import { isCategorySyncEligible, type CategoryConfig } from '@/lib/categories'
 import { contactFields } from '@/lib/contactRead'
 import { editorRows, rowSummary, type EditorRow, type EditorValues } from '@/lib/editorRows'
@@ -46,6 +47,8 @@ export type KosherLookup = { lists: { name: string; url: string; values: Record<
 
 export type AddLine = {
   text: string
+  /** Still being read, or read with nothing kept from it: the row's sticker. */
+  state?: LineState
   url?: string | null
   when?: string | null
   red?: boolean
@@ -126,9 +129,9 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     const read = reads[slot]
     const named = where.startsWith('its ') ? `I${where.slice(1)}` : where
     const idle: AddLine = { text: named, url, readNow: slot, change }
-    if (read?.state === 'reading') return [{ text: `Reading ${where}…` }]
+    if (read?.state === 'reading') return [{ text: `Reading ${where}…`, state: 'checking' }]
     if (read?.state === 'done') return [{ text: named, url, when: 'just now', change }]
-    if (read?.state === 'none') return [{ text: `No ${what} on ${where}`, change }]
+    if (read?.state === 'none') return [{ text: `No ${what} on ${where}`, change, state: 'unchecked' }]
     if (read?.state === 'failed') return [{ text: `Couldn’t read ${where}`, red: true }, idle]
     return [idle]
   }
@@ -136,10 +139,10 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
   function emailLines(address: string): AddLine[] {
     const change: AddLine['change'] = { slot: 'email', label: TIMES_SOURCE }
     const read = reads.email
-    if (read?.state === 'reading') return [{ text: 'Looking in the guide’s Gmail…' }]
+    if (read?.state === 'reading') return [{ text: 'Looking in the guide’s Gmail…', state: 'checking' }]
     if (read?.state === 'found') return [{ text: address, when: read.on, change }]
-    if (read?.state === 'no-email') return [{ text: `No emails from ${address} yet`, change, signUp: true }]
-    if (read?.state === 'no-times') return [{ text: `${address}’s ${read.on} email had no times`, change }]
+    if (read?.state === 'no-email') return [{ text: `No emails from ${address} yet`, change, signUp: true, state: 'unchecked' }]
+    if (read?.state === 'no-times') return [{ text: `${address}’s ${read.on} email had no times`, change, state: 'unchecked' }]
     if (read?.state === 'no-answer') return [{ text: 'Couldn’t reach the guide’s Gmail', red: true }, { text: address, when: 'within the hour', change }]
     if (read?.state === 'no-gmail') return [{ text: 'The guide’s Gmail isn’t set up', setUpGmail: true }, { text: address, when: 'within the hour', change }]
     return [{ text: address, readNow: 'email', change }]
@@ -174,7 +177,7 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     if (read?.state === 'not-found') return { job: 'Nothing', amber: true, lines: [{ text: 'Not found on Refuah', add: { label, slot: 'refuah', words: 'Add its page' } }] }
     if (!given.refuah && !s.hasPlace) return nothing({ add: { label, slot: 'refuah' } })
     const change = { slot: 'refuah' as const, label }
-    if (read?.state === 'reading') return { job: 'Refuah', amber: false, lines: [{ text: 'Reading Refuah…' }] }
+    if (read?.state === 'reading') return { job: 'Refuah', amber: false, lines: [{ text: 'Reading Refuah…', state: 'checking' }] }
     if (read?.state === 'done') return { job: 'Refuah', amber: false, lines: [{ text: 'Refuah', when: 'just now', change }] }
     if (read?.state === 'failed') return { job: 'Refuah', amber: false, lines: [{ text: 'Couldn’t read Refuah', red: true }, { text: 'Refuah', readNow: 'refuah', change }] }
     return { job: 'Refuah', amber: false, lines: [{ text: 'Refuah', readNow: 'refuah', change }] }

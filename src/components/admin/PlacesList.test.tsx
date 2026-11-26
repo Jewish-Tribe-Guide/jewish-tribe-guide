@@ -255,7 +255,7 @@ describe('Places', () => {
       await waitFor(() => expect(menu(/^Checked by/)).toBeEnabled())
       await user.click(screen.getByRole('button', { name: 'Open Bravo' }))
       renderWithProviders(editor.props!.rowAside!({ id: 'minyans:weekday', title: 'x', kind: 'minyans', fields: [], box: 'weekday' }) as React.ReactElement)
-      expect(screen.getByTestId('row-job')).toHaveTextContent(/^Nothing$/)
+      expect(screen.getByTestId('row-job')).toHaveAttribute('data-job', 'Nothing')
     })
   })
 

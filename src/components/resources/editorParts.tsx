@@ -68,8 +68,9 @@ export function EditorRowCard({
 
 /** A short row, open where it is: its fields inside its card, Done under
  *  them. Its heading closes it too. With `source` (admin's listing) the card
- *  holds only the fields: the line saying where they come from sits on the
- *  gray under it, then a solid Done, as on the row's own screen. */
+ *  holds its fields and, under a thin line, the one saying where they come
+ *  from (board L2, Nov 25); a solid Done under the card, as on the row's
+ *  own screen. */
 export function EditorOpenCard({
   title,
   tags,
@@ -110,8 +111,10 @@ export function EditorOpenCard({
   if (source) {
     return (
       <div ref={cardRef} data-testid={testId} className="scroll-my-4 space-y-2 pb-2">
-        <div className={card}>{inside}</div>
-        {source.line && <div className="px-0.5">{source.line}</div>}
+        <div className={card}>
+          {inside}
+          {source.line && <RowSourceFoot>{source.line}</RowSourceFoot>}
+        </div>
         <div className="mt-2 flex items-center gap-2">
           {remove}
           <button type="button" onClick={onClose} className={`${SUBMIT_PILL} min-w-0 flex-1`}>
@@ -130,6 +133,18 @@ export function EditorOpenCard({
           Done
         </button>
       </div>
+    </div>
+  )
+}
+
+/** An opened row's source line, small, under a thin line inside its box
+ *  (board L2, Nov 25). Nothing at all when there's nothing to say. */
+export function RowSourceFoot({ children, sticker }: { children: ReactNode; sticker?: ReactNode }) {
+  if (!children && !sticker) return null
+  return (
+    <div className="flex items-start gap-2 border-t border-slate-200 pt-3" data-testid="row-source-foot">
+      {sticker}
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   )
 }

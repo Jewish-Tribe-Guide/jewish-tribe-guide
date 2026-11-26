@@ -352,7 +352,7 @@ export default function EruvListing({
             {rows.map((r) => (
               <li key={r.id}>
                 {openRow === r.id ? (
-                  <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} onClose={() => setOpenRow(null)} source={{ line: lineOf(r.source) }}>
+                  <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} tags={r.source ? <RowJob source={r.source} /> : null} onClose={() => setOpenRow(null)} source={{ line: lineOf(r.source) }}>
                     {r.body}
                   </EditorOpenCard>
                 ) : (
@@ -553,7 +553,7 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
     })),
   ]
   const opened = (r: (typeof rows)[number]) => (
-    <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} onClose={() => setOpenRow(null)} source={r.line ? { line: r.line } : undefined}>
+    <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} tags={r.source ? <RowJob source={r.source} /> : null} onClose={() => setOpenRow(null)} source={r.line ? { line: r.line } : undefined}>
       {r.body}
     </EditorOpenCard>
   )

@@ -77,7 +77,9 @@ describe('Add a place', () => {
     expect(screen.getByText('Goes live as soon as you add it, with no review.')).toBeInTheDocument()
     expect(screen.queryByText('Filled in from Google')).toBeNull()
     for (const row of ['editor-row-name', 'editor-row-contact:phone', 'editor-row-field:website']) {
-      expect(within(screen.getByTestId(row)).getByTestId('row-job')).toHaveTextContent('Google')
+      const job = within(screen.getByTestId(row)).getByTestId('row-job')
+      expect(job).toHaveAttribute('data-job', 'Google')
+      expect(job).toHaveTextContent('Checked nightly')
     }
     expect(within(screen.getByTestId('editor-empty')).queryByTestId('row-job')).toBeNull()
     expect(screen.getByTestId('editor-empty')).toHaveTextContent('Usual weekday times')
@@ -87,7 +89,8 @@ describe('Add a place', () => {
     const user = userEvent.setup()
     renderAdd()
     await user.click(screen.getByRole('button', { name: 'Fill it in yourself' }))
-    expect(within(screen.getByTestId('editor-row-name')).getByTestId('row-job')).toHaveTextContent('Nothing')
+    expect(within(screen.getByTestId('editor-row-name')).getByTestId('row-job')).toHaveAttribute('data-job', 'Nothing')
+    expect(within(screen.getByTestId('editor-row-name')).getByTestId('row-job')).toHaveTextContent('Not checked')
     expect(screen.getByTestId('editor-add-contact:phone')).toBeInTheDocument()
     await user.click(screen.getByTestId('editor-add-contact:phone'))
     expect(screen.getByTestId('row-source')).toHaveTextContent('Nothing reads this · Find it on Google')
