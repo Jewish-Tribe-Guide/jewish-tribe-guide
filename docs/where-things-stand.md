@@ -135,6 +135,18 @@ old number can still be looked up. When an item is done, move it to
       its domain or postal address when exactly one place matches,
       otherwise To do with the guess picked; "confirm your
       subscription" emails to To do.
+    - **Built Nov 25** (all pushed on the branch, no PR yet): stickers
+      and the source line in the box (3d6e7d62); the field in the row,
+      saved by Done, on Add and Edit listing (dc155bd1); the read on a
+      Google pick, held for Use these times (b164d04c); Watches at the
+      top of Reports (00a21438). A rejected reading ("Keep mine") needs
+      nothing new: the page watch never files the same suggestion
+      twice, approved or rejected (`filedBefore`, listingPageWatch.ts),
+      so a kept value stands until the page says something else.
+    - **Not built yet:** the "Sign up as … to get its emails" line under
+      a typed email; refusing an email typed for usual times (pages
+      only); the eruv listing still opens its Change screens; email
+      linking and confirmation emails (the later step above).
 
 ### You decide
 

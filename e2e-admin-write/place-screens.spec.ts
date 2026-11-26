@@ -158,7 +158,7 @@ test('an eruv in Places: a row', async ({ page }) => {
   await page.getByLabel('Find a place by name').fill(eruvName)
   await page.getByRole('button', { name: `Open ${eruvName}`, exact: true }).click()
   await walk(page, [
-    { shows: page.getByRole('button', { name: /^Status\s*Nothing/ }) },
+    { shows: page.getByTestId('editor-row-status').filter({ hasText: 'Not checked' }) },
     { shows: page.getByRole('button', { name: 'Add a source' }), open: () => page.getByRole('button', { name: /^Status/ }).click(), close: () => page.getByRole('button', { name: 'Done', exact: true }).click() },
   ])
   await expect(page).toHaveURL(new RegExp(`\\?place=${eruvId}$`))
@@ -211,16 +211,17 @@ test('a change found on a place in Places: To do’s screen, a minyan in it', as
   expect(data?.status).toBe('pending')
 })
 
-// Add a place's form after Find, and a source's Add over a row of it (Nov
-// 18: both were only state, so Back left Add altogether). Not walk(): a
-// reload on the form is Find again, since what was typed isn't kept, and
-// the address says so in place. Writes nothing: nothing is added.
-test('Add a place: Find, the form, a row, a source over it', async ({ page }) => {
+// Add a place's form after Find, and a row of it (Nov 18: both were only
+// state, so Back left Add altogether). A row's source is a field in the row
+// since Nov 25 (board N4), not a screen over it. Not walk(): a reload on the
+// form is Find again, since what was typed isn't kept, and the address says
+// so in place. Writes nothing: nothing is added.
+test('Add a place: Find, the form, a row with its source field', async ({ page }) => {
   await page.goto(`/${TEST_COMMUNITY}/admin/places?add=synagogue`)
   const find = page.getByLabel('Find the place')
   const form = visible(page, page.getByRole('button', { name: /^Usual weekday times/ }))
   const row = visible(page, page.getByRole('button', { name: 'Add a minyan' }))
-  const over = visible(page, page.getByRole('heading', { name: 'Add a source' }))
+  const field = visible(page, page.getByTestId('source-field'))
   const at = (query: string) => expect.poll(() => new URL(page.url()).search).toBe(query)
   await expect(find).toBeVisible()
 
@@ -230,19 +231,18 @@ test('Add a place: Find, the form, a row, a source over it', async ({ page }) =>
   await form.click()
   await expect(row).toBeVisible()
   await at('?add=synagogue&step=finish&row=minyans%3Aweekday')
-  await visible(page, page.getByRole('button', { name: 'Add a source' })).click()
-  await expect(over).toBeVisible()
-  await at('?add=synagogue&step=finish&row=minyans%3Aweekday&over=page.add')
+  // The source is asked for in the row, inside its box: no screen over it.
+  await expect(field).toBeVisible()
+  await expect(field).toHaveAttribute('placeholder', 'A page’s link')
+  await expect(page.getByRole('heading', { name: 'Add a source' })).toHaveCount(0)
 
   await page.goBack()
-  await expect(row).toBeVisible()
-  await expect(over).not.toBeVisible()
-  await page.goBack()
   await expect(form).toBeVisible()
+  await expect(row).not.toBeVisible()
   await page.goBack()
   await expect(find).toBeVisible()
   await at('?add=synagogue')
-  for (const shows of [form, row, over]) {
+  for (const shows of [form, row]) {
     await page.goForward()
     await expect(shows).toBeVisible()
   }
