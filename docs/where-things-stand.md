@@ -106,6 +106,36 @@ old number can still be looked up. When an item is done, move it to
     lint and `next build`'s own check use 6 (~19s), as TypeScript's 7.0
     announcement recommends (Nov 24). Both run in CI.
 
+### Building now
+
+95. **Kept current, on Add and the listing** (agreed with the user Nov
+    25, branch `claude/kept-current`, boards M1–M6 and N2–N4 on the
+    design canvas). Watches stop being a chore the admin sets up and
+    become something they can see and, rarely, change:
+    - Stickers on rows: "Checked nightly" / "Checked weekly" (green),
+      "Not checked" (grey), none where nothing can check the fact, and
+      "Checking…" only while a read runs. Times found but not yet taken
+      get no sticker; an email waited for is "Not checked".
+    - An opened row keeps its sticker; inside its box, under a thin
+      line, one small source line ("From Google", "From
+      bethshalom.org/schedule · Change"). Where a source is needed, just
+      a field there: "A page’s link" (usual times; pages only), "A
+      page’s link or an email" (this week's schedule). Done saves it; an
+      empty field changes nothing. An email reads "Sign up as … to get
+      its emails", no Copy.
+    - Picking a place from Google starts its website read straight away:
+      times rows say "Checking…" with "Use a different page"; found
+      times show with "Use these times"; nothing found is "Not checked"
+      with the field. Add before it finishes sends the result to To do.
+      Changing the website re-reads. No cancel. The screen after Add
+      stays as it is.
+    - Edit listing behaves the same. To do gets only what's broken or
+      unclear. Watches moves into Reports.
+    - Later, or not at all: an email from an unknown sender linked by
+      its domain or postal address when exactly one place matches,
+      otherwise To do with the guess picked; "confirm your
+      subscription" emails to To do.
+
 ### You decide
 
 28. The drawings for asking for location when it helps (the hospital
