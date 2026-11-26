@@ -22,6 +22,7 @@ import { AdminBack } from './AdminUI'
 import { addRowSources, foundLines, type AddLine, type AddRead, type AddSlot, type GivenSources, type KosherLookup } from './addSources'
 import ListingEditorScreen from './ListingEditorScreen'
 import { RowJob, SourceScreen, SourceWords, fromWords } from './PlaceListing'
+import { SignUpLine } from './SignUpLine'
 import { addSourceWords, sourcePlaceholder, useSourceFields, type FieldSpec } from './useSourceFields'
 import { sourceActions } from './sourceActions'
 import { useStepsInAddress } from './useStepsInAddress'
@@ -41,25 +42,6 @@ type AddedAs = { listing: DirectoryResource; stage: 'reading' | 'failed' | 'foun
 /** What a Change or Add a source screen asks for. */
 
 /** No email has come: the guide has to be on its list (EmailNone14). */
-export function SignUpLine({ account }: { account: string | null }) {
-  const [copied, setCopied] = useState(false)
-  if (!account) return <p className="m-0 text-[0.8125rem] text-slate-500">Sign up for its emails with the guide’s Gmail</p>
-  return (
-    <p className="m-0 text-[0.8125rem] text-slate-500 [overflow-wrap:anywhere]">
-      Sign up for its emails with {account} ·{' '}
-      <button
-        type="button"
-        className={LINE_LINK}
-        onClick={() => {
-          void navigator.clipboard?.writeText(account).then(() => setCopied(true), () => {})
-        }}
-      >
-        {copied ? 'Copied' : 'Copy'}
-      </button>
-    </p>
-  )
-}
-
 const LINE_LINK = 'cursor-pointer font-semibold text-primary hover:underline disabled:opacity-60'
 
 export default function AddPlace({ category, listings, token, onClose }: { category: CategoryConfig; listings: readonly DirectoryResource[]; token: string; onClose: () => void }) {

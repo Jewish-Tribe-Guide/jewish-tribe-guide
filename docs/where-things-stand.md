@@ -157,6 +157,14 @@ old number can still be looked up. When an item is done, move it to
       a click away while it's empty or unchanged, and on Escape. A
       field opened by Change takes its line's place while it's open; one
       opened by Add sits under its line.
+    - **Read from is gone from Edit listing (Nov 25, the user's yes):**
+      its two jobs no row had moved onto rows. A place Google hasn't
+      matched says so on its name row, "Not found on Google · Find it
+      on Google". A shul's this week's schedule, while no email reads
+      it, ends with the guide's Gmail to sign up with (Copy), "The
+      guide’s Gmail isn’t set up · Set it up", or "An email from … came
+      in · Link it" when a sender is waiting. The eruv listing still
+      has its Read from box until its rows are done.
     - **Not built yet:** the "Sign up as … to get its emails" line under
       a typed email; refusing an email typed for usual times (pages
       only); the eruv listing still opens its Change screens; email

@@ -47,6 +47,9 @@ export type SourceLine = {
   googleStop?: CheckedField
   useGoogle?: CheckedField
   read?: ReadNow
+  /** Its place on Google isn't matched: Find it on Google (Nov 25, from
+   *  the Read from box). */
+  findOnGoogle?: true
 }
 
 /** `unchecked`: a job has it, but every page it reads is failing, so
@@ -284,6 +287,7 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
   function rowOf(row: EditorRow): RowSource | null {
     if (row.kind === 'name') {
       const place = jobs.google?.places.find((p) => p.id === id)
+      if (place && !place.matched && !off('google')) return { job: 'Nothing', amber: true, line: { text: 'Not found on Google', findOnGoogle: true } }
       return place?.matched ? keptField('name') : null
     }
     if (row.kind === 'minyans') return row.id === 'minyans:this_week' ? weekRow(true) : row.id === 'minyans:next_week' ? weekRow(false) : pagesRow('times', row.box ?? null)

@@ -26,10 +26,10 @@ import { kindsOf } from './WatchKinds'
 import { useStepsInAddress } from './useStepsInAddress'
 import { addSourceWords, sourcePlaceholder, useSourceFields, type FieldSpec } from './useSourceFields'
 import { useAdminApi } from './useAdminApi'
-import ReadFrom from './ReadFrom'
-import { listingReadFrom } from './readFromFacts'
-import { editSubmission } from '@/lib/editSubmission'
-import { MENU_LINK_KEY } from '@/lib/menuLink'
+import { FindSheet } from './FindSheet'
+import { SignUpLine } from './SignUpLine'
+import { useWeekEmails } from './useWeekEmails'
+import { kindOf } from '@/lib/placeKinds'
 
 // A listing as an admin sees it, wherever it's opened from: Places, or a job's
 // row with nothing waiting (boards Listing6, States6, Menu5, Change5, Stopped6,
@@ -304,6 +304,10 @@ export default function PlaceListing({
   // Until every job has answered, nothing can be said of a row.
   const loaded = (['google', 'times', 'hours', 'dishes', 'kosher', 'hospitals', 'links', 'runs'] as const).every((k) => jobs[k] !== undefined)
   const sources = useMemo(() => (loaded && category ? listingSources(place.id, jobs, now, category, item as Record<string, unknown> & { id: string }) : null), [loaded, category, place.id, jobs, now, item])
+  // A shul's emails, said on its this-week row while none reads it.
+  const [emails, reloadEmails] = useWeekEmails(api, !!category && kindOf(category) === 'shuls')
+  const [finding, setFinding] = useState(false)
+  const googlePlace = jobs.google?.places.find((p) => p.id === place.id) ?? null
 
   const give = (add: GiveSource): Attempt => async (url) => {
     if ('kind' in add.run) await actions.change(add.run, url)
@@ -501,6 +505,7 @@ export default function PlaceListing({
       const f = line.useGoogle
       controls.push(control('Use Google’s', () => void google(row, 'use_field', f)))
     }
+    if (line.findOnGoogle && googlePlace) controls.push(control('Find it on Google', () => setFinding(true)))
     const words = said(line)
     return (
       <div className="space-y-1.5">
@@ -513,7 +518,33 @@ export default function PlaceListing({
         {specs.add && fields.field(row, specs.add)}
         {source.also && !(specs.also && fields.isOpen(row, 'also')) && <SourceWords line={said(source.also)} controls={[...readControl(source.also), ...changeOf('also')]} />}
         {specs.also && fields.field(row, specs.also)}
+        {row.id === 'minyans:this_week' && !source.job.includes('Email') && emailLine()}
       </div>
+    )
+  }
+
+  /** No email reads its week yet: a sender to link, or what to sign up with. */
+  function emailLine(): ReactNode {
+    if (!emails.loaded) return null
+    const { waiting, account } = emails
+    if (waiting) {
+      const link = () =>
+        void post('/api/admin/watches', { action: 'link', id: waiting.id, resourceId: place.id }).then(
+          () => Promise.all([reload(), reloadEmails()]),
+          (err: unknown) => setRowError({ row: 'minyans:this_week', text: err instanceof Error ? err.message : 'Could not link it.' }),
+        )
+      return <SourceWords line={{ text: `An email from ${waiting.sender} came in` }} controls={[control('Link it', link)]} />
+    }
+    if (account) return <SignUpLine account={account} />
+    return (
+      <SourceWords
+        line={{ text: 'The guide’s Gmail isn’t set up' }}
+        controls={[
+          <a key="gmail" href={`${adminBase(community)}/team/email`} className={LINE_LINK}>
+            Set it up
+          </a>,
+        ]}
+      />
     )
   }
 
@@ -532,16 +563,6 @@ export default function PlaceListing({
     }
   }
 
-  /** A Read from row's Save: one field of the listing, saved as an admin's
-   *  edit, and the editor starting again from it. */
-  async function saveField(key: string, url: string) {
-    await api.send('PATCH', `/api/admin/listings/${place.id}`, { payload: editSubmission(category!, item, { [key]: url }) }, 'Could not save it.')
-    const got = await api.get<{ item: DirectoryResource }>(`/api/admin/watches/google?item=${place.id}`, 'Could not open its listing.')
-    setItem(got.item)
-    setEditorRound((r) => r + 1)
-  }
-  const readFrom = loaded ? listingReadFrom(place.id, jobs, category, item as Record<string, unknown>) : null
-  const websiteKey = websiteKeyOf(category)
 
   const watched = menuChange ? kindsOf(jobs, adminBase(community), now)?.kinds.flatMap((k) => k.places).find((p) => p.id === place.id) : undefined
   return (
@@ -576,20 +597,6 @@ export default function PlaceListing({
         onClose={onClose}
         splitContact
         patch={patch}
-        top={
-          readFrom && (
-            <ReadFrom
-              key={`${place.id}-${editorRound}`}
-              placeId={place.id}
-              token={token}
-              {...readFrom}
-              saveWebsite={(url) => saveField(websiteKey!, url)}
-              saveMenu={(url) => saveField(MENU_LINK_KEY, url)}
-              linkEmail={async (w) => void (await post('/api/admin/watches', { action: 'link', id: w.id, resourceId: place.id }))}
-              onChanged={() => reload()}
-            />
-          )
-        }
         rowAside={(row: EditorRow) => {
           const source = sources?.(row)
           return source ? <RowJob source={source} checking={!!source.line.read && reading === JSON.stringify(source.line.read)} /> : null
@@ -604,6 +611,17 @@ export default function PlaceListing({
           beside: confirming ? undefined : <ArchiveBin onClick={() => setConfirming(true)} />,
         }}
       />
+      {finding && googlePlace && (
+        <FindSheet
+          place={googlePlace}
+          post={(body) => post('/api/admin/watches/google', body)}
+          onPicked={() => {
+            setFinding(false)
+            void reload(jobsChangedBy('/api/admin/watches/google'))
+          }}
+          onClose={() => setFinding(false)}
+        />
+      )}
       {confirming && (
         <div className="mt-4 flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
           <p className="m-0 text-sm text-red-800">Take {place.name} off the site? It stays under Archived.</p>

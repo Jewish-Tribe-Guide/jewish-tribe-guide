@@ -371,15 +371,44 @@ describe('PlacePage', () => {
     })
 
     // Board W3, Nov 25: what it's read from, at the top, each with its own way to fill it.
-    it('opens with Read from: its website, its emails and Google', async () => {
+    // Nov 25: every row says its own source, so no Read from box; what only
+    // it had moved to the row it's about.
+    it('opens with no Read from box', async () => {
       await listingPage({ job: withTimes, places: [row({ website: 'https://kesher.example' })] })
-      const box = screen.getByRole('region', { name: 'Read from' })
-      expect(within(box).getByTestId('read-from-website')).toHaveTextContent('kesher.example · every night')
-      expect(within(box).getByTestId('read-from-emails')).toHaveTextContent('Its emails')
-      expect(within(box).getByTestId('read-from-google')).toHaveTextContent('Matched')
-      // A row opened, it gives way to the row.
-      await userEvent.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
       expect(screen.queryByRole('region', { name: 'Read from' })).toBeNull()
+    })
+
+    it('a place Google hasn’t matched: its name row says so, with Find it on Google', async () => {
+      await listingPage({ job: withTimes, google: [place('a', 'Kesher Israel', { matched: false })] })
+      const user = userEvent.setup()
+      const name = screen.getAllByTestId('row-job').find((j) => j.closest('button')?.textContent?.includes('Kesher Israel'))!
+      expect(name).toHaveTextContent('Not checked')
+      await user.click(name.closest('button')!)
+      expect(screen.getByTestId('row-source')).toHaveTextContent('Not found on Google · Find it on Google')
+      await user.click(screen.getByRole('button', { name: 'Find it on Google' }))
+      expect(await screen.findByRole('dialog')).toBeTruthy()
+    })
+
+    describe('this week’s schedule, with no email reading it', () => {
+      const openWeek = async (job: (url: string) => unknown) => {
+        await listingPage({ job })
+        await userEvent.click(screen.getByRole('button', { name: /^This week’s schedule/ }))
+      }
+      it('says what to sign up with', async () => {
+        await openWeek((url) => (url.includes('community-email') ? { email: 'guide@example.org' } : url.includes('newsletters') ? { newsletters: [] } : withTimes(url)))
+        expect(await screen.findByText(/Sign up for its emails with guide@example.org/)).toBeTruthy()
+      })
+      it('with no Gmail set up, says so, with Set it up', async () => {
+        await openWeek((url) => (url.includes('community-email') ? { email: null } : url.includes('newsletters') ? { newsletters: [] } : withTimes(url)))
+        expect(await screen.findByText(/The guide’s Gmail isn’t set up/)).toBeTruthy()
+        expect(screen.getByRole('link', { name: 'Set it up' })).toHaveAttribute('href', '/philly/admin/team/email')
+      })
+      it('an email that came in linked to nothing: Link it links it here', async () => {
+        await openWeek((url) => (url.includes('community-email') ? { email: 'guide@example.org' } : url.includes('newsletters') ? { newsletters: [{ watchId: 'n1', email: 'office@kesher.example', shul: null }] } : withTimes(url)))
+        expect(await screen.findByText(/An email from office@kesher.example came in/)).toBeTruthy()
+        await userEvent.click(screen.getByRole('button', { name: 'Link it' }))
+        await waitFor(() => expect(posts).toContainEqual(['/api/admin/watches', { action: 'link', id: 'n1', resourceId: 'a' }]))
+      })
     })
 
     // Board N4, Nov 25: Change opens a field in the row itself; its Done saves it.
