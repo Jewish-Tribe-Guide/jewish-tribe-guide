@@ -292,13 +292,14 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       const on = line.useList
       out.push(control('Use it', () => takeList(on)))
     }
-    if (line.add && !fields.isOpen(row, line.add.slot)) {
-      const slot = line.add.slot
-      out.push(control(line.add.words ?? addSourceWords(row), () => fields.reveal(row, slotSpec(row, slot))))
-    }
     if (line.change && !fields.isOpen(row, line.change.slot)) {
       const slot = line.change.slot
       out.push(control(line.change.words ?? 'Change', () => fields.reveal(row, slotSpec(row, slot, slot === 'site' ? '' : (given[slot] ?? '')))))
+    }
+    // After Change, on the same line: "... · Change · Add an email".
+    if (line.add && !fields.isOpen(row, line.add.slot)) {
+      const slot = line.add.slot
+      out.push(control(line.add.words ?? addSourceWords(row), () => fields.reveal(row, slotSpec(row, slot))))
     }
     if (line.setUpGmail) {
       out.push(

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { EditorRow } from '@/lib/editorRows'
 import type { Attempt } from './sourceActions'
 
@@ -10,7 +10,10 @@ import type { Attempt } from './sourceActions'
 // schedule, opened by "Add a page" (Nov 25: not there till it's asked for).
 // Change on a line opens the same field, filled in. No Save, no
 // Cancel: the row's Done saves what it holds, and an empty or unchanged
-// field changes nothing. It replaces the Change and Add a source screens.
+// field changes nothing. A click anywhere else closes a field that's still
+// empty or unchanged, and Escape closes it whatever it holds (Nov 25: once
+// opened there was no way out but Done). It replaces the Change and Add a
+// source screens.
 
 export type FieldSpec = {
   /** What it saves as, within its row: one row can have two (a week's
@@ -43,6 +46,27 @@ export function useSourceFields() {
   const [open, setOpen] = useState<Record<string, Record<string, Open>>>({})
   const [error, setError] = useState<{ row: string; text: string } | null>(null)
 
+  // When the last field was opened: the click that opened it isn't a
+  // click away from it.
+  const openedAt = useRef(0)
+  const anyOpen = Object.values(open).some((r) => Object.keys(r).length > 0)
+  useEffect(() => {
+    if (!anyOpen) return
+    // A click, not a press: a press closing the field would move what's
+    // under it (Done) before the click lands.
+    const away = (e: MouseEvent) => {
+      if (e.timeStamp < openedAt.current) return
+      if (e.target instanceof Element && e.target.closest('[data-source-field]')) return
+      setOpen((o) => {
+        const next: typeof o = {}
+        for (const [row, keys] of Object.entries(o)) next[row] = Object.fromEntries(Object.entries(keys).filter(([, f]) => f.value.trim() && f.value.trim() !== f.first.trim()))
+        return next
+      })
+    }
+    document.addEventListener('click', away)
+    return () => document.removeEventListener('click', away)
+  }, [anyOpen])
+
   const set = (row: string, key: string, next: Open | null) =>
     setOpen((o) => {
       const mine = { ...(o[row] ?? {}) }
@@ -53,6 +77,7 @@ export function useSourceFields() {
 
   /** Change on a line: its field, filled in. */
   function reveal(row: EditorRow, spec: FieldSpec) {
+    openedAt.current = performance.now()
     set(row.id, spec.key, { value: spec.value, first: spec.value, attempt: spec.attempt, ...(spec.stop ? { stop: spec.stop } : {}) })
   }
 
@@ -66,12 +91,18 @@ export function useSourceFields() {
     const value = now?.value ?? ''
     const stop = now?.stop
     return (
-      <div className="space-y-1.5">
+      <div className="space-y-1.5" data-source-field>
         <input
           value={value}
           onChange={(e) => {
             setError(null)
             set(row.id, spec.key, { value: e.target.value, first: now?.first ?? '', attempt: now?.attempt ?? spec.attempt, ...(stop ? { stop } : {}) })
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== 'Escape') return
+            e.preventDefault()
+            setError(null)
+            set(row.id, spec.key, null)
           }}
           placeholder={spec.placeholder}
           aria-label={spec.placeholder}

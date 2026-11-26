@@ -150,6 +150,11 @@ old number can still be looked up. When an item is done, move it to
       has no field at all, since the kept lists are matched by name
       every night, and a place on none says "Not found on Keystone-K or
       Mekor Habracha’s list · read last night" (the lists' last read).
+      Then, from the user's look at usual Shabbos times: only this
+      week's schedule offers the other kind of source, at the end of
+      its line ("… · Change · Add an email"); usual times are pages
+      only, so they no longer offer an email. An opened field closes on
+      a click away while it's empty or unchanged, and on Escape.
     - **Not built yet:** the "Sign up as … to get its emails" line under
       a typed email; refusing an email typed for usual times (pages
       only); the eruv listing still opens its Change screens; email

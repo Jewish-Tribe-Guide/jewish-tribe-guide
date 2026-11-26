@@ -183,8 +183,12 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
       ...(email ? emailLines(email) : []),
       ...(where ? pageLines(row, 'page', where, WHAT[kind], page ?? (website || null), { slot: 'page', label, placeholder }) : []),
     ]
-    // The other kind of source, behind its own words (Nov 25).
-    if (withAdd && !(where && email)) lines.push({ text: '', add: { label, slot: 'page', placeholder, words: where ? 'Add an email' : 'Add a page' } })
+    // This week's other kind of source, at the end of the line before it
+    // (Nov 25: on a line of its own it read as a second thing).
+    if (withAdd && !(where && email)) {
+      const last = lines.length - 1
+      lines[last] = { ...lines[last], add: { label, slot: 'page', placeholder, words: where ? 'Add an email' : 'Add a page' } }
+    }
     return { job: where && email ? 'Website, Email' : email ? 'Email' : 'Website', amber: false, lines }
   }
 
@@ -223,7 +227,9 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
   const contact = contactFields(category, {})
   return (row) => {
     if (row.kind === 'name') return kept('name')
-    if (row.kind === 'minyans') return pagesRow(row, 'times', row.id !== 'minyans:next_week')
+    // Usual times come from a page only, so only this week's offers the other
+    // kind (Nov 25: usual Shabbos times offered Add an email).
+    if (row.kind === 'minyans') return pagesRow(row, 'times', row.id === 'minyans:this_week')
     if (row.kind === 'audience') return pagesRow(row, 'hours', false)
     if (row.kind === 'items') return itemWording(row.fields[0]).noun === 'dish' ? menuRow(row) : null
     if (row.kind === 'contact') return row.part === 'phone' ? kept('phone') : null

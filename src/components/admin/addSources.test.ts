@@ -25,7 +25,7 @@ const state = (over: Partial<AddState> = {}): AddState => ({
 })
 
 function rowOf(s: AddState, id: string) {
-  const row = editorRows(s.category, s.values.details, { splitContact: true }).find((r) => r.id === id)
+  const row = editorRows(s.category, s.values.details, { splitContact: true, week: { from: '2026-11-22', to: '2026-11-28' } }).find((r) => r.id === id)
   if (!row) throw new Error(`no row ${id}`)
   return addRowSources(s)(row)
 }
@@ -74,14 +74,18 @@ describe('Add a place: what a row is read from', () => {
     expect(rowOf(state(), 'minyans:weekday')?.amber).toBe(true)
   })
 
-  it('a shul with a website: its website, Read now, Change, and Add an email under it (ReadNow13)', () => {
+  it('a shul with a website: its website, Read now and Change (ReadNow13)', () => {
     expect(rowOf(fromGoogle, 'minyans:weekday')?.job).toBe('Website')
-    expect(words(fromGoogle, 'minyans:weekday')).toEqual(['Its website · Read now · Change', 'Add an email'])
+    // Usual times are read from a page only: no Add an email (Nov 25).
+    expect(words(fromGoogle, 'minyans:weekday')).toEqual(['Its website · Read now · Change'])
+    expect(words(fromGoogle, 'minyans:shabbos')).toEqual(['Its website · Read now · Change'])
+    // This week's offers the other kind, on the same line (Nov 25).
+    expect(words(fromGoogle, 'minyans:this_week')).toEqual(['Its website · Read now · Change · Add an email'])
   })
 
   it('a page given is named, and an email goes first, one line each (GivenRead13, WebsiteEmail14)', () => {
-    // An email and no page: the other one is a page.
-    expect(words(state({ given: { email: 'office@ohev.org' } }), 'minyans:weekday')?.at(-1)).toBe('Add a page')
+    // An email and no page: this week's other one is a page.
+    expect(words(state({ given: { email: 'office@ohev.org' } }), 'minyans:this_week')).toEqual(['office@ohev.org · Read now · Change · Add a page'])
     const both = { ...fromGoogle, given: { page: 'https://ohev.org/davening', email: 'office@ohev.org' } }
     expect(rowOf(both, 'minyans:weekday')?.job).toBe('Website, Email')
     expect(words(both, 'minyans:weekday')).toEqual(['office@ohev.org · Read now · Change', 'ohev.org/davening · Read now · Change'])
