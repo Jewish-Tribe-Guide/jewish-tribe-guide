@@ -181,6 +181,16 @@ old number can still be looked up. When an item is done, move it to
       page" (usual times), "· Add a page or an email" (this week's). The
       field opens under the line. A read that failed keeps Read now and
       Change.
+    - **Nov 26, guided Add (boards U1–U4, the user's yes):** Add on
+      Places opens "What are you adding?", a screen of the categories
+      as rows with their glyphs (`?add=`); a tap goes on, with no menu
+      and no Next. Find and the rows say what's added ("Add a
+      synagogue", "Find the synagogue") when the category has a plural
+      of its own, else "Add to Food" and "Find the place"
+      (`addingWords.ts`). Each says "Step N of 3". Back steps through
+      them (`&from=pick` says the first step's entry is underneath).
+      The rows use the admin's own grey glyph squares, as Site's
+      category list does, not the board's dark circles.
     - **Not built yet:** the "Sign up as … to get its emails" line under
       a typed email; refusing an email typed for usual times (pages
       only); the eruv listing still opens its Change screens; email

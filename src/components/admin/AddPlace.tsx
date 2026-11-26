@@ -21,6 +21,8 @@ import type { DirectoryResource } from '@/types'
 import { AdminBack } from './AdminUI'
 import { addRowSources, foundLines, type AddLine, type AddRead, type AddSlot, type GivenSources, type KosherLookup } from './addSources'
 import ListingEditorScreen from './ListingEditorScreen'
+import { AddStep } from './AddWhat'
+import { addingWords } from '@/lib/addingWords'
 import { RowJob, SourceScreen, SourceWords, fromWords } from './PlaceListing'
 import { SignUpLine } from './SignUpLine'
 import { addSourceWords, sourcePlaceholder, useSourceFields, type FieldSpec } from './useSourceFields'
@@ -44,7 +46,10 @@ type AddedAs = { listing: DirectoryResource; stage: 'reading' | 'failed' | 'foun
 /** No email has come: the guide has to be on its list (EmailNone14). */
 const LINE_LINK = 'cursor-pointer font-semibold text-primary hover:underline disabled:opacity-60'
 
-export default function AddPlace({ category, listings, token, onClose }: { category: CategoryConfig; listings: readonly DirectoryResource[]; token: string; onClose: () => void }) {
+/** `onBack`: Find's own Back, to the step before it (What are you adding?)
+ *  when Add came that way; otherwise out of Add, as `onClose`. */
+export default function AddPlace({ category, listings, token, onClose, onBack = onClose }: { category: CategoryConfig; listings: readonly DirectoryResource[]; token: string; onClose: () => void; onBack?: () => void }) {
+  const naming = addingWords(category)
   const community = useCommunitySlug()
   const draft = useListingDraft(category)
   const googleFirst = isCategorySyncEligible(category)
@@ -116,7 +121,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   }, [autoSlot, autoUrl])
 
   const back = googleFirst ? () => setStep('find') : onClose
-  useSetScreenHeader(step === 'find', 'Add a place', onClose)
+  useSetScreenHeader(step === 'find', naming.title, onBack)
 
   // The form after Find has an address and an entry (?step=finish), so
   // Back goes to Find rather than out of Add, and Forward and a reload land
@@ -139,10 +144,11 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   if (step === 'find') {
     return (
       <div className="flex flex-col gap-4">
-        <AdminBack back={{ label: 'Back', onClick: onClose }} title="Add a place" />
+        <AdminBack back={{ label: 'Back', onClick: onBack }} title={naming.title} />
+        <AddStep n={2} />
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <label htmlFor="add-find-place" className="mb-1 block text-sm font-semibold text-slate-700">
-            Find the place
+            {naming.find}
           </label>
           <AddressInput
             id="add-find-place"
@@ -405,7 +411,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   if (addedAs) {
     const { listing, stage } = addedAs
     const banner = <p role="status" className="m-0 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-[0.9375rem] font-bold text-emerald-900">{listing.name} is added</p>
-    const title = stage === 'failed' ? 'Change' : 'Add a place'
+    const title = stage === 'failed' ? 'Change' : naming.title
     return (
       <div className="flex flex-col gap-4">
         <AdminBack back={{ label: 'Back', onClick: onClose }} title={title} />
@@ -474,7 +480,8 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
 
   return (
     <ListingEditorScreen
-      heading="Add a place"
+      heading={naming.title}
+      top={<AddStep n={3} />}
       category={category}
       draft={draft}
       fromGoogle={!!picked}

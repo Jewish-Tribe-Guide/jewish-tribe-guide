@@ -102,9 +102,9 @@ describe('Places', () => {
     expect(screen.queryByRole('link', { name: /Watches/ })).toBeNull()
   })
 
-  // It floats, so it's tapped from down the list; "Which category" opens at
-  // the top, out of sight unless the page goes there too.
-  it('Add a place floats like the site’s, and goes to the top to ask which category', async () => {
+  // It floats, so it's tapped from down the list; What are you adding?
+  // opens at the top, out of sight unless the page goes there too.
+  it('Add a place floats like the site’s, and goes to the top to ask what you’re adding', async () => {
     const user = userEvent.setup()
     const scrollTo = vi.fn()
     vi.stubGlobal('scrollTo', scrollTo)
@@ -114,7 +114,7 @@ describe('Places', () => {
     expect(add).toHaveTextContent(/^Add$/)
     await user.click(add)
     expect(scrollTo).toHaveBeenCalledWith(0, 0)
-    expect(screen.getByLabelText('Which category')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'What are you adding?' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add a place' })).not.toBeInTheDocument()
     vi.unstubAllGlobals()
   })
@@ -444,9 +444,14 @@ describe('Places', () => {
     const user = userEvent.setup()
     renderPlaces()
     await user.click(await screen.findByRole('button', { name: 'Add a place' }))
-    await user.selectOptions(screen.getByLabelText('Which category'), 'food')
-    await user.click(screen.getByRole('button', { name: 'Next' }))
-    expect(screen.getByRole('heading', { name: 'Add a place' })).toBeInTheDocument()
+    // Board U2 (Nov 26): the categories as rows, a tap goes on; no menu, no Next.
+    expect(screen.getByText('Step 1 of 3')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Next' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Map' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Food' }))
+    expect(screen.getByRole('heading', { name: 'Add to Food' })).toBeInTheDocument()
+    expect(screen.getByText('Step 2 of 3')).toBeInTheDocument()
     expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Fill it in yourself' }))
     expect(editor.props?.category.id).toBe('food')
@@ -485,6 +490,48 @@ describe('Places, the way back from a place', () => {
     // Forward.
     pop('/philly/admin/places?place=goldie')
     expect(await screen.findByRole('heading', { name: 'Goldie' })).toBeInTheDocument()
+  })
+
+  // Board U2 (Nov 26): each step of Add is an entry, so Back steps through
+  // them, and once it's added it's back on the list, over both.
+  it('Add’s steps are entries: Back from finding it is What are you adding?, then the list', async () => {
+    const user = userEvent.setup()
+    renderPlaces()
+    const before = window.history.length
+    await user.click(await screen.findByRole('button', { name: 'Add a place' }))
+    await waitFor(() => expect(here()).toBe('/philly/admin/places?add='))
+    await user.click(screen.getByRole('button', { name: 'Food' }))
+    await waitFor(() => expect(here()).toBe('/philly/admin/places?add=food&from=pick'))
+    expect(window.history.length).toBe(before + 2)
+    pop('/philly/admin/places?add=')
+    expect(await screen.findByRole('heading', { name: 'What are you adding?' })).toBeInTheDocument()
+    pop('/philly/admin/places')
+    expect(await screen.findByRole('region', { name: 'Places' })).toBeInTheDocument()
+    pop('/philly/admin/places?add=food&from=pick')
+    expect(await screen.findByRole('heading', { name: 'Add to Food' })).toBeInTheDocument()
+  })
+
+  // Seen in a real browser, Nov 26: the screen's own Back went over both,
+  // to the list, as it read the address before the router had written it.
+  it('Find’s own Back is What are you adding?', async () => {
+    const user = userEvent.setup()
+    renderPlaces()
+    await user.click(await screen.findByRole('button', { name: 'Add a place' }))
+    await user.click(screen.getByRole('button', { name: 'Food' }))
+    await screen.findByRole('heading', { name: 'Add to Food' })
+    const go = vi.spyOn(window.history, 'go').mockImplementation((n = 0) => {
+      expect(n).toBe(-1)
+      pop('/philly/admin/places?add=')
+    })
+    await user.click(screen.getAllByRole('button', { name: /Back/ })[0])
+    expect(await screen.findByRole('heading', { name: 'What are you adding?' })).toBeInTheDocument()
+    go.mockRestore()
+  })
+
+  it('a reload on What are you adding? opens it', async () => {
+    window.history.replaceState(null, '', '/philly/admin/places?add=')
+    renderPlaces()
+    expect(await screen.findByRole('heading', { name: 'What are you adding?' })).toBeInTheDocument()
   })
 
   it('a reload on a place opens it', async () => {

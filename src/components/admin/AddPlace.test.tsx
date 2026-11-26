@@ -90,6 +90,21 @@ describe('Add a place', () => {
     expect(screen.getByRole('button', { name: 'Fill it in yourself' })).toBeInTheDocument()
   })
 
+  // Board U3 (Nov 26): Find names what's being added, when the category's
+  // name is a thing (it has a plural), and Back is the step before it.
+  it('Find names a synagogue, says Step 2 of 3, and Back goes to the step before', async () => {
+    const user = userEvent.setup()
+    const onBack = vi.fn()
+    const onClose = vi.fn()
+    renderWithProviders(<AddPlace category={{ ...shul, pluralLabel: 'Synagogues' }} listings={[]} token="tok" onClose={onClose} onBack={onBack} />, { community: { slug: 'philly' } })
+    expect(screen.getByRole('heading', { name: 'Add a synagogue' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Find the synagogue')).toBeInTheDocument()
+    expect(screen.getByText('Step 2 of 3')).toBeInTheDocument()
+    await user.click(screen.getAllByRole('button', { name: /Back/ })[0])
+    expect(onBack).toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('picked on Google, its rows say Google and What’s not there has no word (AddRows11)', async () => {
     const user = userEvent.setup()
     renderAdd()

@@ -218,7 +218,7 @@ test('a change found on a place in Places: To do’s screen, a minyan in it', as
 // so in place. Writes nothing: nothing is added.
 test('Add a place: Find, the form, a row with its source field', async ({ page }) => {
   await page.goto(`/${TEST_COMMUNITY}/admin/places?add=synagogue`)
-  const find = page.getByLabel('Find the place')
+  const find = page.getByLabel(/^Find the /)
   const form = visible(page, page.getByRole('button', { name: /^Usual weekday times/ }))
   const row = visible(page, page.getByRole('button', { name: 'Add a minyan' }))
   const field = visible(page, page.getByTestId('source-field'))
@@ -258,4 +258,44 @@ test('Add a place: Find, the form, a row with its source field', async ({ page }
   await at('?add=synagogue&step=finish')
   await page.goBack()
   await expect(find).toBeVisible()
+})
+
+// Add's steps (board U2, Nov 26): What are you adding?, then finding it,
+// each an entry, so Back steps through them and Forward and a reload land on
+// each. Writes nothing.
+test('Add a place: What are you adding?, then Find, Back through both', async ({ page }) => {
+  await page.goto(`/${TEST_COMMUNITY}/admin/places`)
+  const list = page.getByRole('region', { name: 'Places' })
+  const what = page.getByRole('heading', { name: 'What are you adding?' })
+  const find = page.getByLabel(/^Find the /)
+  const at = (query: string) => expect.poll(() => new URL(page.url()).search).toBe(query)
+  await expect(list).toBeVisible()
+
+  await page.getByRole('button', { name: 'Add a place' }).click()
+  await expect(what).toBeVisible()
+  await at('?add=')
+  await page.getByRole('button', { name: 'Synagogue', exact: true }).click()
+  await expect(find).toBeVisible()
+  await at('?add=synagogue&from=pick')
+
+  // The screen's own Back, then the browser's.
+  await page.getByRole('button', { name: /Back/ }).first().click()
+  await expect(what).toBeVisible()
+  await at('?add=')
+  await page.goBack()
+  await expect(list).toBeVisible()
+  await page.goForward()
+  await expect(what).toBeVisible()
+  await page.goForward()
+  await expect(find).toBeVisible()
+
+  await page.reload()
+  await expect(find).toBeVisible()
+  await page.goBack()
+  await expect(what).toBeVisible()
+  await page.reload()
+  await expect(what).toBeVisible()
+  await page.getByRole('button', { name: /Back/ }).first().click()
+  await expect(list).toBeVisible()
+  await at('')
 })
