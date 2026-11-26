@@ -1,3 +1,4 @@
+import { stickerOf } from './rowSticker'
 import { describe, expect, it } from 'vitest'
 import { editorRows } from '@/lib/editorRows'
 import { makeCategory } from '@/test/providerFixtures'
@@ -20,13 +21,12 @@ const state = (over: Partial<AddState> = {}): AddState => ({
   hasPlace: false,
   values: { name: 'Ohev', address: '', phone: '', details: {} },
   given: {},
-  stopped: new Set(),
   reads: {},
   ...over,
 })
 
 function rowOf(s: AddState, id: string) {
-  const row = editorRows(s.category, s.values.details, { splitContact: true }).find((r) => r.id === id)
+  const row = editorRows(s.category, s.values.details, { splitContact: true, week: { from: '2026-11-22', to: '2026-11-28' } }).find((r) => r.id === id)
   if (!row) throw new Error(`no row ${id}`)
   return addRowSources(s)(row)
 }
@@ -36,9 +36,9 @@ describe('Add a place: what a row is read from', () => {
   const picked = { name: 'Ohev', phone: '(215) 555-0142', website: 'https://ohev.org' }
   const fromGoogle = state({ picked, values: { name: 'Ohev', address: '', phone: '(215) 555-0142', details: { website: 'https://ohev.org' } } })
 
-  it('what Google filled in is Google’s, with Stop (AddRows11, AddGoogle8)', () => {
+  it('what Google filled in is Google’s; no Stop, typing over it is how (AddRows11, Nov 25)', () => {
     expect(rowOf(fromGoogle, 'name')?.job).toBe('Google')
-    expect(rowOf(fromGoogle, 'contact:phone')?.lines[0]).toMatchObject({ text: 'Google', googleStop: 'phone' })
+    expect(rowOf(fromGoogle, 'contact:phone')?.lines[0]).toEqual({ text: 'Google' })
     expect(rowOf(fromGoogle, 'field:website')?.job).toBe('Google')
   })
 
@@ -46,17 +46,13 @@ describe('Add a place: what a row is read from', () => {
     const food = makeCategory({ id: 'food', label: 'Food', detailFields: [{ key: 'website', label: 'Website', type: 'url' }, { key: 'hours', label: 'Hours', type: 'hours' }] })
     const hours = JSON.stringify({ mon: { open: '09:00', close: '17:00' } })
     const s = state({ category: food, picked: { ...picked, hours }, values: { name: 'Ohev', address: '', phone: '', details: { website: 'https://ohev.org', hours: JSON.parse(hours) } } })
-    expect(rowOf(s, 'hours')).toMatchObject({ job: 'Google', lines: [{ text: 'Google', googleStop: 'hours' }] })
+    expect(rowOf(s, 'hours')).toMatchObject({ job: 'Google', lines: [{ text: 'Google' }] })
   })
 
   it('typed over, Google stops keeping it (AddTyped8)', () => {
     const typed = { ...fromGoogle, values: { ...fromGoogle.values, phone: '1-800-555-0199' } }
     expect(words(typed, 'contact:phone')).toEqual(['Google stops keeping this'])
     expect(rowOf(typed, 'contact:phone')).toMatchObject({ job: 'Nothing', amber: true })
-  })
-
-  it('stopped, nothing reads it, and Google can have it back', () => {
-    expect(rowOf({ ...fromGoogle, stopped: new Set(['phone'] as const) }, 'contact:phone')).toMatchObject({ job: 'Nothing', lines: [{ text: 'Nothing reads this', useGoogle: 'phone' }] })
   })
 
   it('filled in by hand, nothing reads it, and it can still be found on Google (AddSelf11, AddSelfPhone8)', () => {
@@ -79,12 +75,20 @@ describe('Add a place: what a row is read from', () => {
     expect(rowOf(state(), 'minyans:weekday')?.amber).toBe(true)
   })
 
-  it('a shul with a website: its website, Read now, Change, and Add a source under it (ReadNow13)', () => {
+  it('a shul with a website: its website, Read now and Change (ReadNow13)', () => {
     expect(rowOf(fromGoogle, 'minyans:weekday')?.job).toBe('Website')
-    expect(words(fromGoogle, 'minyans:weekday')).toEqual(['Its website · Read now · Change', 'Add a source'])
+    // Usual times are read from a page only: no Add an email (Nov 25).
+    expect(words(fromGoogle, 'minyans:weekday')).toEqual(['Its website · Read now · Change'])
+    expect(words(fromGoogle, 'minyans:shabbos')).toEqual(['Its website · Read now · Change'])
+    // This week's offers the other kind, on the same line (Nov 25).
+    expect(words(fromGoogle, 'minyans:this_week')).toEqual(['Its website · Read now · Change · Add an email'])
+    // Read and nothing there: one link, a page or an email (Nov 26).
+    expect(words({ ...fromGoogle, reads: { page: { state: 'none' } } }, 'minyans:this_week')).toEqual(['No minyan times on its website · Add a source'])
   })
 
   it('a page given is named, and an email goes first, one line each (GivenRead13, WebsiteEmail14)', () => {
+    // An email and no page: this week's other one is a page.
+    expect(words(state({ given: { email: 'office@ohev.org' } }), 'minyans:this_week')).toEqual(['office@ohev.org · Read now · Change · Add a page'])
     const both = { ...fromGoogle, given: { page: 'https://ohev.org/davening', email: 'office@ohev.org' } }
     expect(rowOf(both, 'minyans:weekday')?.job).toBe('Website, Email')
     expect(words(both, 'minyans:weekday')).toEqual(['office@ohev.org · Read now · Change', 'ohev.org/davening · Read now · Change'])
@@ -92,10 +96,38 @@ describe('Add a place: what a row is read from', () => {
 
   it('a read leaves its line saying how it went (Reading13, ReadDone13, ReadFailed13, ReadNothing13)', () => {
     const after = (read: AddState['reads']['page']) => words({ ...fromGoogle, reads: { page: read } }, 'minyans:weekday')
-    expect(after({ state: 'reading' })?.[0]).toBe('Reading its website…')
+    expect(after({ state: 'reading' })?.[0]).toBe('Reading its website… · Change')
     expect(after({ state: 'done' })?.[0]).toBe('Its website · just now · Change')
-    expect(after({ state: 'none' })?.[0]).toBe('No minyan times on its website · Change')
+    // Nothing there: nothing to change, one source to add (Nov 26).
+    expect(after({ state: 'none' })?.[0]).toBe('No minyan times on its website · Add a source')
+    expect(rowOf({ ...fromGoogle, reads: { page: { state: 'none' } } }, 'minyans:weekday')?.lines[0].change).toBeUndefined()
     expect(after({ state: 'failed' })?.slice(0, 2)).toEqual(['Couldn’t read its website', 'Its website · Read now · Change'])
+  })
+
+  // A read that failed keeps nothing current: the sticker says so, not
+  // "Checked nightly" beside "Couldn’t read its website" (Nov 25).
+  it('a read that failed is Not checked: a page, Refuah, the guide’s Gmail', () => {
+    const page = rowOf({ ...fromGoogle, reads: { page: { state: 'failed' } } }, 'minyans:weekday')!
+    expect(stickerOf(page)).toEqual({ text: 'Not checked', tone: 'grey' })
+    const gmail = rowOf({ ...state({ given: { email: 'office@ohev.org' } }), reads: { email: { state: 'no-answer' } } }, 'minyans:weekday')!
+    expect(stickerOf(gmail)).toEqual({ text: 'Not checked', tone: 'grey' })
+    // Read again and it worked: checked.
+    expect(stickerOf(rowOf({ ...fromGoogle, reads: { page: { state: 'done' } } }, 'minyans:weekday')!)).toEqual({ text: 'Checked nightly', tone: 'green' })
+  })
+
+  it('reading on its own: Checking…, and Use a different page, never a cancel (board N5, Nov 25)', () => {
+    const line = rowOf({ ...fromGoogle, reads: { page: { state: 'reading' } } }, 'minyans:weekday')?.lines[0]
+    expect(line).toMatchObject({ state: 'checking', change: { slot: 'page', words: 'Use a different page' } })
+  })
+
+  it('what a read on its own found waits, row by row, for Use these times (board N5, Nov 25)', () => {
+    const found = { details: { minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon', 'tue'], time: '07:00' }, { id: 'b', tefillah: 'mincha', days: ['tue'], time: '18:00' }] } }
+    const held = { ...fromGoogle, reads: { page: { state: 'held' as const, found } } }
+    expect(rowOf(held, 'minyans:weekday')?.lines[0]).toMatchObject({ text: 'Found on its website: 2 times', state: 'waiting', use: { slot: 'page', words: 'Use these times' } })
+    // A row it found nothing for: not checked, with its field.
+    expect(rowOf(held, 'minyans:shabbos')?.lines[0]).toMatchObject({ text: 'No minyan times on its website', state: 'unchecked', add: { slot: 'page' } })
+    // Nothing's put in till it's used.
+    expect(held.values.details).toEqual({ website: 'https://ohev.org' })
   })
 
   it('an email’s read says what the Gmail had (EmailFound14 to EmailNoGmail14)', () => {
@@ -116,7 +148,13 @@ describe('Add a place: what a row is read from', () => {
     expect(addRowSources(s)(kosher)?.lines[0].text).toBe('Nothing reads this')
     const on = { name: 'Keystone-K’s list', url: 'https://k', values: { kosherCert: 'Keystone-K' } }
     expect(addRowSources({ ...s, kosher: { lists: [on], none: '' } })(kosher)?.lines[0]).toMatchObject({ text: 'On Keystone-K’s list', useList: on })
-    expect(addRowSources({ ...s, kosher: { lists: [], none: 'Not on Keystone-K or Mekor Habracha’s list' } })(kosher)?.lines[0]).toMatchObject({ text: 'Not on Keystone-K or Mekor Habracha’s list', add: { words: 'Add its page' } })
+    // Not found: said with when the lists were read, and nothing to give
+    // (Nov 25): the nightly match finds it once it's on one.
+    const none = { lists: [], none: 'Not found on Keystone-K or Mekor Habracha’s list', readAt: '2026-11-25T06:00:00Z' }
+    const notFound = addRowSources({ ...s, kosher: none, now: Date.parse('2026-11-25T15:00:00Z') })(kosher)?.lines[0]
+    expect(notFound).toMatchObject({ text: 'Not found on Keystone-K or Mekor Habracha’s list', says: true, when: 'read last night' })
+    expect(notFound?.add).toBeUndefined()
+    expect(addRowSources({ ...s, kosher: none, now: Date.parse('2026-11-29T15:00:00Z') })(kosher)?.lines[0].when).toBe('read Nov 25')
     expect(addRowSources({ ...s, kosherUsed: 'Keystone-K’s list' })(kosher)).toMatchObject({ job: 'Keystone-K', lines: [{ text: 'Keystone-K’s list', when: 'today' }] })
   })
 
@@ -127,6 +165,8 @@ describe('Add a place: what a row is read from', () => {
     expect(addRowSources(s)(row)).toMatchObject({ job: 'Refuah', lines: [{ text: 'Refuah', readNow: 'refuah' }] })
     expect(addRowSources({ ...s, reads: { refuah: { state: 'not-found' } } })(row)?.lines[0]).toMatchObject({ text: 'Not found on Refuah', add: { words: 'Add its page' } })
     expect(addRowSources({ ...s, hasPlace: false })(row)?.lines[0].text).toBe('Nothing reads this')
+    // A read of Refuah that failed: Not checked (Nov 25).
+    expect(stickerOf(addRowSources({ ...s, reads: { refuah: { state: 'failed' } } })(row)!)).toEqual({ text: 'Not checked', tone: 'grey' })
   })
 
   describe('foundLines (AddFound13)', () => {

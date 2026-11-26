@@ -7,40 +7,27 @@ import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { hoursJobCategories } from '@/lib/hoursJob'
 import type { NightKindId } from '@/lib/jobRuns'
-import { NIGHT_KINDS, type KindNight, type NightKindView, type TrackedSource } from '@/lib/nightKinds'
-import { pageFrom, placePath } from '@/lib/placeLink'
+import { NIGHT_KINDS, type NightKindView } from '@/lib/nightKinds'
+import { jobPlaceRows, type JobPlaceRow } from '@/lib/jobPlaceRows'
+import { jobTitle } from '@/lib/keptCurrent'
+import { pageFrom } from '@/lib/placeLink'
 import { kindOf } from '@/lib/placeKinds'
-import { JOB_STEPS } from '@/lib/watchJobList'
+import { JOB_STEPS, lastRunWord } from '@/lib/watchJobList'
 import { AdminBack, AdminBox, AdminRow, adminInputClass } from './AdminUI'
 import { useAdminApi } from './useAdminApi'
 import { noteJobSwitched, useWatchJobsAndReload } from './useWatchJobs'
 
-// A job, opened (board "a job"): how last night went and when it runs, what
-// it didn't read, all it tracks, its last 14 nights with a check or an X, and
-// Turn off this job. A job that needs its one step says it here, and adds
-// here. Newsletters have their own page (NewslettersPage.tsx).
+// A Watches row, opened (board W4, Nov 25): when it last read, Nothing to
+// read (each place with why, in amber), Read (each with what it's read
+// from), and Turn off this job, or Turn it back on once off. Adds from its
+// header. The last-14-nights box and Not read last night went: Nothing to
+// read says the same per place, and Watches' row says when the job ran.
 
 export type NightlyRunsLoaded = { available: boolean; kinds: NightKindView[]; off?: NightKindId[] }
 
 const button = 'inline-flex items-center justify-center min-h-11 px-3.5 rounded-lg text-sm font-semibold cursor-pointer disabled:opacity-60'
 const primary = `${button} border border-primary bg-primary text-white`
 const secondary = `${button} border border-slate-300 bg-white text-slate-900 hover:bg-slate-50`
-
-export function GoodMark({ label = 'Good' }: { label?: string }) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#166534" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={label} className="shrink-0">
-      <path d="M5 12.5l4.5 4.5L19 7.5" />
-    </svg>
-  )
-}
-
-export function BadMark({ label = 'Something wrong' }: { label?: string }) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" strokeWidth="2.4" strokeLinecap="round" role="img" aria-label={label} className="shrink-0">
-      <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
-    </svg>
-  )
-}
 
 /** What a job adds, and how: a place and its page, or just a page. */
 const ADDS: Partial<Record<NightKindId, { label: string; purpose: string; place?: string; placeholder: string }>> = {
@@ -134,7 +121,7 @@ export function TurnOffJob({ kind, name, count, token }: { kind: NightKindId; na
 
   if (!asking) {
     return (
-      <button type="button" onClick={() => setAsking(true)} className="min-h-11 cursor-pointer text-[0.9375rem] font-semibold text-slate-600">
+      <button type="button" onClick={() => setAsking(true)} className="min-h-11 cursor-pointer self-start text-[0.9375rem] font-semibold text-red-700">
         Turn off this job
       </button>
     )
@@ -157,29 +144,55 @@ export function TurnOffJob({ kind, name, count, token }: { kind: NightKindId; na
   )
 }
 
-/** "Last night: 15 of 16 read"; with no run yet, the job's own step. */
-function statusLine(job: NightKindView): string {
-  if (!job.lastAt) return job.tracked.length ? 'Not run yet' : (JOB_STEPS[job.id] ?? 'Not run yet')
-  return /^(Didn’t run|Failed|Running)/.test(job.count) ? job.count : `Last night: ${job.count}`
+/** Under the title: "Read every night · last night", or what's wrong
+ *  with the job itself; with no run yet, the job's own step. */
+function subtitle(job: NightKindView, off: boolean, now: number): { text: string; bad: boolean } {
+  if (off) return { text: 'Turned off', bad: false }
+  const whole = job.fixes.find((f) => f.whole)
+  if (whole) return { text: whole.why, bad: true }
+  if (!job.lastAt) return { text: job.tracked.length ? 'Not run yet' : (JOB_STEPS[job.id] ?? 'Not run yet'), bad: false }
+  const nightly = job.id !== 'links'
+  const word = lastRunWord(job.lastAt, now, nightly)
+  return { text: `${nightly ? 'Read every night' : 'Read every Sunday'} · ${/^(Last|Today|Yesterday)/.test(word) ? word[0].toLowerCase() + word.slice(1) : word}`, bad: false }
 }
 
-function NightRow({ night }: { night: KindNight }) {
+/** Read rows shown before "Show all" (board W4). */
+const READ_SHOWN = 6
+
+function TurnOnJob({ kind, token }: { kind: NightKindId; token: string }) {
+  const community = useCommunitySlug()
+  const api = useAdminApi(token)
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  async function turnOn() {
+    setBusy(true)
+    setError(null)
+    try {
+      await api.post('/api/admin/watches', { action: 'job-on', kind }, 'Could not turn it on.')
+      noteJobSwitched(community, kind, false)
+      router.push(`${adminBase(community)}/watches`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not turn it on.')
+      setBusy(false)
+    }
+  }
   return (
-    <li className="flex min-h-10 items-center justify-between gap-2 border-b border-slate-100 px-3 text-sm last:border-b-0">
-      <span className="font-semibold text-slate-900">{night.date}</span>
-      {night.tone === 'good' ? <GoodMark label={night.result} /> : night.tone === 'bad' ? <BadMark label={night.result} /> : <span className="text-[0.8125rem] text-slate-400">{night.result}</span>}
-    </li>
+    <div className="flex flex-col gap-2">
+      <button type="button" disabled={busy} onClick={() => void turnOn()} className={`${primary} self-start`}>
+        {busy ? 'Turning on…' : 'Turn it back on'}
+      </button>
+      {error && <p className="m-0 text-sm text-red-700">{error}</p>}
+    </div>
   )
 }
-
-/** Tracked rows shown before "Show all". */
-const TRACKED_SHOWN = 2
 
 export default function JobPage({ token, id }: { token: string; id: string }) {
   const community = useCommunitySlug()
   const base = adminBase(community)
   const api = useAdminApi(token)
   const { jobs, reload } = useWatchJobsAndReload(token)
+  const [now] = useState(() => Date.now())
   const [adding, setAdding] = useState(false)
   const [all, setAll] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -198,10 +211,18 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
     </Link>
   ) : undefined
 
-  const head = <AdminBack back={{ label: 'Watches', href: `${base}/watches` }} title={job?.name ?? known?.name ?? ''} right={right} />
+  const name = job ?? known
+  const title = name ? jobTitle(name.id, name.name) : ''
+  const off = !!job && !!jobs.runs?.off?.includes(job.id)
+  const sub = job && jobs.runs ? subtitle(job, off, now) : null
+  const head = (
+    <div className="flex flex-col gap-1">
+      <AdminBack back={{ label: 'Watches', href: `${base}/watches` }} title={title} right={right} />
+      {sub && <p className={`m-0 text-[0.9375rem] ${sub.bad ? 'font-semibold text-amber-800' : 'text-slate-600'}`}>{sub.text}</p>}
+    </div>
+  )
   if (jobs.runs === null) return <div className="space-y-4">{head}<p className="text-sm text-red-700">Couldn’t load this job.</p></div>
   if (!job) return <div className="space-y-4">{head}<p className="text-sm text-muted">{known || jobs.runs === undefined ? 'Loading…' : 'No such job.'}</p></div>
-  const off = jobs.runs?.off?.includes(job.id)
 
   async function list(id: string, action: 'pause' | 'resume') {
     setError(null)
@@ -212,62 +233,48 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
       setError(err instanceof Error ? err.message : 'Could not do that.')
     }
   }
-  // Every eruv, not only those with a website being read: each opens on its
-  // own, so its status and map can be set up there too.
-  const everything: TrackedSource[] = job.id === 'eruvs' && jobs.eruvim ? jobs.eruvim.eruvim.map((e) => ({ name: e.name, status: '', bad: false, page: placePath(e.id) })) : job.tracked
-  const tracked = all ? everything : everything.slice(0, TRACKED_SHOWN)
+  const places = job.id === 'times' ? jobs.times?.places : job.id === 'hours' ? jobs.hours?.places : null
+  // Minyan times lists only shuls as missing a source (a restaurant can keep minyanim).
+  const shulCategories = new Set((jobs.categories ?? []).filter((c) => kindOf(c) === 'shuls').map((c) => c.id))
+  const categoryOf = new Map((jobs.places ?? []).map((p) => [p.id, p.category]))
+  const listsMissing = (placeId: string) => job.id !== 'times' || !jobs.places || shulCategories.has(categoryOf.get(placeId) ?? '')
+  const { missing, read } = jobPlaceRows(job.id, { tracked: job.tracked, places, eruvim: job.id === 'eruvs' ? jobs.eruvim?.eruvim : null }, listsMissing)
+  const shown = all ? read : read.slice(0, READ_SHOWN)
   const opens = (p: string) => page(pageFrom(p, `job/${job.id}`))
+  const row = (r: JobPlaceRow, tone: string) =>
+    r.page ? (
+      <AdminRow key={r.key} href={opens(r.page)} name={r.name} line={<span className={tone}>{r.line}</span>} />
+    ) : (
+      <div key={r.key} className="flex min-h-11 items-center gap-2 px-4 py-2">
+        <span className="flex flex-1 flex-col">
+          <span className="text-[0.9375rem] font-semibold text-slate-900">{r.name}</span>
+          <span className={`text-[0.8125rem] ${tone}`}>{r.line}</span>
+        </span>
+        {r.watch && (
+          <button type="button" onClick={() => void list(r.watch!.id, r.watch!.active ? 'pause' : 'resume')} className="min-h-11 cursor-pointer whitespace-nowrap text-[0.8125rem] font-semibold text-primary">
+            {r.watch.active ? 'Stop' : 'Read again'}
+          </button>
+        )}
+      </div>
+    )
 
   return (
     <div className="flex flex-col gap-3">
       {head}
       {adding && known && <AddToJob kind={known.id} token={token} onDone={async () => { setAdding(false); await reload() }} />}
-      <div className="rounded-[10px] border border-slate-200 bg-white px-4 py-3.5">
-        <p className="m-0 text-lg font-semibold text-slate-900">{statusLine(job)}</p>
-        {job.schedule && <p className="m-0 mt-0.5 text-[0.8125rem] text-slate-600">{job.schedule}</p>}
-        {job.scheduleMore && <p className="m-0 text-[0.8125rem] text-slate-600">{job.scheduleMore}</p>}
-      </div>
-      {job.misses.length > 0 && (
-        <AdminBox title={job.id === 'links' ? 'Needs a look' : 'Not read last night'}>
-          {job.misses.map((m, i) => (m.page ? <AdminRow key={i} href={opens(m.page)} name={m.name} line={<span className="text-amber-800">{m.why}</span>} /> : (
-            <div key={i} className="px-4 py-2.5">
-              <p className="m-0 text-[0.9375rem] font-semibold text-slate-900">{m.name}</p>
-              <p className="m-0 text-[0.8125rem] text-amber-800">{m.why}</p>
-            </div>
-          )))}
-        </AdminBox>
-      )}
-      {everything.length > 0 && (
-        <AdminBox title={`All ${everything.length} tracked`}>
-          {tracked.map((t, i) => (t.page ? <AdminRow key={i} href={opens(t.page)} name={t.name} /> : (
-            <div key={i} className="flex min-h-11 items-center gap-2 px-4 py-2">
-              <span className="flex-1 text-[0.9375rem] font-semibold text-slate-900">{t.name}</span>
-              <span className={`text-[0.8125rem] ${t.bad ? 'text-amber-800' : 'text-slate-500'}`}>{t.status}</span>
-              {t.watch && (
-                <button type="button" onClick={() => void list(t.watch!.id, t.watch!.active ? 'pause' : 'resume')} className="min-h-11 cursor-pointer whitespace-nowrap text-[0.8125rem] font-semibold text-primary">
-                  {t.watch.active ? 'Stop' : 'Read again'}
-                </button>
-              )}
-            </div>
-          )))}
-          {everything.length > TRACKED_SHOWN && (
-            <button type="button" aria-expanded={all} onClick={() => setAll((a) => !a)} className="min-h-11 w-full cursor-pointer px-4 text-left text-[0.9375rem] font-semibold text-slate-900">
-              {all ? 'Show fewer' : `Show all ${everything.length}`}
+      {missing.length > 0 && <AdminBox title={`Nothing to read · ${missing.length}`}>{missing.map((r) => row(r, 'font-semibold text-amber-800'))}</AdminBox>}
+      {read.length > 0 && (
+        <AdminBox title={`Read · ${read.length}`}>
+          {shown.map((r) => row(r, 'text-slate-600'))}
+          {read.length > READ_SHOWN && (
+            <button type="button" aria-expanded={all} onClick={() => setAll((a) => !a)} className="min-h-11 w-full cursor-pointer px-4 text-left text-[0.9375rem] font-semibold text-primary">
+              {all ? 'Show fewer' : `Show all ${read.length}`}
             </button>
           )}
         </AdminBox>
       )}
       {error && <p className="m-0 text-sm text-red-700">{error}</p>}
-      {job.nights.length > 0 && (
-        <AdminBox title="Last 14 nights">
-          <ul className="m-0 list-none p-0">
-            {job.nights.map((n) => (
-              <NightRow key={n.date} night={n} />
-            ))}
-          </ul>
-        </AdminBox>
-      )}
-      {!off && <TurnOffJob kind={job.id} name={job.name} count={job.tracked.length} token={token} />}
+      {off ? <TurnOnJob kind={job.id} token={token} /> : <TurnOffJob kind={job.id} name={title} count={job.tracked.length} token={token} />}
     </div>
   )
 }

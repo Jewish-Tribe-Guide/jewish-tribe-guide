@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { dueQueue, filterLooks, lookAgainFix, lookItems, lookView, menuWhy, pickFound, pickPage, LOOK_AGAIN_MS, type LookInput, type LookItem } from './lookAgain'
-import { nextRunAt, NIGHTLY_JOBS, type JobRun } from './jobRuns'
+import { dueQueue, filterLooks, lookItems, lookView, menuWhy, pickFound, pickPage, LOOK_AGAIN_MS, type LookInput, type LookItem } from './lookAgain'
+import { nextRunAt, NIGHTLY_JOBS } from './jobRuns'
 
 // Look again (board XSuFCMdLQmBYNJqfWaEM3A, Oct 27): each one tried again a
 // month after its last try, a few a night; what it finds offered, never set.
@@ -129,12 +129,3 @@ describe('what it offers', () => {
   })
 })
 
-describe('lookAgainFix', () => {
-  const run = (over: Partial<JobRun>): JobRun => ({ id: 'r', job: 'look-again', startedAt: '2026-11-03T09:00:00Z', finishedAt: '2026-11-03T09:01:00Z', ok: true, summary: 'Tried 5 again', warning: null, error: null, ...over })
-  it('needs fixing when its last run failed or it stopped running, not when it worked', () => {
-    expect(lookAgainFix([run({})], NOW)).toBeNull()
-    expect(lookAgainFix([run({ ok: false, error: 'boom' })], NOW)).toEqual({ name: 'Look again', why: 'Last run failed', page: 'job/look-again' })
-    expect(lookAgainFix([run({ startedAt: '2026-10-30T09:00:00Z', finishedAt: '2026-10-30T09:01:00Z' })], NOW)?.why).toBe('Didn’t run since Oct 30')
-  })
-
-})

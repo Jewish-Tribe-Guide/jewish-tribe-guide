@@ -48,7 +48,7 @@ export const GET = adminRead(async (request: Request, { community }) => {
   }
 })
 
-// POST { url } — Paste its link: tried at once, kept only if it answers with
+// POST { url } — Copy the Web app URL: tried at once, kept only if it answers with
 // this community's key (SetupBad14).
 export const POST = adminRead(async (request: Request, { community }) => {
   const body = (await request.json().catch(() => null)) as { url?: unknown } | null

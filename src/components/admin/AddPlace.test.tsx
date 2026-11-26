@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { makeCategory } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -10,7 +10,9 @@ import AddPlace from './AddPlace'
 
 vi.mock('next/navigation', () => ({ useRouter: () => mockRouter, usePathname: () => '/philly/admin/places', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(async () => ({})), parseOkJson: vi.fn() }))
-vi.mock('@/lib/useEditWeek', () => ({ useEditWeek: () => null }))
+// No week but where a test gives one (this week's row).
+const editWeek = vi.hoisted(() => ({ now: null as null | { week: { from: string; to: string }; next: { from: string; to: string } } }))
+vi.mock('@/lib/useEditWeek', () => ({ useEditWeek: () => editWeek.now }))
 vi.mock('@/components/intake/AddressInput', () => ({
   default: ({ id, onChange, onPlaceSelect, suggestionNote }: { id: string; onChange: (v: string) => void; onPlaceSelect: (r: unknown) => void; suggestionNote?: (id: string) => string | null }) => (
     <div>
@@ -56,6 +58,24 @@ afterEach(() => {
 })
 
 const posts = () => vi.mocked(fetchJson).mock.calls.filter(([, init]) => init?.method === 'POST').map(([url, init]) => [String(url).split('?')[0], JSON.parse(String(init?.body))])
+/** What's saved: a read (on a pick, or Read now) saves nothing. */
+const saves = () => posts().filter(([u]) => u !== '/api/admin/read-now')
+
+/** A page or an email for its usual weekday times, as an admin gives one:
+ *  Change on the row's line (or Add a page, when its website had nothing),
+ *  the field, Done (board N4). */
+async function giveSource(user: ReturnType<typeof userEvent.setup>, value: string) {
+  await user.click(screen.getByTestId('editor-add-minyans:weekday'))
+  const open = within(screen.getByTestId('editor-open-minyans:weekday'))
+  const change = open.queryByRole('button', { name: 'Change' }) ?? open.queryByRole('button', { name: /^Add a page/ })
+  if (change) await user.click(change)
+  const field = screen.getByTestId('source-field')
+  expect(field.closest('[data-testid="row-source-foot"]')).not.toBeNull()
+  await user.clear(field)
+  await user.type(field, value)
+  await user.click(screen.getByRole('button', { name: 'Done' }))
+  await waitFor(() => expect(screen.queryByTestId('source-field')).toBeNull())
+}
 
 function renderAdd(onClose = vi.fn(), category = shul) {
   renderWithProviders(<AddPlace category={category} listings={[{ id: 'x', category: 'synagogue', name: 'There', anchorId: 'all', distance: 0, address: '', placeId: 'in-guide' }]} token="tok" onClose={onClose} />, { community: { slug: 'philly' } })
@@ -70,6 +90,21 @@ describe('Add a place', () => {
     expect(screen.getByRole('button', { name: 'Fill it in yourself' })).toBeInTheDocument()
   })
 
+  // Board U3 (Nov 26): Find names what's being added, when the category's
+  // name is a thing (it has a plural), and Back is the step before it.
+  it('Find names a synagogue, says Step 2 of 3, and Back goes to the step before', async () => {
+    const user = userEvent.setup()
+    const onBack = vi.fn()
+    const onClose = vi.fn()
+    renderWithProviders(<AddPlace category={{ ...shul, pluralLabel: 'Synagogues' }} listings={[]} token="tok" onClose={onClose} onBack={onBack} />, { community: { slug: 'philly' } })
+    expect(screen.getByRole('heading', { name: 'Add a synagogue' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Find the synagogue')).toBeInTheDocument()
+    expect(screen.getByText('Step 2 of 3')).toBeInTheDocument()
+    await user.click(screen.getAllByRole('button', { name: /Back/ })[0])
+    expect(onBack).toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('picked on Google, its rows say Google and What’s not there has no word (AddRows11)', async () => {
     const user = userEvent.setup()
     renderAdd()
@@ -77,7 +112,9 @@ describe('Add a place', () => {
     expect(screen.getByText('Goes live as soon as you add it, with no review.')).toBeInTheDocument()
     expect(screen.queryByText('Filled in from Google')).toBeNull()
     for (const row of ['editor-row-name', 'editor-row-contact:phone', 'editor-row-field:website']) {
-      expect(within(screen.getByTestId(row)).getByTestId('row-job')).toHaveTextContent('Google')
+      const job = within(screen.getByTestId(row)).getByTestId('row-job')
+      expect(job).toHaveAttribute('data-job', 'Google')
+      expect(job).toHaveTextContent('Checked nightly')
     }
     expect(within(screen.getByTestId('editor-empty')).queryByTestId('row-job')).toBeNull()
     expect(screen.getByTestId('editor-empty')).toHaveTextContent('Usual weekday times')
@@ -87,36 +124,117 @@ describe('Add a place', () => {
     const user = userEvent.setup()
     renderAdd()
     await user.click(screen.getByRole('button', { name: 'Fill it in yourself' }))
-    expect(within(screen.getByTestId('editor-row-name')).getByTestId('row-job')).toHaveTextContent('Nothing')
+    expect(within(screen.getByTestId('editor-row-name')).getByTestId('row-job')).toHaveAttribute('data-job', 'Nothing')
+    expect(within(screen.getByTestId('editor-row-name')).getByTestId('row-job')).toHaveTextContent('Not checked')
     expect(screen.getByTestId('editor-add-contact:phone')).toBeInTheDocument()
     await user.click(screen.getByTestId('editor-add-contact:phone'))
-    expect(screen.getByTestId('row-source')).toHaveTextContent('Nothing reads this · Find it on Google')
+    expect(screen.getByTestId('row-source')).toHaveTextContent(/^Find it on Google$/)
     await user.click(screen.getByRole('button', { name: 'Find it on Google' }))
     expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
   })
 
+  // Board N4, Nov 25: Change opens a field in the row; its Done keeps it.
   it('a choice waits, its line says so, and it’s saved with the listing (AddChange8, GivenRead13)', async () => {
     const user = userEvent.setup()
     const onClose = renderAdd()
     await user.click(screen.getByRole('button', { name: 'Pick it' }))
+    await giveSource(user, 'https://ohev.org/davening')
+    expect(screen.queryByTestId('source-field')).toBeNull()
     await user.click(screen.getByTestId('editor-add-minyans:weekday'))
-    await user.click(screen.getByRole('button', { name: 'Change' }))
-    expect(screen.getByLabelText('A web page, or the email it comes from')).toHaveAttribute('placeholder', 'ohev.org/…')
-    await user.type(screen.getByLabelText('A web page, or the email it comes from'), 'https://ohev.org/davening')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
-    expect(await screen.findByText('ohev.org/davening')).toBeInTheDocument()
-    expect(posts()).toEqual([])
+    expect(screen.getAllByTestId('row-source')[0]).toHaveTextContent('ohev.org/davening')
+    expect(saves()).toEqual([])
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('Stop is kept till the listing’s saved (AddGoogle8)', async () => {
+  // Nov 25: the field only once it's asked for, by Add a page.
+  it('a row with no source: Add a page opens its field, and Done keeps it', async () => {
+    const user = userEvent.setup()
+    renderAdd()
+    await user.click(screen.getByRole('button', { name: 'Fill it in yourself' }))
+    await user.click(screen.getByTestId('editor-add-minyans:weekday'))
+    const open = screen.getByTestId('editor-open-minyans:weekday')
+    // Beside the screen's title, not by the line (Nov 26).
+    expect(within(screen.getByTestId('screen-aside')).getByTestId('row-job')).toHaveTextContent('Not checked')
+    expect(within(open).queryByTestId('row-job')).toBeNull()
+    expect(within(open).queryByText('Nothing reads this')).toBeNull()
+    expect(screen.queryByTestId('source-field')).toBeNull()
+    expect(screen.getByTestId('row-source')).toHaveTextContent(/^Add a page$/)
+    await user.click(within(open).getByRole('button', { name: 'Add a page' }))
+    expect(screen.getByTestId('source-field')).toHaveAttribute('placeholder', 'A page’s link')
+    expect(within(open).queryByRole('button', { name: 'Add a page' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    // Left empty, nothing changes, and the field's gone again.
+    await user.click(screen.getByTestId('editor-add-minyans:weekday'))
+    expect(screen.queryByTestId('source-field')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Add a page' }))
+    await user.type(screen.getByTestId('source-field'), 'https://ohev.org/davening')
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    await user.click(screen.getByTestId('editor-add-minyans:weekday'))
+    expect(screen.getAllByTestId('row-source').map((p) => p.textContent)).toEqual(['Checked nightly from ohev.org/davening · Read now · Change'])
+    expect(screen.queryByTestId('source-field')).toBeNull()
+    expect(posts()).toEqual([])
+  })
+
+  // Nov 25: opened, there was no way out but Done.
+  it('a field opened by mistake: a click away closes it while empty, Escape always', async () => {
+    const user = userEvent.setup()
+    renderAdd()
+    await user.click(screen.getByRole('button', { name: 'Fill it in yourself' }))
+    await user.click(screen.getByTestId('editor-add-minyans:weekday'))
+    const away = screen.getByText('Usual weekday times')
+    await user.click(screen.getByRole('button', { name: 'Add a page' }))
+    expect(screen.getByTestId('source-field')).toBeTruthy()
+    await user.click(away)
+    expect(screen.queryByTestId('source-field')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Add a page' })).toBeTruthy()
+    // Something typed stays through a click away; Escape drops it.
+    await user.click(screen.getByRole('button', { name: 'Add a page' }))
+    await user.type(screen.getByTestId('source-field'), 'https://ohev.org/davening')
+    await user.click(away)
+    expect(screen.getByTestId('source-field')).toHaveValue('https://ohev.org/davening')
+    await user.type(screen.getByTestId('source-field'), '{Escape}')
+    expect(screen.queryByTestId('source-field')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    expect(posts()).toEqual([])
+  })
+
+  it('a Google field has no Stop: typed over, Google stops keeping it', async () => {
     const user = userEvent.setup()
     renderAdd()
     await user.click(screen.getByRole('button', { name: 'Pick it' }))
     await user.click(screen.getByTestId('editor-row-contact:phone'))
-    await user.click(screen.getByRole('button', { name: 'Stop' }))
-    expect(posts()).toEqual([])
-    await waitFor(() => expect(screen.getByTestId('row-source')).toHaveTextContent('Nothing reads this · Use Google’s'))
+    expect(screen.getByTestId('row-source')).toHaveTextContent(/^Checked nightly from Google$/)
+    expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull()
+    const phone = within(screen.getByTestId('editor-open-contact:phone')).getAllByRole('textbox')[0]
+    await user.clear(phone)
+    await user.type(phone, '215-555-0199')
+    expect(screen.getByTestId('row-source')).toHaveTextContent(/^Google stops keeping this$/)
+    expect(saves()).toEqual([])
+  })
+
+  // Nov 25: a sentence about a source isn't its name, so no "From" before
+  // it ("From Not on Keystone-K…"), and the field says which page it wants.
+  // Nov 25: a sentence about a source isn't its name, so no "From" before
+  // it; it says when the lists were read; and there's nothing to give.
+  it('Kosher: not found on the lists is said as it is, with when they were read, and no field', async () => {
+    const user = userEvent.setup()
+    const readAt = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+    vi.mocked(fetchJson).mockImplementation(async (_url, init) =>
+      JSON.parse(String(init?.body ?? '{}')).slot === 'kosher' ? { kosher: { lists: [], none: 'Not found on Keystone-K or Mekor Habracha’s list', readAt } } : {},
+    )
+    const food = makeCategory({
+      id: 'restaurant',
+      label: 'Food',
+      placeKind: 'food',
+      detailFields: [{ key: 'kosherCert', label: 'Kosher Certification', type: 'select', options: [{ value: 'IKC', label: 'IKC' }] }],
+    })
+    renderAdd(vi.fn(), food)
+    await user.click(screen.getByRole('button', { name: 'Pick it' }))
+    const row = await waitFor(() => screen.getByTestId(/^editor-(add|row)-.*kosher/i))
+    await user.click(row)
+    await waitFor(() => expect(screen.getByTestId('row-source')).toHaveTextContent(/^Not found on Keystone-K or Mekor Habracha’s list · read last night$/))
+    expect(screen.queryByTestId('source-field')).toBeNull()
+    expect(within(screen.getByTestId('row-source')).queryByRole('button')).toBeNull()
   })
 
   describe('after Add listing', () => {
@@ -136,7 +254,7 @@ describe('Add a place', () => {
       vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, listing: added }), { status: 200 })))
       await user.click(screen.getByRole('button', { name: 'Add listing' }))
     }
-    const sent = () => posts().map(([u, b]) => `${String(u).replace(/\?.*/, '')} ${(b as { action?: string } | undefined)?.action ?? ''}`.trim())
+    const sent = () => saves().map(([u, b]) => `${String(u).replace(/\?.*/, '')} ${(b as { action?: string } | undefined)?.action ?? ''}`.trim())
 
     it('a food place’s website is read as any other’s, not by the hours job (FoodDone13)', async () => {
       const user = userEvent.setup()
@@ -168,7 +286,7 @@ describe('Add a place', () => {
       renderAdd(vi.fn(), mikvah)
       await user.click(screen.getByRole('button', { name: 'Pick it' }))
       await user.click(screen.getByTestId('editor-add-audience:womenTevillah'))
-      expect(screen.getByTestId('row-source')).toHaveTextContent('Its website · Read now · Change')
+      expect(screen.getAllByTestId('row-source').at(-1)).toHaveTextContent('From its website · Read now · Change')
       await user.type(document.querySelector('textarea')!, 'By appointment')
       await user.click(screen.getByRole('button', { name: 'Done' }))
       expect(screen.getByTestId('editor-add-audience:menTevillah')).toBeInTheDocument()
@@ -223,15 +341,13 @@ describe('Add a place', () => {
       site()
       vi.mocked(fetchJson).mockImplementation(async (url, init) => {
         const body = init?.body ? JSON.parse(String(init.body)) : {}
-        if (String(url).includes('/watches/google') && body.action === 'stop_field') throw new Error('Could not do that.')
+        if (String(url).includes('/found') && body.action === 'google') throw new Error('Could not do that.')
         return String(url).includes('/found') && init?.method !== 'POST' ? { found: [] } : {}
       })
       const onClose = renderAdd()
       await user.click(screen.getByRole('button', { name: 'Pick it' }))
-      await user.click(screen.getByTestId('editor-row-contact:phone'))
-      await user.click(screen.getByRole('button', { name: 'Stop' }))
       await addIt(user)
-      expect(await screen.findByRole('alert')).toHaveTextContent('Not saved: Google’s Stops')
+      expect(await screen.findByRole('alert')).toHaveTextContent('Not saved: Google’s details')
       expect(onClose).not.toHaveBeenCalled()
       await user.click(screen.getByRole('button', { name: 'Done' }))
       expect(onClose).toHaveBeenCalled()
@@ -256,12 +372,7 @@ describe('Add a place', () => {
       site({ lastError: 'It wouldn’t open' })
       const onClose = renderAdd()
       await user.click(screen.getByRole('button', { name: 'Pick it' }))
-      await user.click(screen.getByTestId('editor-add-minyans:weekday'))
-      await user.click(screen.getByRole('button', { name: 'Change' }))
-      await user.type(screen.getByLabelText('A web page, or the email it comes from'), 'https://ohev.org/davening')
-      await user.click(screen.getByRole('button', { name: 'Save' }))
-      await screen.findByText('ohev.org/davening')
-      await user.click(screen.getByRole('button', { name: 'Done' }))
+      await giveSource(user, 'https://ohev.org/davening')
       await addIt(user)
       expect(await screen.findByText('Ohev Shalom is added')).toBeInTheDocument()
       expect(screen.getByText('Couldn’t read that page')).toBeInTheDocument()
@@ -281,48 +392,110 @@ describe('Add a place', () => {
       await user.click(screen.getByTestId('editor-add-minyans:weekday'))
     }
 
-    it('fills in the rows from its website, saving nothing (ReadDone13, ReadRows13)', async () => {
+    // Board N5, Nov 25: picked on Google, its website is read straight
+    // away; what it finds waits for Use these times, with no sticker.
+    it('picked, its website is read at once, and what it finds waits for Use these times', async () => {
       const user = userEvent.setup()
-      reading({ state: 'done', details: { email: 'office@ohev.org', minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '7:00am' }] } })
+      let answer: (v: unknown) => void = () => {}
+      vi.mocked(fetchJson).mockImplementation((url) => (String(url).includes('/read-now') ? new Promise((r) => (answer = r)) : Promise.resolve({})))
       renderAdd()
       await openTimes(user)
-      await user.click(screen.getByRole('button', { name: 'Read now' }))
-      await waitFor(() => expect(sourceWords()).toContain('just now'))
       const [[path, body]] = posts()
-      expect(path).toContain('/api/admin/read-now')
+      expect(path).toBe('/api/admin/read-now')
       expect(body).toMatchObject({ slot: 'page', category: 'synagogue', draft: { name: 'Ohev Shalom' } })
+      expect(screen.getByTestId('row-job')).toHaveTextContent('Checking…')
+      expect(sourceWords()).toBe('Reading its website… · Use a different page')
+      answer({ state: 'done', details: { email: 'office@ohev.org', minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '7:00am' }] } })
+      await waitFor(() => expect(sourceWords()).toBe('Found on its website: 1 time · Use these times · Change'))
+      expect(screen.queryByTestId('row-job')).toBeNull()
+      // Nothing's put in till it's used.
+      expect(screen.getByTestId('editor-open-minyans:weekday')).not.toHaveTextContent('Shacharis 7 AM')
+      await user.click(screen.getByRole('button', { name: 'Use these times' }))
+      expect(sourceWords()).toBe('Checked nightly from its website · read just now · Change')
       await user.click(screen.getByRole('button', { name: 'Done' }))
       expect(screen.getByTestId('editor-row-minyans:weekday')).toHaveTextContent('Shacharis 7 AM')
+      expect(saves()).toEqual([])
     })
 
-    it('says when the website has none, or couldn’t be read (ReadNothing13, ReadFailed13)', async () => {
+    it('a different page, given while it reads, is read instead; the first answer is dropped', async () => {
+      const user = userEvent.setup()
+      const answers: ((v: unknown) => void)[] = []
+      vi.mocked(fetchJson).mockImplementation((url) => (String(url).includes('/read-now') ? new Promise((r) => answers.push(r)) : Promise.resolve({})))
+      renderAdd()
+      await openTimes(user)
+      await user.click(screen.getByRole('button', { name: 'Use a different page' }))
+      await user.type(screen.getByTestId('source-field'), 'https://ohev.org/davening')
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      await waitFor(() => expect(answers).toHaveLength(2))
+      expect(posts().map(([, b]) => b.url)).toEqual([undefined, 'https://ohev.org/davening'])
+      answers[0]({ state: 'done', details: { minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '7:00am' }] } })
+      answers[1]({ state: 'none' })
+      await user.click(screen.getByTestId('editor-add-minyans:weekday'))
+      await waitFor(() => expect(sourceWords()).toBe('No minyan times on ohev.org/davening · Add a page'))
+    })
+
+    // Nov 26: nothing there, so nothing to change: one link, to add a page.
+    it('nothing found: Not checked, its field behind Add a page; couldn’t read: Read now (ReadNothing13, ReadFailed13)', async () => {
       const user = userEvent.setup()
       reading({ state: 'none' })
       renderAdd()
       await openTimes(user)
-      await user.click(screen.getByRole('button', { name: 'Read now' }))
-      await waitFor(() => expect(sourceWords()).toContain('No minyan times on its website'))
+      await waitFor(() => expect(sourceWords()).toBe('No minyan times on its website · Add a page'))
+      expect(screen.getByTestId('row-job')).toHaveTextContent('Not checked')
+      expect(screen.queryByRole('button', { name: 'Change' })).toBeNull()
+      // Nov 25: no field till it's asked for.
+      expect(screen.queryByTestId('source-field')).toBeNull()
+      await user.click(screen.getByRole('button', { name: 'Add a page' }))
+      expect(screen.getByTestId('source-field')).toHaveValue('')
+      // The field sits under the line, which says why it's needed.
+      expect(sourceWords()).toBe('No minyan times on its website')
+      await user.type(screen.getByTestId('source-field'), '{Escape}')
+      expect(sourceWords()).toBe('No minyan times on its website · Add a page')
       cleanup()
       reading({ state: 'failed' })
       renderAdd()
       await openTimes(user)
-      await user.click(screen.getByRole('button', { name: 'Read now' }))
       await waitFor(() => expect(sourceWords()).toContain('Couldn’t read its website'))
-      expect(screen.getByRole('button', { name: 'Read now' })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Read now' }))
+      expect(posts().filter(([u]) => u === '/api/admin/read-now')).toHaveLength(3)
+    })
+
+    // Nov 26: one link for this week too, a page or an email; the line stays.
+    it('this week’s Add a page or an email opens its field under the line, which stays', async () => {
+      const user = userEvent.setup()
+      reading({ state: 'none' })
+      editWeek.now = { week: { from: '2026-11-22', to: '2026-11-28' }, next: { from: '2026-11-29', to: '2026-12-05' } }
+      onTestFinished(() => {
+        editWeek.now = null
+      })
+      renderAdd()
+      await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await user.click(screen.getByTestId('editor-add-minyans:this_week'))
+      await waitFor(() => expect(sourceWords()).toBe('No minyan times on its website · Add a page or an email'))
+      await user.click(screen.getByRole('button', { name: 'Add a page or an email' }))
+      expect(sourceWords()).toBe('No minyan times on its website')
+      expect(screen.getByTestId('source-field')).toHaveAttribute('placeholder', 'A page’s link or an email')
+    })
+
+    it('filled in by hand, nothing is read till Read now', async () => {
+      const user = userEvent.setup()
+      reading({ state: 'none' })
+      renderAdd()
+      await user.click(screen.getByRole('button', { name: 'Fill it in yourself' }))
+      expect(posts()).toEqual([])
     })
   })
 
   describe('Read now for email', () => {
+    // The page's own read, on the pick, finds nothing.
     function reading(reply: unknown) {
-      vi.mocked(fetchJson).mockImplementation(async (url) => (String(url).includes('/read-now') ? reply : {}))
+      vi.mocked(fetchJson).mockImplementation(async (url, init) => (String(url).includes('/read-now') ? (JSON.parse(String(init?.body)).slot === 'email' ? reply : { state: 'none' }) : {}))
     }
     const sourceWords = () => screen.getAllByTestId('row-source').map((p) => p.textContent).join('\n')
     async function giveEmail(user: ReturnType<typeof userEvent.setup>) {
       await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await giveSource(user, 'office@ohev.org')
       await user.click(screen.getByTestId('editor-add-minyans:weekday'))
-      await user.click(screen.getByRole('button', { name: 'Change' }))
-      await user.type(screen.getByLabelText('A web page, or the email it comes from'), 'office@ohev.org')
-      await user.click(screen.getByRole('button', { name: 'Save' }))
       await waitFor(() => expect(sourceWords()).toContain('office@ohev.org'))
     }
     const readEmail = async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getAllByRole('button', { name: 'Read now' })[0])
@@ -335,7 +508,7 @@ describe('Add a place', () => {
       await readEmail(user)
       expect(await screen.findByText(/Sign up for its emails with guide@gmail.com/)).toBeInTheDocument()
       expect(sourceWords()).toContain('No emails from office@ohev.org yet')
-      const body = posts().find(([u]) => String(u).includes('/read-now'))![1]
+      const body = posts().find(([u, b]) => String(u).includes('/read-now') && b.slot === 'email')![1]
       expect(body).toMatchObject({ slot: 'email', url: 'office@ohev.org' })
     })
 
@@ -345,7 +518,7 @@ describe('Add a place', () => {
       renderAdd()
       await giveEmail(user)
       await readEmail(user)
-      expect(await screen.findByRole('link', { name: 'Set it up' })).toHaveAttribute('href', expect.stringContaining('/watches/newsletters'))
+      expect(await screen.findByRole('link', { name: 'Set it up' })).toHaveAttribute('href', expect.stringContaining('/team/email'))
     })
 
     it('found: fills in, and says the day it was sent (EmailFound14)', async () => {
@@ -354,7 +527,7 @@ describe('Add a place', () => {
       renderAdd()
       await giveEmail(user)
       await readEmail(user)
-      await waitFor(() => expect(sourceWords()).toContain('office@ohev.org · Oct 30'))
+      await waitFor(() => expect(sourceWords()).toContain('office@ohev.org · last Oct 30'))
     })
   })
 
@@ -373,8 +546,8 @@ describe('Add a place', () => {
       expect(await screen.findByTestId('editor-row-name')).toBeInTheDocument()
     })
 
-    it('a reload on the form, or a source screen over it, is Find, and the address says so in place', async () => {
-      window.history.replaceState({}, '', '/philly/admin/places?add=synagogue&step=finish&row=hours&over=page.add')
+    it('a reload on the form is Find, and the address says so in place', async () => {
+      window.history.replaceState({}, '', '/philly/admin/places?add=synagogue&step=finish&row=hours')
       renderAdd()
       expect(screen.getByLabelText('Find the place')).toBeInTheDocument()
       await waitFor(() => expect(window.location.search).toBe('?add=synagogue'))

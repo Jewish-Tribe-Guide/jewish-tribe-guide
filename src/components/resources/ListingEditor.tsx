@@ -35,7 +35,7 @@ import { useListingDraft, type ListingDraft } from './useListingDraft'
 import { useListingSubmit, useTurnstileActive, type SendVia } from './useListingSubmit'
 import { PlusIcon } from '@/components/icons'
 import { SUBMIT_PILL } from './submitPill'
-import { ChangedTag, EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCard, EditorSent, editorFieldLabel, editorInputClass } from './editorParts'
+import { ChangedTag, EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCard, EditorSent, RowSourceFoot, editorFieldLabel, editorInputClass } from './editorParts'
 
 // ── Suggest an edit, the whole listing (agreed Oct 11, canvas page "editor") ─
 // The listing's own boxes, in the listing's order, one row each: its
@@ -102,6 +102,9 @@ type Props = {
   sendSlot?: HTMLElement | null
   /** Where the title goes: the host's own header row, beside Back. */
   titleSlot?: HTMLElement | null
+  /** Where a row open on its own screen puts its rowAside: the host's
+   *  header, beside the screen's title, as a row has it beside its own. */
+  asideSlot?: HTMLElement | null
   sharedTurnstile?: { token: string; reset: () => void }
   onRemovalOpenChange?: (open: boolean) => void
   /** Whether the Request removal screen is showing, when the host owns it
@@ -137,6 +140,9 @@ type Props = {
   /** In a row, opened, above Done: where it's read from. `changed`: the
    *  draft has changed it. */
   rowSource?: (row: EditorRow, changed: boolean) => ReactNode
+  /** A row's Done, before it closes: saves what its source field holds
+   *  (board N4, Nov 25). False keeps it open, the reason in its line. */
+  rowDone?: (row: EditorRow) => Promise<boolean>
   /** The contact box a row each (editorRows). */
   splitContact?: boolean
   /** editorRows' allSections. */
@@ -201,6 +207,13 @@ function AlreadyListed({ listing, reason, category }: { listing: DirectoryResour
       to suggest an edit instead, or carry on if this is a different place.
     </div>
   )
+}
+
+/** A field with nothing in it, in the shape it's stored in. */
+export function clearedValue(f: CategoryField, was: unknown): unknown {
+  if (f.type === 'boolean') return false
+  if (f.type === 'tags' || f.type === 'contacts' || f.type === 'minyanim' || Array.isArray(was)) return []
+  return ''
 }
 
 /** No answer at all — the server's own test for a required field. */
@@ -273,6 +286,7 @@ export default function ListingEditor({
   onClose,
   sendSlot,
   titleSlot,
+  asideSlot,
   sharedTurnstile,
   onRemovalOpenChange,
   removalOpen: removalOpenProp,
@@ -286,6 +300,7 @@ export default function ListingEditor({
   preset,
   adminSave,
   rowAside,
+  rowDone,
   rowSource,
   splitContact,
   allSections,
@@ -345,6 +360,11 @@ export default function ListingEditor({
   const challenged = !adminSubmit && !adminSave && !preview
   const verifying = challenged && sender.verifying
   const [openId, setOpenId] = useState<string | null>(null)
+  // The row last opened from "Not on the listing yet" (see `stays`).
+  const [openedEmpty, setOpenedEmpty] = useState<string | null>(null)
+  // What it held when opened, for its Remove (the user, Nov 25: a field
+  // opened just to look was hard to take off again).
+  const openedWith = useRef<{ details: Record<string, unknown>; address: string; phone: string } | null>(null)
   // A step inside a row (a minyan, a person): its title and Back, and
   // which field it belongs to, so the row shows only that one.
   const [child, setChild] = useState<(EditorStep & { key: string; row?: string }) | null>(null)
@@ -418,7 +438,21 @@ export default function ListingEditor({
   // list (the dishes, a week of hours, the minyanim) on its own screen
   // (agreed Oct 11, canvas page "editorlook").
   const inPlace = row !== null && opensInPlace(row)
-  const closeRow = () => setOpenId(null)
+  const closeRow = () => {
+    setOpenId(null)
+    setOpenedEmpty(null)
+  }
+  // Done: the row's source field saved first, when there is one.
+  const [finishing, setFinishing] = useState(false)
+  async function finishRow(r: EditorRow) {
+    if (rowDone) {
+      setFinishing(true)
+      const ok = await rowDone(r).catch(() => false)
+      setFinishing(false)
+      if (!ok) return
+    }
+    closeRow()
+  }
   const step: EditorStep | null = removalOpen ? null : (child ?? (row ? (inPlace ? { back: closeRow } : { title: rowTitle(row), back: closeRow }) : null))
   // The host asks for Back through a function that stays the same, so
   // the latest step's own Back is kept in a ref, set after each render.
@@ -631,12 +665,56 @@ export default function ListingEditor({
   // A short row, open: its fields inside its card, Done under them. Its
   // heading closes it too.
   const openInPlace = (r: EditorRow) => (
-    <EditorOpenCard cardRef={openCard} testId={`editor-open-${r.id}`} title={rowTitle(r)} tags={tags(r)} onClose={closeRow} source={rowSource ? { line: rowSource(r, changed.has(r.id)) } : undefined}>
+    <EditorOpenCard
+      cardRef={openCard}
+      testId={`editor-open-${r.id}`}
+      title={rowTitle(r)}
+      tags={
+        <>
+          {tags(r)}
+          {rowAside?.(r)}
+        </>
+      }
+      onClose={closeRow}
+      onDone={() => void finishRow(r)}
+      finishing={finishing}
+      onRemove={r.id === stays ? () => removeRow(r) : removable(r) && !rowIsEmpty(r, values) ? () => clearRow(r) : undefined}
+      removeLabel={`Remove ${rowTitle(r)}`}
+      source={rowSource ? { line: rowSource(r, changed.has(r.id)) } : undefined}>
       {rowBody(r)}
     </EditorOpenCard>
   )
-  const filled = rows.filter((r) => !rowIsEmpty(r, values) || needed(r))
-  const empty = rows.filter((r) => rowIsEmpty(r, values) && !needed(r))
+  // A row opened from "Not on the listing yet" stays there while it's open
+  // (the user, Nov 25: picking a Store Type jumped the card up the list
+  // under their finger). Done puts it where it now belongs.
+  const stays = inPlace && openId === openedEmpty ? openId : null
+  // A row whose every field waits on another answer has nothing to fill
+  // in yet ("+ Delivery" opened empty until Store Type is Scheduled
+  // Deliveries, Nov 25): it isn't offered until that answer is given.
+  const waiting = (r: EditorRow) =>
+    r.kind === 'fields' && !r.part && !rowHas(r, 'address') && !rowHas(r, 'phone') && r.fields.length > 0 && !r.fields.some(visible)
+  // Remove: the row back as it was when its + line was opened, and closed.
+  function removeRow(r: EditorRow) {
+    const was = openedWith.current
+    if (was) {
+      for (const f of r.fields) setDetail(f.key, was.details[f.key])
+      if (rowHas(r, 'address')) draft.setAddress(was.address)
+      if (rowHas(r, 'phone')) draft.setPhone(was.phone)
+    }
+    closeRow()
+  }
+  // Remove on a row that has something (the user, Nov 25: "why don't the
+  // other boxes have remove?"): it empties the row, which goes under "Not
+  // on the listing yet" once closed. Never the name, the address or a
+  // field the category requires.
+  const removable = (r: EditorRow) => r.kind !== 'name' && !rowHas(r, 'address') && !r.fields.some((f) => f.required)
+  function clearRow(r: EditorRow) {
+    for (const f of r.fields) setDetail(f.key, clearedValue(f, details[f.key]))
+    if (rowHas(r, 'phone')) draft.setPhone('')
+    closeRow()
+  }
+  const filled = rows.filter((r) => r.id !== stays && (!rowIsEmpty(r, values) || needed(r)))
+  const empty = rows.filter((r) => r.id === stays || (rowIsEmpty(r, values) && !needed(r) && !waiting(r)))
   const listScreen = (
     <div className="space-y-4" data-testid="editor-list">
       {creating && fromGoogle && !adminSubmit && <p className="-mt-1 text-[0.875rem] text-muted">Filled in from Google</p>}
@@ -650,7 +728,10 @@ export default function ListingEditor({
           return (
             <li key={r.id}>
               <EditorRowCard
-                onOpen={() => setOpenId(r.id)}
+                onOpen={() => {
+                  setOpenedEmpty(null)
+                  setOpenId(r.id)
+                }}
                 testId={`editor-row-${r.id}`}
                 opens={opensInPlace(r) ? 'here' : 'screen'}
                 changed={isChanged}
@@ -683,7 +764,13 @@ export default function ListingEditor({
               {inPlace && r.id === openId ? (
                 openInPlace(r)
               ) : (
-                <EditorAddLine onOpen={() => setOpenId(r.id)} testId={`editor-add-${r.id}`} opens={opensInPlace(r) ? 'here' : 'screen'} title={r.title} />
+                <EditorAddLine
+                  onOpen={() => {
+                    openedWith.current = { details, address: draft.address, phone: draft.phone }
+                    setOpenedEmpty(r.id)
+                    setOpenId(r.id)
+                  }}
+                  testId={`editor-add-${r.id}`} opens={opensInPlace(r) ? 'here' : 'screen'} title={r.title} />
               )}
             </li>
           ))}
@@ -899,13 +986,18 @@ export default function ListingEditor({
   // A row holding a list, open on its own screen, in the same white card.
   const rowScreen = row && !inPlace ? (
     <div className="space-y-4" data-testid={`editor-open-${row.id}`}>
-      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">{rowBody(row)}</div>
-      {!child && rowSource && <div className="-mt-2 px-0.5">{rowSource(row, changed.has(row.id))}</div>}
+      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+        {rowBody(row)}
+        {/* Where it's kept from, small, under a thin line in the same box
+            (board L2, Nov 25); the sticker beside it, as the screen's
+            heading is the row's title. */}
+        {!child && rowSource && <RowSourceFoot sticker={asideSlot === undefined ? rowAside?.(row) : null}>{rowSource(row, changed.has(row.id))}</RowSourceFoot>}
+      </div>
       {!child &&
         foot(
           <div className="space-y-1">
-            <button type="button" onClick={() => setOpenId(null)} className={SUBMIT_PILL}>
-              Done
+            <button type="button" disabled={finishing} onClick={() => void finishRow(row)} className={SUBMIT_PILL}>
+              {finishing ? 'Saving…' : 'Done'}
             </button>
             {noMinyanLink(row)}
           </div>,
@@ -979,6 +1071,7 @@ export default function ListingEditor({
     <div ref={rootRef} className="space-y-4">
       {challenged && <Honeypot value={sender.honeypot} onChange={sender.setHoneypot} />}
       {titleSlot && (!creating || stepTitle || removalOpen) && createPortal(title, titleSlot)}
+      {asideSlot && rowScreen && !child && !removalOpen && rowAside && row && createPortal(rowAside(row), asideSlot)}
       {!titleSlot && !creating && !onStep && <div className="text-base">{title}</div>}
       <div className={removalOpen ? 'hidden' : ''}>{boxScreen ?? rowScreen ?? listScreen}</div>
       {/* Only while it's showing: it's opened from the edit bar's Request

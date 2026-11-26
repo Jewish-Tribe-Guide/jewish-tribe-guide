@@ -4,13 +4,16 @@ import { getAllowedAdminEmails } from '@/lib/adminAuth'
 import { siteAdminRead } from '@/lib/adminRoute'
 import {
   createCommunity,
-  listCommunities,
+  readCommunities,
   listCommunityAdminEmails,
   listCommunityNotifyPreferenceLists,
+  listCommunityPlaceCounts,
   listCommunityPreviewTokens,
   removeUnfinishedCommunity,
 } from '@/lib/communityStore'
-import { addMissingSiteScreens, cloneCommunityContent } from '@/lib/communityCloning'
+import tzLookup from 'tz-lookup'
+import { addMissingSiteScreens } from '@/lib/communityCloning'
+import { copyStarterPack } from '@/lib/starterPack'
 
 // GET /api/admin/communities — the same data as the public GET
 // /api/communities, but superadmin-gated (getAdminUser — the global
@@ -18,14 +21,14 @@ import { addMissingSiteScreens, cloneCommunityContent } from '@/lib/communityClo
 // own note on what that list means now). CommunityManager.tsx calls THIS
 // instead of the public route specifically so a regular per-community admin
 // gets a 401 here and the "manage every community" UI (the list of every
-// community plus "+ New community") never renders for them at all — that's
+// community plus "New community") never renders for them at all — that's
 // the actual point: creating and browsing every community is a superadmin
 // action, not something scoped to whichever one community an admin
 // administers.
 export const GET = siteAdminRead(async () => {
   try {
     const [communities, adminEmails, notifyPreferenceLists, previewTokens] = await Promise.all([
-      listCommunities(),
+      readCommunities(),
       listCommunityAdminEmails(),
       listCommunityNotifyPreferenceLists(),
       listCommunityPreviewTokens(),
@@ -34,12 +37,14 @@ export const GET = siteAdminRead(async () => {
     // along here (superadmin-only route) but never on Community/
     // listCommunities() itself — that object is also served by the public
     // GET /api/communities, which has no business exposing any of them.
+    const placeCounts = await listCommunityPlaceCounts(communities.map((c) => c.slug))
     const withExtras = communities.map((c) => ({
       ...c,
       adminEmails: adminEmails[c.slug] ?? [],
       notifyMutedEmails: notifyPreferenceLists[c.slug]?.notifyMutedEmails ?? [],
       notifyReviewEmails: notifyPreferenceLists[c.slug]?.notifyReviewEmails ?? [],
       previewToken: previewTokens[c.slug] ?? null,
+      placeCount: placeCounts[c.slug] ?? 0,
     }))
     return Response.json({ ok: true, communities: withExtras })
   } catch (err) {
@@ -51,21 +56,23 @@ export const GET = siteAdminRead(async () => {
 type CreateBody = {
   slug?: string
   name?: string
-  mission?: string
-  region?: string
-  timezone?: string
-  mapCenter?: { lat: number; lng: number }
-  themeColor?: string
-  backgroundColor?: string
+  /** The city picked (GET /api/admin/cities): its name, state and centre.
+   *  The region, time zone, map and mission follow from it. */
+  city?: { city?: string; area?: string; lat?: number; lng?: number }
   adminEmails?: string[]
-  /** An existing community's slug to clone categories/home sections from, or
-   *  omitted/null to start empty. */
-  cloneFrom?: string | null
+  /** The Starter pack switch (board 2f): a few of the default community's
+   *  pages, its home and tabs, no places. Off: it starts empty. */
+  starterPack?: boolean
 }
 
-// POST /api/admin/communities — the "New Community" flow: creates the
-// community row, then optionally clones another community's categories and
-// home sections into it. Superadmin only (see GET above).
+const THEME_COLOR = '#1d4ed8'
+const BACKGROUND_COLOR = '#f8fafc'
+
+// POST /api/admin/communities — New community (Nov 25, boards 1, 2f and 3):
+// a city, a name, who runs it and the Starter pack switch. Everything else
+// the old form asked for (mission, region, time zone, coordinates, colours)
+// follows from the city or starts at the site's own; each is editable in
+// the community's admin afterwards. Superadmin only (see GET above).
 //
 // siteAdminRead, not siteAdminWrite: it invalidates itself, with
 // `newCommunity` (the list expired outright, and read until it has the new
@@ -78,20 +85,23 @@ export const POST = siteAdminRead(async (request: Request) => {
     return Response.json({ ok: false, errors: ['Invalid request body.'] }, { status: 400 })
   }
 
-  const required: (keyof CreateBody)[] = [
-    'slug',
-    'name',
-    'mission',
-    'region',
-    'timezone',
-    'mapCenter',
-    'themeColor',
-    'backgroundColor',
-  ]
-  const missing = required.filter((key) => !body[key])
-  if (missing.length) {
-    return Response.json({ ok: false, errors: [`Missing required field(s): ${missing.join(', ')}.`] }, { status: 400 })
+  const name = body.name?.trim()
+  const slug = body.slug?.trim()
+  const city = body.city?.city?.trim()
+  const { lat, lng } = body.city ?? {}
+  if (!city || typeof lat !== 'number' || typeof lng !== 'number') {
+    return Response.json({ ok: false, errors: ['Pick the city from the list.'] }, { status: 400 })
   }
+  if (!name) return Response.json({ ok: false, errors: ['Give it a name.'] }, { status: 400 })
+  if (!slug) return Response.json({ ok: false, errors: ['Give it an address.'] }, { status: 400 })
+
+  let timezone: string
+  try {
+    timezone = tzLookup(lat, lng)
+  } catch {
+    return Response.json({ ok: false, errors: ['That city has no usable location.'] }, { status: 400 })
+  }
+  const mission = `A guide to Jewish ${city} — community resources for residents and visitors.`
 
   try {
     // Every superadmin (SUPERADMIN_EMAILS) gets folded into the new
@@ -104,20 +114,20 @@ export const POST = siteAdminRead(async (request: Request) => {
     const submittedEmails = Array.isArray(body.adminEmails) ? body.adminEmails : []
     const adminEmails = Array.from(new Set([...submittedEmails, ...getAllowedAdminEmails()]))
     const community = await createCommunity({
-      slug: body.slug!,
-      name: body.name!,
-      mission: body.mission!,
-      region: body.region!,
-      timezone: body.timezone!,
-      mapCenter: body.mapCenter!,
-      themeColor: body.themeColor!,
-      backgroundColor: body.backgroundColor!,
+      slug,
+      name,
+      mission,
+      region: city,
+      timezone,
+      mapCenter: { lat, lng },
+      themeColor: THEME_COLOR,
+      backgroundColor: BACKGROUND_COLOR,
       adminEmails,
     })
 
     try {
-      if (body.cloneFrom) {
-        await cloneCommunityContent(community.slug, body.cloneFrom)
+      if (body.starterPack) {
+        await copyStarterPack({ slug: community.slug, name, region: city, mission })
       }
       // On from the start, cloned or empty: without the Map's row a new
       // community has no Map tab, which read as a bug (the user, Oct 31).

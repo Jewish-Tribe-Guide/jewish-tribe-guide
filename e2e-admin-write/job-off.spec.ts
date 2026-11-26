@@ -3,20 +3,20 @@ import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Turns a job off and on for real (the user, Oct 31): Turn off this job says
-// what it costs and asks once; the job leaves Watches for + Add a watch, and
-// one tap there brings it back. Links, as every community has it and turning
+// what it costs and asks once; its Watches row then says Turned off, and its
+// page turns it back on (board W4, Nov 25: + Add a watch went). Links, as every community has it and turning
 // it off here runs nothing: this suite starts no nightly run. Puts it back on
 // in `finally`, whatever happens.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Watches' read again is held back after Turn on, so Links has to show from
-// the switch itself. Next keeps the Watches left for Add a watch behind
-// React's <Activity>, and the one that came back used to show Links off
-// until that read answered: over 5s on CI's busy test project (PR 405's
-// first run, Nov 20). useWatchJobs.test.tsx has the same with no browser.
+// Watches' read again is held back after Turn on, so Links has to show on
+// from the switch itself. Next keeps the Watches left behind React's
+// <Activity>, and the one that came back used to show Links off until that
+// read answered: over 5s on CI's busy test project (PR 405's first run, Nov
+// 20). useWatchJobs.test.tsx has the same with no browser.
 const jobsRead = (url: URL) => url.pathname === '/api/admin/watches/jobs'
 
-test('a job turned off leaves Watches, and comes back from Add a watch', async ({ page, request }) => {
+test('a job turned off says so on Watches, and turns back on from its page', async ({ page, request }) => {
   await page.goto(`/${TEST_COMMUNITY}/admin/watches/job/links`)
   let release = () => {}
   try {
@@ -25,9 +25,10 @@ test('a job turned off leaves Watches, and comes back from Add a watch', async (
     await page.getByRole('button', { name: 'Turn it off' }).click()
 
     await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/watches$`))
-    await expect(page.getByRole('main').getByRole('link', { name: /^Links/ })).toHaveCount(0)
-    await page.getByRole('link', { name: '+ Add a watch' }).click()
-    const button = page.getByRole('button', { name: /^Links/ })
+    const row = page.getByRole('main').getByRole('link', { name: /^Links/ })
+    await expect(row).toContainText('Turned off')
+    await row.click()
+    const button = page.getByRole('button', { name: 'Turn it back on' })
     await expect(button).toBeVisible()
 
     const held = new Promise<void>((resolve) => (release = resolve))
@@ -38,9 +39,7 @@ test('a job turned off leaves Watches, and comes back from Add a watch', async (
     await button.click()
 
     await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/watches$`))
-    // Back in its own section, and under Needs fixing too once its last run
-    // is a week old, so either row will do.
-    await expect(page.getByRole('main').getByRole('link', { name: /^Links/ }).first()).toBeVisible()
+    await expect(page.getByRole('main').getByRole('link', { name: /^Links/ })).not.toContainText('Turned off')
   } finally {
     release()
     await page.unrouteAll({ behavior: 'ignoreErrors' })

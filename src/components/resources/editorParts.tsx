@@ -68,9 +68,44 @@ export function EditorRowCard({
 
 /** A short row, open where it is: its fields inside its card, Done under
  *  them. Its heading closes it too. With `source` (admin's listing) the card
- *  holds only the fields: the line saying where they come from sits on the
- *  gray under it, then a solid Done, as on the row's own screen. */
-export function EditorOpenCard({ title, tags, onClose, children, cardRef, testId, source }: { title: ReactNode; tags?: ReactNode; onClose: () => void; children: ReactNode; cardRef?: Ref<HTMLDivElement>; testId: string; source?: { line: ReactNode } }) {
+ *  holds its fields and, under a thin line, the one saying where they come
+ *  from (board L2, Nov 25); a solid Done under the card, as on the row's
+ *  own screen. */
+export function EditorOpenCard({
+  title,
+  tags,
+  onClose,
+  onRemove,
+  removeLabel = 'Remove',
+  children,
+  cardRef,
+  testId,
+  source,
+  onDone,
+  finishing = false,
+}: {
+  title: ReactNode
+  tags?: ReactNode
+  onClose: () => void
+  /** Done, where it does more than close (saves a source field first). */
+  onDone?: () => void
+  finishing?: boolean
+  /** A row opened from "Not on the listing yet": "Remove Kosher", a link
+   *  under Done (Nov 25: beside it, it read as a second main button, and
+   *  "Remove" alone as removing the place), takes what was put in back out
+   *  and closes it. `removeLabel`: its words. */
+  onRemove?: () => void
+  removeLabel?: string
+  children: ReactNode
+  cardRef?: Ref<HTMLDivElement>
+  testId: string
+  source?: { line: ReactNode }
+}) {
+  const remove = onRemove && (
+    <button type="button" onClick={onRemove} className="mx-auto block min-h-11 cursor-pointer px-3 text-[0.9375rem] font-bold text-red-700 hover:underline">
+      {removeLabel}
+    </button>
+  )
   const card = 'space-y-4 rounded-2xl border-[1.5px] border-slate-400 bg-white px-4 pt-2.5 pb-4 shadow-sm'
   const inside = (
     <>
@@ -85,20 +120,36 @@ export function EditorOpenCard({ title, tags, onClose, children, cardRef, testId
   if (source) {
     return (
       <div ref={cardRef} data-testid={testId} className="scroll-my-4 space-y-2 pb-2">
-        <div className={card}>{inside}</div>
-        {source.line && <div className="px-0.5">{source.line}</div>}
-        <button type="button" onClick={onClose} className={`${SUBMIT_PILL} mt-2`}>
-          Done
+        <div className={card}>
+          {inside}
+          {source.line && <RowSourceFoot>{source.line}</RowSourceFoot>}
+        </div>
+        <button type="button" disabled={finishing} onClick={onDone ?? onClose} className={`${SUBMIT_PILL} mt-2 w-full`}>
+          {finishing ? 'Saving…' : 'Done'}
         </button>
+        {remove}
       </div>
     )
   }
   return (
     <div ref={cardRef} data-testid={testId} className={`scroll-my-4 ${card}`}>
       {inside}
-      <button type="button" onClick={onClose} className="h-11 w-full cursor-pointer rounded-full border border-slate-300 bg-white text-[0.9375rem] font-bold text-primary">
-        Done
+      <button type="button" disabled={finishing} onClick={onDone ?? onClose} className="h-11 w-full cursor-pointer rounded-full border border-slate-300 bg-white text-[0.9375rem] font-bold text-primary">
+        {finishing ? 'Saving…' : 'Done'}
       </button>
+      {remove}
+    </div>
+  )
+}
+
+/** An opened row's source line, small, under a thin line inside its box
+ *  (board L2, Nov 25). Nothing at all when there's nothing to say. */
+export function RowSourceFoot({ children, sticker }: { children: ReactNode; sticker?: ReactNode }) {
+  if (!children && !sticker) return null
+  return (
+    <div className="flex items-start gap-2 border-t border-slate-200 pt-3" data-testid="row-source-foot">
+      {sticker}
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   )
 }

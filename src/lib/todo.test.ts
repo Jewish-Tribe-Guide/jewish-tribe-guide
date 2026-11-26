@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { EnrichedSubmission } from '@/types'
 import type { ClassifiedMiss } from './missedSearches'
 import { makeCategory } from '@/test/providerFixtures'
-import { changeWhat, isNewPlace, openSearches, responseSummary, splitSubmissions, submissionLine, teachable, unmatchedPlaces, watchesLine, type TodoReading } from './todo'
+import { changeWhat, isNewPlace, openSearches, readWhen, responseSummary, splitSubmissions, submissionLine, teachable, unmatchedPlaces, watchesLine, type TodoReading } from './todo'
 
 function sub(overrides: Partial<EnrichedSubmission> = {}): EnrichedSubmission {
   return {
@@ -154,6 +154,14 @@ describe('watchesLine', () => {
   })
   it('says only the count before anything has run', () => {
     expect(watchesLine([{ active: true, lastRunAt: null }], noon)).toBe('1 page')
+  })
+})
+
+describe('readWhen', () => {
+  const read = new Date(2026, 10, 25, 4).toISOString()
+  it('last night within a day and a bit, the day after that', () => {
+    expect(readWhen(read, new Date(2026, 10, 25, 15).getTime())).toBe('read last night')
+    expect(readWhen(read, new Date(2026, 10, 27, 15).getTime())).toBe('read Nov 25')
   })
 })
 

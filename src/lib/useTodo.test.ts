@@ -33,13 +33,13 @@ afterEach(() => {
 
 describe('useTodoCount', () => {
   it('counts the setup steps left with what there is to decide', async () => {
-    answer({ logo: true, admins: 2, categories: 0, places: 0, heroWords: false })
+    answer({ logo: true, admins: 2, communityEmail: false, categories: 0, places: 0 })
     const { result } = renderHook(() => useTodoCount('tok', 'newtown'))
     await waitFor(() => expect(result.current).toBe(3))
   })
 
   it('counts no setup once it is done, or when it could not be read', async () => {
-    answer({ logo: true, admins: 2, categories: 1, places: 1, heroWords: true })
+    answer({ logo: true, admins: 2, communityEmail: true, categories: 1, places: 1 })
     const done = renderHook(() => useTodoCount('tok', 'philly'))
     await waitFor(() => expect(done.result.current).toBe(1))
     done.unmount()
@@ -55,7 +55,7 @@ describe('useTodoCount', () => {
 // was opened, so saving a logo on Home page left "To do · 3" standing.
 describe('a save elsewhere in the admin', () => {
   it('ticks off a setup step in the count without opening To do', async () => {
-    let setup = { logo: false, admins: 2, categories: 1, places: 1, heroWords: true }
+    let setup = { logo: false, admins: 2, communityEmail: true, categories: 1, places: 1 }
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
@@ -80,7 +80,7 @@ describe('a save elsewhere in the admin', () => {
       vi.fn(async (url: string) => {
         calls.push(url)
         const body = url.includes('/api/admin/setup')
-          ? { ok: true, setup: { logo: false, admins: 2, categories: 1, places: 1, heroWords: true } }
+          ? { ok: true, setup: { logo: false, admins: 2, communityEmail: true, categories: 1, places: 1 } }
           : { ok: true, submissions: [], responses: [], places: [] }
         return new Response(JSON.stringify(body), { status: 200 })
       }),

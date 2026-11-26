@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { fetchJson } from '@/lib/fetchJson'
-import NewslettersPage, { checkedWhen, scriptPreview, STOPPED_AFTER_MS, type NewslettersLoaded } from './NewslettersPage'
+import NewslettersPage, { type NewslettersLoaded } from './NewslettersPage'
 
-// Watches → Newsletters (admin drawings 18 and 18b, Oct 29): a new
-// community sets up its Gmail script from here, and keeps its shuls'
-// newsletters here.
+// The shuls' and eruvs' emails (admin drawings 18 and 18b, Oct 29): the
+// emails the Gmail script reads, each with its place. Setting the script up
+// is on the Community email page (CommunityEmailPage.test.tsx, Nov 25).
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -44,49 +44,10 @@ afterEach(() => {
 })
 
 describe('NewslettersPage', () => {
-  it('not set up yet: the six steps, and the script copied whole', async () => {
-    show(loaded())
-    expect(await screen.findByText('Not set up yet')).toBeInTheDocument()
-    const steps = within(screen.getByRole('region', { name: 'Set it up' })).getAllByRole('listitem')
-    expect(steps.map((s) => s.textContent)).toEqual([
-      '1Make a Gmail for the guideSign it up for each shul’s newsletter',
-      expect.stringMatching(/^2Copy the script/),
-      '3Open script.google.com ↗New project, then paste over what’s there',
-      '4Run installPick install, press Run, then Allow',
-      '5Deploy itDeploy, New deployment, Web app, access Anyone',
-      expect.stringMatching(/^6Paste its link/),
-    ])
-    expect(screen.getByRole('link', { name: /Open script\.google\.com/ })).toHaveAttribute('target', '_blank')
-    const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Copy the script' }))
-    expect(await navigator.clipboard.readText()).toBe(SCRIPT)
-    expect(screen.getByRole('button', { name: 'Copied' })).toBeInTheDocument()
-    expect(screen.getByText('None yet')).toBeInTheDocument()
-  })
-
-  it('running: where it checks and when, the steps behind Set up, while Read now is off', async () => {
-    const now = Date.now()
-    show(loaded({ checkedAt: new Date(now - 20 * 60_000).toISOString(), account: 'riverton.guide@gmail.com' }))
-    expect(await screen.findByText('Checking riverton.guide@gmail.com')).toBeInTheDocument()
-    expect(screen.getByText(/^Last checked /)).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Set it up' })).toBeNull()
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Set up' }))
-    expect(screen.getByRole('region', { name: 'Set it up' })).toBeInTheDocument()
-  })
-
-  it('says when it has stopped checking in', async () => {
-    show(loaded({ checkedAt: new Date(Date.now() - STOPPED_AFTER_MS - 60_000).toISOString(), account: 'g@gmail.com' }))
-    expect(await screen.findByText('Stopped checking g@gmail.com')).toBeInTheDocument()
-  })
-
-  it('without migration 090, says it can’t be set up yet', async () => {
-    show(loaded({ available: false, script: null }))
-    expect(await screen.findByText('Shul emails can’t be set up here yet.')).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Set it up' })).toBeNull()
-  })
-
   it('adds a newsletter with its shul', async () => {
     show(loaded())
+    expect(await screen.findByText('None yet')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Community email/ })).toHaveAttribute('href', '/test-community/admin/team/email')
     const user = userEvent.setup()
     await user.click(await screen.findByRole('button', { name: 'Add a newsletter' }))
     const add = screen.getByRole('button', { name: 'Add' })
@@ -118,54 +79,5 @@ describe('NewslettersPage', () => {
       { action: 'link', id: 'n', resourceId: 'shul-1' },
       { action: 'ignore', id: 'n' },
     ])
-  })
-})
-
-describe('scriptPreview', () => {
-  it('shows the site, the community and the key, shortened', () => {
-    expect(scriptPreview(SCRIPT)).toBe("var SITE = 'https://guide.example'\nvar COMMUNITY = 'philly'\nvar KEY = 'nl_7f3c…a91d'")
-  })
-})
-
-describe('NewslettersPage, Read now', () => {
-  it('Read now on: says so, and asks nothing more (SetupOn14)', async () => {
-    show(loaded({ checkedAt: new Date().toISOString(), account: 'guide@gmail.com', readNow: true }))
-    expect(await screen.findByText(/Read now on/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Set up' })).toBeNull()
-    expect(screen.queryByRole('region', { name: 'Update the script' })).toBeNull()
-  })
-
-  it('Read now on: the script can still be copied again, to update the running one (Nov 21)', async () => {
-    show(loaded({ checkedAt: new Date().toISOString(), account: 'guide@gmail.com', readNow: true }))
-    const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: 'Update the script' }))
-    const box = screen.getByRole('region', { name: 'Update the script' })
-    expect(within(box).getByText(/New version/)).toBeInTheDocument()
-    // Not the first-time steps: a new deployment would change the link.
-    expect(screen.queryByRole('region', { name: 'Set it up' })).toBeNull()
-    await user.click(within(box).getByRole('button', { name: 'Copy the script' }))
-    expect(await navigator.clipboard.readText()).toBe(SCRIPT)
-  })
-
-  it('Paste its link: tried at once, and says if it doesn’t answer (SetupSteps14, SetupBad14)', async () => {
-    const user = userEvent.setup()
-    show(loaded())
-    const load = vi.mocked(fetchJson).getMockImplementation()!
-    vi.mocked(fetchJson).mockImplementation(async (url, init, message) => {
-      if (init?.method === 'POST') throw new Error('That link didn’t answer. Check access is set to Anyone.')
-      return load(url, init, message)
-    })
-    expect(await screen.findByText('Deploy it')).toBeInTheDocument()
-    await user.type(screen.getByLabelText('Its web app link'), 'https://script.google.com/macros/s/AKfy/exec')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
-    expect(await screen.findByText('That link didn’t answer. Check access is set to Anyone.')).toBeInTheDocument()
-  })
-})
-
-describe('checkedWhen', () => {
-  it('the time today, the day before that', () => {
-    const now = new Date(2026, 9, 29, 16, 0).getTime()
-    expect(checkedWhen(new Date(2026, 9, 29, 15, 0).toISOString(), now)).toBe('3:00 PM')
-    expect(checkedWhen(new Date(2026, 9, 27, 15, 0).toISOString(), now)).toBe('Oct 27, 3:00 PM')
   })
 })

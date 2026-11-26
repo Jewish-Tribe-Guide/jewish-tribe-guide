@@ -17,23 +17,32 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 
-const view = (over: Partial<NightKindView>): NightKindView => ({ id: 'times', name: 'Minyan times', about: '', when: '3:00 AM', count: '15 of 16 read', trouble: null, misses: [], tracked: [], nights: [], fixes: [], lastAt: '2026-10-31T07:00:00Z', schedule: 'Runs every night at 3:00 AM', ...over })
-const TIMES = view({
-  misses: [{ name: 'Lower Merion Synagogue', why: 'Page didn’t open, 3 nights', page: 'place/l' }],
-  tracked: ['Bnai Abraham', 'Kesher Israel', 'Mekor Habracha'].map((name) => ({ name, status: 'Read', bad: false, page: `place/${name}` })),
-  nights: [{ date: 'Oct 30', result: '15 of 16 read', tone: 'bad' }, { date: 'Oct 27', result: '16 of 16 read', tone: 'good' }],
-})
+const lastNight = new Date(Date.now() - 3_600_000).toISOString()
+const view = (over: Partial<NightKindView>): NightKindView => ({ id: 'times', name: 'Shul times', about: '', when: '3:00 AM', count: '15 of 16 read', trouble: null, misses: [], tracked: [], nights: [], fixes: [], lastAt: lastNight, schedule: 'Runs every night at 3:00 AM', ...over })
+const TIMES = view({ tracked: ['Kesher', 'Mekor'].map((name) => ({ name, status: 'Read', bad: false, page: `place/${name}` })) })
+const shul = (id: string, name: string, over: Record<string, unknown> = {}) => ({ id, name, href: '', website: null, pages: [], off: false, offSince: null, reason: null, fields: [], ...over })
+const page = { watch: { active: true }, source: 'https://x.org' }
+const email = { active: true, pageChangedAt: lastNight }
+const SHULS = [
+  shul('leyv', 'Leyv Ha-Ir', { reason: 'No website on Google.' }),
+  shul('kesher', 'Kesher Israel', { pages: [page], reason: 'Its website wouldn’t open: 503' }),
+  shul('mekor', 'Mekor Habracha', { pages: [page], newsletters: [email] }),
+  ...['A', 'B', 'C', 'D', 'E', 'F'].map((n) => shul(n, `Shul ${n}`, { pages: [page] })),
+]
 
 const posts: Record<string, unknown>[] = []
-function serve(kinds: NightKindView[], off: string[] = []) {
+function serve(kinds: NightKindView[], off: string[] = [], more: (url: string) => unknown = () => undefined) {
   vi.mocked(fetchJson).mockImplementation(async (url, init) => {
     if (init?.method === 'POST') {
       posts.push(JSON.parse(String(init.body)))
       return { ok: true }
     }
+    const got = more(String(url))
+    if (got) return got
     if (String(url).includes('/api/admin/watches/runs')) return { available: true, kinds, off }
-    if (String(url).includes('/api/admin/categories')) return { categories: [] }
-    if (String(url).includes('/api/admin/listings')) return { places: [] }
+    if (String(url).includes('/api/admin/watches/hours') && String(url).includes('job=times')) return { name: 'Shul times', places: SHULS }
+    if (String(url).includes('/api/admin/categories')) return { categories: [{ id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] }] }
+    if (String(url).includes('/api/admin/listings')) return { places: SHULS.map((p) => ({ id: p.id, name: p.name, category: 'synagogue', status: 'approved' })) }
     throw new Error('down')
   })
 }
@@ -47,60 +56,57 @@ afterEach(() => {
   forgetWatchJobs()
 })
 
-describe('a job, opened', () => {
-  it('says how last night went and when it runs', async () => {
+describe('a Watches row, opened (board W4)', () => {
+  it('is titled as its Watches row, and says when it last read', async () => {
     serve([TIMES])
     show('times')
-    expect(await screen.findByText('Last night: 15 of 16 read')).toBeInTheDocument()
-    expect(screen.getByText('Runs every night at 3:00 AM')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Minyan times' })).toBeInTheDocument()
+    expect(screen.getByText('Read every night · last night')).toBeInTheDocument()
   })
 
-  it('Eruvs says what it doesn’t read at night (EruvJob6)', async () => {
-    serve([view({ id: 'eruvs', name: 'Eruvs', schedule: 'Maps, hotlines and alerts, every night at 3:00 AM', scheduleMore: 'Status, when someone looks' })])
-    show('eruvs')
-    expect(await screen.findByText('Maps, hotlines and alerts, every night at 3:00 AM')).toBeInTheDocument()
-    expect(screen.getByText('Status, when someone looks')).toBeInTheDocument()
+  it('a job that didn’t run says so instead', async () => {
+    serve([view({ fixes: [{ name: 'Minyan times', page: '', why: 'Didn’t run since Nov 20', whole: true }], tracked: TIMES.tracked })])
+    show('times')
+    expect(await screen.findByText('Didn’t run since Nov 20')).toBeInTheDocument()
   })
 
-  it('links what it didn’t read to the place, and marks each night with a check or an X', async () => {
+  it('lists the shuls with nothing to read, and why, each opening the place', async () => {
     serve([TIMES])
     show('times')
-    const missed = await screen.findByRole('region', { name: 'Not read last night' })
-    expect(within(missed).getByRole('link')).toHaveAttribute('href', '/philly/admin/watches/place/l?from=job/times')
-    const nights = screen.getByRole('region', { name: 'Last 14 nights' })
-    expect(within(nights).getByRole('img', { name: '15 of 16 read' })).toBeInTheDocument()
-    expect(within(nights).getByRole('img', { name: '16 of 16 read' })).toBeInTheDocument()
+    const missing = await screen.findByRole('region', { name: 'Nothing to read · 2' })
+    expect(within(missing).getByRole('link', { name: /Leyv Ha-Ir/ })).toHaveAttribute('href', '/philly/admin/watches/place/leyv?from=job/times')
+    expect(within(missing).getByText('No website')).toBeInTheDocument()
+    expect(within(missing).getByText('Its website wouldn’t open: 503')).toBeInTheDocument()
   })
 
-  it('shows two of what it tracks until asked for them all', async () => {
+  it('lists what’s read, from where, six until asked for all', async () => {
     serve([TIMES])
     show('times')
-    const all = await screen.findByRole('region', { name: 'All 3 tracked' })
-    expect(within(all).queryByText('Mekor Habracha')).toBeNull()
-    await userEvent.click(within(all).getByRole('button', { name: 'Show all 3' }))
-    expect(within(all).getByText('Mekor Habracha')).toBeInTheDocument()
+    const read = await screen.findByRole('region', { name: 'Read · 7' })
+    expect(within(read).getByRole('link', { name: /Mekor Habracha/ })).toHaveTextContent('Website and emails')
+    expect(within(read).queryByText('Shul F')).toBeNull()
+    await userEvent.click(within(read).getByRole('button', { name: 'Show all 7' }))
+    expect(within(read).getByText('Shul F')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Last 14 nights' })).toBeNull()
   })
 
-  // The Eruvs job's button opened the kind page, which listed them all; an
-  // eruv with no website is on no watch, so only this reaches it now.
-  it('Eruvs lists every eruv, with or without a website, each opening on its own', async () => {
+  it('Eruv up or down lists every eruv, one with no source under Nothing to read', async () => {
     const kinds = [view({ id: 'eruvs', name: 'Eruvs', tracked: [{ name: 'Lower Merion', status: 'Read', bad: false, page: 'place/lm' }] })]
-    vi.mocked(fetchJson).mockImplementation(async (url) => {
-      if (String(url).includes('/api/admin/watches/runs')) return { available: true, kinds, off: [] }
-      if (String(url).includes('/api/admin/watches/eruv')) return { available: true, timezone: 'America/New_York', eruvim: [{ id: 'lm', name: 'Lower Merion' }, { id: 'ne', name: 'Northeast' }], findings: [], watches: [] }
-      if (String(url).includes('/api/admin/categories')) return { categories: [{ id: 'eruv-information', kind: 'eruv', pluralLabel: 'Eruv Information' }] }
-      if (String(url).includes('/api/admin/listings')) return { places: [] }
-      throw new Error('down')
+    serve(kinds, [], (url) => {
+      if (url.includes('/api/admin/watches/eruv')) return { available: true, timezone: 'America/New_York', eruvim: [{ id: 'lm', name: 'Lower Merion', statusUrl: 'https://lm.org', statusEmail: null, statusErrorAt: null }, { id: 'ne', name: 'Northeast', statusUrl: null, statusEmail: null, statusErrorAt: null }], findings: [], watches: [] }
+      if (url.includes('/api/admin/categories')) return { categories: [{ id: 'eruv-information', kind: 'eruv', pluralLabel: 'Eruv Information' }] }
     })
     show('eruvs')
-    expect(await screen.findByRole('link', { name: /Northeast/ })).toHaveAttribute('href', '/philly/admin/watches/place/ne?from=job/eruvs')
-    expect(screen.getByRole('link', { name: /Lower Merion/ })).toHaveAttribute('href', '/philly/admin/watches/place/lm?from=job/eruvs')
-    // Eruvs are added in Places, like any place (Nov 9: the Eruv page no longer lists them).
+    expect(await screen.findByRole('heading', { name: 'Eruv up or down' })).toBeInTheDocument()
+    const missing = await screen.findByRole('region', { name: 'Nothing to read · 1' })
+    expect(within(missing).getByRole('link', { name: /Northeast/ })).toHaveAttribute('href', '/philly/admin/watches/place/ne?from=job/eruvs')
+    expect(within(screen.getByRole('region', { name: 'Read · 1' })).getByRole('link', { name: /Lower Merion/ })).toHaveTextContent('Status page')
+    // Eruvs are added in Places, like any place (Nov 9).
     expect(screen.getByRole('link', { name: '+ Add an eruv' })).toHaveAttribute('href', '/philly/admin/places?add=eruv-information')
   })
 
   it('a job not yet set up says its step, and adds from its header', async () => {
-    serve([])
+    serve([], [], (url) => (url.includes('/api/admin/watches/hours') ? { name: 'Shul times', places: [] } : undefined))
     show('times')
     expect(await screen.findByText('Add each shul’s times page')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '+ Add a shul' }))
@@ -122,7 +128,7 @@ describe('a job, opened', () => {
     show('times')
     const u = userEvent.setup()
     await u.click(await screen.findByRole('button', { name: 'Turn off this job' }))
-    expect(screen.getByText('Turn off Minyan times? 3 places won’t be checked.')).toBeInTheDocument()
+    expect(screen.getByText('Turn off Minyan times? 2 places won’t be checked.')).toBeInTheDocument()
     expect(posts).toEqual([])
     await u.click(screen.getByRole('button', { name: 'Leave it on' }))
     await u.click(screen.getByRole('button', { name: 'Turn off this job' }))
@@ -131,11 +137,14 @@ describe('a job, opened', () => {
     expect(mockRouter.push).toHaveBeenCalledWith('/philly/admin/watches')
   })
 
-  it('one already off has no Turn off', async () => {
+  it('one already off says so, and turns back on from here', async () => {
     serve([TIMES], ['times'])
     show('times')
-    await screen.findByText('Last night: 15 of 16 read')
+    expect(await screen.findByText('Turned off')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Turn off this job' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Turn it back on' }))
+    expect(posts).toEqual([{ action: 'job-on', kind: 'times' }])
+    expect(mockRouter.push).toHaveBeenCalledWith('/philly/admin/watches')
   })
 })
 

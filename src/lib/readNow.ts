@@ -189,5 +189,5 @@ export function kosherLookup(
     }
   }
   const names = [keystone && 'Keystone-K', mekor && 'Mekor Habracha'].filter(Boolean).join(' or ')
-  return { lists, none: `Not on ${names}’s list` }
+  return { lists, none: `Not found on ${names}’s list` }
 }

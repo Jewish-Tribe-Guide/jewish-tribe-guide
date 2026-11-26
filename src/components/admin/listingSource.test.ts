@@ -70,6 +70,14 @@ describe('a listing row’s job (Listing6, States6, GoogleListing7)', () => {
     expect(got?.line.add).toBeUndefined()
   })
 
+  // Nov 25: the kosher lists are matched by name every night, so a food
+  // place on none of them has nothing to give.
+  it('kosher on no list: Nothing, with nothing to give', () => {
+    const got = sourceOf(jobs({}), fieldRow('kosherCert', 'select'))
+    expect(got).toMatchObject({ job: 'Nothing', line: { text: 'Nothing reads this' } })
+    expect(got?.line.add).toBeUndefined()
+  })
+
   it('a week read from both: Website, Email, one line each, the email first', () => {
     const news = { id: 'n', url: 'mailto:office@a.example', active: true, pageChangedAt: at }
     const times = { places: [{ id: 'a', pages: [{ watch: page }], newsletters: [news], stopped: [] }] }
@@ -83,6 +91,20 @@ describe('a listing row’s job (Listing6, States6, GoogleListing7)', () => {
     const got = sourceOf(jobs({ times: times as never }), row({ id: 'minyans:this_week', kind: 'minyans' }))
     expect(got).toMatchObject({ job: 'Email', line: { text: 'Its email' } })
     expect(got?.also).toBeUndefined()
+  })
+
+  // Nov 25: Kesher's website wouldn't open and its times still said
+  // Checked nightly.
+  it('every page it reads failing: not being checked, unless an email still keeps it', () => {
+    const down = { ...page, lastOkAt: null, lastError: 'won’t open', failingSince: at }
+    const usual = row({ id: 'minyans:weekday', kind: 'minyans', box: 'weekday' })
+    const times = (pages: unknown[], newsletters: unknown[] = []) => jobs({ times: { places: [{ id: 'a', pages, newsletters, stopped: [] }] } as never })
+    expect(sourceOf(times([{ watch: down }]), usual)).toMatchObject({ job: 'Website', unchecked: true })
+    expect(sourceOf(times([{ watch: page }]), usual)?.unchecked).toBeUndefined()
+    expect(sourceOf(times([{ watch: down }, { watch: { ...page, id: 'w2' } }]), usual)?.unchecked).toBeUndefined()
+    const news = { id: 'n', url: 'mailto:office@a.example', active: true, pageChangedAt: at }
+    expect(sourceOf(times([{ watch: down }], [news]), row({ id: 'minyans:this_week', kind: 'minyans' }))?.unchecked).toBeUndefined()
+    expect(sourceOf(jobs({ sites: [{ id: 'a', pages: [{ watch: down }] }] as never }), email)).toMatchObject({ job: 'Website', unchecked: true })
   })
 
   it('a row like it no job reads has no job at all', () => {

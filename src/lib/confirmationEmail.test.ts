@@ -9,6 +9,9 @@ vi.mock('./communityStore', () => ({
   getCommunityNotifyRecipients: mockGetCommunityNotifyRecipients,
 }))
 
+const mockGetCommunityEmail = vi.hoisted(() => vi.fn())
+vi.mock('./communityEmailStore', () => ({ getCommunityEmail: mockGetCommunityEmail }))
+
 const mockSendEmail = vi.hoisted(() => vi.fn())
 vi.mock('./email', () => ({ sendEmail: mockSendEmail, escapeHtml: (v: unknown) => String(v) }))
 
@@ -53,6 +56,7 @@ beforeEach(() => {
   vi.stubEnv('RESEND_FROM', 'noreply@example.org') // not the sandbox address
   mockGetCommunityAdminEmails.mockResolvedValue(['baltimorejewishguide@gmail.com', 'second-admin@example.com'])
   mockGetCommunityNotifyRecipients.mockResolvedValue(['baltimorejewishguide@gmail.com', 'second-admin@example.com'])
+  mockGetCommunityEmail.mockResolvedValue({ email: null, canSave: true })
 })
 
 afterEach(() => {
@@ -99,6 +103,25 @@ describe('per-community reply-to and bcc on public-facing confirmation emails', 
     await sendSubmissionConfirmation(makeSubmission({ community_id: 'no-admins-yet' }))
 
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({ replyTo: 'fallback@example.com', bcc: [] }))
+  })
+
+  // Boards E1-E3 (Nov 25): the community email, once there is one, not
+  // whichever admin happens to be first on the list.
+  it('replies to the community email when there is one', async () => {
+    mockGetCommunityEmail.mockResolvedValue({ email: 'guide@gmail.com', canSave: true })
+
+    await sendSubmissionConfirmation(makeSubmission({ community_id: 'baltimore' }))
+
+    expect(mockGetCommunityEmail).toHaveBeenCalledWith('baltimore')
+    expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({ replyTo: 'guide@gmail.com' }))
+  })
+
+  it('still sends, to the first admin, when the community email can\'t be read', async () => {
+    mockGetCommunityEmail.mockRejectedValue(new Error('down'))
+
+    await sendDecisionEmail(makeSubmission({ community_id: 'baltimore' }), 'approved')
+
+    expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({ replyTo: 'baltimorejewishguide@gmail.com' }))
   })
 
   it('a different community gets its own address, not the last one requested', async () => {

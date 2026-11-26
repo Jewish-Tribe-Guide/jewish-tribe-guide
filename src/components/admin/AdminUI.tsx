@@ -118,11 +118,15 @@ export function AdminHead({
   back,
   title,
   right,
+  titleAside,
   phoneOnly = false,
 }: {
   back: { label: string; href?: string; onClick?: () => void }
   title: React.ReactNode
   right?: React.ReactNode
+  /** On the title's own line, at its right: a row's sticker on the row's
+   *  own screen (the user, Nov 26), level with the title, not with Back. */
+  titleAside?: React.ReactNode
   phoneOnly?: boolean
 }) {
   const linkClass = `inline-flex items-center justify-center w-11 h-11 shrink-0 text-primary cursor-pointer md:mr-auto md:justify-start md:w-auto md:h-auto md:min-h-11 md:-mt-3 md:text-sm md:font-semibold ${
@@ -147,11 +151,10 @@ export function AdminHead({
       )}
       {/* Under the way back on a computer, or beside what's `right` of it
           when the way back is the phone's alone (board 1). */}
-      <h1
-        className={`flex-1 min-w-0 m-0 truncate text-lg font-bold text-slate-900 md:whitespace-normal md:text-[1.625rem] ${phoneOnly ? '' : 'md:order-last md:basis-full'}`}
-      >
-        {title}
-      </h1>
+      <div className={`flex flex-1 min-w-0 items-center gap-3 ${phoneOnly ? '' : 'md:order-last md:basis-full'}`}>
+        <h1 className="flex-1 min-w-0 m-0 truncate text-lg font-bold text-slate-900 md:whitespace-normal md:text-[1.625rem]">{title}</h1>
+        {titleAside}
+      </div>
       {right}
     </header>
   )

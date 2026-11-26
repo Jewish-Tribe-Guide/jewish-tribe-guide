@@ -47,9 +47,14 @@ export type SourceLine = {
   googleStop?: CheckedField
   useGoogle?: CheckedField
   read?: ReadNow
+  /** Its place on Google isn't matched: Find it on Google (Nov 25, from
+   *  the Read from box). */
+  findOnGoogle?: true
 }
 
-export type RowSource = { job: string; amber: boolean; line: SourceLine; also?: SourceLine }
+/** `unchecked`: a job has it, but every page it reads is failing, so
+ *  nothing is keeping it right now; its sticker says Not checked. */
+export type RowSource = { job: string; amber: boolean; line: SourceLine; also?: SourceLine; unchecked?: boolean }
 
 /** What a row calls the source behind a job. A kosher list goes by its own
  *  name, from its line. */
@@ -134,11 +139,17 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
   ]
     .map((p) => p.watch)
     .find((w) => w.active)
-  const website = (at?: string | null): RowSource => ({ job: nameOf('sites'), amber: false, line: { text: 'Its website', url: own?.url ?? null, when: (at ?? own?.lastOkAt) ? day((at ?? own?.lastOkAt)!) : null } })
+  const website = (at?: string | null): RowSource => ({ job: nameOf('sites'), amber: false, ...(own?.failingSince ? { unchecked: true } : {}), line: { text: 'Its website', url: own?.url ?? null, when: (at ?? own?.lastOkAt) ? day((at ?? own?.lastOkAt)!) : null } })
 
   /** A shul's or mikvah's row: the box the page gives, else a page it has,
-   *  else stopped, else nothing. */
+   *  else stopped, else nothing. Every page it reads failing (Kesher's
+   *  "won't open", Nov 25), it's not being checked, whatever reads it. */
   function pagesRow(job: 'times' | 'hours', key: string | null): RowSource {
+    const row = pagesRowSource(job, key)
+    const active = jobs[job]?.places.find((p) => p.id === id)?.pages.filter((p) => p.watch.active) ?? []
+    return !row.amber && active.length > 0 && active.every((p) => p.watch.failingSince) ? { ...row, unchecked: true } : row
+  }
+  function pagesRowSource(job: 'times' | 'hours', key: string | null): RowSource {
     if (off(job)) return nothing()
     const place = jobs[job]?.places.find((p) => p.id === id)
     // Turned off, its pages are still there and aren't being read.
@@ -219,8 +230,9 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
     if (!isKosherJobCategory(category)) return null
     if (off('kosher')) return nothing()
     const found = box('kosher')
-    const give: GiveSource = { label: WHERE.keystone, email: false, run: { kind: 'keystone' } }
-    if (!found || !found.foot.links.length) return nothing(give)
+    // Not on a list: nothing to give. The lists are matched by name and
+    // address every night, so it's found once it's there (Nov 25).
+    if (!found || !found.foot.links.length) return nothing()
     return fromFoot('kosher', found.foot, found.foot.links[0]?.url ?? '')
   }
 
@@ -275,6 +287,7 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
   function rowOf(row: EditorRow): RowSource | null {
     if (row.kind === 'name') {
       const place = jobs.google?.places.find((p) => p.id === id)
+      if (place && !place.matched && !off('google')) return { job: 'Nothing', amber: true, line: { text: 'Not found on Google', findOnGoogle: true } }
       return place?.matched ? keptField('name') : null
     }
     if (row.kind === 'minyans') return row.id === 'minyans:this_week' ? weekRow(true) : row.id === 'minyans:next_week' ? weekRow(false) : pagesRow('times', row.box ?? null)

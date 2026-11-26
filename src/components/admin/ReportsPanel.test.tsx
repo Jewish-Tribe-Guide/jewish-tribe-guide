@@ -40,7 +40,9 @@ const MONTH: Report = {
 const WEEK: Report = { ...MONTH, words: 'this week', missedSearches: 4, topPlaces: [] }
 
 async function renderPanel() {
-  vi.mocked(fetchJson).mockImplementation(async (url) => ({ report: String(url).includes('period=week') ? WEEK : MONTH }))
+  vi.mocked(fetchJson).mockImplementation(async (url) =>
+    String(url).startsWith('/api/admin/watches') ? { watches: [{ active: true, lastRunAt: null }, { active: true, lastRunAt: null }, { active: false, lastRunAt: null }] } : { report: String(url).includes('period=week') ? WEEK : MONTH },
+  )
   renderWithProviders(<ReportsPanel token="tok" />, { community: { slug: 'philly' } })
   await screen.findByRole('heading', { name: 'Listing views' })
 }
@@ -53,8 +55,19 @@ afterEach(() => {
 describe('ReportsPanel', () => {
   it('opens on the month, for this community', async () => {
     await renderPanel()
-    expect(vi.mocked(fetchJson).mock.calls[0]![0]).toBe('/api/admin/reports?period=month&community=philly')
+    expect(vi.mocked(fetchJson).mock.calls.map(([u]) => u)).toContain('/api/admin/reports?period=month&community=philly')
     expect(screen.getByRole('button', { name: 'Month' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  // Moved from the top of Places on Nov 25 (item 95): what keeps the guide
+  // current is a report, not a place.
+  it('has Watches first, ringed, with how many pages it reads', async () => {
+    await renderPanel()
+    const watches = screen.getByTestId('reports-watches')
+    expect(watches).toHaveAttribute('href', '/philly/admin/watches')
+    expect(watches.className).toContain('border-emerald-600')
+    expect(watches.compareDocumentPosition(screen.getByRole('button', { name: 'Month' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    await within(watches).findByText('2 pages')
   })
 
   it('draws a bar a day, with the total since the first', async () => {

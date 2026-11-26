@@ -1,20 +1,17 @@
 'use client'
 
 import { replaceAddress } from '@/lib/replaceAddress'
-import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { CategoryConfig } from '@/lib/categories'
-import type { AdminApi } from '@/lib/adminApi'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
-import { ADMIN_AREA_TAPPED, adminBase } from '@/lib/adminNav'
-import { watchesLine } from '@/lib/todo'
-import { useCommunitySlug } from '@/lib/communityContext'
+import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import { stepCount, withoutSteps } from '@/lib/stepAddress'
 import { eruvPlace, filterPlaces, isPlaceShow, nameKey, placeCounts, placeLine, sharedNames, streetOf, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
 import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notCheckedLine, type CheckedBy } from '@/lib/fieldCoverage'
 import AddPlace from './AddPlace'
-import { AdminBox, AdminEmpty, AdminMenu, AdminRow } from './AdminUI'
+import AddWhat from './AddWhat'
+import { AdminEmpty, AdminMenu, AdminRow } from './AdminUI'
 import EruvListing, { AddEruv } from './EruvListing'
 import PlaceListing from './PlaceListing'
 import { AddButton } from '@/components/AddButton'
@@ -27,9 +24,6 @@ import { useAdminApi } from './useAdminApi'
 // what checks it), open it to edit it on the spot (no suggest-then-approve),
 // archive it, or bring an archived one back.
 
-const button = 'inline-flex items-center justify-center gap-1.5 min-h-11 px-4 rounded-lg text-sm font-semibold cursor-pointer disabled:opacity-60'
-const primary = `${button} border border-primary bg-primary text-white`
-const secondary = `${button} border border-slate-300 bg-white text-slate-900 hover:bg-slate-50`
 const field = 'min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-[0.9375rem] text-slate-900'
 
 /** How many rows show before "Show all". */
@@ -60,19 +54,23 @@ function checkedFromAddress(): CheckedBy {
 /** The place open (`?place=`) or the category being added to (`?add=`):
  *  each a screen of its own, with its own address and entry, so Back,
  *  Forward and a reload land on it. */
-function openFromAddress(): { place: string | null; add: string | null } {
+function openFromAddress(): { place: string | null; add: string | null; picked: boolean } {
   const params = new URLSearchParams(window.location.search)
-  return { place: params.get('place'), add: params.get('add') }
+  return { place: params.get('place'), add: params.get('add'), picked: params.get('from') === 'pick' }
 }
 
 /** This address with `place` or `add` (or neither: the list), the list's
- *  own choices kept and the steps of whatever was open dropped. */
-function listHref(open: { place?: string; add?: string } = {}): string {
+ *  own choices kept and the steps of whatever was open dropped. `add: ''`
+ *  is What are you adding?; `picked`, a category chosen there, so that
+ *  screen's entry is under this one. */
+function listHref(open: { place?: string; add?: string; picked?: boolean } = {}): string {
   const url = new URL(withoutSteps(window.location.pathname, window.location.search), window.location.origin)
   url.searchParams.delete('place')
   url.searchParams.delete('add')
+  url.searchParams.delete('from')
   if (open.place) url.searchParams.set('place', open.place)
-  if (open.add) url.searchParams.set('add', open.add)
+  if (open.add !== undefined) url.searchParams.set('add', open.add)
+  if (open.add && open.picked) url.searchParams.set('from', 'pick')
   return url.pathname + url.search
 }
 
@@ -85,44 +83,7 @@ function setAddressParam(name: string, value: string, fallback: string) {
   replaceAddress(url)
 }
 
-/** "142 pages · read last night", for Watches at the top of the list. */
-function useWatchesLine(api: AdminApi, now: number): string | undefined {
-  const [line, setLine] = useState<string>()
-  useEffect(() => {
-    let live = true
-    api.get<{ watches: { active: boolean; lastRunAt: string | null }[] }>('/api/admin/watches', '')
-      .then((body) => live && setLine(watchesLine(body.watches, now)))
-      .catch(() => {})
-    return () => {
-      live = false
-    }
-  }, [api, now])
-  return line
-}
-
-/** Ringed like Synagogues' Minyanim row, the way it's seen (WatchE19, Nov 1):
- *  the one row here that isn't a place. No chevron, as drawn. */
-function WatchesRow({ href, line }: { href: string; line: string | undefined }) {
-  return (
-    <Link href={href} data-testid="places-watches" className="flex items-center gap-3 rounded-2xl border-[1.5px] border-emerald-600 bg-white px-3.5 py-3 transition-colors hover:bg-emerald-50">
-      <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
-        <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" />
-          <circle cx="8" cy="8" r="2" />
-        </svg>
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-base font-extrabold text-ink">Watches</span>
-        {/* Keeps its height while the count loads, so the list doesn't jump. */}
-        <span className="mt-0.5 block min-h-[1.3em] text-[0.875rem] leading-snug text-slate-700">{line}</span>
-      </span>
-    </Link>
-  )
-}
-
 export default function PlacesList({ token }: { token: string }) {
-  const community = useCommunitySlug()
-  const base = adminBase(community)
   const api = useAdminApi(token)
   const router = useRouter()
   const [data, setData] = useState<Data | null>(null)
@@ -130,7 +91,6 @@ export default function PlacesList({ token }: { token: string }) {
   // The places first: the jobs only colour the rows and fill the coverage.
   const { jobs, reload } = useWatchJobsAndReload(token, { ready: data !== null || error !== null })
   const [now] = useState(() => Date.now())
-  const watches = useWatchesLine(api, now)
   const coverage = useMemo(() => coverageOf(jobs), [jobs])
   const [show, setShow] = useState<PlaceShow>('site')
   const [category, setCategory] = useState('')
@@ -138,9 +98,12 @@ export default function PlacesList({ token }: { token: string }) {
   const [checked, setChecked] = useState<CheckedBy>('any')
   const [all, setAll] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
-  // Adding: picking its category (''), then the editor for that category.
+  // Adding: What are you adding? (''), then the editor for that category.
   const [adding, setAdding] = useState<string | null>(null)
-  const [addCategory, setAddCategory] = useState('')
+  // Its category chosen on What are you adding?, whose entry is under it.
+  // State, not read from the address at render: the router writes the
+  // address only once its move lands, after the screen has drawn.
+  const [addPicked, setAddPicked] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -154,6 +117,7 @@ export default function PlacesList({ token }: { token: string }) {
       const open = openFromAddress()
       setOpenId(open.place)
       setAdding(open.add)
+      setAddPicked(open.picked)
       setData(next)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load the places.')
@@ -175,6 +139,7 @@ export default function PlacesList({ token }: { token: string }) {
       const open = openFromAddress()
       setOpenId(open.place)
       setAdding(open.add)
+      setAddPicked(open.picked)
     }
     const onTapped = () => {
       setOpenId(null)
@@ -195,9 +160,22 @@ export default function PlacesList({ token }: { token: string }) {
     window.scrollTo?.(0, 0)
   }
 
-  function startAdding(id: string) {
+  /** `picked`: chosen on What are you adding?, whose entry stays under it. */
+  function startAdding(id: string, picked = false) {
     setAdding(id)
-    void moveTo(router, 'push', () => listHref({ add: id }))
+    setAddPicked(picked)
+    void moveTo(router, 'push', () => listHref({ add: id, picked }))
+    window.scrollTo?.(0, 0)
+  }
+
+  /** From finding a place back to What are you adding?, over the entry. */
+  function backToPicking() {
+    void moveBackTo(
+      router,
+      () => 1 + stepCount(window.location.search),
+      () => listHref({ add: '' }),
+    )
+    setAdding('')
     window.scrollTo?.(0, 0)
   }
 
@@ -207,7 +185,8 @@ export default function PlacesList({ token }: { token: string }) {
       router,
       () => {
         const open = openFromAddress()
-        return open.place || open.add ? 1 + stepCount(window.location.search) : 0
+        if (!open.place && open.add === null) return 0
+        return 1 + stepCount(window.location.search) + (open.add && open.picked ? 1 : 0)
       },
       () => listHref(),
     )
@@ -241,7 +220,7 @@ export default function PlacesList({ token }: { token: string }) {
       <AddEruv
         token={token}
         category={eruvCategory}
-        onBack={close}
+        onBack={addPicked ? backToPicking : close}
         onAdded={async () => {
           await reload()
           close()
@@ -251,8 +230,9 @@ export default function PlacesList({ token }: { token: string }) {
   }
   if (adding) {
     const addTo = categoriesById.get(adding)!
-    return <AddPlace category={addTo} listings={places.filter((p) => p.category === adding && p.status === 'approved').map((p) => p.listing)} token={token} onClose={changed} />
+    return <AddPlace category={addTo} listings={places.filter((p) => p.category === adding && p.status === 'approved').map((p) => p.listing)} token={token} onClose={changed} onBack={addPicked ? backToPicking : changed} />
   }
+  if (adding === '') return <AddWhat categories={listingCategories} onPick={(id) => startAdding(id, true)} onBack={close} />
 
   const opened = openId ? places.find((p) => p.id === openId) : undefined
   const openedEruv = opened && eruvs.find((e) => e.id === opened.id)
@@ -289,32 +269,6 @@ export default function PlacesList({ token }: { token: string }) {
   return (
     // pb-14: the floating Add clears the last row and Show all.
     <div className="flex flex-col gap-4 pb-14">
-      <WatchesRow href={`${base}/watches`} line={watches} />
-
-      {adding === '' && (
-        <AdminBox title="Add a place">
-          <div className="flex flex-wrap items-end gap-2 p-4">
-            <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-[0.8125rem] text-slate-600">
-              Which category
-              <select value={addCategory} onChange={(e) => setAddCategory(e.target.value)} className={field}>
-                <option value="">Pick one</option>
-                {listingCategories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="button" disabled={!addCategory} onClick={() => startAdding(addCategory)} className={primary}>
-              Next
-            </button>
-            <button type="button" onClick={() => setAdding(null)} className={secondary}>
-              Leave it
-            </button>
-          </div>
-        </AdminBox>
-      )}
-
       <label className={`${field} flex items-center gap-2`}>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#64748b" strokeWidth="1.8" aria-hidden="true">
           <circle cx="7" cy="7" r="4.5" />
@@ -400,8 +354,7 @@ export default function PlacesList({ token }: { token: string }) {
             if (category && listingCategories.some((c) => c.id === category)) startAdding(category)
             else {
               setAdding('')
-              // It floats, so it can be tapped from far down the list; what
-              // it opens is at the top.
+              void moveTo(router, 'push', () => listHref({ add: '' }))
               window.scrollTo?.(0, 0)
             }
           }}

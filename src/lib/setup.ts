@@ -1,33 +1,38 @@
-// To do's "Set up your guide" (the admin redesign's board "Setup"): the four
-// things a new community's guide needs before it's ready, each ticked off
-// by what's actually saved, never by a box someone checks. Shown on To do
-// until all four are done, then never again; the nav's count takes in the
-// ones left. The board's fifth, "Kosher lists to watch", is left out: a new
-// community has no way to add a list yet (only Keystone-K and Mekor are
-// read), so it could never be ticked.
-
-import { defaultHeroSplit } from './siteSettings'
+// To do's "Set up your guide" (the admin redesign's board "Setup"): what a
+// new community's guide needs before it's ready, each ticked off by what's
+// actually saved, never by a box someone checks. Shown on To do until all
+// are done, then never again; the nav's count takes in the ones left.
+//
+// Changed Nov 25 (the user, after New community was rebuilt): the name is
+// chosen when the community is made, so the first step is the logo alone;
+// "The home page's words" went (the phone home has no big line, the
+// computer's has no line under it, and New community writes the big line
+// from the city); and the community email came in (board E1): the guide's
+// own Gmail, for replies and the shuls' and eruvs' emails, which are how
+// much of the schedules stay current. A second admin is last: they may all
+// have been added when the community was made. The board's "Kosher lists
+// to watch" is still left out: a new community has no way to add one yet.
 
 /** What's saved, as GET /api/admin/setup reads it. */
 export type SetupState = {
-  /** The header has a logo (the name is given when the community is made). */
+  /** The header has a logo. */
   logo: boolean
   /** How many can sign in to this community's admin. */
   admins: number
+  /** The community email is saved and the newsletter script in it has
+   *  checked in at least once: both halves of its page. */
+  communityEmail: boolean
   /** Categories, and places on the site in any of them. */
   categories: number
   places: number
-  /** The home page's big line has been saved for this community, not left
-   *  to the starting copy. */
-  heroWords: boolean
 }
 
 export type SetupStep = { key: string; name: string; line: string; href: string; done: boolean }
 
 export function setupSteps(s: SetupState, base: string): SetupStep[] {
   return [
-    { key: 'name', name: 'Name and logo', line: 'The name at the top, and its logo', href: `${base}/home`, done: s.logo },
-    { key: 'admins', name: 'A second admin', line: 'Someone to share the deciding', href: `${base}/team`, done: s.admins >= 2 },
+    { key: 'logo', name: 'Your logo', line: 'At the top of every page', href: `${base}/home`, done: s.logo },
+    { key: 'communityEmail', name: 'The community email', line: 'A Gmail for replies and the shuls’ and eruvs’ emails', href: `${base}/team/email`, done: s.communityEmail },
     {
       key: 'category',
       name: 'Your first category',
@@ -36,22 +41,11 @@ export function setupSteps(s: SetupState, base: string): SetupStep[] {
       href: s.categories === 0 ? `${base}/categories/cat:new` : `${base}/places`,
       done: s.categories > 0 && s.places > 0,
     },
-    { key: 'words', name: 'The home page’s words', line: 'The big line and the line under it', href: `${base}/home`, done: s.heroWords },
+    { key: 'admins', name: 'A second admin', line: 'Someone to share the deciding', href: `${base}/team`, done: s.admins >= 2 },
   ]
 }
 
-/** Whether the home page's big line and the line under it are someone's
- *  own. Any first save of the settings writes the whole row, the starting
- *  words with it (split from the community's mission), so a row with words
- *  in it isn't enough: they have to differ from that. */
-export function ownHeroWords(saved: { headline: string | null; subhead: string | null } | null, mission: string): boolean {
-  const headline = saved?.headline?.trim() ?? ''
-  if (!headline) return false
-  const start = defaultHeroSplit(mission)
-  return headline !== start.headline || (saved?.subhead?.trim() ?? '') !== start.subhead
-}
-
-/** How many of the four are left; 0 once the guide is set up. */
+/** How many are left; 0 once the guide is set up. */
 export function setupLeft(s: SetupState | null): number {
   return s ? setupSteps(s, '').filter((step) => !step.done).length : 0
 }

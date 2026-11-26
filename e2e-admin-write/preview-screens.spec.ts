@@ -85,7 +85,7 @@ test('a form’s question and its preview: Back, Forward and a reload land on ea
 test('New community: Back closes it, Forward and a reload reopen it', async ({ page }) => {
   await page.goto('/admin')
   const form = page.getByRole('heading', { name: 'New community' })
-  await page.getByRole('button', { name: '+ New community' }).click()
+  await page.getByRole('button', { name: 'New community' }).click()
   await expect(form).toBeVisible()
   await at(page, '/admin', '?step=new')
   await page.goBack()

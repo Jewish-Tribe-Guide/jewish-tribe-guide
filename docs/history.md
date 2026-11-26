@@ -4,6 +4,130 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## The community email, and Watches as what's kept current (Nov 25)
+
+Boards E1–E3 and W1–W4 (canvas TXWUmY6wTJyDKsB27Q6XV4), the user: "Build
+it all", then "Build as described" for adding a source from W3.
+
+- **The community email (E1–E3).** A community has one Gmail of its own
+  (`community.contact_email`, migration 116), not any admin's. Replies to
+  the site's emails go to it, then the first admin. Settings › Team has
+  its box; `/admin/<c>/team/email` walks through making it and setting up
+  the newsletter script (moved there from Watches › Newsletters). Until
+  116 runs or an address is saved, the Gmail the script runs in stands
+  for it, so Philly's replies go there once that script has checked in.
+- **Watches (W1, W2):** one row per job, saying what it keeps current
+  (`src/lib/keptCurrent.ts`). The old "needs fixing" sentence and the
+  Look again, Add a watch and How watches work links went; their routes
+  still exist.
+- **A row, opened (W4):** "Nothing to read" (why, in amber) and "Read"
+  (what from), from `src/lib/jobPlaceRows.ts`. Minyan times lists only
+  shuls as missing a source: a restaurant with minyanim is listed once
+  read, never as missing (dev listed 88 places before). A job turned off
+  shows "Turn it back on".
+- **A place's Read from box (W3):** on the Places listing and an eruv's
+  page, a row per source (`src/lib/readFrom.ts`, `ReadFrom.tsx`). An
+  empty row adds its source: the website and menu link inline, emails by
+  signing up as the community email (Copy address) or Link it for an
+  email already in, Google with Find it. Kosher lists and Refuah are
+  shown only; they are added on their Watches row.
+- **Adding a place, two fixes (the user, Nov 25):** "+ Delivery" opened
+  an empty card, since both its fields wait on Store Type being Scheduled
+  Deliveries; a row whose fields all wait on another answer now isn't
+  offered until it's given. And a row opened from "Not on the listing
+  yet" stays there while open, instead of jumping up the list the moment
+  something is picked; Done moves it.
+  Such a row also has **Remove** beside Done: it takes back out what was
+  put in and closes it. A row already on the listing has no Remove.
+
+## Set up your guide, after New community (Nov 25)
+
+The user, once New community picked the name: "Name was already decided
+on set up… There is no big line under header… I think email set up is
+big." To do's checklist (`src/lib/setup.ts`) is now:
+
+- **Your logo**, not "Name and logo": the name is chosen in New
+  community.
+- **A second admin**, unchanged.
+- **The newsletter inbox** (closes item 93): opens Watches ›
+  Newsletters, and ticks once the Gmail script has checked in
+  (`newsletter_setup.checked_at`). Read, never made: the Newsletters page
+  makes the row and its key. A database without the table counts as not
+  done.
+- **Your first category**, unchanged.
+
+"The home page's words" went: the phone home has no big line, the
+computer's has no line under it, and New community writes the big line
+from the city.
+
+On dev, Philly now shows 3 of 4: dev's `newsletter_setup` row has no
+check-in. Live wasn't read; if its script has never checked in there,
+Philly's admins will see the checklist again with that one step.
+
+Tests: `setup.test.ts`, the To do checklist's in
+`ModerationQueue.test.tsx` and `useTodo.test.ts`; 9 failed against the
+old steps.
+
+## New community: pick the city, and a starter pack (Nov 25)
+
+Boards 1, 2f and 3 of the new-community drawing, as the user approved
+them ("Yes, build it"). The site owner's New community (`/admin`):
+
+- **Which city?** Google's cities as you type, through our own
+  `/api/admin/cities` (`src/lib/googleCities.ts`, the Maps server key;
+  the browser key is refused on localhost). Picked, the city fills in
+  the rest: a card ("Baltimore, Maryland · Eastern Time · map starts
+  downtown") with Change, the name ("Baltimore Jewish Guide"), its
+  address with Edit, the time zone (`tz-lookup`) and where the map
+  starts. The old form's More details (mission, region, colours,
+  lat/lng) went: the mission is written from the city, the colours are
+  the site's own, and all of it stays editable in the community's
+  Settings.
+- **Who runs it:** a list with Add and ×, instead of a comma-separated
+  box. An address typed and not added still counts.
+- **Starter pack,** on unless switched off (`src/lib/starterPack.ts`):
+  Synagogues, Food, Grocery, Mikvah, Eruv, Candle Lighting and the Map,
+  copied from the default community (Philly), with its home (Right now,
+  Suggest, the email signup and the groups trimmed to those pages), its
+  tabs and desktop menu, and its food words. Left behind: places,
+  forms, the logo and photos, the outside links (mikvah.org at
+  Philly's coordinates), and the hechshers (the user: "hechshers should
+  be empty"). Schools, Hospitals and Hotels are out ("Not every
+  community has hospitals like that"). The headline's "Philadelphia"
+  becomes the new city. It replaces Clone from, which copied a whole
+  community's pages and home.
+- **A change to an earlier rule:** the old clone never copied
+  crowdsourced vocabulary. The pack copies the food words (slugs and
+  labels only, not which places carry them), so item search knows
+  "challah" on day one.
+- **The list after Create** (board 3): the new community at the top,
+  outlined, Hidden, "/baltimore · 1 admin · 0 places", with Open its
+  admin, Copy preview link and Publish. The default community is one
+  row to its admin. Delete stays, quietly, on the others; the
+  "Change who can sign in" link and the hidden-community note went
+  (Open its admin, then Team).
+- **The list reads the communities fresh** (`readCommunities`): the
+  cached list is stale-while-revalidate, so its first read after a
+  create could leave out the one just made. The public reads stay
+  cached.
+- Migration 115 deletes the home rows nothing draws any more and
+  narrows the kinds. The user ran it on Nov 25 (item 92), before the
+  PR reached live, which is safe: no code reads or writes those kinds.
+
+Not as drawn: no "Communities" heading over the list (the page's own
+heading and tab say it); the city list shows Google's "MD, USA" where the
+board wrote "Maryland" (the card says "Maryland"); Create lands on the
+list rather than in the new console. The grocery page's description
+("…near the hospital") is copied as Philly wrote it.
+
+Tests: `CommunityManager.test.tsx` rewritten (21 of 23 failed against
+the old screen), the route's (7 of 8 against the old route, and the
+fresh-list test 1 of 1 against the cached read), `starterPack.test.ts`
+(2 of 7 without the clearing and the retired-row filter),
+`googleCities.test.ts`, the cities route's (2 of 4 without the time zone and the 502); `community-editor.spec.ts` drives it with
+Google answered at our route, the pack included. Checked in the browser
+on desktop and phone against the boards.
+
 ## Suggest a listing opened Add only the first time (Nov 25)
 
 The user, on the computer: Suggest a listing, then a category, opened

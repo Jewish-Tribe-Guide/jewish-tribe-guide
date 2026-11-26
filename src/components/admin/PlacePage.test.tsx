@@ -44,9 +44,18 @@ afterEach(() => {
 
 /** The line sits on the gray under the white card, with Done after it (boards
  *  KosherOpen12, AddGoogle8): inside the card it crowded the button. */
+/** The opened row's source line: inside its box, under a thin line (board
+ *  L2, Nov 25), with the row's sticker in that box; Done under the box. */
 function expectLineUnderCard() {
   const line = screen.getByTestId('row-source')
-  expect(line.closest('.bg-white')).toBeNull()
+  const box = line.closest('.bg-white')!
+  expect(box).not.toBeNull()
+  expect(line.closest('[data-testid="row-source-foot"]')).toHaveClass('border-t')
+  // The sticker: in the opened row's header, or beside the title of a
+  // row's own screen (Nov 26), never twice.
+  const stickers = [...within(box as HTMLElement).queryAllByTestId('row-job'), ...(screen.queryByTestId('screen-aside') ? within(screen.getByTestId('screen-aside')).queryAllByTestId('row-job') : [])]
+  expect(stickers).toHaveLength(1)
+  expect(stickers[0]).toHaveTextContent(/^(Checked nightly|Checked weekly|Not checked|Checking…)$/)
   const done = screen.getByRole('button', { name: 'Done' })
   expect(line.compareDocumentPosition(done) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(done.closest('.bg-white')).toBeNull()
@@ -359,26 +368,106 @@ describe('PlacePage', () => {
       expect(screen.queryByTestId('place-open')).toBeNull()
       expect(screen.getByRole('button', { name: 'No changes yet' })).toBeTruthy()
       expect(screen.getByRole('button', { name: 'Archive it' })).toBeTruthy()
-      const jobs = screen.getAllByTestId('row-job').map((j) => j.textContent)
+      const jobs = screen.getAllByTestId('row-job').map((j) => j.dataset.job)
       expect(jobs).toContain('Website')
       expect(jobs).toContain('Google')
       for (const job of jobs) expect(job).not.toMatch(/\d/)
     })
 
-    it('its row opened says where it’s read, and Change saves another page or stops it', async () => {
+    // Board W3, Nov 25: what it's read from, at the top, each with its own way to fill it.
+    // Nov 25: every row says its own source, so no Read from box; what only
+    // it had moved to the row it's about.
+    it('opens with no Read from box', async () => {
+      await listingPage({ job: withTimes, places: [row({ website: 'https://kesher.example' })] })
+      expect(screen.queryByRole('region', { name: 'Read from' })).toBeNull()
+    })
+
+    it('a place Google hasn’t matched: its name row says so, with Find it on Google', async () => {
+      await listingPage({ job: withTimes, google: [place('a', 'Kesher Israel', { matched: false })] })
+      const user = userEvent.setup()
+      const name = screen.getAllByTestId('row-job').find((j) => j.closest('button')?.textContent?.includes('Kesher Israel'))!
+      expect(name).toHaveTextContent('Not checked')
+      await user.click(name.closest('button')!)
+      expect(screen.getByTestId('row-source')).toHaveTextContent('Not found on Google · Find it on Google')
+      await user.click(screen.getByRole('button', { name: 'Find it on Google' }))
+      expect(await screen.findByRole('dialog')).toBeTruthy()
+    })
+
+    describe('this week’s schedule, with no email reading it', () => {
+      const openWeek = async (job: (url: string) => unknown) => {
+        await listingPage({ job })
+        await userEvent.click(screen.getByRole('button', { name: /^This week’s schedule/ }))
+      }
+      it('says what to sign up with', async () => {
+        await openWeek((url) => (url.includes('community-email') ? { email: 'guide@example.org' } : url.includes('newsletters') ? { newsletters: [] } : withTimes(url)))
+        expect(await screen.findByText(/Sign up for its emails with guide@example.org/)).toBeTruthy()
+      })
+      it('with no Gmail set up, says so, with Set it up', async () => {
+        await openWeek((url) => (url.includes('community-email') ? { email: null } : url.includes('newsletters') ? { newsletters: [] } : withTimes(url)))
+        expect(await screen.findByText(/The guide’s Gmail isn’t set up/)).toBeTruthy()
+        expect(screen.getByRole('link', { name: 'Set it up' })).toHaveAttribute('href', '/philly/admin/team/email')
+      })
+      it('an email that came in linked to nothing: Link it links it here', async () => {
+        await openWeek((url) => (url.includes('community-email') ? { email: 'guide@example.org' } : url.includes('newsletters') ? { newsletters: [{ watchId: 'n1', email: 'office@kesher.example', shul: null }] } : withTimes(url)))
+        expect(await screen.findByText(/An email from office@kesher.example came in/)).toBeTruthy()
+        await userEvent.click(screen.getByRole('button', { name: 'Link it' }))
+        await waitFor(() => expect(posts).toContainEqual(['/api/admin/watches', { action: 'link', id: 'n1', resourceId: 'a' }]))
+      })
+    })
+
+    // Board N4, Nov 25: Change opens a field in the row itself; its Done saves it.
+    it('its row opened says where it’s read, and Change opens a field that Done saves', async () => {
       await listingPage({ job: withTimes })
       const user = userEvent.setup()
-      const minyans = screen.getAllByTestId('row-job').find((j) => j.textContent === 'Website')!.closest('button')!
+      const minyans = screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!
       await user.click(minyans)
-      expect(screen.getByTestId('row-source')).toHaveTextContent(`kesher.example/davening · ${day(at)} · Read now · Change`)
+      // The user, Nov 26: the line says its sticker's own words.
+      expect(screen.getByTestId('row-source')).toHaveTextContent(`Checked nightly from kesher.example/davening · last ${day(at)} · Read now · Change`)
       expectLineUnderCard()
+      // The user, Nov 26: what to do on the right, apart from what it says.
+      const actions = screen.getByTestId('row-source-actions')
+      expect(actions).toHaveTextContent(/^Read now · Change$/)
+      expect(actions).toHaveClass('ml-auto')
+      expect(actions.previousElementSibling).toHaveClass('sr-only')
+      expect(screen.queryByTestId('source-field')).toBeNull()
       await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
-      const change = screen.getByTestId('source-screen')
-      expect(within(change).getByRole('textbox')).toHaveValue('https://kesher.example/davening')
-      await user.clear(within(change).getByRole('textbox'))
-      await user.type(within(change).getByRole('textbox'), 'https://kesher.example/times')
-      await user.click(within(change).getByRole('button', { name: 'Save' }))
-      expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'give', resourceId: 'a', url: 'https://kesher.example/times', replaces: 'w1' }]])
+      expect(screen.queryByTestId('source-screen')).toBeNull()
+      const input = screen.getByTestId('source-field')
+      expect(input).toHaveValue('https://kesher.example/davening')
+      expect(input.closest('.bg-white')).not.toBeNull()
+      // The field takes the line's place while it's open (Nov 25).
+      expect(screen.queryByTestId('row-source')).toBeNull()
+      await user.clear(input)
+      await user.type(input, 'https://kesher.example/times')
+      expect(posts).toEqual([])
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      await waitFor(() => expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'give', resourceId: 'a', url: 'https://kesher.example/times', replaces: 'w1' }]]))
+    })
+
+    // Nov 25: a row nothing reads shows no field till Add a page is tapped.
+    it('a row nothing reads: Add a page opens its field', async () => {
+      await listingPage({ job: (url) => (url.includes('job=times') ? { name: 'Shul times', places: [] } : undefined) })
+      const user = userEvent.setup()
+      await user.click(screen.getAllByTestId('row-job').find((j) => j.closest('button')?.textContent?.includes('Usual weekday times'))!.closest('button')!)
+      expect(screen.queryByTestId('source-field')).toBeNull()
+      await user.click(screen.getByRole('button', { name: /^Add a page/ }))
+      expect(screen.getByTestId('source-field')).toHaveValue('')
+      expect(screen.queryByRole('button', { name: /^Add a page/ })).toBeNull()
+    })
+
+    it('Done with the field left as it was, or emptied, changes nothing', async () => {
+      await listingPage({ job: withTimes })
+      const user = userEvent.setup()
+      await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
+      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      await waitFor(() => expect(screen.queryByTestId('source-field')).toBeNull())
+      await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
+      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+      await user.clear(screen.getByTestId('source-field'))
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      await waitFor(() => expect(screen.queryByTestId('source-field')).toBeNull())
+      expect(posts).toEqual([])
     })
 
     // Nov 1 (SavedRead15, SavedAgrees15, SavedFailed15, SavedGoogle15,
@@ -412,7 +501,7 @@ describe('PlacePage', () => {
         }).then(() => sent)
       }
       const openRow = async (user: ReturnType<typeof userEvent.setup>) => {
-        await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Website')!.closest('button')!)
+        await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
         return within(screen.getByTestId('row-source')).getByRole('button', { name: 'Read now' })
       }
 
@@ -459,17 +548,20 @@ describe('PlacePage', () => {
         await readPage({ lastError: 'down' })
         const user = userEvent.setup()
         await user.click(await openRow(user))
-        expect(await screen.findByText('Couldn’t read its website')).toHaveClass('text-red-700')
+        expect((await screen.findByText('Couldn’t read its website')).closest('[data-testid="row-source"]')).toHaveClass('text-red-700')
         const lines = screen.getAllByTestId('row-source')
         const last = lines[lines.length - 1]
         expect(within(last).getByRole('button', { name: 'Read now' })).toBeTruthy()
         expect(within(last).getByRole('button', { name: 'Change' })).toBeTruthy()
+        // Nothing's keeping it current: Not checked, not Checked nightly (Nov 25).
+        const sticker = screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!
+        expect(sticker).toHaveTextContent('Not checked')
       })
 
       it('none on what Google keeps', async () => {
         await listingPage({ job: withTimes })
         const user = userEvent.setup()
-        await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Google')!.closest('button')!)
+        await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Google')!.closest('button')!)
         expect(within(screen.getByTestId('row-source')).queryByRole('button', { name: 'Read now' })).toBeNull()
       })
     })
@@ -477,13 +569,13 @@ describe('PlacePage', () => {
     it('Stop reading it, on the Change screen: nothing asked first, it can be started again', async () => {
       await listingPage({ job: withTimes })
       const user = userEvent.setup()
-      await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Website')!.closest('button')!)
+      await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
       await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
       await user.click(screen.getByRole('button', { name: 'Stop reading it' }))
       expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'stop', resourceId: 'a', id: 'w1' }]])
     })
 
-    it('a page stopped says Stopped; Start reading reads at once, and a failed read says so and stays', async () => {
+    it('a page stopped says Stopped; Change and Done start it, and a failed read says so and stays open', async () => {
       const off = { ...shul, off: true }
       await renderPage('a', [place('a', 'Kesher Israel')], (url, init) => {
         if (init?.method === 'POST') {
@@ -497,22 +589,30 @@ describe('PlacePage', () => {
         return url.includes('job=times') ? { name: 'Shul times', places: [off] } : undefined
       })
       const user = userEvent.setup()
-      const job = screen.getAllByTestId('row-job').find((j) => j.textContent === 'Stopped')!
+      const job = screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Stopped')!
+      expect(job).toHaveTextContent('Not checked')
       await user.click(job.closest('button')!)
       expect(screen.getByTestId('row-source')).toHaveTextContent('Stopped · Change')
       await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
-      expect(screen.getByRole('textbox')).toHaveValue(page.url)
-      await user.click(screen.getByRole('button', { name: 'Start reading' }))
-      expect(posts).toEqual([
-        ['/api/admin/watches/hours?job=times', { action: 'on', resourceId: 'a' }],
-        ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a' }],
-        ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a', id: 'w1' }],
-      ])
+      const input = screen.getByTestId('source-field')
+      expect(input).toHaveValue(page.url)
+      // Start reading again: the page, given again, and Done.
+      await user.clear(input)
+      await user.type(input, `${page.url}/`)
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      await waitFor(() =>
+        expect(posts).toEqual([
+          ['/api/admin/watches/hours?job=times', { action: 'on', resourceId: 'a' }],
+          ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a' }],
+          ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a', id: 'w1' }],
+        ]),
+      )
+      // It couldn't be read: the row stays open, saying so.
       expect(await screen.findByText('Couldn’t read that page')).toBeTruthy()
-      expect(screen.getByTestId('source-screen')).toBeTruthy()
+      expect(screen.getByTestId('source-field')).toBeTruthy()
     })
 
-    it('a Google field: Stop, then Use Google’s; none to use says so where it’s asked', async () => {
+    it('a Google field: From Google, and no Stop on its line', async () => {
       const phoneCategory = shulCategory
       const fields = [field('Name', 'google'), field('Phone', 'google')]
       await renderPage('a', [place('a', 'Kesher Israel', { fields })], (url, init) => {
@@ -527,12 +627,13 @@ describe('PlacePage', () => {
         if (url.includes('/api/admin/listings')) return { ok: true, places: [row({ phone: '215-555-0100', address: '1 Main St' })], categories: [phoneCategory] }
       })
       const user = userEvent.setup()
-      await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Google' && j.closest('button')?.textContent?.includes('215'))!.closest('button')!)
+      await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Google' && j.closest('button')?.textContent?.includes('215'))!.closest('button')!)
       const line = () => screen.getByTestId('row-source')
-      expect(line()).toHaveTextContent(`Google · ${day(new Date().toISOString())} · Stop`)
+      // Google keeps several rows; this one is stopped by typing over it.
+      expect(line()).toHaveTextContent(`Checked nightly from Google · last ${day(new Date().toISOString())}`)
+      expect(within(line()).queryByRole('button', { name: 'Stop' })).toBeNull()
       expectLineUnderCard()
-      await user.click(within(line()).getByRole('button', { name: 'Stop' }))
-      expect(posts).toEqual([['/api/admin/watches/google', { action: 'stop_field', id: 'a', field: 'phone' }]])
+      expect(posts).toEqual([])
     })
 
     it('says so for a place nothing watches', async () => {
@@ -641,6 +742,19 @@ describe('an eruv', () => {
     posts.length = 0
   })
 
+  it('Read from: its website, its status page, and Google not for an eruv; Change saves on the eruv', async () => {
+    await eruvPage('lm')
+    const box = screen.getByRole('region', { name: 'Read from' })
+    expect(within(box).getByTestId('read-from-website')).toHaveTextContent('lowermerioneruv.org · every night')
+    expect(within(box).getByTestId('read-from-emails')).toHaveTextContent('From lowermerioneruv.org/status')
+    expect(within(box).getByTestId('read-from-google')).toHaveTextContent('Not for an eruv')
+    const row = within(box).getByTestId('read-from-website')
+    await userEvent.click(within(row).getByRole('button', { name: 'Change' }))
+    await userEvent.type(within(row).getByLabelText('Its website'), 'lmeruv.org')
+    await userEvent.click(within(row).getByRole('button', { name: 'Save' }))
+    expect(posts).toContainEqual(['/api/admin/eruvim', { action: 'save', id: 'lm', edit: { website: 'lmeruv.org' } }])
+  })
+
   // Nov 1, boards EruvListing6, EruvStatus5.
   it('with nothing waiting, opens as a listing: every row the Eruvs job’s, but its Website', async () => {
     await eruvPage('lm')
@@ -650,8 +764,8 @@ describe('an eruv', () => {
     expect(rowOf('status')).toHaveTextContent('Status')
     expect(rowOf('map')).toHaveTextContent('On the map')
     expect(rowOf('hotline')).toHaveTextContent('(610) 664-5626')
-    for (const id of ['status', 'map', 'hotline', 'alertsUrl']) expect(within(rowOf(id)).getByTestId('row-job')).toHaveTextContent('Website')
-    expect(within(rowOf('website')).getByTestId('row-job')).toHaveTextContent('Nothing')
+    for (const id of ['status', 'map', 'hotline', 'alertsUrl']) expect(within(rowOf(id)).getByTestId('row-job')).toHaveAttribute('data-job', 'Website')
+    expect(within(rowOf('website')).getByTestId('row-job')).toHaveAttribute('data-job', 'Nothing')
 
     await user.click(rowOf('status'))
     expect(screen.getByTestId('row-source')).toHaveTextContent(`Its status page · ${day(at)} · Change`)
@@ -819,9 +933,18 @@ describe('stopping a hospital’s or food place’s source', () => {
       if (url.includes('/api/admin/main-dishes')) return { places: [grill] }
     })
     const user = userEvent.setup()
-    await user.click(screen.getAllByTestId('row-job').find((j) => j.textContent === 'Website')!.closest('button')!)
-    expect(screen.getByTestId('row-source')).toHaveTextContent(`· ${day(at)} · Read now · Change`)
+    await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
+    expect(screen.getByTestId('row-source')).toHaveTextContent(`· last ${day(at)} · Read now · Change`)
     expectLineUnderCard()
+    // Its own screen: the sticker beside the title, as a row has it, and
+    // not again by the line (the user, Nov 26).
+    expect(within(screen.getByTestId('screen-aside')).getByTestId('row-job')).toHaveTextContent('Checked nightly')
+    // On the title's own line, not up by Back (the user, Nov 26).
+    // (The header's own `right` follows the title too, but a computer
+    // draws it up on Back's line: it must share the title's box.)
+    const aside = screen.getByTestId('screen-aside')
+    expect(aside.previousElementSibling?.tagName).toBe('H1')
+    expect(aside.parentElement?.tagName).not.toBe('HEADER')
     await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
     await user.click(screen.getByRole('button', { name: 'Stop reading it' }))
     expect(posts).toEqual([['/api/admin/main-dishes', { action: 'unlink', resourceId: 'r' }]])

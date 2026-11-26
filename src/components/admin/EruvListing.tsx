@@ -12,7 +12,7 @@ import { useAdminApi } from './useAdminApi'
 import type { CategoryConfig } from '@/lib/categories'
 import { sourceKind, sourceProblem, type WatchPurpose } from '@/lib/watchPurposes'
 import { EditorAddLine, EditorEmptyRows, EditorOpenCard, EditorRowCard, editorFieldLabel, editorInputClass } from '@/components/resources/editorParts'
-import { SignUpLine } from './AddPlace'
+import { SignUpLine } from './SignUpLine'
 import { SUBMIT_PILL } from '@/components/resources/submitPill'
 import { AdminBack } from './AdminUI'
 import { Pill } from './JobBoxes'
@@ -22,6 +22,8 @@ import { sourceActions, type Attempt } from './sourceActions'
 import type { Jobs } from './useWatchJobs'
 import { shortUrl } from './watchText'
 import EruvMapPreview from './EruvMapPreview'
+import ReadFrom from './ReadFrom'
+import { eruvReadFrom } from './readFromFacts'
 import { partNames } from '@/lib/eruvLine'
 import { ownEruvFields, readEruvDetails, withEruvFields } from '@/lib/eruvFields'
 import { ownWords } from '@/lib/eruvSuggestion'
@@ -318,6 +320,23 @@ export default function EruvListing({
   return (
     <div className="flex flex-col gap-4">
       <AdminBack back={{ label: screen || openRow ? 'Back' : backLabel, onClick: back }} title={title} />
+      {!screen && !openRow && (
+        <ReadFrom
+          placeId={eruv.id}
+          token={token}
+          {...eruvReadFrom(eruv, jobs)}
+          saveWebsite={async (url) => {
+            await save({ website: url })
+            setDraft((d) => ({ ...d, website: url }))
+          }}
+          // The sender is the eruv's from now on: its emails are read for its status.
+          linkEmail={async (w) => {
+            await save({ statusEmail: w.sender })
+            await post('/api/admin/watches', { action: 'remove', id: w.id })
+          }}
+          onChanged={reload}
+        />
+      )}
       {screen ? (
         <SourceScreen
           {...screen.props}
@@ -333,7 +352,7 @@ export default function EruvListing({
             {rows.map((r) => (
               <li key={r.id}>
                 {openRow === r.id ? (
-                  <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} onClose={() => setOpenRow(null)} source={{ line: lineOf(r.source) }}>
+                  <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} tags={r.source ? <RowJob source={r.source} /> : null} onClose={() => setOpenRow(null)} source={{ line: lineOf(r.source) }}>
                     {r.body}
                   </EditorOpenCard>
                 ) : (
@@ -503,7 +522,7 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
         <SourceWords line={{ text: `${source}’s ${r.on} email didn’t say` }} controls={[change]} />
       ) : r?.state === 'no-gmail' ? (
         <>
-          <SourceWords line={{ text: 'The guide’s Gmail isn’t set up' }} controls={[<a key="gmail" href={`${adminBase(community)}/watches/newsletters`} target="_blank" rel="noopener noreferrer" className={LINE_LINK}>Set it up</a>]} />
+          <SourceWords line={{ text: 'The guide’s Gmail isn’t set up' }} controls={[<a key="gmail" href={`${adminBase(community)}/team/email`} target="_blank" rel="noopener noreferrer" className={LINE_LINK}>Set it up</a>]} />
           <SourceWords line={{ text: page, when: 'within the hour' }} controls={[change]} />
         </>
       ) : r?.state === 'failed' ? (
@@ -534,7 +553,7 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
     })),
   ]
   const opened = (r: (typeof rows)[number]) => (
-    <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} onClose={() => setOpenRow(null)} source={r.line ? { line: r.line } : undefined}>
+    <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} tags={r.source ? <RowJob source={r.source} /> : null} onClose={() => setOpenRow(null)} source={r.line ? { line: r.line } : undefined}>
       {r.body}
     </EditorOpenCard>
   )

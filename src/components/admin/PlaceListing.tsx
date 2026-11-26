@@ -1,6 +1,7 @@
 'use client'
 
-import { Fragment, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
+import { stickerOf, type LineState } from './rowSticker'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { EnrichedSubmission } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import type { AdminPlace } from '@/lib/adminPlaces'
@@ -23,7 +24,12 @@ import type { Stop } from './openedPlaceBoxes'
 import { jobsChangedBy, type Jobs } from './useWatchJobs'
 import { kindsOf } from './WatchKinds'
 import { useStepsInAddress } from './useStepsInAddress'
+import { addSourceWords, sourcePlaceholder, useSourceFields, type FieldSpec } from './useSourceFields'
 import { useAdminApi } from './useAdminApi'
+import { FindSheet } from './FindSheet'
+import { SignUpLine } from './SignUpLine'
+import { useWeekEmails } from './useWeekEmails'
+import { kindOf } from '@/lib/placeKinds'
 
 // A listing as an admin sees it, wherever it's opened from: Places, or a job's
 // row with nothing waiting (boards Listing6, States6, Menu5, Change5, Stopped6,
@@ -95,11 +101,19 @@ export function ArchivedPlace({ place, category, token, onDone, send: own }: { p
   )
 }
 
-/** On the right of a row: the job that keeps it. */
-export function RowJob({ source }: { source: Pick<RowSource, 'job' | 'amber'> }) {
+/** On the right of a row, and in its header once open: whether something
+ *  keeps it current (rowSticker). The job itself is the source line's to
+ *  name; `data-job` keeps it for tests. */
+export function RowJob({ source, checking }: { source: Pick<RowSource, 'job' | 'amber' | 'unchecked'> & { lines?: { text: string; state?: LineState }[] }; checking?: boolean }) {
+  const sticker = checking ? stickerOf({ job: source.job, amber: false, lines: [{ text: '…', state: 'checking' }] }) : stickerOf(source)
+  if (!sticker) return null
   return (
-    <span className={`max-w-[40%] shrink-0 text-right text-[0.8125rem] leading-snug ${source.amber ? 'text-amber-800' : 'text-slate-600'}`} data-testid="row-job">
-      {source.job}
+    <span
+      className={`shrink-0 rounded-full px-2.5 py-0.5 text-[0.78125rem] font-bold whitespace-nowrap ${sticker.tone === 'green' ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}
+      data-testid="row-job"
+      data-job={source.job}
+    >
+      {sticker.text}
     </span>
   )
 }
@@ -118,26 +132,65 @@ export function ArchiveBin({ onClick }: { onClick: () => void }) {
   )
 }
 
-/** "Its menu · Oct 20 · Change": a row's one line, its controls drawn in by the caller. */
-export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' | 'url' | 'when'> & { red?: boolean }; controls?: ReactNode[] }) {
+/** "From its menu · Oct 20 · Change": a row's one line, its controls drawn
+ *  in by the caller. With no text, just its controls. */
+/** What a source line says on the left, what to do about it on the right
+ *  (boards M1–M6, the user Nov 26: "the actions should go on the right").
+ *  A line that is only actions keeps them where the words would be. The
+ *  dot between the two halves is for a screen reader, which reads it as
+ *  one line. */
+export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' | 'url' | 'when'> & { red?: boolean; lead?: string }; controls?: ReactNode[] }) {
+  const words: ReactNode[] = [
+    ...(line.text
+      ? [
+          <Fragment key="t">
+            {line.lead && `${line.lead} `}
+            {line.url ? (
+              <a href={line.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
+                {line.text}
+              </a>
+            ) : (
+              line.text
+            )}
+          </Fragment>,
+        ]
+      : []),
+    ...(line.when ? [line.when] : []),
+  ]
+  const dotted = (parts: ReactNode[]) =>
+    parts.map((p, i) => (
+      <Fragment key={i}>
+        {i > 0 && ' · '}
+        {p}
+      </Fragment>
+    ))
+  const acts = controls ?? []
   return (
-    <p className={`m-0 text-[0.8125rem] [overflow-wrap:anywhere] ${line.red ? 'font-semibold text-red-700' : 'text-slate-500'}`} data-testid="row-source">
-      {line.url ? (
-        <a href={line.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
-          {line.text}
-        </a>
-      ) : (
-        line.text
-      )}
-      {line.when && ` · ${line.when}`}
-      {controls?.map((c, i) => (
-        <Fragment key={i}>
-          {' · '}
-          {c}
-        </Fragment>
-      ))}
+    <p className={`m-0 flex flex-wrap items-baseline gap-x-3 text-[0.8125rem] [overflow-wrap:anywhere] ${line.red ? 'font-semibold text-red-700' : 'text-slate-500'}`} data-testid="row-source">
+      {words.length > 0 && <span className="min-w-0 grow basis-40">{dotted(words)}</span>}
+      {words.length > 0 && acts.length > 0 && <span className="sr-only"> · </span>}
+      {acts.length > 0 && <span className={words.length > 0 ? 'ml-auto shrink-0' : ''} data-testid="row-source-actions">{dotted(acts)}</span>}
     </p>
   )
+}
+
+/** "Checked nightly from Google · last Aug 28": a source line led by its
+ *  sticker's own words. A line that isn't a From (Stopped, a failed read)
+ *  keeps its own. */
+export function keptWords<L extends { text: string; when?: string | null }>(line: L, kept: string | null): L & { lead?: string } {
+  if (!kept || !/^From /.test(line.text)) return line
+  return { ...line, lead: kept, text: line.text.replace(/^From /, 'from '), when: line.when ? (line.when === 'just now' ? 'read just now' : `last ${line.when}`) : line.when }
+}
+
+/** A source line's words as the opened row says them (board L2, Nov 25):
+ *  "From Google", "From its website", "From kesher.example/davening".
+ *  Nothing reading it has no words: the sticker says Not checked, and the
+ *  field under the line is what to do about it. */
+export function fromWords(text: string): string {
+  if (!text || text === 'Nothing reads this') return ''
+  if (text === 'Stopped' || /^(From|Found|Reading|Couldn’t|No |Looking|Not found)/.test(text)) return text
+  if (text === 'Link check') return 'From the link check'
+  return `From ${text.startsWith('Its ') ? `its ${text.slice(4)}` : text}`
 }
 
 export type SourceScreenProps = {
@@ -155,9 +208,6 @@ export type SourceScreenProps = {
   /** After a try that didn't read: the source is in by then. */
   onTried: () => Promise<void> | void
 }
-
-/** A source's screen as a line's control opens it: its title and what it asks. */
-export type SourceSpec = { title: string; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> }
 
 /** Change, and Add a source: where it's read from, filled in; Save, or Start
  *  reading once it's stopped, which reads at once and says if it couldn't. */
@@ -244,7 +294,8 @@ export default function PlaceListing({
   const [patch, setPatch] = useState<Record<string, unknown> | undefined>(undefined)
   // `key`: which it is, for the address (the row, then which of its line's
   // controls opened it).
-  const [screen, setScreen] = useState<(SourceSpec & { key: string }) | null>(null)
+  // A row's source given or changed in the row itself, saved by its Done.
+  const fields = useSourceFields()
   const [rowError, setRowError] = useState<{ row: string; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -273,40 +324,48 @@ export default function PlaceListing({
   // Until every job has answered, nothing can be said of a row.
   const loaded = (['google', 'times', 'hours', 'dishes', 'kosher', 'hospitals', 'links', 'runs'] as const).every((k) => jobs[k] !== undefined)
   const sources = useMemo(() => (loaded && category ? listingSources(place.id, jobs, now, category, item as Record<string, unknown> & { id: string }) : null), [loaded, category, place.id, jobs, now, item])
+  // A shul's emails, said on its this-week row while none reads it.
+  const [emails, reloadEmails] = useWeekEmails(api, !!category && kindOf(category) === 'shuls')
+  const [finding, setFinding] = useState(false)
+  const googlePlace = jobs.google?.places.find((p) => p.id === place.id) ?? null
 
   const give = (add: GiveSource): Attempt => async (url) => {
     if ('kind' in add.run) await actions.change(add.run, url)
     else await actions.addSource(add.run, url)
     return { failed: false }
   }
-  /** The screens a row's source line opens, by which control opens them. */
-  function screensOf(row: EditorRow): Partial<Record<'change' | 'start' | 'add' | 'also', SourceSpec>> {
+  /** The fields a row's source line opens, by which control opens them
+   *  (board N4, Nov 25). Each reads the listing again once it's tried. */
+  function fieldSpecs(row: EditorRow): Partial<Record<'change' | 'start' | 'add' | 'also', FieldSpec>> {
     const source = sources?.(row)
     if (!source) return {}
     const { line } = source
-    const changeSpec = (c: NonNullable<SourceLine['change']>): SourceSpec => {
+    const placeholder = sourcePlaceholder(row)
+    const then = (run: Attempt): Attempt => async (url) => {
+      const result = await run(url)
+      await reload()
+      return result
+    }
+    const changeSpec = (key: 'change' | 'also', c: NonNullable<SourceLine['change']>): FieldSpec => {
       const stop: Stop | undefined = c.stop
       return {
-        title: 'Change',
-        props: {
-          label: c.label,
-          value: c.value,
-          button: 'Save',
-          attempt: async (url) => {
-            await actions.change(c.act, url)
-            return { failed: false }
-          },
-          ...(stop ? { stop: () => actions.stopSource(stop) } : {}),
-        },
+        key,
+        value: c.value,
+        placeholder,
+        attempt: then(async (url) => {
+          await actions.change(c.act, url)
+          return { failed: false }
+        }),
+        ...(stop ? { stop: async () => { await actions.stopSource(stop); await reload() } } : {}),
       }
     }
     const s = line.start
     const a = line.add
     return {
-      ...(line.change && { change: changeSpec(line.change) }),
-      ...(s && { start: { title: 'Change', props: { label: s.label, value: s.value, button: 'Start reading', attempt: actions.startReading(s.again, s.value) } } }),
-      ...(a && { add: { title: 'Add a source', props: { label: a.label, value: '', button: 'Save', attempt: give(a) } } }),
-      ...(source.also?.change && { also: changeSpec(source.also.change) }),
+      ...(line.change && { change: changeSpec('change', line.change) }),
+      ...(s && { start: { key: 'start', value: s.value, placeholder, attempt: then(actions.startReading(s.again, s.value)) } }),
+      ...(a && { add: { key: 'add', value: '', placeholder, attempt: then(give(a)) } }),
+      ...(source.also?.change && { also: changeSpec('also', source.also.change) }),
     }
   }
 
@@ -324,29 +383,6 @@ export default function PlaceListing({
     },
     { inner: ['step'] },
   )
-  // The rows the editor has shown, for a screen over one to open again.
-  const rowsSeen = useRef(new Map<string, EditorRow>())
-  const [overAsked, setOverAsked] = useState<string | null>(null)
-  useStepsInAddress('over', screen ? [screen.key] : [], ([to]) => {
-    if (!to) {
-      setOverAsked(null)
-      return setScreen(null)
-    }
-    setOverAsked(to)
-  })
-  const openAsked = useEffectEvent(() => {
-    if (!overAsked) return
-    const dot = overAsked.lastIndexOf('.')
-    const row = rowsSeen.current.get(overAsked.slice(0, dot))
-    const spec = row && screensOf(row)[overAsked.slice(dot + 1) as 'change']
-    if (!spec) return
-    setOverAsked(null)
-    setScreen({ ...spec, key: overAsked })
-  })
-  // Every row is seen on the editor's first render (its aside); the
-  // sources come with the jobs, so it is tried again when they arrive.
-  useEffect(() => openAsked(), [overAsked, sources])
-
   if (place.status === 'archived' || !category) {
     return (
       <div className="flex flex-col gap-3">
@@ -354,11 +390,6 @@ export default function PlaceListing({
         {place.status === 'archived' ? <ArchivedPlace place={place} category={category} token={token} onDone={onSaved} /> : <AdminEmpty>Its category is gone, so it can’t be edited here.</AdminEmpty>}
       </div>
     )
-  }
-
-  function open(row: EditorRow, which: 'change' | 'start' | 'add' | 'also') {
-    const spec = screensOf(row)[which]
-    if (spec) setScreen({ ...spec, key: `${row.id}.${which}` })
   }
 
   async function google(row: EditorRow, action: 'stop_field' | 'use_field', field: CheckedField) {
@@ -460,10 +491,7 @@ export default function PlaceListing({
     </button>
   )
 
-  const changeControl = (row: EditorRow, which: 'change' | 'also') => control('Change', () => open(row, which))
-
   function rowSource(row: EditorRow, changed: boolean): ReactNode {
-    rowsSeen.current.set(row.id, row)
     const source = sources?.(row)
     if (!source) return null
     const { line } = source
@@ -478,29 +506,75 @@ export default function PlaceListing({
     const food = row.kind === 'items' && jobs.dishes?.find((p) => p.id === place.id)
     if (food && food.reading?.status === 'proposed' && dishStatus(food) === 'differs') return <SourceWords line={{ text: 'Its menu has a change' }} controls={[control('Open', () => setMenuChange(true))]} />
     const failed = readFailed && readFailed.read === readKey && <SourceWords line={{ text: readFailed.text, red: true }} />
-    const dated = (l: SourceLine) => (l.read && readJust.includes(JSON.stringify(l.read)) ? { ...l, when: 'just now' } : l)
+    const said = (l: SourceLine) => ({ ...l, text: fromWords(l.text), ...(l.read && readJust.includes(JSON.stringify(l.read)) ? { when: 'just now' } : {}) })
     const readControl = (l: SourceLine) => (l.read ? [control('Read now', () => void readNow(row, l.read!))] : [])
-    const controls: ReactNode[] = [...readControl(line)]
-    if (line.change) controls.push(changeControl(row, 'change'))
-    if (line.start) controls.push(control('Change', () => open(row, 'start')))
-    if (line.add) controls.push(control('Add a source', () => open(row, 'add')))
-    if (line.googleStop) {
-      const f = line.googleStop
-      controls.push(control('Stop', () => void google(row, 'stop_field', f)))
+    const specs = fieldSpecs(row)
+    // Change: the field, filled in, under the line; its link goes once it's open.
+    const changeOf = (which: 'change' | 'start' | 'also') => {
+      const spec = specs[which]
+      return spec && !fields.isOpen(row, which) ? [control('Change', () => fields.reveal(row, spec))] : []
     }
+    const controls: ReactNode[] = [...readControl(line), ...changeOf('change'), ...changeOf('start')]
+    // No source yet: a link opens its field.
+    if (specs.add && !fields.isOpen(row, 'add')) {
+      const spec = specs.add
+      controls.push(control(addSourceWords(row), () => fields.reveal(row, spec)))
+    }
+    // Google keeps several rows: what's typed over stops it for that one.
     if (line.useGoogle) {
       const f = line.useGoogle
       controls.push(control('Use Google’s', () => void google(row, 'use_field', f)))
     }
+    if (line.findOnGoogle && googlePlace) controls.push(control('Find it on Google', () => setFinding(true)))
+    // The line says what its sticker says, in the same words, then where
+    // from and when (the user, Nov 26: a newcomer has to see the line is
+    // what the sticker is about). Only a green one: Not checked has no
+    // source to name.
+    const sticker = failed ? null : stickerOf(source)
+    const words = keptWords(said(line), sticker?.tone === 'green' ? sticker.text : null)
     return (
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {error}
         {failed}
-        <SourceWords line={dated(line)} controls={controls} />
-        {source.also && <SourceWords line={dated(source.also)} controls={[...readControl(source.also), ...(source.also.change ? [changeControl(row, 'also')] : [])]} />}
+        {/* Changing it: the field takes the line's place (Nov 25). */}
+        {(words.text || controls.length > 0) && !(['change', 'start', 'add'] as const).some((k) => specs[k] && fields.isOpen(row, k)) && <SourceWords line={words} controls={controls} />}
+        {specs.change && fields.field(row, specs.change)}
+        {specs.start && fields.field(row, specs.start)}
+        {specs.add && fields.field(row, specs.add)}
+        {source.also && !(specs.also && fields.isOpen(row, 'also')) && <SourceWords line={said(source.also)} controls={[...readControl(source.also), ...changeOf('also')]} />}
+        {specs.also && fields.field(row, specs.also)}
+        {row.id === 'minyans:this_week' && !source.job.includes('Email') && emailLine()}
       </div>
     )
   }
+
+  /** No email reads its week yet: a sender to link, or what to sign up with. */
+  function emailLine(): ReactNode {
+    if (!emails.loaded) return null
+    const { waiting, account } = emails
+    if (waiting) {
+      const link = () =>
+        void post('/api/admin/watches', { action: 'link', id: waiting.id, resourceId: place.id }).then(
+          () => Promise.all([reload(), reloadEmails()]),
+          (err: unknown) => setRowError({ row: 'minyans:this_week', text: err instanceof Error ? err.message : 'Could not link it.' }),
+        )
+      return <SourceWords line={{ text: `An email from ${waiting.sender} came in` }} controls={[control('Link it', link)]} />
+    }
+    if (account) return <SignUpLine account={account} />
+    return (
+      <SourceWords
+        line={{ text: 'The guide’s Gmail isn’t set up' }}
+        controls={[
+          <a key="gmail" href={`${adminBase(community)}/team/email`} className={LINE_LINK}>
+            Set it up
+          </a>,
+        ]}
+      />
+    )
+  }
+
+  /** A row's Done: what its field holds, saved first. */
+  const rowDone = (row: EditorRow) => fields.done(row)
 
   async function archive() {
     setArchiving(true)
@@ -513,6 +587,7 @@ export default function PlaceListing({
       setArchiving(false)
     }
   }
+
 
   const watched = menuChange ? kindsOf(jobs, adminBase(community), now)?.kinds.flatMap((k) => k.places).find((p) => p.id === place.id) : undefined
   return (
@@ -547,28 +622,16 @@ export default function PlaceListing({
         onClose={onClose}
         splitContact
         patch={patch}
-        overlay={
-          screen && {
-            title: screen.title,
-            back: () => setScreen(null),
-            node: (
-              <SourceScreen
-                {...screen.props}
-                onTried={reload}
-                onDone={async () => {
-                  await reload()
-                  setScreen(null)
-                }}
-              />
-            ),
-          }
-        }
         rowAside={(row: EditorRow) => {
-          rowsSeen.current.set(row.id, row)
           const source = sources?.(row)
-          return source ? <RowJob source={source} /> : null
+          if (!source) return null
+          const key = (l?: SourceLine) => (l?.read ? JSON.stringify(l.read) : null)
+          // A Read now that failed: nothing's keeping it current (Nov 25).
+          const failed = !!readFailed && [key(source.line), key(source.also)].includes(readFailed.read)
+          return <RowJob source={failed ? { ...source, unchecked: true } : source} checking={!!source.line.read && reading === key(source.line)} />
         }}
         rowSource={rowSource}
+        rowDone={rowDone}
         adminSave={{
           label: 'Update the listing',
           via: ({ payload }) =>
@@ -577,7 +640,18 @@ export default function PlaceListing({
           beside: confirming ? undefined : <ArchiveBin onClick={() => setConfirming(true)} />,
         }}
       />
-      {confirming && !screen && (
+      {finding && googlePlace && (
+        <FindSheet
+          place={googlePlace}
+          post={(body) => post('/api/admin/watches/google', body)}
+          onPicked={() => {
+            setFinding(false)
+            void reload(jobsChangedBy('/api/admin/watches/google'))
+          }}
+          onClose={() => setFinding(false)}
+        />
+      )}
+      {confirming && (
         <div className="mt-4 flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
           <p className="m-0 text-sm text-red-800">Take {place.name} off the site? It stays under Archived.</p>
           <div className="flex flex-wrap gap-2">

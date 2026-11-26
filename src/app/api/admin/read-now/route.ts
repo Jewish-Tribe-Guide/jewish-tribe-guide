@@ -60,7 +60,12 @@ export const POST = adminRead(async (request: Request, { community }) => {
       const kept = (w: { id: string } | undefined) => (w ? (reads.get(w.id)?.entries ?? null) : null)
       const keystone = kept(watches.find((w) => w.active && w.kind === 'keystone_list')) as KeystoneEntry[] | null
       const mekor = kept(watches.find((w) => w.active && isMekorList(w.url))) as MekorEntry[] | null
-      return Response.json({ ok: true, kosher: kosherLookup(category, draft, { keystone, mekor }) })
+      // Our copies are as old as the older list's last good read: said
+      // beside "Not found" (Nov 25), so it isn't a claim with no date.
+      const lists = [watches.find((w) => w.active && w.kind === 'keystone_list'), watches.find((w) => w.active && isMekorList(w.url))].filter((w) => w && kept(w))
+      const readAt = lists.map((w) => w!.lastOkAt).filter((t): t is string => !!t).sort()[0] ?? null
+      const kosher = kosherLookup(category, draft, { keystone, mekor })
+      return Response.json({ ok: true, kosher: kosher && { ...kosher, readAt } })
     }
     const limited = await enforceRateLimit(request, 'admin-watch-check', LIMIT)
     if (limited) return limited

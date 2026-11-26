@@ -119,7 +119,12 @@ export function watchesLine(watches: { active: boolean; lastRunAt: string | null
   const pages = `${active.length} ${active.length === 1 ? 'page' : 'pages'}`
   const last = active.map((w) => w.lastRunAt).filter((t): t is string => !!t).sort().at(-1)
   if (!last) return pages
-  return `${pages} · ${now - Date.parse(last) < 30 * 60 * 60 * 1000 ? 'read last night' : `read ${shortDay(last)}`}`
+  return `${pages} · ${readWhen(last, now)}`
+}
+
+/** "read last night" within a day and a bit of a nightly read, else "read Nov 20". */
+export function readWhen(iso: string, now: number): string {
+  return now - Date.parse(iso) < 30 * 60 * 60 * 1000 ? 'read last night' : `read ${shortDay(iso)}`
 }
 
 export function shortDay(iso: string): string {
