@@ -95,15 +95,11 @@ afterEach(() => {
 
 describe('Places', () => {
   // Nov 1 (WatchE19): it was at the foot, and went unseen.
-  it('has Watches first, above finding a place, ringed and with no chevron', async () => {
+  // Nov 25 (item 95): Watches opens from Reports now.
+  it('has no Watches row', async () => {
     renderPlaces()
     await screen.findByRole('region', { name: 'Places' })
-    const watches = screen.getByRole('link', { name: /Watches/ })
-    expect(watches).toHaveAttribute('href', '/philly/admin/watches')
-    expect(watches.compareDocumentPosition(screen.getByLabelText('Find a place by name')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(watches.className).toContain('border-emerald-600')
-    expect(watches.querySelectorAll('svg')).toHaveLength(1)
-    expect(screen.queryByRole('region', { name: 'Watches' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Watches/ })).toBeNull()
   })
 
   // It floats, so it's tapped from down the list; "Which category" opens at

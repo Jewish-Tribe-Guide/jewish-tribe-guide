@@ -42,7 +42,6 @@ export type AdminTab =
   | 'pages'
   | 'campaigns'
   | 'metrics'
-  | 'watches'
   | 'team'
   | 'location'
   | 'communities'
@@ -79,12 +78,9 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
     {
       area: 'places',
       label: 'Places',
-      // Every listing in one list; archived ones are a filter on it. Watches
-      // opens from the foot of that list (boards Places11, WatchesInPlaces10).
-      tabs: [
-        { tab: 'places', href: `${base}/places`, label: 'Places' },
-        { tab: 'watches', href: `${base}/watches`, label: 'Watches' },
-      ],
+      // Every listing in one list; archived ones are a filter on it
+      // (board Places11). Watches opens from Reports (Nov 25, item 95).
+      tabs: [{ tab: 'places', href: `${base}/places`, label: 'Places' }],
     },
     {
       area: 'site',
@@ -106,8 +102,8 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
       area: 'reports',
       label: 'Reports',
       tabs: [
-        // One page (step 5); History, Searches and What changed open from
-        // its rows.
+        // One page (step 5); Watches, History, Searches and What changed
+        // open from its rows.
         { tab: 'metrics', href: `${base}/metrics`, label: 'Reports' },
       ],
     },
@@ -131,13 +127,14 @@ export function adminTabs(community: string, isSuperAdmin: boolean): AdminTabLin
   return adminAreas(community, isSuperAdmin).flatMap((a) => a.tabs)
 }
 
-// Paths a tab covers besides its own: History (/history/approved and
-// /history/rejected), every search nobody found (/searches) and What
-// changed (/changes) are part of Reports, which opens them.
+// Paths a tab covers besides its own: Watches and its jobs (/watches),
+// History (/history/approved and /history/rejected), every search nobody
+// found (/searches) and What changed (/changes) are part of Reports, which
+// opens them.
 // /site is Site on a phone: a list of its screens (board 21), and Site's
 // own tab there.
 const TAB_ALSO_COVERS: Partial<Record<AdminTab, string[]>> = {
-  metrics: ['/history', '/searches', '/changes'],
+  metrics: ['/watches', '/history', '/searches', '/changes'],
   home: ['/site'],
   // Forms has no tab while it's held back (see features.ts).
   categories: ['/forms'],

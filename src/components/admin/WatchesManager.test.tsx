@@ -155,7 +155,7 @@ describe('WatchesManager', () => {
       view({ id: 'links', lastAt: ago(40), tracked: read, fixes: [{ name: 'Links', why: 'Didn’t run since Oct 15', page: 'job/links', whole: true }] }),
     ]
     await renderTab([], { categories: [shulCategory], runs: { available: true, off: [], kinds } })
-    expect(screen.getByRole('link', { name: /‹ Places/ })).toHaveAttribute('href', '/philly/admin/places')
+    expect(screen.getByRole('link', { name: /‹ Reports/ })).toHaveAttribute('href', '/philly/admin/metrics')
     const box = within(screen.getByRole('region', { name: 'Kept current' }))
     expect(box.getByRole('link', { name: /^Open or closed/ })).toHaveTextContent('Open or closedGoogle · 2 placesLast night')
     expect(box.getByRole('link', { name: /^Hours, phone and website/ })).toHaveAttribute('href', '/philly/admin/watches/job/google')

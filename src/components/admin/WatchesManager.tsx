@@ -46,7 +46,7 @@ export default function WatchesManager({ token }: { token: string }) {
   }, [api])
   useLoadOnMount(loadOwn)
 
-  const back = <AdminBack back={{ label: 'Places', href: `${base}/places` }} title="Watches" />
+  const back = <AdminBack back={{ label: 'Reports', href: `${base}/metrics` }} title="Watches" />
   if (jobs.runs === undefined || jobs.categories === undefined) return <div className="flex flex-col gap-3">{back}<p className="text-sm text-muted">Loading…</p></div>
   if (jobs.runs === null || jobs.categories === null) return <div className="flex flex-col gap-3">{back}<p className="text-sm text-red-700">Couldn’t load the watches.</p></div>
   if (!jobs.runs.available) return <div className="flex flex-col gap-3">{back}<p className="text-sm text-amber-800">Nightly runs aren’t recorded on this site yet.</p></div>
