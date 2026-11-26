@@ -1,3 +1,4 @@
+import { stickerOf } from './rowSticker'
 import { describe, expect, it } from 'vitest'
 import { editorRows } from '@/lib/editorRows'
 import { makeCategory } from '@/test/providerFixtures'
@@ -99,6 +100,17 @@ describe('Add a place: what a row is read from', () => {
     expect(after({ state: 'failed' })?.slice(0, 2)).toEqual(['Couldn’t read its website', 'Its website · Read now · Change'])
   })
 
+  // A read that failed keeps nothing current: the sticker says so, not
+  // "Checked nightly" beside "Couldn’t read its website" (Nov 25).
+  it('a read that failed is Not checked: a page, Refuah, the guide’s Gmail', () => {
+    const page = rowOf({ ...fromGoogle, reads: { page: { state: 'failed' } } }, 'minyans:weekday')!
+    expect(stickerOf(page)).toEqual({ text: 'Not checked', tone: 'grey' })
+    const gmail = rowOf({ ...state({ given: { email: 'office@ohev.org' } }), reads: { email: { state: 'no-answer' } } }, 'minyans:weekday')!
+    expect(stickerOf(gmail)).toEqual({ text: 'Not checked', tone: 'grey' })
+    // Read again and it worked: checked.
+    expect(stickerOf(rowOf({ ...fromGoogle, reads: { page: { state: 'done' } } }, 'minyans:weekday')!)).toEqual({ text: 'Checked nightly', tone: 'green' })
+  })
+
   it('reading on its own: Checking…, and Use a different page, never a cancel (board N5, Nov 25)', () => {
     const line = rowOf({ ...fromGoogle, reads: { page: { state: 'reading' } } }, 'minyans:weekday')?.lines[0]
     expect(line).toMatchObject({ state: 'checking', change: { slot: 'page', words: 'Use a different page' } })
@@ -149,6 +161,8 @@ describe('Add a place: what a row is read from', () => {
     expect(addRowSources(s)(row)).toMatchObject({ job: 'Refuah', lines: [{ text: 'Refuah', readNow: 'refuah' }] })
     expect(addRowSources({ ...s, reads: { refuah: { state: 'not-found' } } })(row)?.lines[0]).toMatchObject({ text: 'Not found on Refuah', add: { words: 'Add its page' } })
     expect(addRowSources({ ...s, hasPlace: false })(row)?.lines[0].text).toBe('Nothing reads this')
+    // A read of Refuah that failed: Not checked (Nov 25).
+    expect(stickerOf(addRowSources({ ...s, reads: { refuah: { state: 'failed' } } })(row)!)).toEqual({ text: 'Not checked', tone: 'grey' })
   })
 
   describe('foundLines (AddFound13)', () => {

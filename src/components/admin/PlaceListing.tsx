@@ -599,7 +599,11 @@ export default function PlaceListing({
         patch={patch}
         rowAside={(row: EditorRow) => {
           const source = sources?.(row)
-          return source ? <RowJob source={source} checking={!!source.line.read && reading === JSON.stringify(source.line.read)} /> : null
+          if (!source) return null
+          const key = (l?: SourceLine) => (l?.read ? JSON.stringify(l.read) : null)
+          // A Read now that failed: nothing's keeping it current (Nov 25).
+          const failed = !!readFailed && [key(source.line), key(source.also)].includes(readFailed.read)
+          return <RowJob source={failed ? { ...source, unchecked: true } : source} checking={!!source.line.read && reading === key(source.line)} />
         }}
         rowSource={rowSource}
         rowDone={rowDone}

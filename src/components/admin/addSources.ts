@@ -140,7 +140,8 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     if (read?.state === 'reading') return [{ text: `Reading ${where}…`, state: 'checking', ...(change ? { change: { ...change, words: 'Use a different page' } } : {}) }]
     if (read?.state === 'done') return [{ text: named, url, when: 'just now', change }]
     if (read?.state === 'none') return [{ text: `No ${what} on ${where}`, change, state: 'unchecked' }]
-    if (read?.state === 'failed') return [{ text: `Couldn’t read ${where}`, red: true }, idle]
+    // A read that failed keeps nothing current yet: Not checked (Nov 25).
+    if (read?.state === 'failed') return [{ text: `Couldn’t read ${where}`, red: true, state: 'unchecked' }, { ...idle, state: 'unchecked' }]
     if (read?.state === 'held') {
       const found = foundFor(row, read.found)
       if (!found) return [{ text: `No ${what} on ${where}`, change, state: 'unchecked' }]
@@ -167,7 +168,7 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     if (read?.state === 'found') return [{ text: address, when: read.on, change }]
     if (read?.state === 'no-email') return [{ text: `No emails from ${address} yet`, change, signUp: true, state: 'unchecked' }]
     if (read?.state === 'no-times') return [{ text: `${address}’s ${read.on} email had no times`, says: true, change, state: 'unchecked' }]
-    if (read?.state === 'no-answer') return [{ text: 'Couldn’t reach the guide’s Gmail', red: true }, { text: address, when: 'within the hour', change }]
+    if (read?.state === 'no-answer') return [{ text: 'Couldn’t reach the guide’s Gmail', red: true, state: 'unchecked' }, { text: address, when: 'within the hour', change, state: 'unchecked' }]
     if (read?.state === 'no-gmail') return [{ text: 'The guide’s Gmail isn’t set up', says: true, setUpGmail: true }, { text: address, when: 'within the hour', change }]
     return [{ text: address, readNow: 'email', change }]
   }
@@ -208,7 +209,7 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     const change = { slot: 'refuah' as const, label }
     if (read?.state === 'reading') return { job: 'Refuah', amber: false, lines: [{ text: 'Reading Refuah…', state: 'checking' }] }
     if (read?.state === 'done') return { job: 'Refuah', amber: false, lines: [{ text: 'Refuah', when: 'just now', change }] }
-    if (read?.state === 'failed') return { job: 'Refuah', amber: false, lines: [{ text: 'Couldn’t read Refuah', red: true }, { text: 'Refuah', readNow: 'refuah', change }] }
+    if (read?.state === 'failed') return { job: 'Refuah', amber: false, lines: [{ text: 'Couldn’t read Refuah', red: true, state: 'unchecked' }, { text: 'Refuah', readNow: 'refuah', change, state: 'unchecked' }] }
     return { job: 'Refuah', amber: false, lines: [{ text: 'Refuah', readNow: 'refuah', change }] }
   }
 

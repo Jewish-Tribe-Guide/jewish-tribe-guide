@@ -206,6 +206,13 @@ function AlreadyListed({ listing, reason, category }: { listing: DirectoryResour
   )
 }
 
+/** A field with nothing in it, in the shape it's stored in. */
+export function clearedValue(f: CategoryField, was: unknown): unknown {
+  if (f.type === 'boolean') return false
+  if (f.type === 'tags' || f.type === 'contacts' || f.type === 'minyanim' || Array.isArray(was)) return []
+  return ''
+}
+
 /** No answer at all — the server's own test for a required field. */
 function isBlank(v: unknown): boolean {
   if (v === undefined || v === null) return true
@@ -667,7 +674,7 @@ export default function ListingEditor({
       onClose={closeRow}
       onDone={() => void finishRow(r)}
       finishing={finishing}
-      onRemove={r.id === stays ? () => removeRow(r) : undefined}
+      onRemove={r.id === stays ? () => removeRow(r) : removable(r) && !rowIsEmpty(r, values) ? () => clearRow(r) : undefined}
       removeLabel={`Remove ${rowTitle(r)}`}
       source={rowSource ? { line: rowSource(r, changed.has(r.id)) } : undefined}>
       {rowBody(r)}
@@ -690,6 +697,16 @@ export default function ListingEditor({
       if (rowHas(r, 'address')) draft.setAddress(was.address)
       if (rowHas(r, 'phone')) draft.setPhone(was.phone)
     }
+    closeRow()
+  }
+  // Remove on a row that has something (the user, Nov 25: "why don't the
+  // other boxes have remove?"): it empties the row, which goes under "Not
+  // on the listing yet" once closed. Never the name, the address or a
+  // field the category requires.
+  const removable = (r: EditorRow) => r.kind !== 'name' && !rowHas(r, 'address') && !r.fields.some((f) => f.required)
+  function clearRow(r: EditorRow) {
+    for (const f of r.fields) setDetail(f.key, clearedValue(f, details[f.key]))
+    if (rowHas(r, 'phone')) draft.setPhone('')
     closeRow()
   }
   const filled = rows.filter((r) => r.id !== stays && (!rowIsEmpty(r, values) || needed(r)))

@@ -543,6 +543,9 @@ describe('PlacePage', () => {
         const last = lines[lines.length - 1]
         expect(within(last).getByRole('button', { name: 'Read now' })).toBeTruthy()
         expect(within(last).getByRole('button', { name: 'Change' })).toBeTruthy()
+        // Nothing's keeping it current: Not checked, not Checked nightly (Nov 25).
+        const sticker = screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!
+        expect(sticker).toHaveTextContent('Not checked')
       })
 
       it('none on what Google keeps', async () => {

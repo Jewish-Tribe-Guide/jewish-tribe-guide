@@ -165,6 +165,16 @@ old number can still be looked up. When an item is done, move it to
       guide’s Gmail isn’t set up · Set it up", or "An email from … came
       in · Link it" when a sender is waiting. The eruv listing still
       has its Read from box until its rows are done.
+    - **Then (Nov 25, the user's yes):** Remove is on every row that
+      opens in place and has something, not only one just added: it
+      empties the row, which goes under "Not on the listing yet"; the
+      save sends it. Never on the name, the address or a field the
+      category requires, and not on rows that open a screen of their
+      own (times, dishes, people). It's the shared editor, so a
+      visitor's Suggest an edit has it too, as a proposal. And a read
+      that failed is "Not checked", not "Checked nightly": on Add (a
+      page, Refuah, the guide's Gmail not answering) and after a Read
+      now that failed on Edit listing.
     - **Not built yet:** the "Sign up as … to get its emails" line under
       a typed email; refusing an email typed for usual times (pages
       only); the eruv listing still opens its Change screens; email

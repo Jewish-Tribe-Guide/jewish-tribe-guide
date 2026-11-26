@@ -663,10 +663,36 @@ describe('ListingEditor — Not on the listing yet (Nov 25)', () => {
     expect(screen.getByRole('button', { name: 'Restaurant' })).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('a row already on the listing has no Remove', async () => {
+  // Remove on every row that has something (the user, Nov 25: "why don't
+  // the other boxes have remove?"), not only one just added.
+  it('a row already on the listing has Remove: it empties the row, which goes under Not on the listing yet', async () => {
     const u = user()
     renderEditor({ category: food })
     await u.click(row('kind'))
-    expect(within(screen.getByTestId('editor-open-kind')).queryByRole('button', { name: /^Remove/ })).toBeNull()
+    await u.click(within(screen.getByTestId('editor-open-kind')).getByRole('button', { name: 'Remove Store Type' }))
+    expect(screen.queryByTestId('editor-open-kind')).toBeNull()
+    expect(screen.queryByTestId('editor-row-kind')).toBeNull()
+    expect(addLine('Store Type')).toBeInTheDocument()
+    expect(sendButton()).toHaveTextContent('Send 1 change')
+  })
+
+  it('a week of hours has Remove too', async () => {
+    const u = user()
+    renderEditor({ category: food })
+    await u.click(row('hours'))
+    await u.click(within(screen.getByTestId('editor-open-hours')).getByRole('button', { name: 'Remove Hours' }))
+    expect(screen.queryByTestId('editor-row-hours')).toBeNull()
+    expect(addLine('Hours')).toBeInTheDocument()
+  })
+
+  it('no Remove on the name, the address, or a field the category requires', async () => {
+    const u = user()
+    const required = { ...food, detailFields: food.detailFields.map((f) => (f.key === 'foodType' ? { ...f, required: true } : f)) }
+    renderEditor({ category: required })
+    for (const id of ['name', 'contact', 'kind']) {
+      await u.click(row(id))
+      expect(within(screen.getByTestId(`editor-open-${id}`)).queryByRole('button', { name: /^Remove/ })).toBeNull()
+      await u.click(done())
+    }
   })
 })
