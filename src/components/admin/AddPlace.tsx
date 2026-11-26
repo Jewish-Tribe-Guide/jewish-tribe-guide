@@ -21,7 +21,8 @@ import type { DirectoryResource } from '@/types'
 import { AdminBack } from './AdminUI'
 import { addRowSources, foundLines, type AddLine, type AddRead, type AddSlot, type GivenSources, type KosherLookup } from './addSources'
 import ListingEditorScreen from './ListingEditorScreen'
-import { RowJob, SourceScreen, SourceWords, type SourceScreenProps } from './PlaceListing'
+import { RowJob, SourceScreen, SourceWords, fromWords } from './PlaceListing'
+import { sourcePlaceholder, useSourceFields, type FieldSpec } from './useSourceFields'
 import { sourceActions } from './sourceActions'
 import { useStepsInAddress } from './useStepsInAddress'
 
@@ -38,7 +39,6 @@ type PageReply = { pages?: { watch: { id: string; url: string; lastError?: strin
 type AddedAs = { listing: DirectoryResource; stage: 'reading' | 'failed' | 'found' | 'no-email' | 'done'; lines: string[]; fromEmail?: boolean; retry?: { job: 'hours' | 'times'; watchId: string; was: string }; notSaved?: string[] }
 
 /** What a Change or Add a source screen asks for. */
-type ScreenSpec = { title: string; label: string; slot: AddSlot; placeholder?: string }
 
 /** No email has come: the guide has to be on its list (EmailNone14). */
 export function SignUpLine({ account }: { account: string | null }) {
@@ -69,8 +69,8 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   const [step, setStep] = useState<'find' | 'finish'>(googleFirst ? 'find' : 'finish')
   const [picked, setPicked] = useState<Partial<Record<CheckedField, string>> | null>(null)
   const [given, setGiven] = useState<GivenSources>({})
-  const [stopped, setStopped] = useState<ReadonlySet<CheckedField>>(new Set())
-  const [screen, setScreen] = useState<{ key: string; title: string; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> } | null>(null)
+  // A source given or changed in a row itself, kept by its Done.
+  const fields = useSourceFields()
   const [addedAs, setAddedAs] = useState<AddedAs | null>(null)
   const [takeFailed, setTakeFailed] = useState(false)
   const [reads, setReads] = useState<Partial<Record<AddSlot, AddRead>>>({})
@@ -117,14 +117,15 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   const back = googleFirst ? () => setStep('find') : onClose
   useSetScreenHeader(step === 'find', 'Add a place', onClose)
 
-  // The form after Find, and a source's Change or Add a source over it, each
-  // have an address and an entry (?step=finish, ?over=page.change), so Back
-  // goes to Find rather than out of Add, and Forward and a reload land on
-  // each (Nov 18: both were only state). What was typed isn't kept, so a
+  // The form after Find has an address and an entry (?step=finish), so
+  // Back goes to Find rather than out of Add, and Forward and a reload land
+  // on it (Nov 18: it was only state). What was typed isn't kept, so a
   // reload on the form is Find again, as Add starts; Forward, with the form
   // still here, is the form.
   const beenToForm = useRef(step === 'finish')
-  if (step === 'finish') beenToForm.current = true
+  useEffect(() => {
+    if (step === 'finish') beenToForm.current = true
+  }, [step])
   useStepsInAddress(
     googleFirst ? 'step' : null,
     step === 'finish' ? ['finish'] : [],
@@ -132,27 +133,8 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       if (to === 'finish' && !beenToForm.current) return false
       setStep(to === 'finish' ? 'finish' : 'find')
     },
-    { inner: ['row', 'over'] },
+    { inner: ['row'] },
   )
-  // The Change and Add a source the lines have offered, for one to open again.
-  const screensSeen = useRef(new Map<string, ScreenSpec>())
-  const [overAsked, setOverAsked] = useState<string | null>(null)
-  useStepsInAddress('over', screen ? [screen.key] : [], ([to]) => {
-    if (to && googleFirst && !beenToForm.current) return false
-    setOverAsked(to ?? null)
-    if (!to) setScreen(null)
-  })
-  // A line records its screen as it renders, so one asked for before its
-  // line is drawn (a reload) opens after the render that draws it: the
-  // check runs after every render.
-  const openAsked = useEffectEvent(() => {
-    const spec = overAsked ? screensSeen.current.get(overAsked) : undefined
-    if (!overAsked || !spec) return
-    setOverAsked(null)
-    openScreen(overAsked, spec)
-  })
-  useEffect(() => openAsked())
-
   if (step === 'find') {
     return (
       <div className="flex flex-col gap-4">
@@ -176,7 +158,6 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
                 ...(result.hours ? { hours: JSON.stringify(result.hours) } : {}),
                 ...(result.website ? { website: result.website } : {}),
               })
-              setStopped(new Set())
               setStep('finish')
             }}
             placeholder="Search by business name or address…"
@@ -203,7 +184,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   const websiteKey = websiteKeyOf(category)
   const website = websiteKey && typeof draft.details[websiteKey] === 'string' ? (draft.details[websiteKey] as string).trim() : ''
   const values: EditorValues = { name: draft.name, address: draft.hasAddress ? draft.address : '', phone: draft.hasPhone ? draft.phone : '', details: draft.details }
-  const sources = addRowSources({ category, picked, hasPlace: !!draft.coords, values, given, stopped, reads, kosher, kosherUsed })
+  const sources = addRowSources({ category, picked, hasPlace: !!draft.coords, values, given, reads, kosher, kosherUsed })
 
   /** A source chosen: kept till the listing's saved. An email given for a
    *  shul's page is its email, and takes the place of nothing else. */
@@ -240,28 +221,16 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     setKosherUsed(on.name)
   }
 
-  function openScreen(key: string, { title, label, slot, placeholder }: ScreenSpec) {
-    setScreen({
-      key,
-      title,
-      props: {
-        label,
-        value: '',
-        button: 'Save',
-        placeholder,
-        attempt: async (url) => {
-          choose(slot, url)
-          return { failed: false }
-        },
-      },
-    })
-  }
-  /** A Change or Add a source on a line: offered, and so can open again. */
-  const screenControl = (words: string, spec: ScreenSpec, kind: 'change' | 'add') => {
-    const key = `${spec.slot}.${kind}`
-    screensSeen.current.set(key, spec)
-    return control(words, () => openScreen(key, spec))
-  }
+  /** A row's field for a slot (board N4, Nov 25): kept by the row's Done. */
+  const slotSpec = (row: EditorRow, slot: AddSlot, value = ''): FieldSpec => ({
+    key: slot,
+    value,
+    placeholder: sourcePlaceholder(row),
+    attempt: async (url) => {
+      choose(slot, url)
+      return { failed: false }
+    },
+  })
 
   const control = (words: string, onClick: () => void) => (
     <button type="button" onClick={onClick} className={LINE_LINK}>
@@ -269,7 +238,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     </button>
   )
 
-  function lineControls(line: AddLine): ReactNode[] {
+  function lineControls(row: EditorRow, line: AddLine): ReactNode[] {
     const out: ReactNode[] = []
     if (line.readNow) {
       const slot = line.readNow
@@ -279,21 +248,9 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       const on = line.useList
       out.push(control('Use it', () => takeList(on)))
     }
-    if (line.change) {
-      const c = line.change
-      out.push(screenControl('Change', { title: 'Change', label: c.label, slot: c.slot, placeholder: c.placeholder }, 'change'))
-    }
-    if (line.add) {
-      const a = line.add
-      out.push(screenControl(a.words ?? 'Add a source', { title: a.words ?? 'Add a source', label: a.label, slot: a.slot, placeholder: a.placeholder }, 'add'))
-    }
-    if (line.googleStop) {
-      const f = line.googleStop
-      out.push(control('Stop', () => setStopped((s) => new Set(s).add(f))))
-    }
-    if (line.useGoogle) {
-      const f = line.useGoogle
-      out.push(control('Use Google’s', () => setStopped((s) => new Set([...s].filter((x) => x !== f)))))
+    if (line.change && !fields.isOpen(row, line.change.slot)) {
+      const slot = line.change.slot
+      out.push(control('Change', () => fields.reveal(row, slotSpec(row, slot, slot === 'site' ? '' : (given[slot] ?? '')))))
     }
     if (line.setUpGmail) {
       out.push(
@@ -306,22 +263,36 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     return out
   }
 
+  /** The field a row offers without a tap: where it has no source yet. One
+   *  that has one gives another through its Change (an email typed there
+   *  is kept beside the page, not in its place). */
+  const shownFields = (row: EditorRow) => {
+    const lines = sources(row)?.lines ?? []
+    return lines.some((l) => l.change) ? [] : lines.flatMap((l) => (l.add ? [slotSpec(row, l.add.slot)] : []))
+  }
+
   function rowSource(row: EditorRow): ReactNode {
     const source = sources(row)
     if (!source) return null
+    const changes = source.lines.flatMap((l) => (l.change ? [l.change.slot] : []))
     return (
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {source.lines.map((line, i) => {
-          const controls = lineControls(line)
-          // A line that's only its Add a source.
-          if (!line.text) return <p key={i} className="m-0 text-[0.8125rem]">{controls}</p>
+          const controls = lineControls(row, line)
+          const words = { ...line, text: fromWords(line.text) }
           return (
             <Fragment key={i}>
-              <SourceWords line={line} controls={controls} />
+              {(words.text || controls.length > 0) && <SourceWords line={words} controls={controls} />}
               {line.signUp && <SignUpLine account={guideGmail} />}
             </Fragment>
           )
         })}
+        {changes.map((slot) => (
+          <Fragment key={slot}>{fields.field(row, slotSpec(row, slot))}</Fragment>
+        ))}
+        {shownFields(row).map((spec) => (
+          <Fragment key={`add-${spec.key}`}>{fields.field(row, spec, true)}</Fragment>
+        ))}
       </div>
     )
   }
@@ -357,14 +328,14 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     // Each saved as the listing's own Change would, and none stopping the
     // rest. What fails is named on the screen, not dropped (Nov 18 review).
     const saves: [string, Promise<unknown>][] = []
-    if (stopped.size) saves.push(['Google’s Stops', Promise.all([...stopped].map((field) => post('/api/admin/watches/google', { action: 'stop_field', id: listing.id, field })))])
     if (given.email) saves.push(['Its email', actions.addSource({ job: 'times', email: true, label: '' }, given.email)])
     if (given.menu) saves.push(['Its menu', actions.addSource({ job: 'dishes', email: false, label: '' }, given.menu, { waitForMenu: true })])
     if (given.refuah) saves.push(['Refuah', actions.change({ kind: 'refuah' }, given.refuah)])
     if (given.keystone) saves.push(['Keystone-K', actions.change({ kind: 'keystone' }, given.keystone)])
     const settled = await Promise.allSettled(saves.map(([, p]) => p))
     const notSaved = saves.filter((_, i) => settled[i].status === 'rejected').map(([name]) => name)
-    // Picked on Google: its Google read now, with Stops already kept.
+    // Picked on Google: its Google read now. A field typed over isn't
+    // Google's any more: the save compares it with what Google filled in.
     if (picked && !(await post(`/api/admin/listings/${listing.id}/found`, { action: 'google' }).then(() => true, () => false))) notSaved.push('Google’s details')
     // Its email looked for now, and filed as the hourly run would.
     const looked = given.email ? await post<{ state?: string; account?: string | null }>(`/api/admin/listings/${listing.id}/found`, { action: 'email', address: given.email }).catch(() => null) : null
@@ -480,18 +451,12 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       onClose={back}
       splitContact
       allSections
-      overlay={
-        screen && {
-          title: screen.title,
-          back: () => setScreen(null),
-          node: <SourceScreen {...screen.props} onTried={() => {}} onDone={() => setScreen(null)} />,
-        }
-      }
       rowAside={(row: EditorRow) => {
         const source = sources(row)
         return source ? <RowJob source={source} /> : null
       }}
       rowSource={rowSource}
+      rowDone={(row) => fields.done(row, shownFields(row))}
     />
   )
 }

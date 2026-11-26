@@ -20,7 +20,6 @@ const state = (over: Partial<AddState> = {}): AddState => ({
   hasPlace: false,
   values: { name: 'Ohev', address: '', phone: '', details: {} },
   given: {},
-  stopped: new Set(),
   reads: {},
   ...over,
 })
@@ -36,9 +35,9 @@ describe('Add a place: what a row is read from', () => {
   const picked = { name: 'Ohev', phone: '(215) 555-0142', website: 'https://ohev.org' }
   const fromGoogle = state({ picked, values: { name: 'Ohev', address: '', phone: '(215) 555-0142', details: { website: 'https://ohev.org' } } })
 
-  it('what Google filled in is Google’s, with Stop (AddRows11, AddGoogle8)', () => {
+  it('what Google filled in is Google’s; no Stop, typing over it is how (AddRows11, Nov 25)', () => {
     expect(rowOf(fromGoogle, 'name')?.job).toBe('Google')
-    expect(rowOf(fromGoogle, 'contact:phone')?.lines[0]).toMatchObject({ text: 'Google', googleStop: 'phone' })
+    expect(rowOf(fromGoogle, 'contact:phone')?.lines[0]).toEqual({ text: 'Google' })
     expect(rowOf(fromGoogle, 'field:website')?.job).toBe('Google')
   })
 
@@ -46,17 +45,13 @@ describe('Add a place: what a row is read from', () => {
     const food = makeCategory({ id: 'food', label: 'Food', detailFields: [{ key: 'website', label: 'Website', type: 'url' }, { key: 'hours', label: 'Hours', type: 'hours' }] })
     const hours = JSON.stringify({ mon: { open: '09:00', close: '17:00' } })
     const s = state({ category: food, picked: { ...picked, hours }, values: { name: 'Ohev', address: '', phone: '', details: { website: 'https://ohev.org', hours: JSON.parse(hours) } } })
-    expect(rowOf(s, 'hours')).toMatchObject({ job: 'Google', lines: [{ text: 'Google', googleStop: 'hours' }] })
+    expect(rowOf(s, 'hours')).toMatchObject({ job: 'Google', lines: [{ text: 'Google' }] })
   })
 
   it('typed over, Google stops keeping it (AddTyped8)', () => {
     const typed = { ...fromGoogle, values: { ...fromGoogle.values, phone: '1-800-555-0199' } }
     expect(words(typed, 'contact:phone')).toEqual(['Google stops keeping this'])
     expect(rowOf(typed, 'contact:phone')).toMatchObject({ job: 'Nothing', amber: true })
-  })
-
-  it('stopped, nothing reads it, and Google can have it back', () => {
-    expect(rowOf({ ...fromGoogle, stopped: new Set(['phone'] as const) }, 'contact:phone')).toMatchObject({ job: 'Nothing', lines: [{ text: 'Nothing reads this', useGoogle: 'phone' }] })
   })
 
   it('filled in by hand, nothing reads it, and it can still be found on Google (AddSelf11, AddSelfPhone8)', () => {

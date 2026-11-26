@@ -80,10 +80,15 @@ export function EditorOpenCard({
   cardRef,
   testId,
   source,
+  onDone,
+  finishing = false,
 }: {
   title: ReactNode
   tags?: ReactNode
   onClose: () => void
+  /** Done, where it does more than close (saves a source field first). */
+  onDone?: () => void
+  finishing?: boolean
   /** A row opened from "Not on the listing yet": Remove, beside Done,
    *  takes what was put in back out and closes it. */
   onRemove?: () => void
@@ -117,8 +122,8 @@ export function EditorOpenCard({
         </div>
         <div className="mt-2 flex items-center gap-2">
           {remove}
-          <button type="button" onClick={onClose} className={`${SUBMIT_PILL} min-w-0 flex-1`}>
-            Done
+          <button type="button" disabled={finishing} onClick={onDone ?? onClose} className={`${SUBMIT_PILL} min-w-0 flex-1`}>
+            {finishing ? 'Saving…' : 'Done'}
           </button>
         </div>
       </div>
@@ -129,8 +134,8 @@ export function EditorOpenCard({
       {inside}
       <div className="flex items-center gap-2">
         {remove}
-        <button type="button" onClick={onClose} className="h-11 min-w-0 flex-1 cursor-pointer rounded-full border border-slate-300 bg-white text-[0.9375rem] font-bold text-primary">
-          Done
+        <button type="button" disabled={finishing} onClick={onDone ?? onClose} className="h-11 min-w-0 flex-1 cursor-pointer rounded-full border border-slate-300 bg-white text-[0.9375rem] font-bold text-primary">
+          {finishing ? 'Saving…' : 'Done'}
         </button>
       </div>
     </div>

@@ -55,8 +55,6 @@ export type AddLine = {
   readNow?: AddSlot
   change?: { slot: AddSlot; label: string; placeholder?: string }
   add?: { label: string; slot: AddSlot; words?: string; placeholder?: string }
-  googleStop?: CheckedField
-  useGoogle?: CheckedField
   findOnGoogle?: boolean
   /** Kosher: fill the row in from the list it's on. */
   useList?: KosherLookup['lists'][number]
@@ -76,7 +74,6 @@ export type AddState = {
   hasPlace: boolean
   values: EditorValues
   given: GivenSources
-  stopped: ReadonlySet<CheckedField>
   reads: Partial<Record<AddSlot, AddRead>>
   kosher?: KosherLookup | null
   /** Filled in by Use it: nothing else needs saying. */
@@ -106,7 +103,7 @@ const linkCheck: AddRowSource = { job: 'Link check', amber: false, lines: [{ tex
 /** Its row's source, for a place being added; null where nothing reads a row
  *  like it (its address, its About, a photo). */
 export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | null {
-  const { category, picked, values, given, stopped, reads } = s
+  const { category, picked, values, given, reads } = s
   const pageReads = jobPageReads(category)
   const websiteKey = websiteKeyOf(category)
   const website = websiteKey ? asText(values.details[websiteKey]) : ''
@@ -116,8 +113,7 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     if (!isCategorySyncEligible(category)) return field === 'website' ? linkCheck : null
     const fromGoogle = picked?.[field]
     if (fromGoogle !== undefined) {
-      if (stopped.has(field)) return nothing({ useGoogle: field })
-      if (fromGoogle === fieldNow(field, category, values)) return { job: 'Google', amber: false, lines: [{ text: 'Google', googleStop: field }] }
+      if (fromGoogle === fieldNow(field, category, values)) return { job: 'Google', amber: false, lines: [{ text: 'Google' }] }
       return { job: 'Nothing', amber: true, lines: [{ text: 'Google stops keeping this' }] }
     }
     if (field === 'website') return linkCheck

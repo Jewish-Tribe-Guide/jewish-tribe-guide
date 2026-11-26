@@ -1,7 +1,7 @@
 'use client'
 
 import { stickerOf, type LineState } from './rowSticker'
-import { Fragment, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { EnrichedSubmission } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import type { AdminPlace } from '@/lib/adminPlaces'
@@ -24,6 +24,7 @@ import type { Stop } from './openedPlaceBoxes'
 import { jobsChangedBy, type Jobs } from './useWatchJobs'
 import { kindsOf } from './WatchKinds'
 import { useStepsInAddress } from './useStepsInAddress'
+import { sourcePlaceholder, useSourceFields, type FieldSpec } from './useSourceFields'
 import { useAdminApi } from './useAdminApi'
 import ReadFrom from './ReadFrom'
 import { listingReadFrom } from './readFromFacts'
@@ -130,26 +131,45 @@ export function ArchiveBin({ onClick }: { onClick: () => void }) {
   )
 }
 
-/** "Its menu · Oct 20 · Change": a row's one line, its controls drawn in by the caller. */
+/** "From its menu · Oct 20 · Change": a row's one line, its controls drawn
+ *  in by the caller. With no text, just its controls. */
 export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' | 'url' | 'when'> & { red?: boolean }; controls?: ReactNode[] }) {
+  const parts: ReactNode[] = [
+    ...(line.text
+      ? [
+          line.url ? (
+            <a href={line.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
+              {line.text}
+            </a>
+          ) : (
+            line.text
+          ),
+        ]
+      : []),
+    ...(line.when ? [line.when] : []),
+    ...(controls ?? []),
+  ]
   return (
     <p className={`m-0 text-[0.8125rem] [overflow-wrap:anywhere] ${line.red ? 'font-semibold text-red-700' : 'text-slate-500'}`} data-testid="row-source">
-      {line.url ? (
-        <a href={line.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
-          {line.text}
-        </a>
-      ) : (
-        line.text
-      )}
-      {line.when && ` · ${line.when}`}
-      {controls?.map((c, i) => (
+      {parts.map((p, i) => (
         <Fragment key={i}>
-          {' · '}
-          {c}
+          {i > 0 && ' · '}
+          {p}
         </Fragment>
       ))}
     </p>
   )
+}
+
+/** A source line's words as the opened row says them (board L2, Nov 25):
+ *  "From Google", "From its website", "From kesher.example/davening".
+ *  Nothing reading it has no words: the sticker says Not checked, and the
+ *  field under the line is what to do about it. */
+export function fromWords(text: string): string {
+  if (!text || text === 'Nothing reads this') return ''
+  if (text === 'Stopped' || /^(From|Reading|Couldn’t|No |Looking|Not found)/.test(text)) return text
+  if (text === 'Link check') return 'From the weekly link check'
+  return `From ${text.startsWith('Its ') ? `its ${text.slice(4)}` : text}`
 }
 
 export type SourceScreenProps = {
@@ -256,7 +276,8 @@ export default function PlaceListing({
   const [patch, setPatch] = useState<Record<string, unknown> | undefined>(undefined)
   // `key`: which it is, for the address (the row, then which of its line's
   // controls opened it).
-  const [screen, setScreen] = useState<(SourceSpec & { key: string }) | null>(null)
+  // A row's source given or changed in the row itself, saved by its Done.
+  const fields = useSourceFields()
   const [rowError, setRowError] = useState<{ row: string; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -291,34 +312,38 @@ export default function PlaceListing({
     else await actions.addSource(add.run, url)
     return { failed: false }
   }
-  /** The screens a row's source line opens, by which control opens them. */
-  function screensOf(row: EditorRow): Partial<Record<'change' | 'start' | 'add' | 'also', SourceSpec>> {
+  /** The fields a row's source line opens, by which control opens them
+   *  (board N4, Nov 25). Each reads the listing again once it's tried. */
+  function fieldSpecs(row: EditorRow): Partial<Record<'change' | 'start' | 'add' | 'also', FieldSpec>> {
     const source = sources?.(row)
     if (!source) return {}
     const { line } = source
-    const changeSpec = (c: NonNullable<SourceLine['change']>): SourceSpec => {
+    const placeholder = sourcePlaceholder(row)
+    const then = (run: Attempt): Attempt => async (url) => {
+      const result = await run(url)
+      await reload()
+      return result
+    }
+    const changeSpec = (key: 'change' | 'also', c: NonNullable<SourceLine['change']>): FieldSpec => {
       const stop: Stop | undefined = c.stop
       return {
-        title: 'Change',
-        props: {
-          label: c.label,
-          value: c.value,
-          button: 'Save',
-          attempt: async (url) => {
-            await actions.change(c.act, url)
-            return { failed: false }
-          },
-          ...(stop ? { stop: () => actions.stopSource(stop) } : {}),
-        },
+        key,
+        value: c.value,
+        placeholder,
+        attempt: then(async (url) => {
+          await actions.change(c.act, url)
+          return { failed: false }
+        }),
+        ...(stop ? { stop: async () => { await actions.stopSource(stop); await reload() } } : {}),
       }
     }
     const s = line.start
     const a = line.add
     return {
-      ...(line.change && { change: changeSpec(line.change) }),
-      ...(s && { start: { title: 'Change', props: { label: s.label, value: s.value, button: 'Start reading', attempt: actions.startReading(s.again, s.value) } } }),
-      ...(a && { add: { title: 'Add a source', props: { label: a.label, value: '', button: 'Save', attempt: give(a) } } }),
-      ...(source.also?.change && { also: changeSpec(source.also.change) }),
+      ...(line.change && { change: changeSpec('change', line.change) }),
+      ...(s && { start: { key: 'start', value: s.value, placeholder, attempt: then(actions.startReading(s.again, s.value)) } }),
+      ...(a && { add: { key: 'add', value: '', placeholder, attempt: then(give(a)) } }),
+      ...(source.also?.change && { also: changeSpec('also', source.also.change) }),
     }
   }
 
@@ -336,29 +361,6 @@ export default function PlaceListing({
     },
     { inner: ['step'] },
   )
-  // The rows the editor has shown, for a screen over one to open again.
-  const rowsSeen = useRef(new Map<string, EditorRow>())
-  const [overAsked, setOverAsked] = useState<string | null>(null)
-  useStepsInAddress('over', screen ? [screen.key] : [], ([to]) => {
-    if (!to) {
-      setOverAsked(null)
-      return setScreen(null)
-    }
-    setOverAsked(to)
-  })
-  const openAsked = useEffectEvent(() => {
-    if (!overAsked) return
-    const dot = overAsked.lastIndexOf('.')
-    const row = rowsSeen.current.get(overAsked.slice(0, dot))
-    const spec = row && screensOf(row)[overAsked.slice(dot + 1) as 'change']
-    if (!spec) return
-    setOverAsked(null)
-    setScreen({ ...spec, key: overAsked })
-  })
-  // Every row is seen on the editor's first render (its aside); the
-  // sources come with the jobs, so it is tried again when they arrive.
-  useEffect(() => openAsked(), [overAsked, sources])
-
   if (place.status === 'archived' || !category) {
     return (
       <div className="flex flex-col gap-3">
@@ -366,11 +368,6 @@ export default function PlaceListing({
         {place.status === 'archived' ? <ArchivedPlace place={place} category={category} token={token} onDone={onSaved} /> : <AdminEmpty>Its category is gone, so it can’t be edited here.</AdminEmpty>}
       </div>
     )
-  }
-
-  function open(row: EditorRow, which: 'change' | 'start' | 'add' | 'also') {
-    const spec = screensOf(row)[which]
-    if (spec) setScreen({ ...spec, key: `${row.id}.${which}` })
   }
 
   async function google(row: EditorRow, action: 'stop_field' | 'use_field', field: CheckedField) {
@@ -472,10 +469,7 @@ export default function PlaceListing({
     </button>
   )
 
-  const changeControl = (row: EditorRow, which: 'change' | 'also') => control('Change', () => open(row, which))
-
   function rowSource(row: EditorRow, changed: boolean): ReactNode {
-    rowsSeen.current.set(row.id, row)
     const source = sources?.(row)
     if (!source) return null
     const { line } = source
@@ -490,28 +484,39 @@ export default function PlaceListing({
     const food = row.kind === 'items' && jobs.dishes?.find((p) => p.id === place.id)
     if (food && food.reading?.status === 'proposed' && dishStatus(food) === 'differs') return <SourceWords line={{ text: 'Its menu has a change' }} controls={[control('Open', () => setMenuChange(true))]} />
     const failed = readFailed && readFailed.read === readKey && <SourceWords line={{ text: readFailed.text, red: true }} />
-    const dated = (l: SourceLine) => (l.read && readJust.includes(JSON.stringify(l.read)) ? { ...l, when: 'just now' } : l)
+    const said = (l: SourceLine) => ({ ...l, text: fromWords(l.text), ...(l.read && readJust.includes(JSON.stringify(l.read)) ? { when: 'just now' } : {}) })
     const readControl = (l: SourceLine) => (l.read ? [control('Read now', () => void readNow(row, l.read!))] : [])
-    const controls: ReactNode[] = [...readControl(line)]
-    if (line.change) controls.push(changeControl(row, 'change'))
-    if (line.start) controls.push(control('Change', () => open(row, 'start')))
-    if (line.add) controls.push(control('Add a source', () => open(row, 'add')))
-    if (line.googleStop) {
-      const f = line.googleStop
-      controls.push(control('Stop', () => void google(row, 'stop_field', f)))
+    const specs = fieldSpecs(row)
+    // Change: the field, filled in, under the line; its link goes once it's open.
+    const changeOf = (which: 'change' | 'start' | 'also') => {
+      const spec = specs[which]
+      return spec && !fields.isOpen(row, which) ? [control('Change', () => fields.reveal(row, spec))] : []
     }
+    const controls: ReactNode[] = [...readControl(line), ...changeOf('change'), ...changeOf('start')]
+    // Google keeps several rows: what's typed over stops it for that one.
     if (line.useGoogle) {
       const f = line.useGoogle
       controls.push(control('Use Google’s', () => void google(row, 'use_field', f)))
     }
+    const words = said(line)
     return (
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {error}
         {failed}
-        <SourceWords line={dated(line)} controls={controls} />
-        {source.also && <SourceWords line={dated(source.also)} controls={[...readControl(source.also), ...(source.also.change ? [changeControl(row, 'also')] : [])]} />}
+        {(words.text || controls.length > 0) && <SourceWords line={words} controls={controls} />}
+        {specs.change && fields.field(row, specs.change)}
+        {specs.start && fields.field(row, specs.start)}
+        {specs.add && fields.field(row, specs.add, true)}
+        {source.also && <SourceWords line={said(source.also)} controls={[...readControl(source.also), ...changeOf('also')]} />}
+        {specs.also && fields.field(row, specs.also)}
       </div>
     )
+  }
+
+  /** A row's Done: what its field holds, saved first. */
+  const rowDone = (row: EditorRow) => {
+    const add = fieldSpecs(row).add
+    return fields.done(row, add ? [add] : [])
   }
 
   async function archive() {
@@ -584,28 +589,12 @@ export default function PlaceListing({
             />
           )
         }
-        overlay={
-          screen && {
-            title: screen.title,
-            back: () => setScreen(null),
-            node: (
-              <SourceScreen
-                {...screen.props}
-                onTried={reload}
-                onDone={async () => {
-                  await reload()
-                  setScreen(null)
-                }}
-              />
-            ),
-          }
-        }
         rowAside={(row: EditorRow) => {
-          rowsSeen.current.set(row.id, row)
           const source = sources?.(row)
           return source ? <RowJob source={source} checking={!!source.line.read && reading === JSON.stringify(source.line.read)} /> : null
         }}
         rowSource={rowSource}
+        rowDone={rowDone}
         adminSave={{
           label: 'Update the listing',
           via: ({ payload }) =>
@@ -614,7 +603,7 @@ export default function PlaceListing({
           beside: confirming ? undefined : <ArchiveBin onClick={() => setConfirming(true)} />,
         }}
       />
-      {confirming && !screen && (
+      {confirming && (
         <div className="mt-4 flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
           <p className="m-0 text-sm text-red-800">Take {place.name} off the site? It stays under Archived.</p>
           <div className="flex flex-wrap gap-2">

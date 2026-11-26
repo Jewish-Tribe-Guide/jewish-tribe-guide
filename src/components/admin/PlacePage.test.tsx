@@ -382,20 +382,41 @@ describe('PlacePage', () => {
       expect(screen.queryByRole('region', { name: 'Read from' })).toBeNull()
     })
 
-    it('its row opened says where it’s read, and Change saves another page or stops it', async () => {
+    // Board N4, Nov 25: Change opens a field in the row itself; its Done saves it.
+    it('its row opened says where it’s read, and Change opens a field that Done saves', async () => {
       await listingPage({ job: withTimes })
       const user = userEvent.setup()
       const minyans = screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!
       await user.click(minyans)
-      expect(screen.getByTestId('row-source')).toHaveTextContent(`kesher.example/davening · ${day(at)} · Read now · Change`)
+      expect(screen.getByTestId('row-source')).toHaveTextContent(`From kesher.example/davening · ${day(at)} · Read now · Change`)
       expectLineUnderCard()
+      expect(screen.queryByTestId('source-field')).toBeNull()
       await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
-      const change = screen.getByTestId('source-screen')
-      expect(within(change).getByRole('textbox')).toHaveValue('https://kesher.example/davening')
-      await user.clear(within(change).getByRole('textbox'))
-      await user.type(within(change).getByRole('textbox'), 'https://kesher.example/times')
-      await user.click(within(change).getByRole('button', { name: 'Save' }))
-      expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'give', resourceId: 'a', url: 'https://kesher.example/times', replaces: 'w1' }]])
+      expect(screen.queryByTestId('source-screen')).toBeNull()
+      const input = screen.getByTestId('source-field')
+      expect(input).toHaveValue('https://kesher.example/davening')
+      expect(input.closest('.bg-white')).not.toBeNull()
+      expect(within(screen.getByTestId('row-source')).queryByRole('button', { name: 'Change' })).toBeNull()
+      await user.clear(input)
+      await user.type(input, 'https://kesher.example/times')
+      expect(posts).toEqual([])
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      await waitFor(() => expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'give', resourceId: 'a', url: 'https://kesher.example/times', replaces: 'w1' }]]))
+    })
+
+    it('Done with the field left as it was, or emptied, changes nothing', async () => {
+      await listingPage({ job: withTimes })
+      const user = userEvent.setup()
+      await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
+      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      await waitFor(() => expect(screen.queryByTestId('source-field')).toBeNull())
+      await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
+      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+      await user.clear(screen.getByTestId('source-field'))
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      await waitFor(() => expect(screen.queryByTestId('source-field')).toBeNull())
+      expect(posts).toEqual([])
     })
 
     // Nov 1 (SavedRead15, SavedAgrees15, SavedFailed15, SavedGoogle15,
@@ -500,7 +521,7 @@ describe('PlacePage', () => {
       expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'stop', resourceId: 'a', id: 'w1' }]])
     })
 
-    it('a page stopped says Stopped; Start reading reads at once, and a failed read says so and stays', async () => {
+    it('a page stopped says Stopped; Change and Done start it, and a failed read says so and stays open', async () => {
       const off = { ...shul, off: true }
       await renderPage('a', [place('a', 'Kesher Israel')], (url, init) => {
         if (init?.method === 'POST') {
@@ -515,21 +536,29 @@ describe('PlacePage', () => {
       })
       const user = userEvent.setup()
       const job = screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Stopped')!
+      expect(job).toHaveTextContent('Not checked')
       await user.click(job.closest('button')!)
       expect(screen.getByTestId('row-source')).toHaveTextContent('Stopped · Change')
       await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
-      expect(screen.getByRole('textbox')).toHaveValue(page.url)
-      await user.click(screen.getByRole('button', { name: 'Start reading' }))
-      expect(posts).toEqual([
-        ['/api/admin/watches/hours?job=times', { action: 'on', resourceId: 'a' }],
-        ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a' }],
-        ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a', id: 'w1' }],
-      ])
+      const input = screen.getByTestId('source-field')
+      expect(input).toHaveValue(page.url)
+      // Start reading again: the page, given again, and Done.
+      await user.clear(input)
+      await user.type(input, `${page.url}/`)
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      await waitFor(() =>
+        expect(posts).toEqual([
+          ['/api/admin/watches/hours?job=times', { action: 'on', resourceId: 'a' }],
+          ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a' }],
+          ['/api/admin/watches/hours?job=times', { action: 'check', resourceId: 'a', id: 'w1' }],
+        ]),
+      )
+      // It couldn't be read: the row stays open, saying so.
       expect(await screen.findByText('Couldn’t read that page')).toBeTruthy()
-      expect(screen.getByTestId('source-screen')).toBeTruthy()
+      expect(screen.getByTestId('source-field')).toBeTruthy()
     })
 
-    it('a Google field: Stop, then Use Google’s; none to use says so where it’s asked', async () => {
+    it('a Google field: From Google, and no Stop on its line', async () => {
       const phoneCategory = shulCategory
       const fields = [field('Name', 'google'), field('Phone', 'google')]
       await renderPage('a', [place('a', 'Kesher Israel', { fields })], (url, init) => {
@@ -546,10 +575,11 @@ describe('PlacePage', () => {
       const user = userEvent.setup()
       await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Google' && j.closest('button')?.textContent?.includes('215'))!.closest('button')!)
       const line = () => screen.getByTestId('row-source')
-      expect(line()).toHaveTextContent(`Google · ${day(new Date().toISOString())} · Stop`)
+      // Google keeps several rows; this one is stopped by typing over it.
+      expect(line()).toHaveTextContent(`From Google · ${day(new Date().toISOString())}`)
+      expect(within(line()).queryByRole('button', { name: 'Stop' })).toBeNull()
       expectLineUnderCard()
-      await user.click(within(line()).getByRole('button', { name: 'Stop' }))
-      expect(posts).toEqual([['/api/admin/watches/google', { action: 'stop_field', id: 'a', field: 'phone' }]])
+      expect(posts).toEqual([])
     })
 
     it('says so for a place nothing watches', async () => {

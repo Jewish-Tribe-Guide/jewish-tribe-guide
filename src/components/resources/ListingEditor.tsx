@@ -137,6 +137,9 @@ type Props = {
   /** In a row, opened, above Done: where it's read from. `changed`: the
    *  draft has changed it. */
   rowSource?: (row: EditorRow, changed: boolean) => ReactNode
+  /** A row's Done, before it closes: saves what its source field holds
+   *  (board N4, Nov 25). False keeps it open, the reason in its line. */
+  rowDone?: (row: EditorRow) => Promise<boolean>
   /** The contact box a row each (editorRows). */
   splitContact?: boolean
   /** editorRows' allSections. */
@@ -286,6 +289,7 @@ export default function ListingEditor({
   preset,
   adminSave,
   rowAside,
+  rowDone,
   rowSource,
   splitContact,
   allSections,
@@ -426,6 +430,17 @@ export default function ListingEditor({
   const closeRow = () => {
     setOpenId(null)
     setOpenedEmpty(null)
+  }
+  // Done: the row's source field saved first, when there is one.
+  const [finishing, setFinishing] = useState(false)
+  async function finishRow(r: EditorRow) {
+    if (rowDone) {
+      setFinishing(true)
+      const ok = await rowDone(r).catch(() => false)
+      setFinishing(false)
+      if (!ok) return
+    }
+    closeRow()
   }
   const step: EditorStep | null = removalOpen ? null : (child ?? (row ? (inPlace ? { back: closeRow } : { title: rowTitle(row), back: closeRow }) : null))
   // The host asks for Back through a function that stays the same, so
@@ -650,6 +665,8 @@ export default function ListingEditor({
         </>
       }
       onClose={closeRow}
+      onDone={() => void finishRow(r)}
+      finishing={finishing}
       onRemove={r.id === stays ? () => removeRow(r) : undefined}
       source={rowSource ? { line: rowSource(r, changed.has(r.id)) } : undefined}>
       {rowBody(r)}
@@ -957,8 +974,8 @@ export default function ListingEditor({
       {!child &&
         foot(
           <div className="space-y-1">
-            <button type="button" onClick={() => setOpenId(null)} className={SUBMIT_PILL}>
-              Done
+            <button type="button" disabled={finishing} onClick={() => void finishRow(row)} className={SUBMIT_PILL}>
+              {finishing ? 'Saving…' : 'Done'}
             </button>
             {noMinyanLink(row)}
           </div>,
