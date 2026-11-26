@@ -74,6 +74,8 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   const [addedAs, setAddedAs] = useState<AddedAs | null>(null)
   const [takeFailed, setTakeFailed] = useState(false)
   const [reads, setReads] = useState<Partial<Record<AddSlot, AddRead>>>({})
+  // Each slot's latest read: an earlier one's answer is dropped.
+  const readsStarted = useRef<Partial<Record<AddSlot, number>>>({})
   const [kosher, setKosher] = useState<KosherLookup | null>(null)
   const [kosherUsed, setKosherUsed] = useState<string | null>(null)
   const [guideGmail, setGuideGmail] = useState<string | null>(null)
@@ -113,6 +115,23 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       clearTimeout(wait)
     }
   }, [asksKosher, draft.name, draft.address])
+
+  // Picked on Google with a website: its page read straight away, and read
+  // again when the website or the page given changes (board N5, Nov 25).
+  // What it finds waits for Use these times; a read that's overtaken is
+  // dropped, and one still going when Add is pressed is left to Add's own.
+  const autoSlot: AddSlot | null = picked ? (jobPageReads(category) ? 'page' : keepsMenuLink(category) ? 'menu' : null) : null
+  const siteKey = websiteKeyOf(category)
+  const siteNow = siteKey && typeof draft.details[siteKey] === 'string' ? (draft.details[siteKey] as string).trim() : ''
+  const autoUrl = autoSlot && step === 'finish' && !addedAs ? (given[autoSlot as Exclude<AddSlot, 'site'>] ?? siteNow) : ''
+  const readOnPick = useEffectEvent((slot: AddSlot) => void readNow(slot, true))
+  useEffect(() => {
+    if (!autoSlot || !autoUrl) return
+    // The pick's read goes at once; a website being typed, once it rests.
+    if (readsStarted.current[autoSlot] === undefined) return readOnPick(autoSlot)
+    const wait = setTimeout(() => readOnPick(autoSlot), 600)
+    return () => clearTimeout(wait)
+  }, [autoSlot, autoUrl])
 
   const back = googleFirst ? () => setStep('find') : onClose
   useSetScreenHeader(step === 'find', 'Add a place', onClose)
@@ -194,6 +213,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     if (problem) throw new Error(problem)
     const to = (slot === 'page' || slot === 'email') && sourceKind(url) === 'email' ? 'email' : slot === 'email' ? 'page' : slot
     setGiven((g) => ({ ...g, [to]: url }))
+    readsStarted.current[to] = (readsStarted.current[to] ?? 0) + 1
     setReads((r) => {
       const next = { ...r }
       delete next[to]
@@ -203,17 +223,36 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
 
   const readDraft = () => ({ name: draft.name, address: values.address, phone: values.phone, details: draft.details, coords: draft.coords })
 
-  /** Read now (ReadNow13): it fills in the rows, and the listing's not saved. */
-  async function readNow(slot: AddSlot) {
+  /** Read now (ReadNow13): it fills in the rows, and the listing's not saved.
+   *  `hold`: read on its own, so what it finds waits for a person's Use. */
+  async function readNow(slot: AddSlot, hold = false) {
+    const mine = (readsStarted.current[slot] ?? 0) + 1
+    readsStarted.current[slot] = mine
     setReads((r) => ({ ...r, [slot]: { state: 'reading' } }))
     const url = slot === 'site' ? undefined : given[slot]
     const reply = await post<ReadNowReply>('/api/admin/read-now', { category: category.id, slot, url, draft: readDraft() }).catch(() => null)
-    if (reply?.state === 'done' || reply?.state === 'found') {
+    // Overtaken by another read, or by a page given while it read.
+    if (readsStarted.current[slot] !== mine) return
+    const got = reply?.state === 'done' || reply?.state === 'found'
+    if (got && hold && reply.state === 'done') {
+      setReads((r) => ({ ...r, [slot]: { state: 'held', found: { ...(reply.phone ? { phone: reply.phone } : {}), details: reply.details ?? {} } } }))
+      return
+    }
+    if (got) {
       if (reply.phone) draft.setPhone(reply.phone)
       for (const [key, value] of Object.entries(reply.details ?? {})) draft.setDetail(key, value)
     }
     if (reply?.account) setGuideGmail(reply.account)
     setReads((r) => ({ ...r, [slot]: { state: reply?.state === 'found' ? 'found' : (reply?.state ?? (slot === 'email' ? 'no-answer' : 'failed')), on: reply?.on ?? '' } as AddRead }))
+  }
+
+  /** Use these times: what a read on its own found, put in. */
+  function takeHeld(slot: AddSlot) {
+    const read = reads[slot]
+    if (read?.state !== 'held') return
+    if (read.found.phone) draft.setPhone(read.found.phone)
+    for (const [key, value] of Object.entries(read.found.details)) draft.setDetail(key, value)
+    setReads((r) => ({ ...r, [slot]: { state: 'done' } }))
   }
 
   function takeList(on: KosherLookup['lists'][number]) {
@@ -244,13 +283,17 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       const slot = line.readNow
       out.push(control('Read now', () => void readNow(slot)))
     }
+    if (line.use) {
+      const { slot, words } = line.use
+      out.push(control(words, () => takeHeld(slot)))
+    }
     if (line.useList) {
       const on = line.useList
       out.push(control('Use it', () => takeList(on)))
     }
-    if (line.change && !fields.isOpen(row, line.change.slot)) {
+    if (line.change && !fields.isOpen(row, line.change.slot) && line.state !== 'unchecked') {
       const slot = line.change.slot
-      out.push(control('Change', () => fields.reveal(row, slotSpec(row, slot, slot === 'site' ? '' : (given[slot] ?? '')))))
+      out.push(control(line.change.words ?? 'Change', () => fields.reveal(row, slotSpec(row, slot, slot === 'site' ? '' : (given[slot] ?? '')))))
     }
     if (line.setUpGmail) {
       out.push(
@@ -271,6 +314,9 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     return lines.some((l) => l.change) ? [] : lines.flatMap((l) => (l.add ? [slotSpec(row, l.add.slot)] : []))
   }
 
+  /** A Change whose read found nothing: its field shown without a tap. */
+  const unchecked = (row: EditorRow) => new Set((sources(row)?.lines ?? []).flatMap((l) => (l.change && l.state === 'unchecked' ? [l.change.slot] : [])))
+
   function rowSource(row: EditorRow): ReactNode {
     const source = sources(row)
     if (!source) return null
@@ -288,7 +334,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
           )
         })}
         {changes.map((slot) => (
-          <Fragment key={slot}>{fields.field(row, slotSpec(row, slot))}</Fragment>
+          <Fragment key={slot}>{fields.field(row, slotSpec(row, slot), unchecked(row).has(slot))}</Fragment>
         ))}
         {shownFields(row).map((spec) => (
           <Fragment key={`add-${spec.key}`}>{fields.field(row, spec, true)}</Fragment>
@@ -456,7 +502,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
         return source ? <RowJob source={source} /> : null
       }}
       rowSource={rowSource}
-      rowDone={(row) => fields.done(row, shownFields(row))}
+      rowDone={(row) => fields.done(row, [...shownFields(row), ...[...unchecked(row)].map((slot) => slotSpec(row, slot))])}
     />
   )
 }

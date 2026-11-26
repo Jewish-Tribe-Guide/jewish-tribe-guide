@@ -87,10 +87,25 @@ describe('Add a place: what a row is read from', () => {
 
   it('a read leaves its line saying how it went (Reading13, ReadDone13, ReadFailed13, ReadNothing13)', () => {
     const after = (read: AddState['reads']['page']) => words({ ...fromGoogle, reads: { page: read } }, 'minyans:weekday')
-    expect(after({ state: 'reading' })?.[0]).toBe('Reading its website…')
+    expect(after({ state: 'reading' })?.[0]).toBe('Reading its website… · Change')
     expect(after({ state: 'done' })?.[0]).toBe('Its website · just now · Change')
     expect(after({ state: 'none' })?.[0]).toBe('No minyan times on its website · Change')
     expect(after({ state: 'failed' })?.slice(0, 2)).toEqual(['Couldn’t read its website', 'Its website · Read now · Change'])
+  })
+
+  it('reading on its own: Checking…, and Use a different page, never a cancel (board N5, Nov 25)', () => {
+    const line = rowOf({ ...fromGoogle, reads: { page: { state: 'reading' } } }, 'minyans:weekday')?.lines[0]
+    expect(line).toMatchObject({ state: 'checking', change: { slot: 'page', words: 'Use a different page' } })
+  })
+
+  it('what a read on its own found waits, row by row, for Use these times (board N5, Nov 25)', () => {
+    const found = { details: { minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon', 'tue'], time: '07:00' }, { id: 'b', tefillah: 'mincha', days: ['tue'], time: '18:00' }] } }
+    const held = { ...fromGoogle, reads: { page: { state: 'held' as const, found } } }
+    expect(rowOf(held, 'minyans:weekday')?.lines[0]).toMatchObject({ text: 'Found on its website: 2 times', state: 'waiting', use: { slot: 'page', words: 'Use these times' } })
+    // A row it found nothing for: not checked, with its field.
+    expect(rowOf(held, 'minyans:shabbos')?.lines[0]).toMatchObject({ text: 'No minyan times on its website', state: 'unchecked', change: { slot: 'page' } })
+    // Nothing's put in till it's used.
+    expect(held.values.details).toEqual({ website: 'https://ohev.org' })
   })
 
   it('an email’s read says what the Gmail had (EmailFound14 to EmailNoGmail14)', () => {

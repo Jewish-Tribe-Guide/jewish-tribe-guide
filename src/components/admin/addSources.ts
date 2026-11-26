@@ -40,6 +40,9 @@ export type AddRead =
   | { state: 'no-gmail' }
   /** Refuah has no hospital where this one is. */
   | { state: 'not-found' }
+  /** Read on its own when the place was picked (board N5, Nov 25): what it
+   *  found waits for Use these times, since a person approves what's read. */
+  | { state: 'held'; found: { phone?: string; details: Record<string, unknown> } }
 
 /** What the kept kosher lists say of it: the lists it's on, nothing, or not
  *  asked yet. */
@@ -53,7 +56,10 @@ export type AddLine = {
   when?: string | null
   red?: boolean
   readNow?: AddSlot
-  change?: { slot: AddSlot; label: string; placeholder?: string }
+  /** What was found and held: Use these times puts it in. */
+  use?: { slot: AddSlot; words: string }
+  /** `words`: the control's own, "Use a different page" while reading. */
+  change?: { slot: AddSlot; label: string; placeholder?: string; words?: string }
   add?: { label: string; slot: AddSlot; words?: string; placeholder?: string }
   findOnGoogle?: boolean
   /** Kosher: fill the row in from the list it's on. */
@@ -121,15 +127,31 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
   }
 
   /** A page's line, as its read has left it. `where`: "its website", or the page. */
-  function pageLines(slot: AddSlot, where: string, what: string, url: string | null, change: AddLine['change']): AddLine[] {
+  function pageLines(row: EditorRow, slot: AddSlot, where: string, what: string, url: string | null, change: AddLine['change']): AddLine[] {
     const read = reads[slot]
     const named = where.startsWith('its ') ? `I${where.slice(1)}` : where
     const idle: AddLine = { text: named, url, readNow: slot, change }
-    if (read?.state === 'reading') return [{ text: `Reading ${where}…`, state: 'checking' }]
+    if (read?.state === 'reading') return [{ text: `Reading ${where}…`, state: 'checking', ...(change ? { change: { ...change, words: 'Use a different page' } } : {}) }]
     if (read?.state === 'done') return [{ text: named, url, when: 'just now', change }]
     if (read?.state === 'none') return [{ text: `No ${what} on ${where}`, change, state: 'unchecked' }]
     if (read?.state === 'failed') return [{ text: `Couldn’t read ${where}`, red: true }, idle]
+    if (read?.state === 'held') {
+      const found = foundFor(row, read.found)
+      if (!found) return [{ text: `No ${what} on ${where}`, change, state: 'unchecked' }]
+      return [{ text: `Found on ${where}: ${found}`, state: 'waiting', use: { slot, words: row.kind === 'minyans' ? 'Use these times' : 'Use it' }, change }]
+    }
     return [idle]
+  }
+
+  /** What a held read would put in this row, said short; null when it
+   *  would change nothing here. */
+  function foundFor(row: EditorRow, found: { phone?: string; details: Record<string, unknown> }): string | null {
+    const after: EditorValues = { ...values, phone: found.phone ?? values.phone, details: { ...values.details, ...found.details } }
+    const now = rowSummary(row, after, timeText)
+    if (!now || now === rowSummary(row, values, timeText)) return null
+    if (row.kind !== 'minyans') return now
+    const n = minyanimForBox(regularMinyanim(after.details[row.fields[0].key]), row.box!).length
+    return `${n} ${n === 1 ? 'time' : 'times'}`
   }
 
   function emailLines(address: string): AddLine[] {
@@ -144,7 +166,7 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     return [{ text: address, readNow: 'email', change }]
   }
 
-  function pagesRow(kind: 'times' | 'hours', withAdd: boolean): AddRowSource {
+  function pagesRow(row: EditorRow, kind: 'times' | 'hours', withAdd: boolean): AddRowSource {
     const label = kind === 'times' ? TIMES_SOURCE : 'A web page'
     const placeholder = placeholderFor(website)
     const page = given.page
@@ -153,18 +175,18 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     if (!where && !email) return nothing({ add: { label, slot: 'page', placeholder } })
     const lines: AddLine[] = [
       ...(email ? emailLines(email) : []),
-      ...(where ? pageLines('page', where, WHAT[kind], page ?? (website || null), { slot: 'page', label, placeholder }) : []),
+      ...(where ? pageLines(row, 'page', where, WHAT[kind], page ?? (website || null), { slot: 'page', label, placeholder }) : []),
     ]
     if (withAdd && !(where && email)) lines.push({ text: '', add: { label, slot: 'page', placeholder } })
     return { job: where && email ? 'Website, Email' : email ? 'Email' : 'Website', amber: false, lines }
   }
 
-  function menuRow(): AddRowSource {
+  function menuRow(row: EditorRow): AddRowSource {
     const label = 'Its menu page'
     const placeholder = placeholderFor(website)
     const where = given.menu ? shortUrl(given.menu) : website ? 'its website' : null
     if (!where) return nothing({ add: { label, slot: 'menu', placeholder } })
-    return { job: 'Website', amber: false, lines: pageLines('menu', where, WHAT.menu, given.menu ?? website, { slot: 'menu', label, placeholder }) }
+    return { job: 'Website', amber: false, lines: pageLines(row, 'menu', where, WHAT.menu, given.menu ?? website, { slot: 'menu', label, placeholder }) }
   }
 
   function refuahRow(): AddRowSource {
@@ -192,13 +214,13 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
   const contact = contactFields(category, {})
   return (row) => {
     if (row.kind === 'name') return kept('name')
-    if (row.kind === 'minyans') return pagesRow('times', row.id !== 'minyans:next_week')
-    if (row.kind === 'audience') return pagesRow('hours', false)
-    if (row.kind === 'items') return itemWording(row.fields[0]).noun === 'dish' ? menuRow() : null
+    if (row.kind === 'minyans') return pagesRow(row, 'times', row.id !== 'minyans:next_week')
+    if (row.kind === 'audience') return pagesRow(row, 'hours', false)
+    if (row.kind === 'items') return itemWording(row.fields[0]).noun === 'dish' ? menuRow(row) : null
     if (row.kind === 'contact') return row.part === 'phone' ? kept('phone') : null
     if (row.fields.some((f) => f.key === 'kosherCert')) return isKosherJobCategory(category) ? kosherRow() : null
     if (row.fields.some((f) => f.type === 'contacts')) return kindOf(category) === 'hospitals' ? refuahRow() : null
-    if (row.fields.some((f) => f.type === 'hours')) return pageReads?.kind === 'hours' ? pagesRow('hours', false) : kept('hours')
+    if (row.fields.some((f) => f.type === 'hours')) return pageReads?.kind === 'hours' ? pagesRow(row, 'hours', false) : kept('hours')
     if (row.fields.length !== 1) return null
     const f = row.fields[0]
     if (f.key === websiteKey) return kept('website')
@@ -207,7 +229,7 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
         const slot: AddSlot = pageReads ? 'page' : 'site'
         const where = given.page ? shortUrl(given.page) : 'its website'
         const change = pageReads ? { slot, label: pageReads.kind === 'times' ? TIMES_SOURCE : 'A web page', placeholder: placeholderFor(website) } : undefined
-        return { job: 'Website', amber: false, lines: pageLines(slot, where, 'details', given.page ?? website, change) }
+        return { job: 'Website', amber: false, lines: pageLines(row, slot, where, 'details', given.page ?? website, change) }
       }
       return nothing(pageReads ? { add: { label: pageReads.kind === 'times' ? TIMES_SOURCE : 'A web page', slot: 'page' } } : undefined)
     }

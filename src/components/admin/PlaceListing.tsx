@@ -106,6 +106,7 @@ export function ArchivedPlace({ place, category, token, onDone, send: own }: { p
  *  name; `data-job` keeps it for tests. */
 export function RowJob({ source, checking }: { source: Pick<RowSource, 'job' | 'amber' | 'unchecked'> & { lines?: { text: string; state?: LineState }[] }; checking?: boolean }) {
   const sticker = checking ? stickerOf({ job: source.job, amber: false, lines: [{ text: '…', state: 'checking' }] }) : stickerOf(source)
+  if (!sticker) return null
   return (
     <span
       className={`shrink-0 rounded-full px-2.5 py-0.5 text-[0.78125rem] font-bold whitespace-nowrap ${sticker.tone === 'green' ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}
@@ -167,7 +168,7 @@ export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' 
  *  field under the line is what to do about it. */
 export function fromWords(text: string): string {
   if (!text || text === 'Nothing reads this') return ''
-  if (text === 'Stopped' || /^(From|Reading|Couldn’t|No |Looking|Not found)/.test(text)) return text
+  if (text === 'Stopped' || /^(From|Found|Reading|Couldn’t|No |Looking|Not found)/.test(text)) return text
   if (text === 'Link check') return 'From the weekly link check'
   return `From ${text.startsWith('Its ') ? `its ${text.slice(4)}` : text}`
 }
