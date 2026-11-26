@@ -154,7 +154,9 @@ old number can still be looked up. When an item is done, move it to
       week's schedule offers the other kind of source, at the end of
       its line ("… · Change · Add an email"); usual times are pages
       only, so they no longer offer an email. An opened field closes on
-      a click away while it's empty or unchanged, and on Escape.
+      a click away while it's empty or unchanged, and on Escape. A
+      field opened by Change takes its line's place while it's open; one
+      opened by Add sits under its line.
     - **Not built yet:** the "Sign up as … to get its emails" line under
       a typed email; refusing an email typed for usual times (pages
       only); the eruv listing still opens its Change screens; email

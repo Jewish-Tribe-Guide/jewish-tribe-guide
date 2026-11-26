@@ -261,8 +261,10 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   }
 
   /** A row's field for a slot (board N4, Nov 25): kept by the row's Done. */
-  const slotSpec = (row: EditorRow, slot: AddSlot, value = ''): FieldSpec => ({
-    key: slot,
+  // `adding`: opened by an Add link, beside what the line says rather than
+  // in place of it, so its own key (Nov 25).
+  const slotSpec = (row: EditorRow, slot: AddSlot, value = '', adding = false): FieldSpec => ({
+    key: adding ? `add:${slot}` : slot,
     value,
     // A hospital wants its one page on Refuah; say so.
     placeholder: slot === 'refuah' ? 'Its page on Refuah' : sourcePlaceholder(row),
@@ -292,14 +294,16 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       const on = line.useList
       out.push(control('Use it', () => takeList(on)))
     }
-    if (line.change && !fields.isOpen(row, line.change.slot)) {
+    // One field for a slot at a time: either open, neither link.
+    const slotOpen = (slot: AddSlot) => fields.isOpen(row, slot) || fields.isOpen(row, `add:${slot}`)
+    if (line.change && !slotOpen(line.change.slot)) {
       const slot = line.change.slot
       out.push(control(line.change.words ?? 'Change', () => fields.reveal(row, slotSpec(row, slot, slot === 'site' ? '' : (given[slot] ?? '')))))
     }
     // After Change, on the same line: "... · Change · Add an email".
-    if (line.add && !fields.isOpen(row, line.add.slot)) {
+    if (line.add && !slotOpen(line.add.slot)) {
       const slot = line.add.slot
-      out.push(control(line.add.words ?? addSourceWords(row), () => fields.reveal(row, slotSpec(row, slot))))
+      out.push(control(line.add.words ?? addSourceWords(row), () => fields.reveal(row, slotSpec(row, slot, '', true))))
     }
     if (line.setUpGmail) {
       out.push(
@@ -315,11 +319,18 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   function rowSource(row: EditorRow): ReactNode {
     const source = sources(row)
     if (!source) return null
-    // Each field the row's Change or Add a page opens, once it's open.
-    const slots = [...new Set(source.lines.flatMap((l) => [...(l.change ? [l.change.slot] : []), ...(l.add ? [l.add.slot] : [])]))]
+    // Each field the row's Change or Add opens, once it's open.
+    const specs = new Map<string, FieldSpec>()
+    for (const l of source.lines) {
+      if (l.change) specs.set(l.change.slot, slotSpec(row, l.change.slot))
+      if (l.add) specs.set(`add:${l.add.slot}`, slotSpec(row, l.add.slot, '', true))
+    }
     return (
       <div className="space-y-1.5">
         {source.lines.map((line, i) => {
+          // Changing what a line says: the field takes its place (Nov 25:
+          // "No minyan times on its website" over the field read as its label).
+          if (line.change && fields.isOpen(row, line.change.slot)) return null
           const controls = lineControls(row, line)
           const words = { ...line, text: line.says ? line.text : fromWords(line.text) }
           return (
@@ -329,8 +340,8 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
             </Fragment>
           )
         })}
-        {slots.map((slot) => (
-          <Fragment key={slot}>{fields.field(row, slotSpec(row, slot))}</Fragment>
+        {[...specs].map(([key, spec]) => (
+          <Fragment key={key}>{fields.field(row, spec)}</Fragment>
         ))}
       </div>
     )

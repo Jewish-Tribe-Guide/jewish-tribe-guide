@@ -396,7 +396,8 @@ describe('PlacePage', () => {
       const input = screen.getByTestId('source-field')
       expect(input).toHaveValue('https://kesher.example/davening')
       expect(input.closest('.bg-white')).not.toBeNull()
-      expect(within(screen.getByTestId('row-source')).queryByRole('button', { name: 'Change' })).toBeNull()
+      // The field takes the line's place while it's open (Nov 25).
+      expect(screen.queryByTestId('row-source')).toBeNull()
       await user.clear(input)
       await user.type(input, 'https://kesher.example/times')
       expect(posts).toEqual([])

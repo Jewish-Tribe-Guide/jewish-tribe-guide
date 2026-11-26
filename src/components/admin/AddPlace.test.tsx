@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { makeCategory } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -10,7 +10,9 @@ import AddPlace from './AddPlace'
 
 vi.mock('next/navigation', () => ({ useRouter: () => mockRouter, usePathname: () => '/philly/admin/places', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(async () => ({})), parseOkJson: vi.fn() }))
-vi.mock('@/lib/useEditWeek', () => ({ useEditWeek: () => null }))
+// No week but where a test gives one (this week's row).
+const editWeek = vi.hoisted(() => ({ now: null as null | { week: { from: string; to: string }; next: { from: string; to: string } } }))
+vi.mock('@/lib/useEditWeek', () => ({ useEditWeek: () => editWeek.now }))
 vi.mock('@/components/intake/AddressInput', () => ({
   default: ({ id, onChange, onPlaceSelect, suggestionNote }: { id: string; onChange: (v: string) => void; onPlaceSelect: (r: unknown) => void; suggestionNote?: (id: string) => string | null }) => (
     <div>
@@ -424,6 +426,10 @@ describe('Add a place', () => {
       expect(screen.queryByTestId('source-field')).toBeNull()
       await user.click(screen.getByRole('button', { name: 'Change' }))
       expect(screen.getByTestId('source-field')).toHaveValue('')
+      // The field takes the line's place while it's open (Nov 25).
+      expect(screen.queryByText('No minyan times on its website', { exact: false })).toBeNull()
+      await user.type(screen.getByTestId('source-field'), '{Escape}')
+      expect(sourceWords()).toBe('No minyan times on its website · Change')
       cleanup()
       reading({ state: 'failed' })
       renderAdd()
@@ -431,6 +437,23 @@ describe('Add a place', () => {
       await waitFor(() => expect(sourceWords()).toContain('Couldn’t read its website'))
       await user.click(screen.getByRole('button', { name: 'Read now' }))
       expect(posts().filter(([u]) => u === '/api/admin/read-now')).toHaveLength(3)
+    })
+
+    // Nov 25: Add an email is beside what the line says, so the line stays.
+    it('this week’s Add an email opens its field under the line, which stays', async () => {
+      const user = userEvent.setup()
+      reading({ state: 'none' })
+      editWeek.now = { week: { from: '2026-11-22', to: '2026-11-28' }, next: { from: '2026-11-29', to: '2026-12-05' } }
+      onTestFinished(() => {
+        editWeek.now = null
+      })
+      renderAdd()
+      await user.click(screen.getByRole('button', { name: 'Pick it' }))
+      await user.click(screen.getByTestId('editor-add-minyans:this_week'))
+      await waitFor(() => expect(sourceWords()).toBe('No minyan times on its website · Change · Add an email'))
+      await user.click(screen.getByRole('button', { name: 'Add an email' }))
+      expect(sourceWords()).toBe('No minyan times on its website')
+      expect(screen.getByTestId('source-field')).toHaveAttribute('placeholder', 'A page’s link or an email')
     })
 
     it('filled in by hand, nothing is read till Read now', async () => {
