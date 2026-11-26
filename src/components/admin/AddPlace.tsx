@@ -22,7 +22,7 @@ import { AdminBack } from './AdminUI'
 import { addRowSources, foundLines, type AddLine, type AddRead, type AddSlot, type GivenSources, type KosherLookup } from './addSources'
 import ListingEditorScreen from './ListingEditorScreen'
 import { RowJob, SourceScreen, SourceWords, fromWords } from './PlaceListing'
-import { sourcePlaceholder, useSourceFields, type FieldSpec } from './useSourceFields'
+import { addSourceWords, sourcePlaceholder, useSourceFields, type FieldSpec } from './useSourceFields'
 import { sourceActions } from './sourceActions'
 import { useStepsInAddress } from './useStepsInAddress'
 
@@ -264,8 +264,8 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   const slotSpec = (row: EditorRow, slot: AddSlot, value = ''): FieldSpec => ({
     key: slot,
     value,
-    // Kosher and a hospital want one page on one site; say which.
-    placeholder: slot === 'keystone' ? 'Its page on Keystone-K’s list' : slot === 'refuah' ? 'Its page on Refuah' : sourcePlaceholder(row),
+    // A hospital wants its one page on Refuah; say so.
+    placeholder: slot === 'refuah' ? 'Its page on Refuah' : sourcePlaceholder(row),
     attempt: async (url) => {
       choose(slot, url)
       return { failed: false }
@@ -292,7 +292,11 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       const on = line.useList
       out.push(control('Use it', () => takeList(on)))
     }
-    if (line.change && !fields.isOpen(row, line.change.slot) && line.state !== 'unchecked') {
+    if (line.add && !fields.isOpen(row, line.add.slot)) {
+      const slot = line.add.slot
+      out.push(control(line.add.words ?? addSourceWords(row), () => fields.reveal(row, slotSpec(row, slot))))
+    }
+    if (line.change && !fields.isOpen(row, line.change.slot)) {
       const slot = line.change.slot
       out.push(control(line.change.words ?? 'Change', () => fields.reveal(row, slotSpec(row, slot, slot === 'site' ? '' : (given[slot] ?? '')))))
     }
@@ -307,21 +311,11 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
     return out
   }
 
-  /** The field a row offers without a tap: where it has no source yet. One
-   *  that has one gives another through its Change (an email typed there
-   *  is kept beside the page, not in its place). */
-  const shownFields = (row: EditorRow) => {
-    const lines = sources(row)?.lines ?? []
-    return lines.some((l) => l.change) ? [] : lines.flatMap((l) => (l.add ? [slotSpec(row, l.add.slot)] : []))
-  }
-
-  /** A Change whose read found nothing: its field shown without a tap. */
-  const unchecked = (row: EditorRow) => new Set((sources(row)?.lines ?? []).flatMap((l) => (l.change && l.state === 'unchecked' ? [l.change.slot] : [])))
-
   function rowSource(row: EditorRow): ReactNode {
     const source = sources(row)
     if (!source) return null
-    const changes = source.lines.flatMap((l) => (l.change ? [l.change.slot] : []))
+    // Each field the row's Change or Add a page opens, once it's open.
+    const slots = [...new Set(source.lines.flatMap((l) => [...(l.change ? [l.change.slot] : []), ...(l.add ? [l.add.slot] : [])]))]
     return (
       <div className="space-y-1.5">
         {source.lines.map((line, i) => {
@@ -334,11 +328,8 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
             </Fragment>
           )
         })}
-        {changes.map((slot) => (
-          <Fragment key={slot}>{fields.field(row, slotSpec(row, slot), unchecked(row).has(slot))}</Fragment>
-        ))}
-        {shownFields(row).map((spec) => (
-          <Fragment key={`add-${spec.key}`}>{fields.field(row, spec, true)}</Fragment>
+        {slots.map((slot) => (
+          <Fragment key={slot}>{fields.field(row, slotSpec(row, slot))}</Fragment>
         ))}
       </div>
     )
@@ -503,7 +494,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
         return source ? <RowJob source={source} /> : null
       }}
       rowSource={rowSource}
-      rowDone={(row) => fields.done(row, [...shownFields(row), ...[...unchecked(row)].map((slot) => slotSpec(row, slot))])}
+      rowDone={(row) => fields.done(row)}
     />
   )
 }

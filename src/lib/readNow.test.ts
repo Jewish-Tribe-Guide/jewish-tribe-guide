@@ -24,7 +24,7 @@ describe('kosherLookup (KosherFound13, KosherNone13)', () => {
   it('on neither: says which it looked at', () => {
     const got = kosherLookup(food, { ...draft, name: 'Somewhere Else' }, { keystone, mekor: [] as MekorEntry[] })!
     expect(got.lists).toEqual([])
-    expect(got.none).toBe('Not on Keystone-K or Mekor Habracha’s list')
-    expect(kosherLookup(food, { ...draft, name: 'Somewhere Else' }, { keystone, mekor: null })!.none).toBe('Not on Keystone-K’s list')
+    expect(got.none).toBe('Not found on Keystone-K or Mekor Habracha’s list')
+    expect(kosherLookup(food, { ...draft, name: 'Somewhere Else' }, { keystone, mekor: null })!.none).toBe('Not found on Keystone-K’s list')
   })
 })

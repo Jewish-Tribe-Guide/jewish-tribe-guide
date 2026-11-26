@@ -10,6 +10,7 @@ import { kindOf } from '@/lib/placeKinds'
 import { minyanimForBox } from '@/lib/minyanimBox'
 import { timeText } from '@/lib/minyanText'
 import { dateText, readSchedules, regularMinyanim, schedulesKey } from '@/lib/schedules'
+import { readWhen } from '@/lib/todo'
 import { shortUrl } from './watchText'
 
 // ── Add a place: what each row will be read from (boards *11, *13, *14) ──────
@@ -46,7 +47,7 @@ export type AddRead =
 
 /** What the kept kosher lists say of it: the lists it's on, nothing, or not
  *  asked yet. */
-export type KosherLookup = { lists: { name: string; url: string; values: Record<string, unknown> }[]; none: string }
+export type KosherLookup = { lists: { name: string; url: string; values: Record<string, unknown> }[]; none: string; readAt?: string | null }
 
 export type AddLine = {
   text: string
@@ -87,6 +88,8 @@ export type AddState = {
   kosher?: KosherLookup | null
   /** Filled in by Use it: nothing else needs saying. */
   kosherUsed?: string | null
+  /** For "read last night": when it's being said. */
+  now?: number
 }
 
 const TIMES_SOURCE = 'A web page, or the email it comes from'
@@ -180,7 +183,8 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
       ...(email ? emailLines(email) : []),
       ...(where ? pageLines(row, 'page', where, WHAT[kind], page ?? (website || null), { slot: 'page', label, placeholder }) : []),
     ]
-    if (withAdd && !(where && email)) lines.push({ text: '', add: { label, slot: 'page', placeholder } })
+    // The other kind of source, behind its own words (Nov 25).
+    if (withAdd && !(where && email)) lines.push({ text: '', add: { label, slot: 'page', placeholder, words: where ? 'Add an email' : 'Add a page' } })
     return { job: where && email ? 'Website, Email' : email ? 'Email' : 'Website', amber: false, lines }
   }
 
@@ -210,7 +214,9 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     if (given.keystone) return { job: 'Keystone-K', amber: false, lines: [{ text: shortUrl(given.keystone), change: { slot: 'keystone', label } }] }
     const on = s.kosher?.lists[0]
     if (on) return { job: 'Nothing', amber: true, lines: [{ text: `On ${on.name}`, says: true, useList: on }] }
-    if (s.kosher) return { job: 'Nothing', amber: true, lines: [{ text: s.kosher.none, says: true, add: { label, slot: 'keystone', words: 'Add its page' } }] }
+    // Not found: nothing to give. The lists are matched every night, so
+    // it's found once it's on one (Nov 25).
+    if (s.kosher) return { job: 'Nothing', amber: true, lines: [{ text: s.kosher.none, says: true, ...(s.kosher.readAt ? { when: readWhen(s.kosher.readAt, s.now ?? Date.now()) } : {}) }] }
     return nothing()
   }
 

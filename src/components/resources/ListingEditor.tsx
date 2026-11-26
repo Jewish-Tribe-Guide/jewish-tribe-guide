@@ -668,6 +668,7 @@ export default function ListingEditor({
       onDone={() => void finishRow(r)}
       finishing={finishing}
       onRemove={r.id === stays ? () => removeRow(r) : undefined}
+      removeLabel={`Remove ${rowTitle(r)}`}
       source={rowSource ? { line: rowSource(r, changed.has(r.id)) } : undefined}>
       {rowBody(r)}
     </EditorOpenCard>

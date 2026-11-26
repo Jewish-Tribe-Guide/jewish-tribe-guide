@@ -70,6 +70,14 @@ describe('a listing row’s job (Listing6, States6, GoogleListing7)', () => {
     expect(got?.line.add).toBeUndefined()
   })
 
+  // Nov 25: the kosher lists are matched by name every night, so a food
+  // place on none of them has nothing to give.
+  it('kosher on no list: Nothing, with nothing to give', () => {
+    const got = sourceOf(jobs({}), fieldRow('kosherCert', 'select'))
+    expect(got).toMatchObject({ job: 'Nothing', line: { text: 'Nothing reads this' } })
+    expect(got?.line.add).toBeUndefined()
+  })
+
   it('a week read from both: Website, Email, one line each, the email first', () => {
     const news = { id: 'n', url: 'mailto:office@a.example', active: true, pageChangedAt: at }
     const times = { places: [{ id: 'a', pages: [{ watch: page }], newsletters: [news], stopped: [] }] }

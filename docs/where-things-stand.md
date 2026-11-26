@@ -119,14 +119,14 @@ old number can still be looked up. When an item is done, move it to
     - An opened row keeps its sticker; inside its box, under a thin
       line, one small source line ("From Google", "From
       bethshalom.org/schedule · Change"). Where a source is needed, just
-      a field there: "A page’s link" (usual times; pages only), "A
-      page’s link or an email" (this week's schedule). Done saves it; an
+      a link to its field: "Add a page" (usual times; pages only), "Add
+      a page or an email" (this week's schedule). Done saves it; an
       empty field changes nothing. An email reads "Sign up as … to get
       its emails", no Copy.
     - Picking a place from Google starts its website read straight away:
       times rows say "Checking…" with "Use a different page"; found
       times show with "Use these times"; nothing found is "Not checked"
-      with the field. Add before it finishes sends the result to To do.
+      with Change. Add before it finishes sends the result to To do.
       Changing the website re-reads. No cancel. The screen after Add
       stays as it is.
     - Edit listing behaves the same. To do gets only what's broken or
@@ -143,6 +143,13 @@ old number can still be looked up. When an item is done, move it to
       nothing new: the page watch never files the same suggestion
       twice, approved or rejected (`filedBefore`, listingPageWatch.ts),
       so a kept value stands until the page says something else.
+    - **Changed Nov 25, after the user's look at Kosher:** Remove is a
+      small centred link under Done that names its row ("Remove
+      Kosher"); a source field shows only once "Add a page" (or "Add an
+      email", for a shul's second source) or Change is tapped; Kosher
+      has no field at all, since the kept lists are matched by name
+      every night, and a place on none says "Not found on Keystone-K or
+      Mekor Habracha’s list · read last night" (the lists' last read).
     - **Not built yet:** the "Sign up as … to get its emails" line under
       a typed email; refusing an email typed for usual times (pages
       only); the eruv listing still opens its Change screens; email

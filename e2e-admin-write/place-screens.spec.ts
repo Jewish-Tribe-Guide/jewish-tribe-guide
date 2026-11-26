@@ -213,7 +213,7 @@ test('a change found on a place in Places: To do’s screen, a minyan in it', as
 
 // Add a place's form after Find, and a row of it (Nov 18: both were only
 // state, so Back left Add altogether). A row's source is a field in the row
-// since Nov 25 (board N4), not a screen over it. Not walk(): a reload on the
+// since Nov 25 (board N4), not a screen over it, behind Add a page. Not walk(): a reload on the
 // form is Find again, since what was typed isn't kept, and the address says
 // so in place. Writes nothing: nothing is added.
 test('Add a place: Find, the form, a row with its source field', async ({ page }) => {
@@ -231,7 +231,10 @@ test('Add a place: Find, the form, a row with its source field', async ({ page }
   await form.click()
   await expect(row).toBeVisible()
   await at('?add=synagogue&step=finish&row=minyans%3Aweekday')
-  // The source is asked for in the row, inside its box: no screen over it.
+  // The source is asked for in the row, inside its box: no screen over it,
+  // and only once Add a page is tapped (Nov 25).
+  await expect(field).toHaveCount(0)
+  await page.getByRole('button', { name: 'Add a page' }).click()
   await expect(field).toBeVisible()
   await expect(field).toHaveAttribute('placeholder', 'A page’s link')
   await expect(page.getByRole('heading', { name: 'Add a source' })).toHaveCount(0)

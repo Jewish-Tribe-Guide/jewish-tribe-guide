@@ -404,6 +404,17 @@ describe('PlacePage', () => {
       await waitFor(() => expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'give', resourceId: 'a', url: 'https://kesher.example/times', replaces: 'w1' }]]))
     })
 
+    // Nov 25: a row nothing reads shows no field till Add a page is tapped.
+    it('a row nothing reads: Add a page opens its field', async () => {
+      await listingPage({ job: (url) => (url.includes('job=times') ? { name: 'Shul times', places: [] } : undefined) })
+      const user = userEvent.setup()
+      await user.click(screen.getAllByTestId('row-job').find((j) => j.closest('button')?.textContent?.includes('Usual weekday times'))!.closest('button')!)
+      expect(screen.queryByTestId('source-field')).toBeNull()
+      await user.click(screen.getByRole('button', { name: /^Add a page/ }))
+      expect(screen.getByTestId('source-field')).toHaveValue('')
+      expect(screen.queryByRole('button', { name: /^Add a page/ })).toBeNull()
+    })
+
     it('Done with the field left as it was, or emptied, changes nothing', async () => {
       await listingPage({ job: withTimes })
       const user = userEvent.setup()

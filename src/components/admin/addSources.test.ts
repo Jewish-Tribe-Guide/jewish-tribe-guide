@@ -74,12 +74,14 @@ describe('Add a place: what a row is read from', () => {
     expect(rowOf(state(), 'minyans:weekday')?.amber).toBe(true)
   })
 
-  it('a shul with a website: its website, Read now, Change, and Add a source under it (ReadNow13)', () => {
+  it('a shul with a website: its website, Read now, Change, and Add an email under it (ReadNow13)', () => {
     expect(rowOf(fromGoogle, 'minyans:weekday')?.job).toBe('Website')
-    expect(words(fromGoogle, 'minyans:weekday')).toEqual(['Its website · Read now · Change', 'Add a source'])
+    expect(words(fromGoogle, 'minyans:weekday')).toEqual(['Its website · Read now · Change', 'Add an email'])
   })
 
   it('a page given is named, and an email goes first, one line each (GivenRead13, WebsiteEmail14)', () => {
+    // An email and no page: the other one is a page.
+    expect(words(state({ given: { email: 'office@ohev.org' } }), 'minyans:weekday')?.at(-1)).toBe('Add a page')
     const both = { ...fromGoogle, given: { page: 'https://ohev.org/davening', email: 'office@ohev.org' } }
     expect(rowOf(both, 'minyans:weekday')?.job).toBe('Website, Email')
     expect(words(both, 'minyans:weekday')).toEqual(['office@ohev.org · Read now · Change', 'ohev.org/davening · Read now · Change'])
@@ -126,7 +128,13 @@ describe('Add a place: what a row is read from', () => {
     expect(addRowSources(s)(kosher)?.lines[0].text).toBe('Nothing reads this')
     const on = { name: 'Keystone-K’s list', url: 'https://k', values: { kosherCert: 'Keystone-K' } }
     expect(addRowSources({ ...s, kosher: { lists: [on], none: '' } })(kosher)?.lines[0]).toMatchObject({ text: 'On Keystone-K’s list', useList: on })
-    expect(addRowSources({ ...s, kosher: { lists: [], none: 'Not on Keystone-K or Mekor Habracha’s list' } })(kosher)?.lines[0]).toMatchObject({ text: 'Not on Keystone-K or Mekor Habracha’s list', add: { words: 'Add its page' } })
+    // Not found: said with when the lists were read, and nothing to give
+    // (Nov 25): the nightly match finds it once it's on one.
+    const none = { lists: [], none: 'Not found on Keystone-K or Mekor Habracha’s list', readAt: '2026-11-25T06:00:00Z' }
+    const notFound = addRowSources({ ...s, kosher: none, now: Date.parse('2026-11-25T15:00:00Z') })(kosher)?.lines[0]
+    expect(notFound).toMatchObject({ text: 'Not found on Keystone-K or Mekor Habracha’s list', says: true, when: 'read last night' })
+    expect(notFound?.add).toBeUndefined()
+    expect(addRowSources({ ...s, kosher: none, now: Date.parse('2026-11-29T15:00:00Z') })(kosher)?.lines[0].when).toBe('read Nov 25')
     expect(addRowSources({ ...s, kosherUsed: 'Keystone-K’s list' })(kosher)).toMatchObject({ job: 'Keystone-K', lines: [{ text: 'Keystone-K’s list', when: 'today' }] })
   })
 

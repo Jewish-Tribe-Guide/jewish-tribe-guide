@@ -7,7 +7,8 @@ import type { Attempt } from './sourceActions'
 // ── A source, given in the row itself (board N4, Nov 25) ────────────────────
 // Where a row needs a source, its opened box has a field under the thin
 // line: "A page’s link", or "A page’s link or an email" for this week's
-// schedule. Change on a line opens the same field, filled in. No Save, no
+// schedule, opened by "Add a page" (Nov 25: not there till it's asked for).
+// Change on a line opens the same field, filled in. No Save, no
 // Cancel: the row's Done saves what it holds, and an empty or unchanged
 // field changes nothing. It replaces the Change and Add a source screens.
 
@@ -27,6 +28,12 @@ export type FieldSpec = {
  *  email; usual times and the rest only from a page (Nov 25). */
 export function sourcePlaceholder(row: EditorRow): string {
   return row.week || row.id === 'minyans:this_week' || row.id === 'minyans:next_week' ? 'A page’s link or an email' : 'A page’s link'
+}
+
+/** The link that opens a row's field when it has no source yet (Nov 25:
+ *  a field only once it's asked for, never sitting there unasked). */
+export function addSourceWords(row: EditorRow): string {
+  return sourcePlaceholder(row) === 'A page’s link or an email' ? 'Add a page or an email' : 'Add a page'
 }
 
 type Open = { value: string; first: string; attempt: Attempt; stop?: () => Promise<void> }

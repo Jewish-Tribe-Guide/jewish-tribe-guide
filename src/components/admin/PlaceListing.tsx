@@ -24,7 +24,7 @@ import type { Stop } from './openedPlaceBoxes'
 import { jobsChangedBy, type Jobs } from './useWatchJobs'
 import { kindsOf } from './WatchKinds'
 import { useStepsInAddress } from './useStepsInAddress'
-import { sourcePlaceholder, useSourceFields, type FieldSpec } from './useSourceFields'
+import { addSourceWords, sourcePlaceholder, useSourceFields, type FieldSpec } from './useSourceFields'
 import { useAdminApi } from './useAdminApi'
 import ReadFrom from './ReadFrom'
 import { listingReadFrom } from './readFromFacts'
@@ -491,6 +491,11 @@ export default function PlaceListing({
       return spec && !fields.isOpen(row, which) ? [control('Change', () => fields.reveal(row, spec))] : []
     }
     const controls: ReactNode[] = [...readControl(line), ...changeOf('change'), ...changeOf('start')]
+    // No source yet: a link opens its field.
+    if (specs.add && !fields.isOpen(row, 'add')) {
+      const spec = specs.add
+      controls.push(control(addSourceWords(row), () => fields.reveal(row, spec)))
+    }
     // Google keeps several rows: what's typed over stops it for that one.
     if (line.useGoogle) {
       const f = line.useGoogle
@@ -504,7 +509,7 @@ export default function PlaceListing({
         {(words.text || controls.length > 0) && <SourceWords line={words} controls={controls} />}
         {specs.change && fields.field(row, specs.change)}
         {specs.start && fields.field(row, specs.start)}
-        {specs.add && fields.field(row, specs.add, true)}
+        {specs.add && fields.field(row, specs.add)}
         {source.also && <SourceWords line={said(source.also)} controls={[...readControl(source.also), ...changeOf('also')]} />}
         {specs.also && fields.field(row, specs.also)}
       </div>
@@ -512,10 +517,7 @@ export default function PlaceListing({
   }
 
   /** A row's Done: what its field holds, saved first. */
-  const rowDone = (row: EditorRow) => {
-    const add = fieldSpecs(row).add
-    return fields.done(row, add ? [add] : [])
-  }
+  const rowDone = (row: EditorRow) => fields.done(row)
 
   async function archive() {
     setArchiving(true)

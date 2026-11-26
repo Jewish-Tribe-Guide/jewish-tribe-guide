@@ -227,8 +227,9 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
     if (!isKosherJobCategory(category)) return null
     if (off('kosher')) return nothing()
     const found = box('kosher')
-    const give: GiveSource = { label: WHERE.keystone, email: false, run: { kind: 'keystone' } }
-    if (!found || !found.foot.links.length) return nothing(give)
+    // Not on a list: nothing to give. The lists are matched by name and
+    // address every night, so it's found once it's there (Nov 25).
+    if (!found || !found.foot.links.length) return nothing()
     return fromFoot('kosher', found.foot, found.foot.links[0]?.url ?? '')
   }
 

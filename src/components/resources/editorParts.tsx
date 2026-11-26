@@ -76,6 +76,7 @@ export function EditorOpenCard({
   tags,
   onClose,
   onRemove,
+  removeLabel = 'Remove',
   children,
   cardRef,
   testId,
@@ -89,17 +90,20 @@ export function EditorOpenCard({
   /** Done, where it does more than close (saves a source field first). */
   onDone?: () => void
   finishing?: boolean
-  /** A row opened from "Not on the listing yet": Remove, beside Done,
-   *  takes what was put in back out and closes it. */
+  /** A row opened from "Not on the listing yet": "Remove Kosher", a link
+   *  under Done (Nov 25: beside it, it read as a second main button, and
+   *  "Remove" alone as removing the place), takes what was put in back out
+   *  and closes it. `removeLabel`: its words. */
   onRemove?: () => void
+  removeLabel?: string
   children: ReactNode
   cardRef?: Ref<HTMLDivElement>
   testId: string
   source?: { line: ReactNode }
 }) {
   const remove = onRemove && (
-    <button type="button" onClick={onRemove} className="h-11 shrink-0 cursor-pointer px-3 text-[0.9375rem] font-bold text-red-700">
-      Remove
+    <button type="button" onClick={onRemove} className="mx-auto block min-h-11 cursor-pointer px-3 text-[0.9375rem] font-bold text-red-700 hover:underline">
+      {removeLabel}
     </button>
   )
   const card = 'space-y-4 rounded-2xl border-[1.5px] border-slate-400 bg-white px-4 pt-2.5 pb-4 shadow-sm'
@@ -120,24 +124,20 @@ export function EditorOpenCard({
           {inside}
           {source.line && <RowSourceFoot>{source.line}</RowSourceFoot>}
         </div>
-        <div className="mt-2 flex items-center gap-2">
-          {remove}
-          <button type="button" disabled={finishing} onClick={onDone ?? onClose} className={`${SUBMIT_PILL} min-w-0 flex-1`}>
-            {finishing ? 'Saving…' : 'Done'}
-          </button>
-        </div>
+        <button type="button" disabled={finishing} onClick={onDone ?? onClose} className={`${SUBMIT_PILL} mt-2 w-full`}>
+          {finishing ? 'Saving…' : 'Done'}
+        </button>
+        {remove}
       </div>
     )
   }
   return (
     <div ref={cardRef} data-testid={testId} className={`scroll-my-4 ${card}`}>
       {inside}
-      <div className="flex items-center gap-2">
-        {remove}
-        <button type="button" disabled={finishing} onClick={onDone ?? onClose} className="h-11 min-w-0 flex-1 cursor-pointer rounded-full border border-slate-300 bg-white text-[0.9375rem] font-bold text-primary">
-          {finishing ? 'Saving…' : 'Done'}
-        </button>
-      </div>
+      <button type="button" disabled={finishing} onClick={onDone ?? onClose} className="h-11 w-full cursor-pointer rounded-full border border-slate-300 bg-white text-[0.9375rem] font-bold text-primary">
+        {finishing ? 'Saving…' : 'Done'}
+      </button>
+      {remove}
     </div>
   )
 }
