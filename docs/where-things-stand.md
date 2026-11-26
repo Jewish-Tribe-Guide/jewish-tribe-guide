@@ -175,6 +175,12 @@ old number can still be looked up. When an item is done, move it to
       that failed is "Not checked", not "Checked nightly": on Add (a
       page, Refuah, the guide's Gmail not answering) and after a Read
       now that failed on Edit listing.
+    - **Nov 26 (the user's yes):** on Add, a website read that has
+      nothing for a row gets one link, not "Change · Add an email" (they
+      opened the same field): "No minyan times on its website · Add a
+      page" (usual times), "· Add a page or an email" (this week's). The
+      field opens under the line. A read that failed keeps Read now and
+      Change.
     - **Not built yet:** the "Sign up as … to get its emails" line under
       a typed email; refusing an email typed for usual times (pages
       only); the eruv listing still opens its Change screens; email

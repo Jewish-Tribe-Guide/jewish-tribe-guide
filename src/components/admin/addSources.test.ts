@@ -82,6 +82,8 @@ describe('Add a place: what a row is read from', () => {
     expect(words(fromGoogle, 'minyans:shabbos')).toEqual(['Its website · Read now · Change'])
     // This week's offers the other kind, on the same line (Nov 25).
     expect(words(fromGoogle, 'minyans:this_week')).toEqual(['Its website · Read now · Change · Add an email'])
+    // Read and nothing there: one link, a page or an email (Nov 26).
+    expect(words({ ...fromGoogle, reads: { page: { state: 'none' } } }, 'minyans:this_week')).toEqual(['No minyan times on its website · Add a source'])
   })
 
   it('a page given is named, and an email goes first, one line each (GivenRead13, WebsiteEmail14)', () => {
@@ -96,7 +98,9 @@ describe('Add a place: what a row is read from', () => {
     const after = (read: AddState['reads']['page']) => words({ ...fromGoogle, reads: { page: read } }, 'minyans:weekday')
     expect(after({ state: 'reading' })?.[0]).toBe('Reading its website… · Change')
     expect(after({ state: 'done' })?.[0]).toBe('Its website · just now · Change')
-    expect(after({ state: 'none' })?.[0]).toBe('No minyan times on its website · Change')
+    // Nothing there: nothing to change, one source to add (Nov 26).
+    expect(after({ state: 'none' })?.[0]).toBe('No minyan times on its website · Add a source')
+    expect(rowOf({ ...fromGoogle, reads: { page: { state: 'none' } } }, 'minyans:weekday')?.lines[0].change).toBeUndefined()
     expect(after({ state: 'failed' })?.slice(0, 2)).toEqual(['Couldn’t read its website', 'Its website · Read now · Change'])
   })
 
@@ -121,7 +125,7 @@ describe('Add a place: what a row is read from', () => {
     const held = { ...fromGoogle, reads: { page: { state: 'held' as const, found } } }
     expect(rowOf(held, 'minyans:weekday')?.lines[0]).toMatchObject({ text: 'Found on its website: 2 times', state: 'waiting', use: { slot: 'page', words: 'Use these times' } })
     // A row it found nothing for: not checked, with its field.
-    expect(rowOf(held, 'minyans:shabbos')?.lines[0]).toMatchObject({ text: 'No minyan times on its website', state: 'unchecked', change: { slot: 'page' } })
+    expect(rowOf(held, 'minyans:shabbos')?.lines[0]).toMatchObject({ text: 'No minyan times on its website', state: 'unchecked', add: { slot: 'page' } })
     // Nothing's put in till it's used.
     expect(held.values.details).toEqual({ website: 'https://ohev.org' })
   })

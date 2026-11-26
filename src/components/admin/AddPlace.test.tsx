@@ -62,10 +62,12 @@ const posts = () => vi.mocked(fetchJson).mock.calls.filter(([, init]) => init?.m
 const saves = () => posts().filter(([u]) => u !== '/api/admin/read-now')
 
 /** A page or an email for its usual weekday times, as an admin gives one:
- *  Change on the row's line, the field, Done (board N4). */
+ *  Change on the row's line (or Add a page, when its website had nothing),
+ *  the field, Done (board N4). */
 async function giveSource(user: ReturnType<typeof userEvent.setup>, value: string) {
   await user.click(screen.getByTestId('editor-add-minyans:weekday'))
-  const change = within(screen.getByTestId('editor-open-minyans:weekday')).queryByRole('button', { name: 'Change' })
+  const open = within(screen.getByTestId('editor-open-minyans:weekday'))
+  const change = open.queryByRole('button', { name: 'Change' }) ?? open.queryByRole('button', { name: /^Add a page/ })
   if (change) await user.click(change)
   const field = screen.getByTestId('source-field')
   expect(field.closest('[data-testid="row-source-foot"]')).not.toBeNull()
@@ -412,24 +414,26 @@ describe('Add a place', () => {
       answers[0]({ state: 'done', details: { minyanim: [{ id: 'a', tefillah: 'shacharis', days: ['mon'], time: '7:00am' }] } })
       answers[1]({ state: 'none' })
       await user.click(screen.getByTestId('editor-add-minyans:weekday'))
-      await waitFor(() => expect(sourceWords()).toBe('No minyan times on ohev.org/davening · Change'))
+      await waitFor(() => expect(sourceWords()).toBe('No minyan times on ohev.org/davening · Add a page'))
     })
 
-    it('nothing found: Not checked, its field behind Change; couldn’t read: Read now (ReadNothing13, ReadFailed13)', async () => {
+    // Nov 26: nothing there, so nothing to change: one link, to add a page.
+    it('nothing found: Not checked, its field behind Add a page; couldn’t read: Read now (ReadNothing13, ReadFailed13)', async () => {
       const user = userEvent.setup()
       reading({ state: 'none' })
       renderAdd()
       await openTimes(user)
-      await waitFor(() => expect(sourceWords()).toBe('No minyan times on its website · Change'))
+      await waitFor(() => expect(sourceWords()).toBe('No minyan times on its website · Add a page'))
       expect(screen.getByTestId('row-job')).toHaveTextContent('Not checked')
+      expect(screen.queryByRole('button', { name: 'Change' })).toBeNull()
       // Nov 25: no field till it's asked for.
       expect(screen.queryByTestId('source-field')).toBeNull()
-      await user.click(screen.getByRole('button', { name: 'Change' }))
+      await user.click(screen.getByRole('button', { name: 'Add a page' }))
       expect(screen.getByTestId('source-field')).toHaveValue('')
-      // The field takes the line's place while it's open (Nov 25).
-      expect(screen.queryByText('No minyan times on its website', { exact: false })).toBeNull()
+      // The field sits under the line, which says why it's needed.
+      expect(sourceWords()).toBe('No minyan times on its website')
       await user.type(screen.getByTestId('source-field'), '{Escape}')
-      expect(sourceWords()).toBe('No minyan times on its website · Change')
+      expect(sourceWords()).toBe('No minyan times on its website · Add a page')
       cleanup()
       reading({ state: 'failed' })
       renderAdd()
@@ -439,8 +443,8 @@ describe('Add a place', () => {
       expect(posts().filter(([u]) => u === '/api/admin/read-now')).toHaveLength(3)
     })
 
-    // Nov 25: Add an email is beside what the line says, so the line stays.
-    it('this week’s Add an email opens its field under the line, which stays', async () => {
+    // Nov 26: one link for this week too, a page or an email; the line stays.
+    it('this week’s Add a page or an email opens its field under the line, which stays', async () => {
       const user = userEvent.setup()
       reading({ state: 'none' })
       editWeek.now = { week: { from: '2026-11-22', to: '2026-11-28' }, next: { from: '2026-11-29', to: '2026-12-05' } }
@@ -450,8 +454,8 @@ describe('Add a place', () => {
       renderAdd()
       await user.click(screen.getByRole('button', { name: 'Pick it' }))
       await user.click(screen.getByTestId('editor-add-minyans:this_week'))
-      await waitFor(() => expect(sourceWords()).toBe('No minyan times on its website · Change · Add an email'))
-      await user.click(screen.getByRole('button', { name: 'Add an email' }))
+      await waitFor(() => expect(sourceWords()).toBe('No minyan times on its website · Add a page or an email'))
+      await user.click(screen.getByRole('button', { name: 'Add a page or an email' }))
       expect(sourceWords()).toBe('No minyan times on its website')
       expect(screen.getByTestId('source-field')).toHaveAttribute('placeholder', 'A page’s link or an email')
     })

@@ -137,14 +137,18 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     const read = reads[slot]
     const named = where.startsWith('its ') ? `I${where.slice(1)}` : where
     const idle: AddLine = { text: named, url, readNow: slot, change }
+    // Read, and nothing there for this row: no source works, so nothing to
+    // change, only one to add (Nov 26: Change and Add an email opened the
+    // same field).
+    const nothingThere: AddLine = { text: `No ${what} on ${where}`, state: 'unchecked', ...(change ? { add: { label: change.label, slot: change.slot, placeholder: change.placeholder } } : {}) }
     if (read?.state === 'reading') return [{ text: `Reading ${where}…`, state: 'checking', ...(change ? { change: { ...change, words: 'Use a different page' } } : {}) }]
     if (read?.state === 'done') return [{ text: named, url, when: 'just now', change }]
-    if (read?.state === 'none') return [{ text: `No ${what} on ${where}`, change, state: 'unchecked' }]
+    if (read?.state === 'none') return [nothingThere]
     // A read that failed keeps nothing current yet: Not checked (Nov 25).
     if (read?.state === 'failed') return [{ text: `Couldn’t read ${where}`, red: true, state: 'unchecked' }, { ...idle, state: 'unchecked' }]
     if (read?.state === 'held') {
       const found = foundFor(row, read.found)
-      if (!found) return [{ text: `No ${what} on ${where}`, change, state: 'unchecked' }]
+      if (!found) return [nothingThere]
       return [{ text: `Found on ${where}: ${found}`, state: 'waiting', use: { slot, words: row.kind === 'minyans' ? 'Use these times' : 'Use it' }, change }]
     }
     return [idle]
@@ -186,7 +190,7 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     ]
     // This week's other kind of source, at the end of the line before it
     // (Nov 25: on a line of its own it read as a second thing).
-    if (withAdd && !(where && email)) {
+    if (withAdd && !(where && email) && !lines[lines.length - 1].add) {
       const last = lines.length - 1
       lines[last] = { ...lines[last], add: { label, slot: 'page', placeholder, words: where ? 'Add an email' : 'Add a page' } }
     }
