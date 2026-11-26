@@ -1,6 +1,6 @@
 'use client'
 
-import { type ComponentProps, type ReactNode } from 'react'
+import { useState, type ComponentProps, type ReactNode } from 'react'
 import ListingEditor from '@/components/resources/ListingEditor'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
 import { AdminBack } from './AdminUI'
@@ -45,13 +45,16 @@ export default function ListingEditorScreen({
   // The preview's own SiteHeader shows "‹ title" on mobile, as it does over
   // the real editor.
   useSetScreenHeader(true, title, back)
+  // A row open on its own screen puts its sticker here, beside the title,
+  // where a row has it beside its own (the user, Nov 26).
+  const [asideSlot, setAsideSlot] = useState<HTMLElement | null>(null)
   return (
     <div className="flex flex-col gap-4">
-      <AdminBack back={{ label: step || overlay ? 'Back' : backLabel, onClick: back }} title={title} />
+      <AdminBack back={{ label: step || overlay ? 'Back' : backLabel, onClick: back }} title={title} right={<span ref={setAsideSlot} className="contents" data-testid="screen-aside" />} />
       {!step && !overlay && top}
       {overlay?.node}
       <div className={overlay ? 'hidden' : ''}>
-        <ListingEditor {...editor} onClose={onClose} onStep={onStep} reopen={reopen} />
+        <ListingEditor {...editor} onClose={onClose} onStep={onStep} reopen={reopen} asideSlot={asideSlot} />
       </div>
     </div>
   )

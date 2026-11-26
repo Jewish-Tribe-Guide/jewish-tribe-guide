@@ -51,7 +51,11 @@ function expectLineUnderCard() {
   const box = line.closest('.bg-white')!
   expect(box).not.toBeNull()
   expect(line.closest('[data-testid="row-source-foot"]')).toHaveClass('border-t')
-  expect(within(box as HTMLElement).getByTestId('row-job')).toHaveTextContent(/^(Checked nightly|Checked weekly|Not checked|Checking…)$/)
+  // The sticker: in the opened row's header, or beside the title of a
+  // row's own screen (Nov 26), never twice.
+  const stickers = [...within(box as HTMLElement).queryAllByTestId('row-job'), ...(screen.queryByTestId('screen-aside') ? within(screen.getByTestId('screen-aside')).queryAllByTestId('row-job') : [])]
+  expect(stickers).toHaveLength(1)
+  expect(stickers[0]).toHaveTextContent(/^(Checked nightly|Checked weekly|Not checked|Checking…)$/)
   const done = screen.getByRole('button', { name: 'Done' })
   expect(line.compareDocumentPosition(done) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(done.closest('.bg-white')).toBeNull()
@@ -417,7 +421,8 @@ describe('PlacePage', () => {
       const user = userEvent.setup()
       const minyans = screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!
       await user.click(minyans)
-      expect(screen.getByTestId('row-source')).toHaveTextContent(`From kesher.example/davening · ${day(at)} · Read now · Change`)
+      // The user, Nov 26: the line says its sticker's own words.
+      expect(screen.getByTestId('row-source')).toHaveTextContent(`Checked nightly from kesher.example/davening · last ${day(at)} · Read now · Change`)
       expectLineUnderCard()
       // The user, Nov 26: what to do on the right, apart from what it says.
       const actions = screen.getByTestId('row-source-actions')
@@ -625,7 +630,7 @@ describe('PlacePage', () => {
       await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Google' && j.closest('button')?.textContent?.includes('215'))!.closest('button')!)
       const line = () => screen.getByTestId('row-source')
       // Google keeps several rows; this one is stopped by typing over it.
-      expect(line()).toHaveTextContent(`From Google · ${day(new Date().toISOString())}`)
+      expect(line()).toHaveTextContent(`Checked nightly from Google · last ${day(new Date().toISOString())}`)
       expect(within(line()).queryByRole('button', { name: 'Stop' })).toBeNull()
       expectLineUnderCard()
       expect(posts).toEqual([])
@@ -929,8 +934,11 @@ describe('stopping a hospital’s or food place’s source', () => {
     })
     const user = userEvent.setup()
     await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
-    expect(screen.getByTestId('row-source')).toHaveTextContent(`· ${day(at)} · Read now · Change`)
+    expect(screen.getByTestId('row-source')).toHaveTextContent(`· last ${day(at)} · Read now · Change`)
     expectLineUnderCard()
+    // Its own screen: the sticker beside the title, as a row has it, and
+    // not again by the line (the user, Nov 26).
+    expect(within(screen.getByTestId('screen-aside')).getByTestId('row-job')).toHaveTextContent('Checked nightly')
     await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
     await user.click(screen.getByRole('button', { name: 'Stop reading it' }))
     expect(posts).toEqual([['/api/admin/main-dishes', { action: 'unlink', resourceId: 'r' }]])

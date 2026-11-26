@@ -102,6 +102,9 @@ type Props = {
   sendSlot?: HTMLElement | null
   /** Where the title goes: the host's own header row, beside Back. */
   titleSlot?: HTMLElement | null
+  /** Where a row open on its own screen puts its rowAside: the host's
+   *  header, beside the screen's title, as a row has it beside its own. */
+  asideSlot?: HTMLElement | null
   sharedTurnstile?: { token: string; reset: () => void }
   onRemovalOpenChange?: (open: boolean) => void
   /** Whether the Request removal screen is showing, when the host owns it
@@ -283,6 +286,7 @@ export default function ListingEditor({
   onClose,
   sendSlot,
   titleSlot,
+  asideSlot,
   sharedTurnstile,
   onRemovalOpenChange,
   removalOpen: removalOpenProp,
@@ -987,7 +991,7 @@ export default function ListingEditor({
         {/* Where it's kept from, small, under a thin line in the same box
             (board L2, Nov 25); the sticker beside it, as the screen's
             heading is the row's title. */}
-        {!child && rowSource && <RowSourceFoot sticker={rowAside?.(row)}>{rowSource(row, changed.has(row.id))}</RowSourceFoot>}
+        {!child && rowSource && <RowSourceFoot sticker={asideSlot === undefined ? rowAside?.(row) : null}>{rowSource(row, changed.has(row.id))}</RowSourceFoot>}
       </div>
       {!child &&
         foot(
@@ -1067,6 +1071,7 @@ export default function ListingEditor({
     <div ref={rootRef} className="space-y-4">
       {challenged && <Honeypot value={sender.honeypot} onChange={sender.setHoneypot} />}
       {titleSlot && (!creating || stepTitle || removalOpen) && createPortal(title, titleSlot)}
+      {asideSlot && rowScreen && !child && !removalOpen && rowAside && row && createPortal(rowAside(row), asideSlot)}
       {!titleSlot && !creating && !onStep && <div className="text-base">{title}</div>}
       <div className={removalOpen ? 'hidden' : ''}>{boxScreen ?? rowScreen ?? listScreen}</div>
       {/* Only while it's showing: it's opened from the edit bar's Request

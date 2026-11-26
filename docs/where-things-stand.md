@@ -196,6 +196,12 @@ old number can still be looked up. When an item is done, move it to
       and puts Read now · Change on the right, as the M boards drew it.
       On a phone with no room the actions drop to their own line, still
       on the right.
+    - **Nov 26, the line says the sticker's words (the user's yes):** an
+      opened row's line reads "Checked nightly from Google · last Aug 28",
+      the sticker's own words in plain text, so a newcomer sees the line
+      is what the sticker is about. A row on its own screen (Main dishes)
+      has its sticker in the header, beside the title, not by the line.
+      The date is when that source was last read.
     - **Not built yet:** the "Sign up as … to get its emails" line under
       a typed email; refusing an email typed for usual times (pages
       only); the eruv listing still opens its Change screens; email

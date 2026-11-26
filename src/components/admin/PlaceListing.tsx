@@ -139,17 +139,20 @@ export function ArchiveBin({ onClick }: { onClick: () => void }) {
  *  A line that is only actions keeps them where the words would be. The
  *  dot between the two halves is for a screen reader, which reads it as
  *  one line. */
-export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' | 'url' | 'when'> & { red?: boolean }; controls?: ReactNode[] }) {
+export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' | 'url' | 'when'> & { red?: boolean; lead?: string }; controls?: ReactNode[] }) {
   const words: ReactNode[] = [
     ...(line.text
       ? [
-          line.url ? (
-            <a href={line.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
-              {line.text}
-            </a>
-          ) : (
-            line.text
-          ),
+          <Fragment key="t">
+            {line.lead && `${line.lead} `}
+            {line.url ? (
+              <a href={line.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
+                {line.text}
+              </a>
+            ) : (
+              line.text
+            )}
+          </Fragment>,
         ]
       : []),
     ...(line.when ? [line.when] : []),
@@ -171,6 +174,14 @@ export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' 
   )
 }
 
+/** "Checked nightly from Google · last Aug 28": a source line led by its
+ *  sticker's own words. A line that isn't a From (Stopped, a failed read)
+ *  keeps its own. */
+export function keptWords<L extends { text: string; when?: string | null }>(line: L, kept: string | null): L & { lead?: string } {
+  if (!kept || !/^From /.test(line.text)) return line
+  return { ...line, lead: kept, text: line.text.replace(/^From /, 'from '), when: line.when ? (line.when === 'just now' ? 'read just now' : `last ${line.when}`) : line.when }
+}
+
 /** A source line's words as the opened row says them (board L2, Nov 25):
  *  "From Google", "From its website", "From kesher.example/davening".
  *  Nothing reading it has no words: the sticker says Not checked, and the
@@ -178,7 +189,7 @@ export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' 
 export function fromWords(text: string): string {
   if (!text || text === 'Nothing reads this') return ''
   if (text === 'Stopped' || /^(From|Found|Reading|Couldn’t|No |Looking|Not found)/.test(text)) return text
-  if (text === 'Link check') return 'From the weekly link check'
+  if (text === 'Link check') return 'From the link check'
   return `From ${text.startsWith('Its ') ? `its ${text.slice(4)}` : text}`
 }
 
@@ -515,7 +526,12 @@ export default function PlaceListing({
       controls.push(control('Use Google’s', () => void google(row, 'use_field', f)))
     }
     if (line.findOnGoogle && googlePlace) controls.push(control('Find it on Google', () => setFinding(true)))
-    const words = said(line)
+    // The line says what its sticker says, in the same words, then where
+    // from and when (the user, Nov 26: a newcomer has to see the line is
+    // what the sticker is about). Only a green one: Not checked has no
+    // source to name.
+    const sticker = failed ? null : stickerOf(source)
+    const words = keptWords(said(line), sticker?.tone === 'green' ? sticker.text : null)
     return (
       <div className="space-y-1.5">
         {error}

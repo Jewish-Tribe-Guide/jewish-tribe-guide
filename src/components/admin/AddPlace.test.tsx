@@ -153,7 +153,9 @@ describe('Add a place', () => {
     await user.click(screen.getByRole('button', { name: 'Fill it in yourself' }))
     await user.click(screen.getByTestId('editor-add-minyans:weekday'))
     const open = screen.getByTestId('editor-open-minyans:weekday')
-    expect(within(open).getByTestId('row-job')).toHaveTextContent('Not checked')
+    // Beside the screen's title, not by the line (Nov 26).
+    expect(within(screen.getByTestId('screen-aside')).getByTestId('row-job')).toHaveTextContent('Not checked')
+    expect(within(open).queryByTestId('row-job')).toBeNull()
     expect(within(open).queryByText('Nothing reads this')).toBeNull()
     expect(screen.queryByTestId('source-field')).toBeNull()
     expect(screen.getByTestId('row-source')).toHaveTextContent(/^Add a page$/)
