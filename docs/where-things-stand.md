@@ -200,8 +200,9 @@ old number can still be looked up. When an item is done, move it to
       opened row's line reads "Checked nightly from Google · last Aug 28",
       the sticker's own words in plain text, so a newcomer sees the line
       is what the sticker is about. A row on its own screen (Main dishes)
-      has its sticker in the header, beside the title, not by the line.
-      The date is when that source was last read.
+      has its sticker on the title's line, at its right (not up on
+      Back's line, Nov 26). Add's rows say the same words. The date is
+      when that source was last read.
     - **Not built yet:** the "Sign up as … to get its emails" line under
       a typed email; refusing an email typed for usual times (pages
       only); the eruv listing still opens its Change screens; email

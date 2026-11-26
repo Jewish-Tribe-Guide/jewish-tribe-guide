@@ -50,7 +50,7 @@ export default function ListingEditorScreen({
   const [asideSlot, setAsideSlot] = useState<HTMLElement | null>(null)
   return (
     <div className="flex flex-col gap-4">
-      <AdminBack back={{ label: step || overlay ? 'Back' : backLabel, onClick: back }} title={title} right={<span ref={setAsideSlot} className="contents" data-testid="screen-aside" />} />
+      <AdminBack back={{ label: step || overlay ? 'Back' : backLabel, onClick: back }} title={title} titleAside={<span ref={setAsideSlot} className="contents" data-testid="screen-aside" />} />
       {!step && !overlay && top}
       {overlay?.node}
       <div className={overlay ? 'hidden' : ''}>

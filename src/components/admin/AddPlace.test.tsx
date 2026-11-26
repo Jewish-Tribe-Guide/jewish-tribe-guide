@@ -170,7 +170,7 @@ describe('Add a place', () => {
     await user.type(screen.getByTestId('source-field'), 'https://ohev.org/davening')
     await user.click(screen.getByRole('button', { name: 'Done' }))
     await user.click(screen.getByTestId('editor-add-minyans:weekday'))
-    expect(screen.getAllByTestId('row-source').map((p) => p.textContent)).toEqual(['From ohev.org/davening · Read now · Change'])
+    expect(screen.getAllByTestId('row-source').map((p) => p.textContent)).toEqual(['Checked nightly from ohev.org/davening · Read now · Change'])
     expect(screen.queryByTestId('source-field')).toBeNull()
     expect(posts()).toEqual([])
   })
@@ -203,7 +203,7 @@ describe('Add a place', () => {
     renderAdd()
     await user.click(screen.getByRole('button', { name: 'Pick it' }))
     await user.click(screen.getByTestId('editor-row-contact:phone'))
-    expect(screen.getByTestId('row-source')).toHaveTextContent(/^From Google$/)
+    expect(screen.getByTestId('row-source')).toHaveTextContent(/^Checked nightly from Google$/)
     expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull()
     const phone = within(screen.getByTestId('editor-open-contact:phone')).getAllByRole('textbox')[0]
     await user.clear(phone)
@@ -411,7 +411,7 @@ describe('Add a place', () => {
       // Nothing's put in till it's used.
       expect(screen.getByTestId('editor-open-minyans:weekday')).not.toHaveTextContent('Shacharis 7 AM')
       await user.click(screen.getByRole('button', { name: 'Use these times' }))
-      expect(sourceWords()).toBe('From its website · just now · Change')
+      expect(sourceWords()).toBe('Checked nightly from its website · read just now · Change')
       await user.click(screen.getByRole('button', { name: 'Done' }))
       expect(screen.getByTestId('editor-row-minyans:weekday')).toHaveTextContent('Shacharis 7 AM')
       expect(saves()).toEqual([])
@@ -527,7 +527,7 @@ describe('Add a place', () => {
       renderAdd()
       await giveEmail(user)
       await readEmail(user)
-      await waitFor(() => expect(sourceWords()).toContain('office@ohev.org · Oct 30'))
+      await waitFor(() => expect(sourceWords()).toContain('office@ohev.org · last Oct 30'))
     })
   })
 

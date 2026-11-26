@@ -939,6 +939,12 @@ describe('stopping a hospital’s or food place’s source', () => {
     // Its own screen: the sticker beside the title, as a row has it, and
     // not again by the line (the user, Nov 26).
     expect(within(screen.getByTestId('screen-aside')).getByTestId('row-job')).toHaveTextContent('Checked nightly')
+    // On the title's own line, not up by Back (the user, Nov 26).
+    // (The header's own `right` follows the title too, but a computer
+    // draws it up on Back's line: it must share the title's box.)
+    const aside = screen.getByTestId('screen-aside')
+    expect(aside.previousElementSibling?.tagName).toBe('H1')
+    expect(aside.parentElement?.tagName).not.toBe('HEADER')
     await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
     await user.click(screen.getByRole('button', { name: 'Stop reading it' }))
     expect(posts).toEqual([['/api/admin/main-dishes', { action: 'unlink', resourceId: 'r' }]])

@@ -23,7 +23,8 @@ import { addRowSources, foundLines, type AddLine, type AddRead, type AddSlot, ty
 import ListingEditorScreen from './ListingEditorScreen'
 import { AddStep } from './AddWhat'
 import { addingWords } from '@/lib/addingWords'
-import { RowJob, SourceScreen, SourceWords, fromWords } from './PlaceListing'
+import { RowJob, SourceScreen, SourceWords, fromWords, keptWords } from './PlaceListing'
+import { stickerOf } from './rowSticker'
 import { SignUpLine } from './SignUpLine'
 import { addSourceWords, sourcePlaceholder, useSourceFields, type FieldSpec } from './useSourceFields'
 import { sourceActions } from './sourceActions'
@@ -313,6 +314,11 @@ export default function AddPlace({ category, listings, token, onClose, onBack = 
       if (l.change) specs.set(l.change.slot, slotSpec(row, l.change.slot))
       if (l.add) specs.set(`add:${l.add.slot}`, slotSpec(row, l.add.slot, '', true))
     }
+    // The first From line says the sticker's words (Nov 26), as a saved
+    // place's does.
+    const sticker = stickerOf(source)
+    const kept = sticker?.tone === 'green' ? sticker.text : null
+    const leadAt = source.lines.findIndex((l) => !l.says && fromWords(l.text).startsWith('From '))
     return (
       <div className="space-y-1.5">
         {source.lines.map((line, i) => {
@@ -320,7 +326,8 @@ export default function AddPlace({ category, listings, token, onClose, onBack = 
           // "No minyan times on its website" over the field read as its label).
           if (line.change && fields.isOpen(row, line.change.slot)) return null
           const controls = lineControls(row, line)
-          const words = { ...line, text: line.says ? line.text : fromWords(line.text) }
+          const said = { ...line, text: line.says ? line.text : fromWords(line.text) }
+          const words = i === leadAt ? keptWords(said, kept) : said
           return (
             <Fragment key={i}>
               {(words.text || controls.length > 0) && <SourceWords line={words} controls={controls} />}
