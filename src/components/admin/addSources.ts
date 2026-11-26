@@ -50,6 +50,9 @@ export type KosherLookup = { lists: { name: string; url: string; values: Record<
 
 export type AddLine = {
   text: string
+  /** A sentence about the source ("Google stops keeping this"), said as
+   *  it is; without it, `text` names the source and reads "From …". */
+  says?: boolean
   /** Still being read, or read with nothing kept from it: the row's sticker. */
   state?: LineState
   url?: string | null
@@ -120,7 +123,7 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     const fromGoogle = picked?.[field]
     if (fromGoogle !== undefined) {
       if (fromGoogle === fieldNow(field, category, values)) return { job: 'Google', amber: false, lines: [{ text: 'Google' }] }
-      return { job: 'Nothing', amber: true, lines: [{ text: 'Google stops keeping this' }] }
+      return { job: 'Nothing', amber: true, lines: [{ text: 'Google stops keeping this', says: true }] }
     }
     if (field === 'website') return linkCheck
     return picked ? nothing() : nothing({ findOnGoogle: true })
@@ -160,9 +163,9 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     if (read?.state === 'reading') return [{ text: 'Looking in the guide’s Gmail…', state: 'checking' }]
     if (read?.state === 'found') return [{ text: address, when: read.on, change }]
     if (read?.state === 'no-email') return [{ text: `No emails from ${address} yet`, change, signUp: true, state: 'unchecked' }]
-    if (read?.state === 'no-times') return [{ text: `${address}’s ${read.on} email had no times`, change, state: 'unchecked' }]
+    if (read?.state === 'no-times') return [{ text: `${address}’s ${read.on} email had no times`, says: true, change, state: 'unchecked' }]
     if (read?.state === 'no-answer') return [{ text: 'Couldn’t reach the guide’s Gmail', red: true }, { text: address, when: 'within the hour', change }]
-    if (read?.state === 'no-gmail') return [{ text: 'The guide’s Gmail isn’t set up', setUpGmail: true }, { text: address, when: 'within the hour', change }]
+    if (read?.state === 'no-gmail') return [{ text: 'The guide’s Gmail isn’t set up', says: true, setUpGmail: true }, { text: address, when: 'within the hour', change }]
     return [{ text: address, readNow: 'email', change }]
   }
 
@@ -206,8 +209,8 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
     if (s.kosherUsed) return { job: s.kosherUsed.replace(/’s list$/, ''), amber: false, lines: [{ text: s.kosherUsed, when: 'today', change: { slot: 'keystone', label } }] }
     if (given.keystone) return { job: 'Keystone-K', amber: false, lines: [{ text: shortUrl(given.keystone), change: { slot: 'keystone', label } }] }
     const on = s.kosher?.lists[0]
-    if (on) return { job: 'Nothing', amber: true, lines: [{ text: `On ${on.name}`, useList: on }] }
-    if (s.kosher) return { job: 'Nothing', amber: true, lines: [{ text: s.kosher.none, add: { label, slot: 'keystone', words: 'Add its page' } }] }
+    if (on) return { job: 'Nothing', amber: true, lines: [{ text: `On ${on.name}`, says: true, useList: on }] }
+    if (s.kosher) return { job: 'Nothing', amber: true, lines: [{ text: s.kosher.none, says: true, add: { label, slot: 'keystone', words: 'Add its page' } }] }
     return nothing()
   }
 

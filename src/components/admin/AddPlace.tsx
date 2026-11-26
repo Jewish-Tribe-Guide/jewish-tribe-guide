@@ -264,7 +264,8 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
   const slotSpec = (row: EditorRow, slot: AddSlot, value = ''): FieldSpec => ({
     key: slot,
     value,
-    placeholder: sourcePlaceholder(row),
+    // Kosher and a hospital want one page on one site; say which.
+    placeholder: slot === 'keystone' ? 'Its page on Keystone-K’s list' : slot === 'refuah' ? 'Its page on Refuah' : sourcePlaceholder(row),
     attempt: async (url) => {
       choose(slot, url)
       return { failed: false }
@@ -325,7 +326,7 @@ export default function AddPlace({ category, listings, token, onClose }: { categ
       <div className="space-y-1.5">
         {source.lines.map((line, i) => {
           const controls = lineControls(row, line)
-          const words = { ...line, text: fromWords(line.text) }
+          const words = { ...line, text: line.says ? line.text : fromWords(line.text) }
           return (
             <Fragment key={i}>
               {(words.text || controls.length > 0) && <SourceWords line={words} controls={controls} />}

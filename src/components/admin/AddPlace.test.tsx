@@ -159,8 +159,29 @@ describe('Add a place', () => {
     const phone = within(screen.getByTestId('editor-open-contact:phone')).getAllByRole('textbox')[0]
     await user.clear(phone)
     await user.type(phone, '215-555-0199')
-    expect(screen.getByTestId('row-source')).toHaveTextContent('Google stops keeping this')
+    expect(screen.getByTestId('row-source')).toHaveTextContent(/^Google stops keeping this$/)
     expect(saves()).toEqual([])
+  })
+
+  // Nov 25: a sentence about a source isn't its name, so no "From" before
+  // it ("From Not on Keystone-K…"), and the field says which page it wants.
+  it('Kosher: not on the lists is said as it is, and its field asks for the Keystone-K page', async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetchJson).mockImplementation(async (_url, init) =>
+      JSON.parse(String(init?.body ?? '{}')).slot === 'kosher' ? { kosher: { lists: [], none: 'Not on Keystone-K or Mekor Habracha’s list' } } : {},
+    )
+    const food = makeCategory({
+      id: 'restaurant',
+      label: 'Food',
+      placeKind: 'food',
+      detailFields: [{ key: 'kosherCert', label: 'Kosher Certification', type: 'select', options: [{ value: 'IKC', label: 'IKC' }] }],
+    })
+    renderAdd(vi.fn(), food)
+    await user.click(screen.getByRole('button', { name: 'Pick it' }))
+    const row = await waitFor(() => screen.getByTestId(/^editor-(add|row)-.*kosher/i))
+    await user.click(row)
+    await waitFor(() => expect(screen.getByTestId('row-source')).toHaveTextContent(/^Not on Keystone-K or Mekor Habracha’s list$/))
+    expect(screen.getByTestId('source-field')).toHaveAttribute('placeholder', 'Its page on Keystone-K’s list')
   })
 
   describe('after Add listing', () => {
