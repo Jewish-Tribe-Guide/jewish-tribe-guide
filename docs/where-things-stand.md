@@ -191,6 +191,11 @@ old number can still be looked up. When an item is done, move it to
       them (`&from=pick` says the first step's entry is underneath).
       The rows use the admin's own grey glyph squares, as Site's
       category list does, not the board's dark circles.
+    - **Nov 26, actions on the right (the user's ask):** a row's source
+      line keeps "Checked nightly · From its menu · Oct 20" on the left
+      and puts Read now · Change on the right, as the M boards drew it.
+      On a phone with no room the actions drop to their own line, still
+      on the right.
     - **Not built yet:** the "Sign up as … to get its emails" line under
       a typed email; refusing an email typed for usual times (pages
       only); the eruv listing still opens its Change screens; email

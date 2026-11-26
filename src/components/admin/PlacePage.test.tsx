@@ -419,6 +419,11 @@ describe('PlacePage', () => {
       await user.click(minyans)
       expect(screen.getByTestId('row-source')).toHaveTextContent(`From kesher.example/davening · ${day(at)} · Read now · Change`)
       expectLineUnderCard()
+      // The user, Nov 26: what to do on the right, apart from what it says.
+      const actions = screen.getByTestId('row-source-actions')
+      expect(actions).toHaveTextContent(/^Read now · Change$/)
+      expect(actions).toHaveClass('ml-auto')
+      expect(actions.previousElementSibling).toHaveClass('sr-only')
       expect(screen.queryByTestId('source-field')).toBeNull()
       await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
       expect(screen.queryByTestId('source-screen')).toBeNull()
@@ -538,7 +543,7 @@ describe('PlacePage', () => {
         await readPage({ lastError: 'down' })
         const user = userEvent.setup()
         await user.click(await openRow(user))
-        expect(await screen.findByText('Couldn’t read its website')).toHaveClass('text-red-700')
+        expect((await screen.findByText('Couldn’t read its website')).closest('[data-testid="row-source"]')).toHaveClass('text-red-700')
         const lines = screen.getAllByTestId('row-source')
         const last = lines[lines.length - 1]
         expect(within(last).getByRole('button', { name: 'Read now' })).toBeTruthy()

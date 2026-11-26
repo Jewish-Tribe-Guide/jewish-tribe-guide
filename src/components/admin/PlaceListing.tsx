@@ -134,8 +134,13 @@ export function ArchiveBin({ onClick }: { onClick: () => void }) {
 
 /** "From its menu · Oct 20 · Change": a row's one line, its controls drawn
  *  in by the caller. With no text, just its controls. */
+/** What a source line says on the left, what to do about it on the right
+ *  (boards M1–M6, the user Nov 26: "the actions should go on the right").
+ *  A line that is only actions keeps them where the words would be. The
+ *  dot between the two halves is for a screen reader, which reads it as
+ *  one line. */
 export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' | 'url' | 'when'> & { red?: boolean }; controls?: ReactNode[] }) {
-  const parts: ReactNode[] = [
+  const words: ReactNode[] = [
     ...(line.text
       ? [
           line.url ? (
@@ -148,16 +153,20 @@ export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' 
         ]
       : []),
     ...(line.when ? [line.when] : []),
-    ...(controls ?? []),
   ]
+  const dotted = (parts: ReactNode[]) =>
+    parts.map((p, i) => (
+      <Fragment key={i}>
+        {i > 0 && ' · '}
+        {p}
+      </Fragment>
+    ))
+  const acts = controls ?? []
   return (
-    <p className={`m-0 text-[0.8125rem] [overflow-wrap:anywhere] ${line.red ? 'font-semibold text-red-700' : 'text-slate-500'}`} data-testid="row-source">
-      {parts.map((p, i) => (
-        <Fragment key={i}>
-          {i > 0 && ' · '}
-          {p}
-        </Fragment>
-      ))}
+    <p className={`m-0 flex flex-wrap items-baseline gap-x-3 text-[0.8125rem] [overflow-wrap:anywhere] ${line.red ? 'font-semibold text-red-700' : 'text-slate-500'}`} data-testid="row-source">
+      {words.length > 0 && <span className="min-w-0 grow basis-40">{dotted(words)}</span>}
+      {words.length > 0 && acts.length > 0 && <span className="sr-only"> · </span>}
+      {acts.length > 0 && <span className={words.length > 0 ? 'ml-auto shrink-0' : ''} data-testid="row-source-actions">{dotted(acts)}</span>}
     </p>
   )
 }
