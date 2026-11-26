@@ -198,6 +198,10 @@ describe('Places', () => {
       ['watches/kosher', { lists: [], places: [] }],
       ['watches/google', { counts: {}, places: [] }],
       ['watches/links', { links: [] }],
+      // A shul's this-week row asks these (useWeekEmails); unanswered,
+      // its read threw after the test and failed CI's run (Nov 26).
+      ['watches/newsletters', { newsletters: [] }],
+      ['community-email', { email: null }],
     ]
     const page = (id: string, failing = false) => ({ id, name: id, pages: [{ source: '', watch: { active: true, failingSince: failing ? '2026-10-20T00:00:00Z' : null, lastError: failing ? 'down' : null, lastRunAt: new Date().toISOString(), lastOkAt: failing ? null : new Date().toISOString(), lastCheck: null, createdAt: '2026-10-01T00:00:00Z' } }], findings: [], fields: [], off: false })
 
