@@ -233,23 +233,27 @@ those, so they still see the end result. If built, this changes:
 R4's "You check it before it's sent", and P6b (a paste no longer opens
 Edit listing).
 
-## Renamed and split (drawn Nov 27, U1–U4)
+## Renamed and split (drawn Nov 27, U1, U2b, U2c, U3, U4b)
 
 The user: change the name from Add, and maybe camera and paste as two
-buttons. A first draft (T1–T3: a wide "Add or update" pill, two big rows,
-a form-like photo box) was replaced by:
+buttons. Drafts T1–T3, then U2 and U4, were replaced by:
 
 - **U1:** on a phone, a round apricot "+" (aria-label "Add or update");
   a computer keeps the words.
-- **U2:** the sheet titled "Add or update", search first; one quiet row
-  under it, "Have a flyer or a post?", with small Photo and Paste
-  buttons, so they don't outweigh search.
-- **U3:** Photo opens the phone's own picker (camera, library, file;
-  several at once), then a messaging-style composer (WhatsApp,
+- **U2b:** the sheet titled "Add or update", search first; under it
+  "Or just tell us" and two small buttons, **Send a photo** and **Send a
+  message**. A button says what it does; no lead-in sentence ("Have a
+  flyer or a post?" and "Paste" were unclear to the user).
+- **U2c:** Send a photo opens the phone's own menu (library, camera,
+  file; several at once). No screen of ours before it.
+- **U3:** the photos picked, in a messaging-style screen (WhatsApp,
   iMessage): the photo big with ✕, a strip with + for more, "Add a note
-  (optional)", a round Send. Nothing goes until Send.
-- **U4:** Paste opens the same composer with the text first and a camera
-  button in its bar. It replaces today's box and its "Photo or PDF" row.
+  (optional)" (it grows, so a pasted message fits), a round Send.
+  Nothing goes until Send.
+- **U4b:** Send a message: a text box, "Say it in your own words, or
+  paste it from WhatsApp or an email", Send grey until there's text. No
+  camera button: a photo with words is U3, so each screen does one
+  thing.
 
 ## Waiting on the user
 
