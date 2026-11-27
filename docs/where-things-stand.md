@@ -227,8 +227,8 @@ old number can still be looked up. When an item is done, move it to
   community, every kind of Jew, every fact dated, anyone can fix), the
   first point's sentence leading with what it is. Seed, dev and live
   have the new text (live written Nov 26 with the user's go-ahead, old
-  text backed up first). **Live still serves the old order from its
-  cache until a redeploy or a Save on About in the admin's Pages tab.**
+  text backed up first) and showing since its cache was refreshed.
+  Done.
 - **Fixed Nov 26, every community screen logged "URL data outside of
   <Suspense>" in dev** (Next's instant-navigation check, not only About).
   The community layout and every screen read the community from the
