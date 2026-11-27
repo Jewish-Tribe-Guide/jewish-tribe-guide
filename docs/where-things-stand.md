@@ -216,6 +216,19 @@ old number can still be looked up. When an item is done, move it to
   holding one, the committed-seed check fails on one, a check fails if a
   suite writes one the list doesn't know, and the About tests stop on one
   rather than restoring it.
+- **Nov 26, About laid out as Privacy (the user: "two things that are
+  pretty similar type of pages looking different"; canvas "About like
+  Privacy", boards A1 and B3).** One rule for both pages: the mission
+  line, the first section open with its points as icon rows, the rest as
+  boxes on a computer (with On this page beside them) and rows that open
+  on a phone ("More about the guide"), then Ways to help as one box of
+  rows. The pairs and card grids went (`aboutBlocks` deleted). The text
+  now opens with What sets it apart, its points in the user's order (one
+  community, every kind of Jew, every fact dated, anyone can fix), the
+  first point's sentence leading with what it is. Seed and dev have the
+  new text; **live's About needs the same edit, with your go-ahead**
+  (until then live keeps the old order in the new layout: The problem
+  open, the rest folded).
 
 ### You decide
 

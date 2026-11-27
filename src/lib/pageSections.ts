@@ -1,4 +1,5 @@
-// About and Privacy (boards of Nov 15, "About v2" and "Privacy and terms")
+// About and Privacy (board "Privacy and terms", Nov 15; About follows it
+// since Nov 26)
 // are laid out from the shape of their admin-written text, so an admin edits
 // the words in the Pages tab and the page keeps its layout:
 //
@@ -6,9 +7,9 @@
 //   mission, drawn large);
 // - each heading starts a section;
 // - a section whose list has a bold lead on every item ("<strong>Visiting.
-//   </strong> Where to daven…") is a set of named points, which About draws
-//   as cards and Privacy as rows with an icon (its short version) or as a
-//   list with bold leads (the rest).
+//   </strong> Where to daven…") is a set of named points, drawn as rows with
+//   an icon in the first section (the page in short) and as a list with bold
+//   leads in the rest.
 //
 // Works on sanitized HTML only (pageBodyToHtml), whose tags are a short
 // allowlist with no attributes but a link's href, so plain pattern matching
@@ -102,35 +103,6 @@ export function pageDocumentParts(html: string): PageDocumentParts {
     sections.push({ id, heading, html: body, points: pointsOf(body) })
   }
   return { lead, sections }
-}
-
-/** About's rows: two plain sections in a row sit side by side on a computer
- *  ("The problem" and "What the guide does"), named points are a row of
- *  cards, and a plain section left over stands alone ("Who runs it", which
- *  the page puts beside its ways to help). */
-export type AboutBlock =
-  | { kind: 'pair'; sections: [PageSection, PageSection] }
-  | { kind: 'cards'; section: PageSection }
-  | { kind: 'single'; section: PageSection }
-
-export function aboutBlocks(sections: readonly PageSection[]): AboutBlock[] {
-  const blocks: AboutBlock[] = []
-  for (let i = 0; i < sections.length; i++) {
-    const s = sections[i]
-    if (s.points && !s.points.before && !s.points.after) {
-      blocks.push({ kind: 'cards', section: s })
-      continue
-    }
-    const next = sections[i + 1]
-    const nextIsPlain = next && !(next.points && !next.points.before && !next.points.after)
-    if (nextIsPlain) {
-      blocks.push({ kind: 'pair', sections: [s, next] })
-      i++
-      continue
-    }
-    blocks.push({ kind: 'single', section: s })
-  }
-  return blocks
 }
 
 /** The line icon for a named point, from the words in its lead. Words an
