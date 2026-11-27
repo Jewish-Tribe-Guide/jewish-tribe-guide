@@ -1,14 +1,15 @@
 # Add: the problem and the plan
 
-Written Nov 26, 2026, for the user to approve. Nothing here is built or
-drawn as settled. The boards on the "Add, form first" canvas
-(N1–N6, O1–O4) came before this was written down and are not the plan.
+Written Nov 26, 2026; the drawings settled Nov 27. Nothing here is built:
+the user decides whether to build it. The drawings are on the "Add,
+rethought" canvas (https://claude.ai/artifact/FkD8Lp8jbXC3JgZXsUgY6A):
+R1, R2, R3b, R4 and P6b, with N1 (today) for comparison.
 
 ## What Add is for
 
 The guide stays right only if the people who use it tell us what's
-missing. Add is how a visitor does that, for a place that isn't listed.
-A place that is listed is changed through its own Edit listing.
+missing or wrong. Add is how a visitor does that: a place that isn't
+listed, or a change to one that is.
 
 ## The problem
 
@@ -57,95 +58,98 @@ judgment or a worry, said as one.
 
 - How many open Add, which way they go, and how many send. We don't
   have good numbers today.
-- How long an AI read takes. From migration 117 (Nov 26) each read's
-  time is kept (`message_read_time`), and
-  `scripts/compare-reader/messages.run.ts` replays the posts people sent
-  at each thinking level. On 42 posts the model call took 2.6s
-  typically and 8.1s for the slowest tenth; at "low" 2.3s and 4.8s,
-  reading as well. The box reads at low since then.
 - Whether people miss the button, or see it and don't want it.
+- How long an AI read takes was the third. From migration 117 (Nov 26)
+  each read's time is kept (`message_read_time`), and
+  `scripts/compare-reader/messages.run.ts` replays the posts people sent
+  at each thinking level. On 42 posts the model call took 2.6s typically
+  and 8.1s for the slowest tenth; at "low" 2.3s and 4.8s, reading as
+  well. The box reads at low since then.
 
 ## What a fix has to do
 
 1. **One way in; the method follows from what they give us.** A name
-   finds it on Google, a post or a photo gets read, nothing found leads
-   to filling it in. Nobody picks a method first.
-2. **AI says so when it starts** ("Reading this with AI…"), with a way
-   to stop. Never hidden, never a surprise.
-3. **Add is where the need comes up**, as part of the screen, not over
-   it.
-4. **Nobody has to know whether the place is already here.** The way
-   in finds out: a place we have opens to its listing, to change; one
-   we don't opens to add it. (Changed Nov 26, the user: "is there a way
-   that one way in can include edit?" The trouble today isn't that one
-   box does both; it's two parallel doors, "Add or update" and Edit
-   listing, and the person choosing between them.)
-5. **One look and one sheet everywhere**, so it's learned once.
+   searches; a post or a photo is read by AI; nothing found leads to
+   filling it in. Nobody picks a method before starting.
+2. **AI says so before it reads.** Never hidden, never a surprise.
+3. **Add is where the need comes up**: after a search, not only on the
+   floating button.
+4. **Nobody has to check first whether the place is already here.**
+   Every way in checks: a place we have opens to change it, one we
+   don't opens to add it (the user, Nov 26: "is there a way that one
+   way in can include edit?").
+5. **One screen to learn.** Every way into Add lands on the same one.
 
-## The plan
-
-In order. Each step is worth having on its own.
+## The plan (drawings agreed Nov 27)
 
 1. **Count it.** Record when Add opens (and from where), which way it
-   goes (Google, by hand, AI), and whether it's sent. A small change, and
-   in a month it says whether the rest worked. Nothing below waits on
-   it.
-2. **Add with search.** At the end of every set of search results, on a
-   category and from home, not only when nothing is found: a search for
-   something missing usually still returns other places. "Not here? Add
-   Bagel Factory", opening already searching Google for what was typed.
-   The empty-search card gets it too, ahead of WhatsApp.
-3. **Add in a category's own heading.** The line above the list:
-   "112 places · Add one". Seen when the page opens, part of the list,
-   and it says the list is kept by the community. When filters or a sort
-   cut the list short, an Add row at its end as well.
-4. **One sheet, starting from what they have.** It opens on Find the
-   place. A name searches Google; no match offers "Fill it in yourself";
-   a pasted post or a photo is read by AI, saying so as it starts, with
-   "Fill it in myself" beside the wait and the paste kept. Same title,
-   steps and Back whichever way it goes. A name or a post that turns
-   out to be a place we have opens that place's change (Edit listing's
-   own screen), so new and existing go in by the same door.
-5. **The floating button goes**, once 2–4 are in. The few regulars who
-   add many places (a gabbai, whoever keeps a category) get a plain "Add
-   a place" somewhere quiet, such as the You tab.
-6. **The search box takes a paste or a photo** (a camera in the box, as
-   Google Lens does). The box people already use becomes the way in for
-   the poster too: a typed name searches, a pasted post is read, with AI
-   saying so. *Open: the hardest to get right, since a search box that
-   sometimes starts an AI read must never surprise anyone.*
-7. **Forward it to the guide.** A WhatsApp number or an email address a
-   poster can be sent to, as to a friend. The real answer for the person
-   holding a poster, but a cost and moderation decision (spam, unknown
-   senders), not a screen, so decided on its own. Sharing from the
-   phone's Share menu only works on Android (iPhone Safari doesn't let a
-   website appear there), so it doesn't replace this.
+   goes (a name, Google, by hand, AI), and whether it's sent. The AI
+   read's time is already kept (above).
+2. **Add after search results (R1).** At the end of a category's search
+   results, a dashed row: "Add Bagel Factory · Not in the list? Add it
+   to the guide". No chevron; the whole row is the tap. A search for
+   something missing usually still finds other places, so the row is
+   there whenever results are, not only when there are none.
+3. **Add when nothing is found (R2).** Today's card, without "Search the
+   whole guide" (they can go back and search), and a second button
+   under "Ask in a WhatsApp group": "+ Add Bagel Factory".
+4. **Find the place, one list (R3b).** Where R1, R2 and the floating
+   "+ Add" all open, already searching for what was typed. One list:
+   our places first, tagged "In the guide" (they open to change), then
+   Google's, then "Fill in 'Bagel' yourself · not on Google" last. A
+   Google place we have shows once, as ours. Under the list, "Or paste
+   a post or a photo · AI reads it for you to check". Today these are
+   separate (Google's dropdown, an "In the guide" list, a link under
+   them) only because they come from two sources.
+5. **The AI box, once chosen (R4).** Today's box, titled "Paste a post
+   or a photo", with a "Read by AI" tag and "You check it before it's
+   sent" before anything is typed. Back returns to Find the place.
+6. **A read about a place we have opens its Edit listing (P6b)**, with
+   what the post says filled in and those rows marked Changed, as any
+   edit marks them, and Send counting them. A wrong read is fixed by
+   tapping its row; the rest of the listing is there too. One line at
+   the top: "Read by AI from your post. Tap a row to fix it." Replaces
+   today's summary card and "Change something else about …". A new
+   place goes to the add form, with what was read filled in.
+7. **The floating "+ Add" stays**, as today, and opens Find the place
+   (R3b) instead of the AI box.
 
-Drawings come after this is agreed, for steps 2–4 first.
+What checks for a place already here, on each way in: R3b shows our
+places first; a read is matched against every listing, and for a new
+place it also lists ones with similar names ("is it one of these?");
+"Fill it in yourself" is only reachable under our own matches. An admin
+approves every new place, the last net.
 
-## An idea for later (the user, Nov 26)
+## Considered and left
 
-A "+" that opens into two or three smaller buttons, one being a
-camera: take a picture of a poster or a storefront, and the guide says
-whether it has the place, opening it if so and adding it if not. Text
-would be the other. Noted, not part of the plan yet. In its favour: the
-camera is the poster person’s way in, and "do we have it?" first is
-point 4 of what a fix has to do. Against: it brings back a floating button, and a choice
-of camera or text before starting, though that's a choice of how to
-show us, not of a method.
+- **Add in a category's heading** ("112 places · Add one"). The user,
+  Nov 26: not how the page looks today; Add in the header was turned
+  down too.
+- **The floating button as photo and text only** (P7: a "+" opening
+  into "Take a picture" and "Type or paste"), and **a camera in the
+  Find the place box** (P7b–d). Left Nov 27: every way in already
+  checks, so the photo person is served by R3b's AI row and R4, and one
+  screen behind every Add is easier to learn than a menu. If the AI
+  row turns out to be missed, the camera can come back.
+- **The search box taking a paste or a photo.** Left for now, for the
+  same reason.
+- **Forwarding a poster to the guide** (a WhatsApp number or an email
+  address). The user, Nov 27: the paste and the camera will likely be
+  replaced by a phone number, hopefully. So R3b's AI row and R4 are
+  what serves the poster person until a number exists; once it does,
+  they may go. The number is a cost and moderation decision (spam,
+  unknown senders), not decided yet.
 
 ## Changes to earlier decisions
 
 - **Oct 5:** "No 'AI or by hand' first screen: the box is the default;
-  the form one small link away." Reversed: the form comes first, and the
-  way in follows from what's given.
+  the form one small link away." Reversed: Add opens on Find the place,
+  and AI is one row on it.
 - **Oct 10:** "No word 'AI' on the first screen." Reversed: AI says so
-  when it starts.
-- **Oct 5:** "+ Add on every screen but the Map." Replaced by Add with
-  search and in a category's heading (step 5).
+  before it reads.
+- **Oct 5:** "+ Add on every screen but the Map." Kept.
 
 ## Waiting on the user
 
-- Agree the problem and the plan above, or change them.
-- Step 6: try the search box taking a paste or a photo, or not.
-- Step 7: a WhatsApp number, an email address, or neither for now.
+- Whether to build it, and in what order.
+- The phone number for forwarding: which service, and when.

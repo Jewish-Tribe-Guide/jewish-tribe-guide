@@ -247,16 +247,14 @@ old number can still be looked up. When an item is done, move it to
     taps until it reloads: a gap noted Nov 16, never seen; every way of
     causing it in a browser worked fine (Nov 22). Only if you see it:
     which screen, how long away, installed or in Safari.
-96. **Add, rethought** (Nov 26): the problem and a seven-step plan are
-    in `docs/add-rethink.md` (one way in, the method following from what
-    people have, new or already here; Add with search and in a
-    category's heading; AI saying so when it starts; the floating button
-    going). The user wants drawings before agreeing it. Agree or change it,
-    and pick for steps 6 (the search box takes a paste or photo) and 7
-    (forward to the guide). The "Add, form first" canvas boards came
-    before it and aren't the plan. Drawings on the "Add, rethought"
-    canvas: R1 and R2 liked; R3b (one list) and P6b (a post opens Edit
-    listing) waiting on the user. The AI read's speed: see 97.
+96. **Add, rethought** (Nov 26–27): drawings agreed Nov 27, in
+    `docs/add-rethink.md` and on the "Add, rethought" canvas (R1, R2,
+    R3b, R4, P6b): Add after search results and on the nothing-found
+    card; the floating "+ Add" stays; all three open one Find the place
+    list (ours tagged "In the guide", then Google's, then Fill it in
+    yourself, then the AI row); a read about a place we have opens its
+    Edit listing. Build it or not, and the forwarding phone number the
+    user hopes will replace paste and camera. The AI read's speed: 97.
 
 ### You do
 
