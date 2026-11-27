@@ -120,7 +120,7 @@ export default function FindPlace({
           </span>
           <span>
             <span className="block text-[0.9375rem] font-bold text-slate-900">Or paste a post or a photo</span>
-            <span className="block text-[0.8125rem] text-slate-600">AI reads it for you to check</span>
+            <span className="block text-[0.8125rem] text-slate-600">An admin checks it</span>
           </span>
         </button>
       )}

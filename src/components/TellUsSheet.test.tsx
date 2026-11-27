@@ -672,6 +672,10 @@ describe('Saw something? Tell us', () => {
 
     it('has the AI box a row under the list, saying it’s AI before anything is typed, with Back to the search', async () => {
       add()
+      // Sent as it is (Nov 27, S1b): the row says who checks it, not "for
+      // you to check".
+      expect(screen.getByRole('button', { name: /Or paste a post or a photo/ })).toHaveTextContent('An admin checks it')
+      expect(screen.getByRole('button', { name: /Or paste a post or a photo/ })).not.toHaveTextContent(/for you to check/)
       fireEvent.click(screen.getByRole('button', { name: /Or paste a post or a photo/ }))
       expect(screen.getByRole('dialog', { name: 'Paste a post or a photo' })).toBeInTheDocument()
       // Sent as it is (board S1b): no AI tag, since the sender checks nothing.
