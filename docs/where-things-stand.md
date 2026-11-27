@@ -271,7 +271,7 @@ old number can still be looked up. When an item is done, move it to
     user OKs it ("Add, rethought" canvas U1c, D1b, V1b, V2b). On a phone the
     floating button is a round blue button with a white "+" (U1c); on a
     computer it's gone, and an outlined "+ Add or update" sits in the header
-    beside Set location, Map included (D1b; how the two sit together is open, D1c or D1d; brings back Sep 22's header
+    beside Set location, Map included (D1b, chosen over D1c and D1d; brings back Sep 22's header
     button, drops Oct 26's apricot); the sheet is titled "Add or update", search first, then a
     whole-text link, "Or tell us in your own words ›" (V1b). That opens
     "Tell us": one bordered box holding the words ("Type it, or paste it

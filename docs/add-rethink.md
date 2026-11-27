@@ -124,7 +124,8 @@ approves every new place, the last net.
 
 - **Add in a category's heading** ("112 places · Add one"). The user,
   Nov 26: not how the page looks today; Add in the header was turned
-  down too.
+  down too. (Reversed for a computer Nov 27: D1b puts "+ Add or
+  update" in the site header, outlined, beside Set location.)
 - **The floating button as photo and text only** (P7: a "+" opening
   into "Take a picture" and "Type or paste"), and **a camera in the
   Find the place box** (P7b–d). Left Nov 27: every way in already
@@ -255,14 +256,10 @@ before settling on:
   contribute action quieter than the main job (Yelp, Airbnb, Reddit), and
   here that job is finding, so search stays the loudest thing and filled
   blue stays for Send.
-- **D1c / D1d, open (Nov 27):** in D1b, Add and Set location are twin
-  pills and read as a pair, though one is an action and one a setting.
-  D1c makes location a status line ("Near Center City ▾", as DoorDash
-  and Amazon show your address) and leaves Add the one outlined button;
-  its cost is that location stops looking like a button, and on home,
-  You and Activity the header is the only place to set it. D1d keeps
-  Set location and makes Add blue words after a divider; its cost is
-  that Add becomes the quietest thing in the header. Undecided.
+- **D1b chosen over D1c and D1d (Nov 27):** in D1b, Add and Set location
+  are twin pills. D1c made location a status line ("Near Center City ▾")
+  and D1d made Add blue words; the user kept D1b, to change if visitors
+  find it confusing.
 - **V1b:** the sheet titled "Add or update", search first; under it a
   whole-text link, **Or tell us in your own words ›**, quieter than a
   button so search stays the main way in. ("Have a flyer or a post?",
