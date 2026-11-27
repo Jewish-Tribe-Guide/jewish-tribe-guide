@@ -14,6 +14,10 @@ export async function generateMetadata(props: PageProps<'/[community]/map'>): Pr
   return { alternates: { canonical: `${siteUrl()}${routes.map(community)}` } }
 }
 
+// Waits for the server on purpose, as every community screen but About
+// does: see `instant` in [community]/layout.tsx.
+export const instant = false
+
 // The map's whole view — category chips, search, field filters — lives in the
 // query string, so a shared map link reopens the map the sender was looking at.
 // Reading it needs the request, hence the boundary.

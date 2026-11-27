@@ -207,6 +207,37 @@ old number can still be looked up. When an item is done, move it to
       a typed email; refusing an email typed for usual times (pages
       only); the eruv listing still opens its Change screens; email
       linking and confirmation emails (the later step above).
+- **Fixed Nov 26, the seed's About was a test's marker.** The committed
+  seed's About body was "Mid-regeneration check … round 2", left by a
+  cache run cut off before its `finally` and copied in by the backup the
+  seed was made from; the seed check didn't know that marker. It now has
+  About's live text (Nov 16, its Gmail made up), and `scripts/testWrites.mjs`
+  lists what the write suites save: the seed builder refuses a backup
+  holding one, the committed-seed check fails on one, a check fails if a
+  suite writes one the list doesn't know, and the About tests stop on one
+  rather than restoring it.
+- **Nov 26, About laid out as Privacy (the user: "two things that are
+  pretty similar type of pages looking different"; canvas "About like
+  Privacy", boards A1 and B3).** One rule for both pages: the mission
+  line, the first section open with its points as icon rows, the rest as
+  boxes on a computer (with On this page beside them) and rows that open
+  on a phone ("More about the guide"), then Ways to help as one box of
+  rows. The pairs and card grids went (`aboutBlocks` deleted). The text
+  now opens with What sets it apart, its points in the user's order (one
+  community, every kind of Jew, every fact dated, anyone can fix), the
+  first point's sentence leading with what it is. Seed and dev have the
+  new text; **live's About needs the same edit, with your go-ahead**
+  (until then live keeps the old order in the new layout: The problem
+  open, the rest folded).
+- **Fixed Nov 26, every community screen logged "URL data outside of
+  <Suspense>" in dev** (Next's instant-navigation check, not only About).
+  The community layout and every screen read the community from the
+  address first, on purpose (404 before anything is sent; a whole-screen
+  boundary painted empty, then jumped, Nov 24), so each now says
+  `instant = false`: nothing changes at runtime. About is the exception:
+  its text is shared, so only its count reads the address, in a boundary
+  of its own, and a navigation to About shows the page at once.
+  `src/test/instantNavigation.test.ts` holds both (13 of 14 red before).
 
 ### You decide
 

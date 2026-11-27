@@ -25,6 +25,10 @@ export async function generateMetadata(props: PageProps<'/[community]/privacy'>)
   }
 }
 
+// Waits for the server on purpose, as every community screen but About
+// does: see `instant` in [community]/layout.tsx.
+export const instant = false
+
 // Community-scoped route (used to be a plain top-level /privacy, outside
 // [community] entirely) purely for the chrome that comes with living under
 // [community]/layout.tsx — see AboutPage's own doc for the full reasoning,

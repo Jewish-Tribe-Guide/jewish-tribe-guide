@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aboutBlocks, aboutCount, firstMailto, pageDocumentParts, pointGlyph, pointsOf, sectionId } from './pageSections'
+import { aboutCount, firstMailto, pageDocumentParts, pointGlyph, pointsOf, sectionId } from './pageSections'
 import { pageBodyToHtml } from './richText'
 
 const parts = (body: string) => pageDocumentParts(pageBodyToHtml(body))
@@ -51,32 +51,6 @@ describe('pointsOf', () => {
     expect(pointsOf('<ul><li><strong>A</strong></li></ul><ul><li><strong>B</strong></li></ul>')).toBeNull()
     expect(pointsOf('<ul><li><strong>A</strong><ul><li>x</li></ul></li></ul>')).toBeNull()
     expect(pointsOf('<p>Words.</p>')).toBeNull()
-  })
-})
-
-describe('aboutBlocks', () => {
-  // The shape of the About text (board "About v2").
-  const { sections } = parts(
-    '<p>Mission.</p>' +
-      '<h2>The problem</h2><p>a</p>' +
-      '<h2>What the guide does</h2><p>b</p>' +
-      '<h2>Who it’s for</h2><ul><li><strong>Living here</strong> x</li><li><strong>Visiting</strong> y</li></ul>' +
-      '<h2>What sets it apart</h2><ul><li><strong>Anyone can fix anything</strong> z</li></ul>' +
-      '<h2>Who runs it</h2><p>c</p>',
-  )
-
-  it('pairs plain sections, makes cards of named points, and leaves the last plain one single', () => {
-    expect(aboutBlocks(sections).map((b) => (b.kind === 'pair' ? `pair:${b.sections[0].id}+${b.sections[1].id}` : `${b.kind}:${b.section.id}`))).toEqual([
-      'pair:the-problem+what-the-guide-does',
-      'cards:who-its-for',
-      'cards:what-sets-it-apart',
-      'single:who-runs-it',
-    ])
-  })
-
-  it('keeps a named-points list with text around it as a plain section', () => {
-    const { sections: s } = parts('<h2>A</h2><p>Intro</p><ul><li><strong>X</strong> y</li></ul>')
-    expect(aboutBlocks(s)).toEqual([{ kind: 'single', section: s[0] }])
   })
 })
 

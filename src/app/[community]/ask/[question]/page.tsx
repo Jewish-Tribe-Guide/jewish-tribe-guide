@@ -75,6 +75,10 @@ export async function generateStaticParams() {
   return communities.flatMap((c) => [...questions].map((question) => ({ community: c.slug, question })))
 }
 
+// Waits for the server on purpose, as every community screen but About
+// does: see `instant` in [community]/layout.tsx.
+export const instant = false
+
 // A question nobody built ahead is rendered whole on its first request and
 // kept (the community layout's ensureStatic = 'navigation').
 export default function AskPage(props: PageProps<'/[community]/ask/[question]'>) {

@@ -25,18 +25,19 @@ export function SectionBody({ section, className = '' }: { section: PageSection;
   )
 }
 
-/** Privacy's sections after the short version. On a computer each is its
+/** A page's sections after its first (Privacy's details, About's "More
+ *  about the guide"), under `label` on a phone. On a computer each is its
  *  own white box, all open, reached from the contents list. On a phone they
  *  are rows in one box that open one at a time, so the short version and the
  *  list of what's covered fit on a screen. The text is always in the page
  *  (a closed row is only hidden below the desktop size, by
  *  `.page-row-closed` in globals.css), so search engines and Find in page
  *  still see all of it. */
-export default function PrivacyDetails({ sections }: { sections: PageSection[] }) {
+export default function PrivacyDetails({ sections, label = 'The details' }: { sections: PageSection[]; label?: string }) {
   const [openId, setOpenId] = useState<string | null>(null)
   return (
     <>
-      <p className="mx-1 mt-2 text-[0.8125rem] font-bold uppercase tracking-[0.06em] text-slate-500 desktop:hidden">The details</p>
+      <p className="mx-1 mt-2 text-[0.8125rem] font-bold uppercase tracking-[0.06em] text-slate-500 desktop:hidden">{label}</p>
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.05)] desktop:flex desktop:flex-col desktop:gap-4 desktop:overflow-visible desktop:rounded-none desktop:border-0 desktop:bg-transparent desktop:shadow-none">
         {sections.map((s) => {
           const open = openId === s.id

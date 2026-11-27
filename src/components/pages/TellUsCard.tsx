@@ -13,6 +13,10 @@ const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'), { loading:
 export const HELP_CARD =
   'flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-slate-300 hover:shadow-md desktop:gap-[18px] desktop:px-[26px] desktop:py-6'
 
+/** The same, as a row in one box (About's Ways to help, since Nov 26). */
+export const HELP_ROW =
+  'flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-slate-50 desktop:gap-[18px] desktop:px-9 desktop:py-5'
+
 export function HelpCardBody({ icon, title, text }: { icon: PageGlyphName; title: string; text?: string }) {
   return (
     <>
@@ -32,7 +36,7 @@ export function HelpCardBody({ icon, title, text }: { icon: PageGlyphName; title
  *  animation) and the header's More menu a backdrop blur, and either would
  *  trap a fixed sheet inside it. `onOpenChange` lets that dialog step aside
  *  while the box is up. */
-export default function TellUsCard({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
+export default function TellUsCard({ onOpenChange, className = HELP_CARD }: { onOpenChange?: (open: boolean) => void; className?: string }) {
   const [open, setOpen] = useState(false)
   // Kept mounted once opened so it slides away when closed (SiteAddButton).
   const [mounted, setMounted] = useState(false)
@@ -44,7 +48,7 @@ export default function TellUsCard({ onOpenChange }: { onOpenChange?: (open: boo
 
   return (
     <>
-      <button type="button" className={HELP_CARD} onClick={() => change(true)}>
+      <button type="button" className={className} onClick={() => change(true)}>
         <HelpCardBody icon="plus" title="Know something we don’t?" text="Send a fix, a new place, or forward a message." />
       </button>
       {mounted && createPortal(<TellUsSheet isOpen={open} onClose={() => change(false)} />, document.body)}

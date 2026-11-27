@@ -24,9 +24,9 @@ function HeaderProbe() {
 
 const ABOUT =
   '<p>Everything a community needs.</p>' +
+  '<h2>What sets it apart</h2><ul><li><strong>One community, done properly</strong> In depth.</li><li><strong>Anyone can fix anything</strong> No account.</li></ul>' +
   '<h2>The problem</h2><p>Answers live in group chats.</p>' +
-  '<h2>What the guide does</h2><p>One guide.</p>' +
-  '<h2>Who it’s for</h2><ul><li><strong>Living here</strong> Tonight’s minyan.</li><li><strong>Visiting</strong> Where to eat.</li><li><strong>Here for the hospital</strong> Nearby.</li></ul>' +
+  '<h2>Who it’s for</h2><ul><li><strong>Living here</strong> Tonight’s minyan.</li><li><strong>Visiting</strong> Where to eat.</li></ul>' +
   '<h2>Who runs it</h2><p>Two people. Questions: <a href="mailto:hi@guide.org">hi@guide.org</a></p>'
 
 const PRIVACY =
@@ -82,14 +82,54 @@ describe('AboutDocument (board “About v2”)', () => {
     expect(screen.getByText('Everything a community needs.')).toBeInTheDocument()
   })
 
-  it('lays the sections out by their shape: a pair, cards, and the last one beside the ways to help', () => {
+  // Laid out as Privacy is (the user, Nov 26: "two things that are pretty
+  // similar type of pages looking different"; boards A1 and B3).
+  it('opens its first section with the points as icon rows, as Privacy’s short version', () => {
     renderAbout()
-    const problem = screen.getByRole('region', { name: 'The problem' })
-    expect(problem.parentElement).toBe(screen.getByRole('region', { name: 'What the guide does' }).parentElement)
-    const forWhom = screen.getByRole('region', { name: 'Who it’s for' })
-    expect(within(forWhom).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Living here', 'Visiting', 'Here for the hospital'])
-    expect(within(forWhom).getAllByRole('listitem')).toHaveLength(3)
-    expect(screen.getByRole('region', { name: 'Who runs it' }).parentElement).toBe(screen.getByRole('region', { name: 'Ways to help' }).parentElement)
+    const first = screen.getByRole('region', { name: 'What sets it apart' })
+    expect(within(first).getAllByRole('listitem').map((li) => [li.textContent, li.querySelectorAll('svg').length])).toEqual([
+      ['One community, done properlyIn depth.', 1],
+      ['Anyone can fix anythingNo account.', 1],
+    ])
+    // A row's bold line, as Privacy's, not a card's heading.
+    expect(within(first).queryAllByRole('heading', { level: 3 })).toHaveLength(0)
+    expect(within(first).getAllByRole('listitem').map((li) => li.querySelector('strong')?.textContent)).toEqual(['One community, done properly', 'Anyone can fix anything'])
+    expect(within(first).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('on a phone, folds the rest under “More about the guide”, as rows that open', () => {
+    renderAbout()
+    expect(screen.getByText('More about the guide')).toBeInTheDocument()
+    const row = screen.getByRole('button', { name: 'The problem' })
+    expect(row).toHaveAttribute('aria-expanded', 'false')
+    expect(document.getElementById('the-problem-body')).toHaveClass('page-row-closed')
+    fireEvent.click(row)
+    expect(row).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Who it’s for' })).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('lists every section and the ways to help beside the page, linked to them', () => {
+    renderAbout()
+    const nav = screen.getByRole('navigation', { name: 'On this page' })
+    expect(within(nav).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
+      ['What sets it apart', '#what-sets-it-apart'],
+      ['The problem', '#the-problem'],
+      ['Who it’s for', '#who-its-for'],
+      ['Who runs it', '#who-runs-it'],
+      ['Ways to help', '#ways-to-help'],
+    ])
+    for (const id of ['what-sets-it-apart', 'the-problem', 'who-its-for', 'who-runs-it', 'ways-to-help']) expect(document.getElementById(id)).not.toBeNull()
+  })
+
+  it('puts the ways to help in one box, as rows', () => {
+    renderAbout()
+    const help = screen.getByRole('region', { name: 'Ways to help' })
+    const rows = [within(help).getByRole('button', { name: /Know something/ }), ...within(help).getAllByRole('link')]
+    expect(rows).toHaveLength(3)
+    expect(new Set(rows.map((r) => r.parentElement)).size).toBe(1)
+    // Rows in the box, not cards of their own (HELP_CARD's border and corners).
+    for (const r of rows) expect(r.className).not.toMatch(/rounded-2xl|\bborder\b/)
+    expect(help.className).toMatch(/rounded-2xl/)
   })
 
   it('emails the address the text gives, from the whole card', () => {

@@ -3,10 +3,10 @@ import PhotoHeader from '@/components/PhotoHeader'
 import { PAGE_BOX as BOX, PAGE_COLUMN } from '@/lib/pageColumn'
 import { TAB_BAR_CLEARANCE } from '@/lib/tabBarClearance'
 import { pageBodyToHtml } from '@/lib/richText'
-import { pageDocumentParts, pointGlyph, type PageSection } from '@/lib/pageSections'
-import { GlyphDot } from './PageGlyph'
+import { pageDocumentParts } from '@/lib/pageSections'
 import PageContents from './PageContents'
-import PrivacyDetails, { SectionBody } from './PrivacyDetails'
+import PrivacyDetails from './PrivacyDetails'
+import ShortVersion from './ShortVersion'
 
 type Props = {
   title: string
@@ -14,31 +14,6 @@ type Props = {
   updated?: string | null
   /** The page row's raw body. Sanitized here; never render it any other way. */
   body: string | null | undefined
-}
-
-/** The first section, always open: "The short version". Named points are
- *  rows with an icon; anything else is its text. */
-function ShortVersion({ section }: { section: PageSection }) {
-  return (
-    <section id={section.id} aria-labelledby={`${section.id}-h`} className={`${BOX} px-4 py-[18px] desktop:scroll-mt-24 desktop:px-9 desktop:py-[30px]`}>
-      <h2 id={`${section.id}-h`} className="mb-4 text-[1.1875rem] font-bold text-slate-900">{section.heading}</h2>
-      {section.points && !section.points.before && !section.points.after ? (
-        <ul className="flex flex-col gap-3.5 text-[0.96875rem] leading-[1.5] text-slate-700 desktop:gap-4 desktop:text-[1rem]">
-          {section.points.items.map((item) => (
-            <li key={item.title} className="flex gap-3.5">
-              <GlyphDot name={pointGlyph(item.title)} />
-              <div className="min-w-0">
-                <strong className="block text-slate-900">{item.title}</strong>
-                <span className="rich-text" dangerouslySetInnerHTML={{ __html: item.html }} />
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <SectionBody section={section} className="text-[1rem] leading-[1.7] text-slate-700" />
-      )}
-    </section>
-  )
 }
 
 /** The Privacy and terms page (board "Privacy and terms", the user, Nov 15):

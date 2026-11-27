@@ -36,6 +36,9 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { TEST_WRITES } from './testWrites.mjs'
+
+export { TEST_WRITES }
 
 export const COMMUNITIES = ['philly', 'ues', 'baltimore']
 export const TABLES = [
@@ -96,6 +99,12 @@ export function seedFrom(tables) {
     if (rows.some((r) => 'resource_id' in r)) rows = rows.filter((r) => r.resource_id == null || resourceIds.has(r.resource_id))
     if (rows.some((r) => 'category_id' in r)) rows = rows.filter((r) => r.category_id == null || categoryKeys.has(`${r.community_id}/${r.category_id}`))
     kept[name] = rows
+  }
+  // A borrowed row can't be dropped (About is one row): it's put right in
+  // the backup's database, or by hand, before the seed is made from it.
+  for (const name of TABLES) {
+    const left = kept[name].find((row) => TEST_WRITES.test(JSON.stringify(row)))
+    if (left) throw new Error(`${name} holds what a test wrote and never put back: ${JSON.stringify(left).match(TEST_WRITES)[0]}… Put the row right, then make the seed.`)
   }
   const seen = new Map()
   return Object.fromEntries(TABLES.map((name) => [name, scrubEmails(kept[name], seen)]))

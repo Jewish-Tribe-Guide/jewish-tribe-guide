@@ -20,6 +20,10 @@ export async function generateMetadata(props: PageProps<'/[community]/you'>): Pr
   }
 }
 
+// Waits for the server on purpose, as every community screen but About
+// does: see `instant` in [community]/layout.tsx.
+export const instant = false
+
 export default async function YouPage(props: PageProps<'/[community]/you'>) {
   const { community } = await props.params
   // Saves can be in any category, so every listing, as the home and the map

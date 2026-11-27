@@ -16,7 +16,7 @@ const PHOTO_HEADER_COLOR = '#334155'
  *
  *  `searchOnPhoto`: the first thing a computer shows under it is a search,
  *  which rides up onto the photo as a category page's does (You, Nov 16). */
-export default function PhotoHeader({ eyebrow, title, searchOnPhoto = false, children }: { eyebrow?: string | null; title: string; searchOnPhoto?: boolean; children: ReactNode }) {
+export default function PhotoHeader({ eyebrow, title, searchOnPhoto = false, children }: { eyebrow?: ReactNode; title: string; searchOnPhoto?: boolean; children: ReactNode }) {
   const settings = useSiteSettings()
   return (
     <CategoryBandFrame color={PHOTO_HEADER_COLOR} imageUrl={settings.desktopHeroImage?.url ?? null} hero={<HeroTitle eyebrow={eyebrow} title={title} />} heroOverlap={searchOnPhoto}>
