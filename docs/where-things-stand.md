@@ -330,6 +330,20 @@ old number can still be looked up. When an item is done, move it to
     following the Team tab's "Something new to decide" switch); the reason
     field when rejects are common; leave Reply as it is.
 
+104. **The phone home jumps on a Friday** (found Nov 27, CI on PR 469;
+    shipping first was the user's call). The home is built ahead of time,
+    so Right now's placeholder is a weekday's height (176px). On a
+    Friday the candles card and Shabbos shopping are about 437px, so
+    half a second after the page shows, the category tiles drop about
+    210px (0.148 against the 0.1 target, every run). On the live site
+    since the candles card. Shabbos moves less (0.048), a weekday hardly
+    at all. Fix, my recommendation: on a phone keep Friday's box a
+    weekday's height and move Shabbos shopping under the tiles (a design
+    change, to draw first); else a small script before paint that sizes
+    the placeholder by the day. Its test then joins
+    `e2e/layout-shift.spec.ts`'s days (Tuesday and Shabbos there now),
+    as a plain test: as test.fail it flipped with machine load.
+
 ### You do
 
 102. Turn on the site's email address (100), in order (1 and 2 done
