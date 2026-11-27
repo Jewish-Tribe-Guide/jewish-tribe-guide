@@ -57,7 +57,10 @@ judgment or a worry, said as one.
 
 - How many open Add, which way they go, and how many send. We don't
   have good numbers today.
-- How long an AI read takes.
+- How long an AI read takes. From migration 117 (Nov 26) each read's
+  time is kept (`message_read_time`), and
+  `scripts/compare-reader/messages.run.ts` replays the posts people sent
+  at each thinking level, to see whether a lower one reads as well.
 - Whether people miss the button, or see it and don't want it.
 
 ## What a fix has to do

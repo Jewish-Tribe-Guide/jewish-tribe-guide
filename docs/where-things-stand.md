@@ -254,10 +254,19 @@ old number can still be looked up. When an item is done, move it to
     going). The user wants drawings before agreeing it. Agree or change it,
     and pick for steps 6 (the search box takes a paste or photo) and 7
     (forward to the guide). The "Add, form first" canvas boards came
-    before it and aren't the plan.
+    before it and aren't the plan. Drawings on the "Add, rethought"
+    canvas: R1 and R2 liked; R3b (one list) and P6b (a post opens Edit
+    listing) waiting on the user. The AI read's speed: see 97.
 
 ### You do
 
+97. Run migration 117, dev then live:
+    [`supabase/migrations/20240101000117_message_read_time.sql`](../supabase/migrations/20240101000117_message_read_time.sql)
+    (adds `message_read_time`: how long each "+ Add" box read took, and
+    at what thinking level; no post text). Until then the time isn't
+    kept. The level stays the model's default until the comparison
+    (`scripts/compare-reader/messages.run.ts`) says a lower one reads
+    as well; that's the user's call (Nov 26).
 94. Run migration 116, dev then live:
     [`supabase/migrations/20240101000116_community_email.sql`](../supabase/migrations/20240101000116_community_email.sql)
     (adds `community.contact_email`). Then save Philly's address on
