@@ -233,18 +233,23 @@ those, so they still see the end result. If built, this changes:
 R4's "You check it before it's sent", and P6b (a paste no longer opens
 Edit listing).
 
-## Renamed and split (drawn Nov 27, T1–T3)
+## Renamed and split (drawn Nov 27, U1–U4)
 
 The user: change the name from Add, and maybe camera and paste as two
-buttons. Drawn, not built:
+buttons. A first draft (T1–T3: a wide "Add or update" pill, two big rows,
+a form-like photo box) was replaced by:
 
-- **T1:** the pill says "Add or update", as the box's own title does.
-  Wider (about 150px against 80px); it still hides on scroll down.
-- **T2:** Find the place's one paste row becomes two: "Take a photo"
-  (the phone's own picker: camera or a photo already taken) and "Paste
-  a post" (today's box). "An admin checks it" said once under both.
-- **T3:** a picked photo opens "Send a photo" with it attached,
-  another, an optional line, and Send, then S2 and S4c as a paste does.
+- **U1:** on a phone, a round apricot "+" (aria-label "Add or update");
+  a computer keeps the words.
+- **U2:** the sheet titled "Add or update", search first; one quiet row
+  under it, "Have a flyer or a post?", with small Photo and Paste
+  buttons, so they don't outweigh search.
+- **U3:** Photo opens the phone's own picker (camera, library, file;
+  several at once), then a messaging-style composer (WhatsApp,
+  iMessage): the photo big with ✕, a strip with + for more, "Add a note
+  (optional)", a round Send. Nothing goes until Send.
+- **U4:** Paste opens the same composer with the text first and a camera
+  button in its bar. It replaces today's box and its "Photo or PDF" row.
 
 ## Waiting on the user
 

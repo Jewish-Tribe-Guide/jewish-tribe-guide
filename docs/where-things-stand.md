@@ -268,10 +268,26 @@ old number can still be looked up. When an item is done, move it to
     are not built. Needs migration 118 first: 98. The menu and shul
     times boxes still read while the sender waits.
 99. **Add, renamed and split** (Nov 27): DRAWN, not built until the
-    user OKs it ("Add, rethought" canvas T1–T3). The floating pill says
-    "Add or update" (T1); Find the place has two rows, "Take a photo"
-    (opens the phone's picker at once) and "Paste a post" (T2); a
-    picked photo lands in a "Send a photo" box with Send (T3).
+    user OKs it ("Add, rethought" canvas U1–U4; T1–T3 replaced). On a
+    phone the floating button is a round "+" (U1; a computer keeps
+    "Add or update"); the sheet is titled "Add or update", search first,
+    with one quiet row under it: "Have a flyer or a post?" and two small
+    buttons, Photo and Paste (U2). Photo opens the phone's own picker,
+    then a messaging-style composer: the photo big, a strip to add more,
+    "Add a note (optional)" and a round Send (U3). Paste opens the same
+    composer with the text first (U4). It replaces today's box.
+100. **The site's own email address** (proposed Nov 27, next after
+    99): one address per community (`<community>@in.<domain>`, a
+    catch-all, so a new community has one with nothing to create) that
+    a mail service hands to the site within seconds, instead of the
+    Gmail script checking hourly (an eruv email sat up to an hour,
+    Nov 27). Mail from a watched list (eruv, shul newsletters) is read;
+    anything else (a person's reply) is forwarded to the admins. It
+    becomes the community email (reply-to) shown in onboarding and
+    Settings, and the guide's Gmail can then go (check what else signs
+    in with it first). Needs: the service (Cloudflare Email Routing
+    if the domain's DNS is there), and subscribing the address to
+    JCOR's groups.io list and each newsletter.
 
 ### You do
 
