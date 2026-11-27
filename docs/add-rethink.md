@@ -233,25 +233,29 @@ those, so they still see the end result. If built, this changes:
 R4's "You check it before it's sent", and P6b (a paste no longer opens
 Edit listing).
 
-## Renamed, and one box (drawn Nov 27, U1, V1, V2)
+## Renamed, and one box (drawn Nov 27, U1, V1b, V2b)
 
 The user: change the name from Add, and maybe camera and paste as two
 buttons. Drafts went through two paths (T1–T3; U2–U4c: Send a photo and
-Send a message, each its own screen) before settling on one:
+Send a message, each its own screen) and a first one-box draw (V1, V2)
+before settling on:
 
 - **U1:** on a phone, a round apricot "+" (aria-label "Add or update");
   a computer keeps the words.
-- **V1:** the sheet titled "Add or update", search first; under it one
-  small button, **Just tell us**. "Have a flyer or a post?", "Paste"
-  and "Paste a message" were unclear to the user; a button says what it
-  does.
-- **V2:** one box, as feedback forms and Maps' "report a problem" do:
-  the text box ("Say it in your own words, or paste it from WhatsApp or
-  an email", keyboard up), **Add a photo** with its word (the phone's
-  own menu: library, camera, file; several at once), each photo a
-  thumbnail with ✕, and the site's usual wide **Send**, live once
-  there's words or a photo. No round arrow: every other Send on the
-  site is the wide one.
+- **V1b:** the sheet titled "Add or update", search first; under it a
+  whole-text link, **Or tell us in your own words ›**, quieter than a
+  button so search stays the main way in. ("Have a flyer or a post?",
+  "Paste", "Paste a message" and "Just tell us" were unclear or too
+  loud.)
+- **V2b:** "Tell us": one bordered box is the whole message, as Gmail's
+  and Slack's are: the words ("Type it, or paste it from WhatsApp or an
+  email", keyboard up), the photos inside the frame (thumbnails with ✕),
+  and **Add a photo** as a quiet strip along its bottom edge, always in
+  the same place (the phone's own menu: library, camera, file; several
+  at once). Today's box already had that strip; V2's loose pill beside
+  the thumbnails felt off. The site's usual wide **Send** sits alone
+  below, live once there's words or a photo. Not a "+" beside Send: an
+  icon alone doesn't say what it adds, and beside Send it's mis-tapped.
 
 Why one box over two paths: one choice beside search instead of two,
 a photo and words go together without picking a path first, and it's

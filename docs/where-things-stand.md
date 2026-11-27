@@ -268,14 +268,15 @@ old number can still be looked up. When an item is done, move it to
     are not built. Needs migration 118 first: 98. The menu and shul
     times boxes still read while the sender waits.
 99. **Add, renamed and one box** (Nov 27): DRAWN, not built until the
-    user OKs it ("Add, rethought" canvas U1, V1, V2). On a phone the
+    user OKs it ("Add, rethought" canvas U1, V1b, V2b). On a phone the
     floating button is a round "+" (U1; a computer keeps "Add or
-    update"); the sheet is titled "Add or update", search first, then
-    one small button, Just tell us (V1). That opens one box: "Say it in
-    your own words, or paste it from WhatsApp or an email", an Add a
-    photo button (the phone's own menu; each photo a thumbnail with ✕),
-    and the site's wide Send, live once there's words or a photo (V2).
-    Replaces today's box.
+    update"); the sheet is titled "Add or update", search first, then a
+    whole-text link, "Or tell us in your own words ›" (V1b). That opens
+    "Tell us": one bordered box holding the words ("Type it, or paste it
+    from WhatsApp or an email") and any photos (thumbnails with ✕), with
+    "Add a photo" as a strip along its bottom edge (the phone's own
+    menu); the site's wide Send alone below it, live once there's words
+    or a photo (V2b). Replaces today's box.
 100. **The site's own email address** (proposed Nov 27, next after
     99): one address per community (`<community>@in.<domain>`, a
     catch-all, so a new community has one with nothing to create) that
