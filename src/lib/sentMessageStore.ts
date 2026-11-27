@@ -98,15 +98,6 @@ export async function finishRead(id: string, filed: string[], left: string[]): P
   if (error) throw new Error(`Failed to save what was read: ${error.message}`)
 }
 
-export async function getSentMessage(community: string, id: string): Promise<SentMessage | null> {
-  const { data, error } = await getAdminClient().from(TABLE).select('*').eq('community_id', community).eq('id', id).maybeSingle()
-  if (error) {
-    if (schemaMissing(TABLE, error.message)) return null
-    throw new Error(`Failed to load the message: ${error.message}`)
-  }
-  return data ? fromRow(data as Row) : null
-}
-
 export async function getSentMessages(community: string, ids: string[]): Promise<SentMessage[]> {
   if (ids.length === 0) return []
   const { data, error } = await getAdminClient().from(TABLE).select('*').eq('community_id', community).in('id', ids)
