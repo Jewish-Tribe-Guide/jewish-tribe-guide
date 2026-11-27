@@ -233,14 +233,14 @@ those, so they still see the end result. If built, this changes:
 R4's "You check it before it's sent", and P6b (a paste no longer opens
 Edit listing).
 
-## Renamed, and one box (drawn Nov 27, U1, V1b, V2b)
+## Renamed, and one box (drawn Nov 27, U1b, V1b, V2b)
 
 The user: change the name from Add, and maybe camera and paste as two
 buttons. Drafts went through two paths (T1–T3; U2–U4c: Send a photo and
 Send a message, each its own screen) and a first one-box draw (V1, V2)
 before settling on:
 
-- **U1:** on a phone, a round apricot "+" (aria-label "Add or update");
+- **U1b:** on a phone, a round apricot button, its "+" in the community's blue (`--color-primary`, a 2px stroke; about 4:1 on the apricot) (aria-label "Add or update");
   a computer keeps the words.
 - **V1b:** the sheet titled "Add or update", search first; under it a
   whole-text link, **Or tell us in your own words ›**, quieter than a

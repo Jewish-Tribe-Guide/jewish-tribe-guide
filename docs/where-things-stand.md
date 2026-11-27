@@ -268,8 +268,8 @@ old number can still be looked up. When an item is done, move it to
     are not built. Needs migration 118 first: 98. The menu and shul
     times boxes still read while the sender waits.
 99. **Add, renamed and one box** (Nov 27): DRAWN, not built until the
-    user OKs it ("Add, rethought" canvas U1, V1b, V2b). On a phone the
-    floating button is a round "+" (U1; a computer keeps "Add or
+    user OKs it ("Add, rethought" canvas U1b, V1b, V2b). On a phone the
+    floating button is a round apricot "+" with the + in the site's blue (U1b; a computer keeps "Add or
     update"); the sheet is titled "Add or update", search first, then a
     whole-text link, "Or tell us in your own words ›" (V1b). That opens
     "Tell us": one bordered box holding the words ("Type it, or paste it
