@@ -314,15 +314,18 @@ old number can still be looked up. When an item is done, move it to
     rejects, reply-to the community email. Missing:
     - a "+ Add" post the AI couldn't file reaches the To do list with no
       email to the admins;
-    - "Email me when it's on the site" sends nothing when the post is
-      approved automatically, or when an admin marks an unfiled post
-      Done;
+    - "Email me when it's on the site" on a post the AI couldn't file
+      is kept with the post, but nothing is ever sent to it: the admin
+      makes the change themselves and marks the post Done, and Done
+      emails no one. (Nothing a visitor sends goes live without an
+      admin, so there is no automatic approval to cover.)
     - the To do screen's reject has no reason field, so the visitor's
       email can't say why;
     - a form response's Reply is a plain mailto link from the admin's
       own address (100's forwarding covers the visitor answering back,
       not the admin writing first).
-    My recommendation: the first two, small and worth doing; the reason
+    My recommendation: the first two, small and worth doing (the first
+    following the Team tab's "Something new to decide" switch); the reason
     field when rejects are common; leave Reply as it is.
 
 ### You do
