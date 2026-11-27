@@ -129,7 +129,7 @@ test.describe('accessibility', () => {
     await expectNoViolations(page)
 
     await find.getByRole('button', { name: /^Or paste a post or a photo/ }).click()
-    await expect(page.getByRole('dialog').getByRole('button', { name: 'See what changes' })).toBeVisible()
+    await expect(page.getByRole('dialog').getByRole('button', { name: 'Send', exact: true })).toBeVisible()
     await expectNoViolations(page)
   })
 

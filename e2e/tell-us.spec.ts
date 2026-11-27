@@ -26,7 +26,7 @@ test('the home page’s “+ Add” opens Find the place', async ({ page }) => {
   await expect(find.getByRole('button', { name: /^Or paste a post or a photo/ })).toBeVisible()
 })
 
-test('a category’s “+” opens Find the place, with the AI box one row away, saying so, and Back', async ({ page, request }) => {
+test('a category’s “+” opens Find the place, with the paste box one row away, sent as it is, and Back', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const { category } = await categoryWithListings(request, community)
   await page.goto(`/${community}/${category.id}`)
@@ -34,11 +34,47 @@ test('a category’s “+” opens Find the place, with the AI box one row away,
 
   await categoryAddButton(page).click()
   const box = await openPaste(page)
-  await expect(box.getByTestId('read-by-ai')).toHaveText(/Read by AI\s*You check it before it’s sent\./)
+  // Sent as it is (Nov 27, board S1b): no AI tag, since the sender checks
+  // nothing; an admin checks what the AI reads from it.
+  await expect(box.getByTestId('read-by-ai')).toHaveCount(0)
   await box.getByLabel('Your message').fill('Acme on 5th has challah')
-  await expect(box.getByRole('button', { name: 'See what changes' })).toBeEnabled()
+  await expect(box.getByRole('button', { name: 'Send', exact: true })).toBeEnabled()
   await box.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Find the place' })).toBeVisible()
+})
+
+// Boards S2 and S4c (Nov 27): Send answers at once with Sent, and You lists
+// what this phone sent, Live opening the listing. Both of the post's routes
+// are answered here, so nothing is kept or read (e2e writes nothing).
+test('a post sent from the box says Sent, and You lists it with where it stands', async ({ page, request }) => {
+  const community = await defaultCommunity(page)
+  const { category } = await categoryWithListings(request, community)
+  const ID = '00000000-aaaa-4aaa-8aaa-0000000e2e01'
+  const href = `/${community}/${category.id}/a-place`
+  let sent: string | null = null
+  await page.route('**/api/message/queue**', async (route) => {
+    sent = route.request().postDataBuffer()?.toString() ?? ''
+    await route.fulfill({ json: { ok: true, id: ID } })
+  })
+  await page.route('**/api/updates**', (route) => route.fulfill({ json: { ok: true, statuses: { [ID]: { state: 'live', href, at: new Date().toISOString() } } } }))
+  await page.goto(`/${community}/${category.id}`)
+  await ready(page)
+
+  await categoryAddButton(page).click()
+  const box = await openPaste(page)
+  await box.getByLabel('Your message').fill('Acme on 5th has challah')
+  await box.getByRole('button', { name: 'Send', exact: true }).click()
+  const done = page.getByTestId('tell-us-sent')
+  await expect(done).toContainText('An admin checks it before it’s on the site.')
+  expect(sent).toContain('Acme on 5th has challah')
+  await done.getByRole('button', { name: 'Done' }).click()
+
+  await page.goto(`/${community}/you`)
+  const yours = page.getByTestId('you-updates')
+  await expect(yours.getByTestId('you-update')).toHaveCount(1)
+  await expect(yours.getByTestId('you-update')).toContainText('Acme on 5th has challah')
+  await expect(yours.getByTestId('you-update-state')).toHaveText('Live')
+  await expect(yours.getByRole('link')).toHaveAttribute('href', href)
 })
 
 // The user, Nov 10: the box's steps were React state only, so the

@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
-import { PREVIEW_READ_ERROR } from '@/lib/previewSend'
+import { PREVIEW_SEND_ERROR } from '@/lib/previewSend'
 import { makeListing } from '@/test/providerFixtures'
 import { FOOD } from '@/test/editorFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -159,11 +159,12 @@ describe('CategoryPreview', () => {
     renderWithProviders(<CategoryPreview category={FOOD} onClose={() => {}} />)
 
     await u.click(await screen.findByRole('button', { name: 'Add' }))
-    // The box as a visitor sees it, but its reader isn't asked (an AI
-    // read is paid for): it says it's the preview, and keeps what was written.
+    // The box as a visitor sees it, but nothing is sent (it would be kept
+    // and read, which is paid for): it says it's the preview, and keeps
+    // what was written.
     await u.type(screen.getByLabelText('Your message'), 'Sweet Box has a new phone number')
-    await u.click(screen.getByRole('button', { name: 'See what changes' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(PREVIEW_READ_ERROR)
+    await u.click(screen.getByRole('button', { name: 'Send' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(PREVIEW_SEND_ERROR)
     expect(screen.getByLabelText('Your message')).toHaveValue('Sweet Box has a new phone number')
 
     // The other path: the by-hand editor, a new place.

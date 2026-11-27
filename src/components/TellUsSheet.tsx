@@ -16,6 +16,7 @@ import type { TimesUpdate } from '@/lib/scheduleUpdate'
 import type { PlaceRead, ReadItem } from '@/lib/messageReader'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { tellUsPlaceholder } from '@/lib/tellUs'
+import { postName, recordUpdates } from '@/lib/yourUpdates'
 import ActionDialog from '@/components/resources/ActionDialog'
 import MobileSheet from '@/components/resources/MobileSheet'
 import UpdateTimesBox from '@/components/resources/UpdateTimesBox'
@@ -37,7 +38,7 @@ import { CameraIcon } from '@/components/icons'
 import { track } from '@vercel/analytics'
 import { askMessage } from '@/lib/shareAnswer'
 import { useShareLink } from '@/lib/useShareLink'
-import { PREVIEW_READ_ERROR, useFetchOrPreview } from '@/lib/previewSend'
+import { PREVIEW_READ_ERROR, PREVIEW_SEND_ERROR, useFetchOrPreview } from '@/lib/previewSend'
 
 // "Saw something? Tell us" (agreed Oct 5, canvas TellSheet, TellAsk,
 // TellResult, TellSent; changes agreed on v83/v84). One box: type it, paste
@@ -474,6 +475,8 @@ export function TellUsBody({
   const [at, setAt] = useState(0)
   const [sentList, setSentList] = useState<{ name: string; what: string }[]>([])
   const [sentIds, setSentIds] = useState<string[]>([])
+  // A post sent as it is (board S1b): its id, for the email and You.
+  const [sentPost, setSentPost] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const textArea = useRef<HTMLTextAreaElement>(null)
@@ -550,6 +553,36 @@ export function TellUsBody({
       setStep('result')
     } catch (e) {
       setError(e instanceof Error && e.message !== 'failed' ? e.message : 'Couldn’t read it right now. Please try again.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // The box opened for any update sends a post as it is, and an admin
+  // checks what the AI reads from it afterwards (Nov 27, boards S1b, S2):
+  // the sender waits on nothing and checks nothing. A menu's and a
+  // shul's times still read while they wait, for them to check.
+  const sendsAsIs = !kind
+  const sendPost = async (token: string) => {
+    try {
+      const body = new FormData()
+      body.set('text', text)
+      for (const p of photos) body.append('file', p.file)
+      if (about) body.set('listingId', about.id)
+      body.set('turnstileToken', token)
+      body.set('company', '')
+      // The admin console's preview sends nothing: an answer that says so.
+      const res = await fetchOrPreview(withCommunity('/api/message/queue', community), { method: 'POST', body }, { ok: false, error: PREVIEW_SEND_ERROR }).catch(() => null)
+      const json = ((await res?.json().catch(() => null)) ?? {}) as { ok?: boolean; error?: string; id?: string | null }
+      if (!res?.ok || !json.ok) throw new Error(json.error ?? 'failed')
+      if (json.id) {
+        setSentPost(json.id)
+        recordUpdates(community, 'message', [json.id], about?.name ?? postName(text), text.trim() ? 'Post' : 'Photo')
+      }
+      track('tell_us_sent_post', { photos: photos.length })
+      setStep('sent')
+    } catch (e) {
+      setError(e instanceof Error && e.message !== 'failed' ? e.message : 'That didn’t send. Please try again.')
     } finally {
       setBusy(null)
     }
@@ -664,6 +697,7 @@ export function TellUsBody({
       })
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; ids?: string[] }
       if (!res.ok || !json.ok) throw new Error(json.error ?? 'failed')
+      recordUpdates(community, 'submission', json.ids ?? [], describeAll(g).name, 'Changes')
       markSent(g, json.ids ?? [])
     } catch (e) {
       setError(e instanceof Error && e.message !== 'failed' ? e.message : 'That didn’t send. Please try again.')
@@ -684,13 +718,13 @@ export function TellUsBody({
 
   // The email, asked once (agreed Oct 5): added to everything just sent.
   const done = async () => {
-    if (email.trim() && sentIds.length) {
+    if (email.trim() && (sentIds.length || sentPost)) {
       setBusy('send')
       setError(null)
       const res = await fetchOrPreview(withCommunity('/api/message/email', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: sentIds, email }),
+        body: JSON.stringify({ ids: sentIds, ...(sentPost ? { messageIds: [sentPost] } : {}), email }),
       }).catch(() => null)
       const json = ((await res?.json().catch(() => null)) ?? {}) as { ok?: boolean; error?: string }
       setBusy(null)
@@ -773,6 +807,30 @@ export function TellUsBody({
   const firstWhy = whys.find((w) => w !== null) ?? (nothingRead ? NOTHING_READ : null)
   const allWhy = (shown.length > 0 && whys.every((w) => w !== null)) || nothingRead
   const primary = 'h-12 w-full cursor-pointer rounded-full bg-primary px-4 text-[1rem] font-bold text-white hover:bg-primary-dark disabled:cursor-default disabled:bg-slate-200 disabled:text-slate-500'
+
+  // A post sent as it is (board S2): nothing's read yet, so no list.
+  if (step === 'sent' && sentPost && sentList.length === 0) {
+    return (
+      <div className="space-y-3 p-1" data-testid="tell-us-sent">
+        <p className="text-[1.0625rem] font-extrabold text-slate-900">Sent</p>
+        <p className="text-[0.90625rem] leading-snug text-slate-700">An admin checks it before it’s on the site.</p>
+        <div>
+          <label htmlFor={emailId} className="block text-[0.8125rem] font-semibold text-slate-700">
+            Email me when it’s on the site <span className="font-normal text-slate-500">(optional)</span>
+          </label>
+          <input id={emailId} type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={`${inputClass} mt-1`} autoComplete="email" />
+        </div>
+        {error && (
+          <p role="alert" className="text-[0.84375rem] text-red-700">
+            {error}
+          </p>
+        )}
+        <button type="button" disabled={busy === 'send'} onClick={() => void done()} className="w-full cursor-pointer rounded-lg bg-primary px-4 py-2.5 text-[0.9375rem] font-bold text-white disabled:opacity-60">
+          Done
+        </button>
+      </div>
+    )
+  }
 
   if (step === 'sent') {
     return (
@@ -866,11 +924,16 @@ export function TellUsBody({
         <>
           {/* What it's about, under the title, when that's a place's menu. */}
           {kind === 'menu' && about && <p className="-mt-1 text-[0.875rem] text-muted">{about.name}</p>}
-          {/* AI says so before it reads (Nov 27, board R4). */}
-          <p className="flex items-center gap-2 text-[0.875rem] text-slate-600" data-testid="read-by-ai">
-            <AiTag />
-            You check it before it’s sent.
-          </p>
+          {/* AI says so before it reads (Nov 27, board R4), where the
+              sender checks the read: a menu, a shul's times. A post sent
+              as it is has no tag (board S1b): the AI shows only where
+              someone checks it, the admin. */}
+          {!sendsAsIs && (
+            <p className="flex items-center gap-2 text-[0.875rem] text-slate-600" data-testid="read-by-ai">
+              <AiTag />
+              You check it before it’s sent.
+            </p>
+          )}
           <div className="rounded-xl border-[1.5px] border-slate-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
             {/* The line inside says what to write, by place, and that it'll
                 be read for them to check (Oct 16); this names it. */}
@@ -932,9 +995,15 @@ export function TellUsBody({
             </div>
           </div>
           <div className="pt-2">
-            <button type="button" disabled={!canRead || busy === 'read'} onClick={() => start('read', (token) => void read(token))} className={primary}>
-              {busy === 'read' ? 'Reading…' : kind === 'menu' ? 'Read the menu' : kind === 'times' ? 'Read the times' : 'See what changes'}
-            </button>
+            {sendsAsIs ? (
+              <button type="button" disabled={!canRead || busy === 'send'} onClick={() => start('send', (token) => void sendPost(token))} className={primary}>
+                {busy === 'send' ? 'Sending…' : 'Send'}
+              </button>
+            ) : (
+              <button type="button" disabled={!canRead || busy === 'read'} onClick={() => start('read', (token) => void read(token))} className={primary}>
+                {busy === 'read' ? 'Reading…' : kind === 'menu' ? 'Read the menu' : 'Read the times'}
+              </button>
+            )}
             {yourselfLink}
           </div>
         </>

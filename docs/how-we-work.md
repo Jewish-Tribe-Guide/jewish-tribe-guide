@@ -75,7 +75,9 @@ work is in `docs/where-things-stand.md`.
   Use the site's line glyphs (`src/lib/categoryIcons.tsx`), photos and logos.
 - **Show the contributor the end result.** They see the listing as it will
   look, with light marks on what changed, and Send. The diff and the logic go
-  to the admin.
+  to the admin. Except a pasted post or photo (Nov 27): it's sent as it is,
+  and the admin checks what the AI reads from it, so the sender never
+  waits on or checks a read.
 - **Ready-made first, the same everywhere.** Admin setup leads with what the
   site already has (search and a list), and "make your own" comes second.
   Communities shouldn't look different to visitors.

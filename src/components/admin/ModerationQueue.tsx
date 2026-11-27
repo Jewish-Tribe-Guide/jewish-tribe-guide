@@ -17,6 +17,7 @@ import { STEP_PARAMS } from '@/lib/stepAddress'
 import { useFullPane } from './AdminUI'
 import TodoList, { TODO_START, type TodoView } from './TodoList'
 import TodoPlaceScreen from './TodoPlaceScreen'
+import SentPosts from './SentPosts'
 
 // The admin's front page, To do (mounted at /<community>/admin itself):
 // the one list of places with something waiting (TodoList), and a place
@@ -345,6 +346,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
                   {done}: nothing left to do
                 </p>
               )}
+              {!openPlace && <SentPosts api={api} />}
               <TodoList data={data} categoriesById={categoriesById} view={view} onView={setView} onOpen={(p) => open(p.key)} openKey={openPlace?.key} />
             </div>
             {openPlace && (

@@ -45,6 +45,8 @@ export function usePreviewSend(): PreviewSend | null {
 
 /** What an AI read says in the preview, instead of reading. */
 export const PREVIEW_READ_ERROR = 'This is the preview, so nothing is read here.'
+/** The box's Send for a post, in the preview (Nov 27): kept nowhere. */
+export const PREVIEW_SEND_ERROR = 'This is the preview, so nothing is sent from here.'
 
 /** A route's answer, made here: `{ ok: true, ...body }`, status 200. */
 export function previewAnswer(body: Record<string, unknown> = {}): Response {

@@ -82,14 +82,58 @@ describe('Saw something? Tell us', () => {
       community: { slug: 'philly' },
       content: { categories: [makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Groceries', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }] })] },
     })
+  // The box that still reads while the sender waits, for them to check:
+  // a place's menu (Nov 27; the box for any update sends as it is, S1b).
+  const MENU = { about: { id: 'arch', name: 'Trader Joe’s' }, kind: 'menu' as const }
+  const POST_ID = '44444444-aaaa-4aaa-8aaa-000000000004'
+
+  // Nov 27, boards S1b and S2: a post or photo goes as it is. No read to
+  // wait on or check, no AI tag; an admin checks what the AI reads from it.
+  it('sends a post with its photos as it is, says an admin checks it, and keeps it for Your updates', async () => {
+    localStorage.clear()
+    respond = (url) => (url.includes('/api/message/queue') ? { ok: true, id: POST_ID } : { ok: true, updated: 1 })
+    open()
+    expect(screen.queryByTestId('read-by-ai')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'TJ on Arch always has ground beef' } })
+    fireEvent.change(screen.getByLabelText('Add a photo'), { target: { files: [new File(['x'], 'a.webp', { type: 'image/webp' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    const sent = await screen.findByTestId('tell-us-sent')
+    expect(calls.map((c) => c.url)).toEqual(['/api/message/queue?community=philly'])
+    const body = calls[0].init!.body as FormData
+    expect(body.get('text')).toBe('TJ on Arch always has ground beef')
+    expect((body.get('file') as File).name).toBe('a.webp')
+    expect(sent).toHaveTextContent('Sent')
+    expect(sent).toHaveTextContent('An admin checks it before it’s on the site.')
+    expect(screen.queryByRole('listitem')).not.toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem('jpc:your-updates:philly')!)).toEqual([{ kind: 'message', id: POST_ID, name: 'TJ on Arch always has ground beef', what: 'Post', at: expect.any(Number) }])
+
+    fireEvent.change(screen.getByLabelText(/Email me when it’s on the site/), { target: { value: 'me@x.co' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(calls).toHaveLength(2))
+    expect(calls[1].url).toBe('/api/message/email?community=philly')
+    expect(JSON.parse(String(calls[1].init!.body))).toEqual({ ids: [], messageIds: [POST_ID], email: 'me@x.co' })
+  })
+
+  it('opened from a listing, sends it about that listing, named for it on You', async () => {
+    localStorage.clear()
+    respond = () => ({ ok: true, id: POST_ID })
+    open({ about: { id: 'arch', name: 'Trader Joe’s' } })
+    fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'ground beef now' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await screen.findByTestId('tell-us-sent')
+    expect((calls[0].init!.body as FormData).get('listingId')).toBe('arch')
+    expect(JSON.parse(localStorage.getItem('jpc:your-updates:philly')!)[0].name).toBe('Trader Joe’s')
+  })
 
   it('reads what they wrote with their photos, and shows each store as it will be', async () => {
-    open()
-    expect(screen.getByRole('button', { name: 'See what changes' })).toBeDisabled()
+    open(MENU)
+    expect(screen.getByRole('button', { name: 'Read the menu' })).toBeDisabled()
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'TJ on Arch always has ground beef' } })
     fireEvent.change(screen.getByLabelText('Add a photo'), { target: { files: [new File(['x'], 'a.webp', { type: 'image/webp' })] } })
     expect(screen.getByAltText('Photo 1')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
 
     const cards = await screen.findAllByTestId('tell-us-card')
     expect(calls[0].url).toBe('/api/message/read?community=philly')
@@ -111,14 +155,14 @@ describe('Saw something? Tell us', () => {
   // under whatever the step showed. Now it's the header's chevron, before
   // the title, the same as a listing's own edit.
   it('goes back from what it read to what was written with the header’s chevron', async () => {
-    open()
+    open(MENU)
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'TJ on Arch always has ground beef' } })
-    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
     await screen.findAllByTestId('tell-us-card')
     expect(screen.queryByRole('button', { name: /Change what I wrote/ })).not.toBeInTheDocument()
     const back = screen.getByRole('button', { name: 'Back' })
-    expect(screen.getByRole('heading', { name: 'Add or update a place' }).parentElement).toContainElement(back)
+    expect(screen.getByRole('heading', { name: 'Add their menu' }).parentElement).toContainElement(back)
     fireEvent.click(back)
     expect(screen.getByLabelText('Your message')).toHaveValue('TJ on Arch always has ground beef')
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
@@ -153,7 +197,7 @@ describe('Saw something? Tell us', () => {
     fireEvent.change(screen.getByLabelText('Add a photo'), { target: { files: [new File(['x'], 'mekor-shabbos.pdf', { type: 'application/pdf' })] } })
     expect(screen.getByTitle('mekor-shabbos.pdf')).toHaveTextContent('PDF')
     expect(screen.queryByAltText('Photo 1')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'See what changes' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
   })
 
   // Agreed Oct 5: several places in one message, one at a time: "1 of 3",
@@ -161,9 +205,9 @@ describe('Saw something? Tell us', () => {
   // shows the one before it.
   it('shows several places one at a time, each sent on its own, asking “which one?” where it must', async () => {
     respond = (url) => (url.includes('/read') ? reading : { ok: true, filed: 1, ids: [`id-${calls.length}`] })
-    open()
+    open(MENU)
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'trader joes sometimes has ground turkey' } })
-    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
     await screen.findByTestId('tell-us-card')
     expect(screen.getAllByTestId('tell-us-card')).toHaveLength(1)
     expect(screen.getByTestId('tell-us-count')).toHaveTextContent('Trader Joe’s · 1 of 3')
@@ -188,9 +232,9 @@ describe('Saw something? Tell us', () => {
 
   it('goes back and forth with ‹ › and Next, and sending the last shows the one before', async () => {
     respond = (url) => (url.includes('/read') ? reading : { ok: true, filed: 1, ids: ['x'] })
-    open()
+    open(MENU)
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'trader joes sometimes has ground turkey' } })
-    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
     const count = await screen.findByTestId('tell-us-count')
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     expect(count).toHaveTextContent('2 of 3')
@@ -211,9 +255,9 @@ describe('Saw something? Tell us', () => {
     let n = 0
     respond = (url) => (url.includes('/read') ? two : url.includes('/email') ? { ok: true, updated: 2 } : { ok: true, filed: 1, ids: [`s${++n}`] })
     const onClose = vi.fn()
-    open({ onClose })
+    open({ onClose, ...MENU })
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'both TJs have ground beef' } })
-    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
     await screen.findByTestId('tell-us-card')
     fireEvent.click(screen.getByRole('button', { name: 'Send to an admin' }))
     await screen.findByText('Sent: Trader Joe’s')
@@ -235,9 +279,9 @@ describe('Saw something? Tell us', () => {
   it('lets them fix the items, add another, and open the rest of the listing, sending what they left', async () => {
     const one = { ...reading, proposals: [reading.proposals[0]] }
     respond = (url) => (url.includes('/read') ? one : url.includes('/api/resources') ? { ok: true, resources: [makeListing({ id: 'arch', name: 'Trader Joe’s', category: 'grocery' })] } : { ok: true, filed: 1, ids: ['s1'] })
-    open()
+    open(MENU)
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'TJ on Arch has ground beef' } })
-    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
     const items = await screen.findByTestId('tell-us-items')
     fireEvent.click(within(items).getByRole('button', { name: 'Change how often Hamburger Meat is in stock' }))
     expect(items).toHaveTextContent('Not always in stock')
@@ -287,12 +331,12 @@ describe('Saw something? Tell us', () => {
       askWhen: null,
     }
     respond = (url) => (url.includes('/read') ? { ...reading, proposals: [reading.proposals[0], hours] } : { ok: true, filed: 2, ids: ['a', 'b'] })
-    renderWithProviders(<TellUsSheet isOpen onClose={() => {}} />, {
+    renderWithProviders(<TellUsSheet isOpen onClose={() => {}} {...MENU} />, {
       community: { slug: 'philly' },
       content: { categories: [makeCategory({ id: 'grocery', label: 'Grocery', pluralLabel: 'Groceries', detailFields: [{ key: 'm', label: 'Kosher items', type: 'tags' }, { key: 'hours', label: 'Hours', type: 'hours' }] })] },
     })
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'TJ on Arch has croutons, and closes at 3 on Wednesdays now' } })
-    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
     await screen.findByTestId('tell-us-items')
     expect(screen.queryByTestId('tell-us-count')).not.toBeInTheDocument()
     expect(screen.getByTestId('tell-us-week')).toBeInTheDocument()
@@ -324,12 +368,12 @@ describe('Saw something? Tell us', () => {
       askWhen: null,
     }
     respond = (url) => (url.includes('/read') ? { ...reading, proposals: [fields] } : { ok: true, filed: 1, ids: ['a'] })
-    renderWithProviders(<TellUsSheet isOpen onClose={() => {}} />, {
+    renderWithProviders(<TellUsSheet isOpen onClose={() => {}} {...MENU} />, {
       community: { slug: 'philly' },
       content: { categories: [makeCategory({ id: 'hospital', label: 'Hospital', pluralLabel: 'Hospitals', detailFields: [{ key: 'pantry', label: 'Pantry', type: 'contacts' }] })] },
     })
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'Pantry: 1st floor, Pavilion Building' } })
-    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
     const preview = await screen.findByTestId('contacts-preview')
     expect(within(preview).getByRole('heading', { name: 'Pantry · 2' })).toBeInTheDocument()
     expect(within(preview).getByRole('link', { name: '(215) 805-8668' })).toBeInTheDocument()
@@ -347,9 +391,9 @@ describe('Saw something? Tell us', () => {
   // Agreed Oct 5: a new place is added with the form of questions, found on
   // Google first, filled in from what was read, and labelled with it.
   it('sends a new place with the add form, from what was read, then goes back to the rest', async () => {
-    open()
+    open(MENU)
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'South Square Market on 22nd has challah' } })
-    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
     await screen.findByTestId('tell-us-count')
     fireEvent.click(screen.getByRole('button', { name: 'Previous place' }))
     fireEvent.click(screen.getByRole('button', { name: 'Find it and fill it in' }))
@@ -399,7 +443,7 @@ describe('Saw something? Tell us', () => {
             ],
           }
         : { ok: true, filed: 1 }
-    renderWithProviders(<TellUsSheet isOpen onClose={() => {}} />, {
+    renderWithProviders(<TellUsSheet isOpen onClose={() => {}} {...MENU} />, {
       community: { slug: 'philly' },
       content: {
         categories: [
@@ -415,7 +459,7 @@ describe('Saw something? Tell us', () => {
       },
     })
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'Say She Ate is Keystone K now and closes at 3 on Wednesday' } })
-    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
     const card = await screen.findByTestId('tell-us-card')
     expect(within(card).getByText('Kosher Certification: IKC → Keystone-K')).toBeInTheDocument()
     // The week as the listing shows it, Wednesday marked, what it was struck.
@@ -436,9 +480,9 @@ describe('Saw something? Tell us', () => {
   // so, with where questions get answered, and nothing to send.
   it('says when it’s a question, not a change, and offers asking the group', async () => {
     respond = (url) => (url.includes('/read') ? { ok: true, photoUrls: [], proposals: [{ kind: 'not_update', note: 'A question' }] } : {})
-    open()
+    open(MENU)
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'Where can I get marshmallows?' } })
-    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
     expect(await screen.findByTestId('tell-us-why')).toHaveTextContent('This reads like a question, not a change to the guide.')
     expect(screen.getByRole('button', { name: 'Ask in a WhatsApp group' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Send it as feedback' })).not.toBeInTheDocument()
@@ -461,9 +505,9 @@ describe('Saw something? Tell us', () => {
             ],
           }
         : { ok: true, filed: 1, ids: ['s1'] }
-    open()
+    open(MENU)
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'here’s say she ate’s main dishes https://saysheate.co/menu/' } })
-    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
     const items = await screen.findByTestId('tell-us-items')
     expect(items).toHaveTextContent('Main dishes here · 3')
     expect(within(items).getAllByText('New · on its menu')).toHaveLength(2)
@@ -485,9 +529,9 @@ describe('Saw something? Tell us', () => {
   it('says a guess isn’t something seen, and goes back to the box to say where', async () => {
     respond = (url) =>
       url.includes('/read') ? { ok: true, photoUrls: [], proposals: [{ kind: 'ask_others', listingId: 'arch', listing: ARCH, question: 'Has anyone seen it at Trader Joe’s on Arch?', quote: 'x', checked: true }] } : {}
-    open()
+    open(MENU)
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'I’d be surprised if the TJ on Arch has it' } })
-    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
     expect(await screen.findByTestId('tell-us-why')).toHaveTextContent('It sounds like news, not something you saw at Trader Joe’s.')
     expect(screen.queryByRole('button', { name: /^Send/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Say where you saw it' }))
@@ -630,7 +674,9 @@ describe('Saw something? Tell us', () => {
       add()
       fireEvent.click(screen.getByRole('button', { name: /Or paste a post or a photo/ }))
       expect(screen.getByRole('dialog', { name: 'Paste a post or a photo' })).toBeInTheDocument()
-      expect(screen.getByTestId('read-by-ai')).toHaveTextContent('Read by AIYou check it before it’s sent.')
+      // Sent as it is (board S1b): no AI tag, since the sender checks nothing.
+      expect(screen.queryByTestId('read-by-ai')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument()
       expect(screen.getByLabelText('Your message')).toBeInTheDocument()
       // Back is the way to the search: no second "Find the place" link.
       expect(screen.queryByRole('button', { name: 'Find the place' })).not.toBeInTheDocument()
@@ -655,10 +701,10 @@ describe('Saw something? Tell us', () => {
       }
       const read = { ok: true, photoUrls: [], proposals: [fields] }
       respond = (url) => (url.includes('/api/resources') ? { ok: true, resources: [bagels] } : url.includes('/read') ? read : { ok: true, filed: 1, ids: ['s9'] })
-      add()
+      add({ kind: 'menu' })
       fireEvent.click(screen.getByRole('button', { name: /Or paste a post or a photo/ }))
       fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'Philly Bagels is under IKC now' } })
-      fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
       expect(await screen.findByRole('dialog', { name: 'Philly Bagels' })).toBeInTheDocument()
       expect(screen.getByTestId('read-into-editor')).toHaveTextContent('Read by AIfrom your post. Tap a row to fix it.')
       expect(screen.queryByTestId('tell-us-card')).not.toBeInTheDocument()
@@ -670,10 +716,10 @@ describe('Saw something? Tell us', () => {
       expect(body).toMatchObject({ text: 'Philly Bagels is under IKC now', forms: [{ targetId: 'pb', submission: { details: { kosherCert: 'IKC' } } }] })
       // Back from the editor is the post, as it was written.
       cleanup()
-      add()
+      add({ kind: 'menu' })
       fireEvent.click(screen.getByRole('button', { name: /Or paste a post or a photo/ }))
       fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'Philly Bagels is under IKC now' } })
-      fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
       await screen.findByTestId('read-into-editor')
       fireEvent.click(screen.getByRole('button', { name: 'Back' }))
       expect(screen.getByLabelText('Your message')).toHaveValue('Philly Bagels is under IKC now')
@@ -698,14 +744,14 @@ describe('Saw something? Tell us', () => {
     // Oct 16: inside it, saying too what's done with it.
     it('is named for what it does, says what to do inside, and offers doing it yourself, all at the foot', () => {
       const edit = vi.fn()
-      const line = 'Write what changed at Trader Joe’s, or paste a message about it. We’ll try to read what changes, for you to check.'
+      const line = 'Write what changed at Trader Joe’s, or paste a message about it.'
       open({ about: { id: 'arch', name: 'Trader Joe’s' }, placeholder: line, onEditYourself: edit })
       expect(screen.getByRole('dialog', { name: 'Update Trader Joe’s' })).toBeInTheDocument()
       expect(screen.getByLabelText('Your message')).toHaveAttribute('placeholder', line)
       // The photo is the box's own; then the two paths.
       expect(screen.getByRole('button', { name: 'Photo or PDF' })).toBeInTheDocument()
       expect(screen.queryByText(/or paste or drop one/)).not.toBeInTheDocument()
-      const go = screen.getByRole('button', { name: 'See what changes' })
+      const go = screen.getByRole('button', { name: 'Send' })
       const yourself = screen.getByRole('button', { name: 'Edit it yourself' })
       expect(go.compareDocumentPosition(yourself) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       fireEvent.click(yourself)
@@ -720,9 +766,9 @@ describe('Saw something? Tell us', () => {
 
     it('says the reader isn’t answering, keeps what was written, and tries again', async () => {
       respond = (url) => (url.includes('/read') ? { ok: false, code: 'down' } : {})
-      open()
+      open(MENU)
       fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'Acme has challah' } })
-      fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
       expect(await screen.findByTestId('tell-us-why')).toHaveTextContent('The reader isn’t answering right now.')
       expect(vi.mocked(track)).toHaveBeenCalledWith('tell_us_cant_use', { why: 'down' })
       respond = (url) => (url.includes('/read') ? reading : {})
@@ -736,9 +782,9 @@ describe('Saw something? Tell us', () => {
     it('logs what it couldn’t use, and its fix opens the photo picker, the photo going back to the box', async () => {
       respond = (url) => (url.includes('/read') ? { ok: true, photoUrls: [], proposals: [{ kind: 'menu', listing: ARCH, asWritten: 'tj', why: 'wont_open' }] } : {})
       const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {})
-      open()
+      open(MENU)
       fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'tj menu https://tj.example/menu' } })
-      fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
       expect(await screen.findByTestId('tell-us-why')).toHaveTextContent('Their menu page didn’t open for us.')
       expect(vi.mocked(track)).toHaveBeenCalledWith('tell_us_cant_use', { why: 'menu_wont_open' })
       fireEvent.click(screen.getByRole('button', { name: 'Add a photo of the menu' }))
@@ -768,11 +814,11 @@ describe('Saw something? Tell us', () => {
     })
   })
 
-  it('shows the reader’s refusal, and stays on what they wrote', async () => {
+  it('shows the refusal, and stays on what they wrote', async () => {
     respond = () => ({ ok: false, error: 'Write or paste what you saw, or add a photo.' })
     open()
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'hey' } })
-    fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Write or paste what you saw')
     expect(screen.getByLabelText('Your message')).toHaveValue('hey')
   })

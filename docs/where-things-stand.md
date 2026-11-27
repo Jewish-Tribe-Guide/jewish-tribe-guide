@@ -254,13 +254,27 @@ old number can still be looked up. When an item is done, move it to
     place we have opens its Edit listing. Left: counting it (the plan's
     step 1), the home page's nothing-found card (not drawn), and the
     forwarding phone number the user hopes will replace paste and
-    camera. The AI read's speed: 97. Drawn only, Nov 27: a paste or
-    photo sent straight to the queue, read in the background and
-    checked by the admin, and "Your update is live" for anything sent
-    (canvas S1b, S2, S3b, S4b, S4c); waits on the user's OK.
+    camera. The AI read's speed: 97.
+    Then BUILT Nov 27 (the user's OK, the dot chosen over a pop-up): a
+    post or photo is sent as it is (S1b, S2: Send, then "Sent", no AI
+    tag) and read afterwards at the "high" level into ordinary
+    suggestions (`src/lib/messageFiling.ts`; S3b, today's card). What
+    the read can't file (which of two places, a menu, a question, a
+    failed read) waits on To do as "Posts to sort by hand", the post as
+    sent with what was left, and Done (not drawn). A read that never
+    finished is tried again when To do loads. "Your updates" on You
+    lists what this phone sent (Live / Waiting / Not changed, S4c), and
+    the dot on You lights when one goes live; S4b and S4d (the pop-up)
+    are not built. Needs migration 118 first: 98. The menu and shul
+    times boxes still read while the sender waits.
 
 ### You do
 
+98. Run migration 118, dev then live, BEFORE the next deploy of
+    `claude/kept-current`:
+    [`supabase/migrations/20240101000118_sent_message.sql`](../supabase/migrations/20240101000118_sent_message.sql)
+    (adds `sent_message`: a post sent with the "+ Add" box, kept until
+    it's read). Without it the box can't send a post.
 97. Run migration 117, dev then live:
     [`supabase/migrations/20240101000117_message_read_time.sql`](../supabase/migrations/20240101000117_message_read_time.sql)
     (adds `message_read_time`: how long each "+ Add" box read took, and

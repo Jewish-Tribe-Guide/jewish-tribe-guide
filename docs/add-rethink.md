@@ -173,7 +173,29 @@ them:
   left the page (`e2e/focus-and-announcements.spec.ts`, phone, failed
   3 of 3 before).
 
-## Proposed, drawn only (Nov 27): a paste goes straight to the queue
+## A paste goes straight to the queue (BUILT Nov 27)
+
+Built after the user's OK, with one change from the boards: no pop-up
+(S4b, S4d). The user chose the dot on You instead: it lights when an
+update this phone sent goes live, and "Your updates" (S4c) says which.
+
+- The box opened for any update (from a page, the site's "+", Find the
+  place, or a listing's "Update X") sends what was written and its
+  photos to `/api/message/queue`, kept in `sent_message` (migration
+  118), and shows "Sent". No AI tag, no read to check. The menu and
+  shul-times boxes still read while the sender waits.
+- `messageFiling.ts` reads it in `after()`, at the "high" thinking
+  level, and files what it reads with the same filing the box's Send
+  used (items, fields, new places, a shul's week). It never guesses
+  between two places. What it can't file is left on the post, a line
+  each, and shows on To do as "Posts to sort by hand" (not drawn:
+  today's card look, the post first, then what was left, and Done).
+  A read that fails is tried twice more, when To do loads.
+- The phone keeps the ids each send answers with (`yourUpdates.ts`);
+  `/api/updates` says where each stands. No account, same phone and
+  browser only, so "Email me when it's on the site" stays.
+
+### What was proposed (drawn Nov 27)
 
 The user asked whether the sender should have to wait for the AI and
 check its read, or just send, with the AI reading in the background and
@@ -215,5 +237,3 @@ Edit listing).
 
 - Counting Add (step 1): build it or not.
 - The phone number for forwarding: which service, and when.
-- A paste goes straight to the queue (S1b, S2, S3b), and Your updates
-  (S4b, S4c): build them or not.

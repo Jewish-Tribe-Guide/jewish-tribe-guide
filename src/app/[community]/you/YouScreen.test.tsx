@@ -15,6 +15,7 @@ import { clearEruvStatuses } from '@/lib/useEruvStatuses'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { ScreenHeaderProvider, useScreenHeader } from '@/lib/headerVisibility'
 import YouScreen from './YouScreen'
+import { resetYourUpdatesForTests } from '@/lib/useYourUpdates'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -70,7 +71,10 @@ function show(changes: ChangeLogRow[] | null = null, { mobile = false } = {}) {
   )
 }
 
-beforeEach(() => localStorage.clear())
+beforeEach(() => {
+  localStorage.clear()
+  resetYourUpdatesForTests()
+})
 afterEach(() => {
   cleanup()
   clock.at = null
@@ -188,6 +192,56 @@ describe('You', () => {
     show(changes)
     expect(await screen.findAllByTestId('you-changed-dot')).toHaveLength(1)
     expect(screen.getByText('New hours')).toBeInTheDocument()
+  })
+
+  // Nov 27, board S4c: what this phone sent, with where each stands. Live
+  // opens the listing, with a dot when it's news; a rejection is only
+  // "Not changed".
+  it('Your updates: each one sent, with where it stands, Live opening the listing', async () => {
+    const id = (n: number) => `00000000-aaaa-4aaa-8aaa-${String(n).padStart(12, '0')}`
+    const at = Date.parse('2026-11-26T15:00:00Z')
+    localStorage.setItem(
+      'jpc:your-updates:test-community',
+      JSON.stringify([
+        { kind: 'message', id: id(1), name: 'Bagel Factory', what: 'Post', at },
+        { kind: 'submission', id: id(2), name: 'Sweet Box Bakery', what: 'Changes', at },
+        { kind: 'submission', id: id(3), name: 'Kosher Corner', what: 'New place', at },
+      ]),
+    )
+    localStorage.setItem('jpc:you-seen-at', String(Date.parse('2026-11-27T10:00:00Z')))
+    const asked: unknown[] = []
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      asked.push(JSON.parse(String(init?.body)))
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          statuses: {
+            [id(1)]: { state: 'live', href: '/test-community/grocery/bagel-factory', at: '2026-11-27T12:00:00Z' },
+            [id(2)]: { state: 'waiting' },
+            [id(3)]: { state: 'not_changed' },
+          },
+        }),
+      )
+    })
+    show()
+    expect(screen.queryByTestId('you-empty')).not.toBeInTheDocument()
+    const section = await screen.findByTestId('you-updates')
+    expect(within(section).getByRole('heading')).toHaveTextContent('Your updates')
+    await within(section).findByText('Live')
+    const rows = within(section).getAllByTestId('you-update')
+    expect(rows.map((r) => r.textContent)).toEqual(['Bagel FactoryPost · Nov 26Live', 'Sweet Box BakeryChanges · Nov 26Waiting', 'Kosher CornerNew place · Nov 26Not changed'])
+    expect(within(rows[0]).getByRole('link')).toHaveAttribute('href', '/test-community/grocery/bagel-factory')
+    expect(within(rows[1]).queryByRole('link')).not.toBeInTheDocument()
+    expect(within(section).getAllByTestId('you-update-dot')).toHaveLength(1)
+    expect(asked[0]).toEqual({ submissions: [id(2), id(3)], messages: [id(1)] })
+  })
+
+  it('no Your updates, and nothing asked, when nothing was sent', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    show()
+    expect(screen.queryByTestId('you-updates')).not.toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/api/updates'), expect.anything())
   })
 
   // Oct 15: an eruv couldn't be saved; now it's saved from its listing as
