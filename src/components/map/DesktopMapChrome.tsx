@@ -7,6 +7,8 @@
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import { ChevronLeftIcon, CloseIcon, CollapseIcon, ExpandIcon } from '@/components/icons'
+import { HeaderAddButton } from '@/components/SiteHeader'
+import { useContributions } from '@/lib/communityContext'
 import { SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, SIDEBAR_SEARCH_INSET } from './useMapSidebar'
 
 export default function DesktopMapChrome({
@@ -44,6 +46,7 @@ export default function DesktopMapChrome({
   standalone: boolean | undefined
   controls: LocationControls | undefined
 }) {
+  const contributions = useContributions()
   return (
     <>
       {/* ── Sidebar resize handle (desktop) — a thin invisible strip
@@ -177,6 +180,9 @@ export default function DesktopMapChrome({
               to type an address. Not in the boxed state: the header is
               `sticky top-0` (SiteHeader.tsx) and stays visible above a
               boxed map, its own LocationControl already reachable. */}
+          {/* Add or update (D1b, Nov 27): the header's button, here
+              for the same reason as Set location beside it. */}
+          {fullscreen && contributions.add && <HeaderAddButton testId="map-add" />}
           {fullscreen && controls && (
             <div data-testid="map-location-control">
               <LocationControl controls={controls} />

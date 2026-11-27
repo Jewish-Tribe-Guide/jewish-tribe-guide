@@ -124,11 +124,11 @@ test.describe('accessibility', () => {
     // Add's first screen, Find the place, and the AI box one row on it
     // (boards R3b and R4, Nov 27).
     await categoryAddButton(page).click()
-    const find = page.getByRole('dialog', { name: 'Find the place' })
-    await expect(find.getByRole('button', { name: /^Or paste a post or a photo/ })).toBeVisible()
+    const find = page.getByRole('dialog', { name: 'Add or update' })
+    await expect(find.getByRole('button', { name: /^Or tell us in your own words/ })).toBeVisible()
     await expectNoViolations(page)
 
-    await find.getByRole('button', { name: /^Or paste a post or a photo/ }).click()
+    await find.getByRole('button', { name: /^Or tell us in your own words/ }).click()
     await expect(page.getByRole('dialog').getByRole('button', { name: 'Send', exact: true })).toBeVisible()
     await expectNoViolations(page)
   })

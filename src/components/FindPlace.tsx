@@ -3,10 +3,11 @@
 import { useId, useRef, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import AddressInput, { SuggestionTag, type PlaceSelectResult } from '@/components/intake/AddressInput'
-import { MessageIcon, PencilIcon } from '@/components/icons'
+import { ChevronRightIcon, PencilIcon } from '@/components/icons'
 
-// "Find the place" (agreed Oct 5), since Nov 27 Add's first screen (board
-// R3b): every Add opens here, the AI box a row under the list. One search for adding and editing
+// "Find the place" (agreed Oct 5), since Nov 27 Add's first screen, titled
+// "Add or update" (boards R3b, V1b): every Add opens here, and a link under
+// it, "Or tell us in your own words", opens the box (V2b). One search for adding and editing
 // alike: the guide's own listings by name, and Google's places, the ones the
 // guide already has marked "Already in the guide". A place the guide has
 // opens its edit; a new one, the add form filled in from Google.
@@ -109,19 +110,16 @@ export default function FindPlace({
           }
         />
       </div>
+      {/* The other way in (Nov 27, board V1b): a whole-text link, quieter
+          than the search, to say it in your own words. */}
       {onPaste && (
         <button
           type="button"
           onClick={onPaste}
-          className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left hover:bg-slate-100"
+          className="inline-flex min-h-11 cursor-pointer items-center gap-1 text-[0.96875rem] font-semibold text-primary hover:underline"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-primary">
-            <MessageIcon className="h-[18px] w-[18px]" />
-          </span>
-          <span>
-            <span className="block text-[0.9375rem] font-bold text-slate-900">Or paste a post or a photo</span>
-            <span className="block text-[0.8125rem] text-slate-600">An admin checks it</span>
-          </span>
+          Or tell us in your own words
+          <ChevronRightIcon className="h-4 w-4 shrink-0" />
         </button>
       )}
     </div>

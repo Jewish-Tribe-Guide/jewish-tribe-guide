@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { categoryAddButton, categoryWithListings, defaultCommunity, ready } from './helpers'
+import { addButton, categoryAddButton, categoryWithListings, defaultCommunity, ready } from './helpers'
 
 // "+ Add" opens Find the place (board R3b, Nov 27; the box, "Add or update
 // a place", until then) on every screen but the Map (decided Oct 5), with
@@ -7,26 +7,26 @@ import { categoryAddButton, categoryWithListings, defaultCommunity, ready } from
 // here reads a message or sends one (that would call the AI and file a
 // suggestion).
 
-/** Find the place's row into the AI box, and the box it opens. */
+/** Add or update's link into the words box, and the box it opens. */
 async function openPaste(page: Page) {
-  await page.getByRole('dialog', { name: 'Find the place' }).getByRole('button', { name: /^Or paste a post or a photo/ }).click()
-  return page.getByRole('dialog', { name: 'Paste a post or a photo' })
+  await page.getByRole('dialog', { name: 'Add or update' }).getByRole('button', { name: /^Or tell us in your own words/ }).click()
+  return page.getByRole('dialog', { name: 'Tell us' })
 }
 
-test('the home page’s “+ Add” opens Find the place', async ({ page }) => {
+test('the home page’s Add or update opens its search', async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}`)
   await ready(page)
 
-  await page.getByRole('button', { name: 'Add', exact: true }).click()
-  const find = page.getByRole('dialog', { name: 'Find the place' })
+  await addButton(page).click()
+  const find = page.getByRole('dialog', { name: 'Add or update' })
   await expect(find.getByPlaceholder('Search by name or address…')).toBeVisible()
   // Filling it in by hand is offered once something is typed (Nov 27).
   await expect(find.getByRole('button', { name: /not on Google/ })).toHaveCount(0)
-  await expect(find.getByRole('button', { name: /^Or paste a post or a photo/ })).toBeVisible()
+  await expect(find.getByRole('button', { name: /^Or tell us in your own words/ })).toBeVisible()
 })
 
-test('a category’s “+” opens Find the place, with the paste box one row away, sent as it is, and Back', async ({ page, request }) => {
+test('a category’s Add or update opens its search, with the paste box one row away, sent as it is, and Back', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const { category } = await categoryWithListings(request, community)
   await page.goto(`/${community}/${category.id}`)
@@ -40,7 +40,7 @@ test('a category’s “+” opens Find the place, with the paste box one row aw
   await box.getByLabel('Your message').fill('Acme on 5th has challah')
   await expect(box.getByRole('button', { name: 'Send', exact: true })).toBeEnabled()
   await box.getByRole('button', { name: 'Back', exact: true }).click()
-  await expect(page.getByRole('dialog', { name: 'Find the place' })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Add or update' })).toBeVisible()
 })
 
 // Boards S2 and S4c (Nov 27): Send answers at once with Sent, and You lists
@@ -89,7 +89,7 @@ test('the browser’s Back and Forward walk the box’s steps, a row’s Back ke
 
   const page0 = page.url()
   await categoryAddButton(page).click()
-  const find = page.getByRole('dialog', { name: 'Find the place' })
+  const find = page.getByRole('dialog', { name: 'Add or update' })
   await expect(find).toBeVisible()
   const box = () => new URL(page.url()).searchParams.get('box')
   // Add's first screen is the box's own root: no step in the address.
@@ -139,9 +139,9 @@ test.describe('the box on a phone', { tag: '@mobile' }, () => {
     await page.goto(`/${community}`)
     await ready(page)
 
-    await page.getByRole('button', { name: 'Add', exact: true }).click()
-    const box = page.getByRole('dialog', { name: 'Find the place' })
-    const link = box.getByRole('button', { name: /^Or paste a post or a photo/ })
+    await addButton(page).click()
+    const box = page.getByRole('dialog', { name: 'Add or update' })
+    const link = box.getByRole('button', { name: /^Or tell us in your own words/ })
     await expect(link).toBeVisible()
     // Once it has finished sliding up.
     await expect.poll(async () => (await box.boundingBox())?.y).toBeLessThan(660)
@@ -162,31 +162,43 @@ test.describe('the box on a phone', { tag: '@mobile' }, () => {
     await page.goto(`/${community}`)
     await ready(page)
 
-    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    await addButton(page).click()
     await (await openPaste(page)).getByLabel('Your message').fill('Acme on 5th has challah')
     await page.waitForTimeout(400)
     // Timed in the page: Playwright's own round trips are slower than the slide.
     const shownAfter60ms = await page.evaluate(async () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
       await new Promise((r) => setTimeout(r, 60))
-      return !!document.querySelector('[role=dialog][aria-label="Paste a post or a photo"]')
+      return !!document.querySelector('[role=dialog][aria-label="Tell us"]')
     })
     expect(shownAfter60ms, 'still sliding away 60ms after closing').toBe(true)
-    await expect(page.getByRole('dialog', { name: 'Paste a post or a photo' })).toHaveCount(0)
+    await expect(page.getByRole('dialog', { name: 'Tell us' })).toHaveCount(0)
 
     // And opened again, it starts over, on Find the place.
-    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    await addButton(page).click()
     await expect((await openPaste(page)).getByLabel('Your message')).toHaveValue('')
   })
 })
 
-test('the Map has no “+ Add”', async ({ page }) => {
+test('the Map has no “+” on a phone', { tag: '@mobile' }, async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
   // On a phone the Map hides the header, so wait for its own search box:
   // a page that hasn't rendered would have no Add either.
   await page.getByPlaceholder(/Search name, address/).filter({ visible: true }).waitFor()
-  await expect(page.getByRole('button', { name: 'Add', exact: true })).toHaveCount(0)
+  await expect(addButton(page)).toHaveCount(0)
+})
+
+// D1b (Nov 27): a computer's header has Add or update on every screen.
+// The full-screen Map paints over the header, so its own top bar carries
+// one beside its Set location, opening the site's own Add. A click fails
+// if anything covers it (the header's copy, under the Map, did).
+test('the Map’s header Add or update opens the site’s Add on a computer', { tag: '@desktop' }, async ({ page }) => {
+  const community = await defaultCommunity(page)
+  await page.goto(`/${community}/map`)
+  await page.getByPlaceholder(/Search name, address/).filter({ visible: true }).waitFor()
+  await page.getByTestId('map-add').click()
+  await expect(page.getByRole('dialog', { name: 'Add or update' }).getByPlaceholder('Search by name or address…')).toBeVisible()
 })
 
 // Oct 15: an open listing's Edit listing opens the editor itself, not the
@@ -207,7 +219,7 @@ test('an open listing’s Edit listing opens the editor, not the box about that 
     await expect(categoryAddButton(page)).toHaveCount(0)
   } else {
     await categoryAddButton(page).click()
-    const general = page.getByRole('dialog', { name: 'Find the place' })
+    const general = page.getByRole('dialog', { name: 'Add or update' })
     await expect(general).toBeVisible()
     await general.getByRole('button', { name: 'Close' }).click()
     await expect(general).toBeHidden()

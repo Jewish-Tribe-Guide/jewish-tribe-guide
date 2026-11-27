@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { requestAdd } from '@/lib/addHere'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -11,12 +12,17 @@ import { track } from '@vercel/analytics'
 vi.mock('@/components/resources/useListingSubmit', async (original) => ({ ...(await original<object>()), TURNSTILE_ACTIVE: false }))
 vi.mock('@/lib/useIsMobile', () => ({ useIsMobile: () => true, useMeasuredIsMobile: () => true }))
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
+const pathname = vi.hoisted(() => ({ current: '/philly' }))
+const mockPathname = (p: string) => (pathname.current = p)
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
-  usePathname: () => '/philly',
+  usePathname: () => pathname.current,
   useSearchParams: () => new URLSearchParams(),
 }))
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  pathname.current = '/philly'
+})
 
 const ARCH = { id: 'arch', name: 'Trader Joe’s', address: '1324 Arch St, Philadelphia, PA', category: 'grocery', categoryLabel: 'Grocery' }
 const MARKET = { id: 'market', name: 'Trader Joe’s', address: '2121 Market St, Philadelphia, PA', category: 'grocery', categoryLabel: 'Grocery' }
@@ -651,7 +657,7 @@ describe('Saw something? Tell us', () => {
 
     it('opens on the search, already searching, with the guide’s places first and filling it in last, in one list', async () => {
       add({ query: 'Bagel' })
-      expect(screen.getByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
+      expect(screen.getByRole('dialog', { name: 'Add or update' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
       expect(screen.getByPlaceholderText('Search by name or address…')).toHaveValue('Bagel')
       const ours = await screen.findByTestId('in-guide')
@@ -665,7 +671,7 @@ describe('Saw something? Tell us', () => {
       fireEvent.click(ours)
       expect(screen.getByRole('dialog', { name: 'Philly Bagels' })).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Back' }))
-      expect(screen.getByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
+      expect(screen.getByRole('dialog', { name: 'Add or update' })).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: /not on Google/ }))
       expect(screen.getByRole('dialog', { name: 'Add to Food' })).toBeInTheDocument()
     })
@@ -674,10 +680,9 @@ describe('Saw something? Tell us', () => {
       add()
       // Sent as it is (Nov 27, S1b): the row says who checks it, not "for
       // you to check".
-      expect(screen.getByRole('button', { name: /Or paste a post or a photo/ })).toHaveTextContent('An admin checks it')
-      expect(screen.getByRole('button', { name: /Or paste a post or a photo/ })).not.toHaveTextContent(/for you to check/)
-      fireEvent.click(screen.getByRole('button', { name: /Or paste a post or a photo/ }))
-      expect(screen.getByRole('dialog', { name: 'Paste a post or a photo' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Or tell us in your own words' })).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Or tell us in your own words' }))
+      expect(screen.getByRole('dialog', { name: 'Tell us' })).toBeInTheDocument()
       // Sent as it is (board S1b): no AI tag, since the sender checks nothing.
       expect(screen.queryByTestId('read-by-ai')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument()
@@ -685,7 +690,7 @@ describe('Saw something? Tell us', () => {
       // Back is the way to the search: no second "Find the place" link.
       expect(screen.queryByRole('button', { name: 'Find the place' })).not.toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Back' }))
-      expect(screen.getByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
+      expect(screen.getByRole('dialog', { name: 'Add or update' })).toBeInTheDocument()
       expect(screen.getByTestId('find-place')).toBeInTheDocument()
     })
 
@@ -706,7 +711,7 @@ describe('Saw something? Tell us', () => {
       const read = { ok: true, photoUrls: [], proposals: [fields] }
       respond = (url) => (url.includes('/api/resources') ? { ok: true, resources: [bagels] } : url.includes('/read') ? read : { ok: true, filed: 1, ids: ['s9'] })
       add({ kind: 'menu' })
-      fireEvent.click(screen.getByRole('button', { name: /Or paste a post or a photo/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'Or tell us in your own words' }))
       fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'Philly Bagels is under IKC now' } })
       fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
       expect(await screen.findByRole('dialog', { name: 'Philly Bagels' })).toBeInTheDocument()
@@ -721,13 +726,13 @@ describe('Saw something? Tell us', () => {
       // Back from the editor is the post, as it was written.
       cleanup()
       add({ kind: 'menu' })
-      fireEvent.click(screen.getByRole('button', { name: /Or paste a post or a photo/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'Or tell us in your own words' }))
       fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'Philly Bagels is under IKC now' } })
       fireEvent.click(screen.getByRole('button', { name: 'Read the menu' }))
       await screen.findByTestId('read-into-editor')
       fireEvent.click(screen.getByRole('button', { name: 'Back' }))
       expect(screen.getByLabelText('Your message')).toHaveValue('Philly Bagels is under IKC now')
-      expect(screen.getByRole('dialog', { name: 'Paste a post or a photo' })).toBeInTheDocument()
+      expect(screen.getByRole('dialog', { name: 'Tell us' })).toBeInTheDocument()
     })
 
     it('keeps the result’s card for what the editor can’t hold', () => {
@@ -753,7 +758,7 @@ describe('Saw something? Tell us', () => {
       expect(screen.getByRole('dialog', { name: 'Update Trader Joe’s' })).toBeInTheDocument()
       expect(screen.getByLabelText('Your message')).toHaveAttribute('placeholder', line)
       // The photo is the box's own; then the two paths.
-      expect(screen.getByRole('button', { name: 'Photo or PDF' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Add a photo' })).toBeInTheDocument()
       expect(screen.queryByText(/or paste or drop one/)).not.toBeInTheDocument()
       const go = screen.getByRole('button', { name: 'Send' })
       const yourself = screen.getByRole('button', { name: 'Edit it yourself' })
@@ -847,21 +852,23 @@ describe('SiteAddButton — opened by the search', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     fireEvent(document, new CustomEvent('jpc:open-add'))
     // Add's one way in (Nov 27, board R3b).
-    expect(await screen.findByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Add or update' })).toBeInTheDocument()
   })
-  // Drawn Oct 26 (boards N and O): apricot, the one colour meaning "you
-  // can add here", with a deeper edge; 48px on the phone, with the word.
-  it('is apricot with an edge, smaller on the phone, and says Add there too', () => {
+  // Nov 27 (board U1c): a round blue +, on a phone only.
+  it('is a round blue + on a phone only', () => {
     renderWithProviders(<SiteAddButton />, { content: { categories: [makeCategory()] }, community: { slug: 'philly' } })
-    const add = screen.getByRole('button', { name: 'Add' })
-    expect(add.className).toContain('bg-add')
-    expect(add.className).not.toContain('bg-primary')
-    expect(add.className).toContain('border-add-edge')
-    // 1px on the phone (board N), 1.5px on desktop (board O).
-    expect(add.className).toMatch(/(^|\s)border(\s|$)/)
-    expect(add.className).toContain('desktop:border-[1.5px]')
-    expect(add.className).toMatch(/(^|\s)h-12(\s|$)/)
-    expect(add.className).toContain('desktop:h-14')
-    expect(add.querySelector('span')?.className).not.toMatch(/(^|\s)hidden(\s|$)/)
+    const add = screen.getByRole('button', { name: 'Add or update' })
+    expect(add.className).toContain('bg-primary')
+    expect(add.className).not.toContain('bg-add')
+    expect(add.className).toContain('desktop:hidden')
+  })
+  // A screen without the phone's + (the Map) still opens the box from the
+  // computer's header (board D1b).
+  it('opens the box from the header on a screen without its own +', async () => {
+    mockPathname('/philly/map')
+    renderWithProviders(<SiteAddButton />, { content: { categories: [makeCategory()] }, community: { slug: 'philly' } })
+    expect(screen.queryByRole('button', { name: 'Add or update' })).not.toBeInTheDocument()
+    act(() => requestAdd())
+    expect(await screen.findByRole('dialog', { name: 'Add or update' })).toBeInTheDocument()
   })
 })

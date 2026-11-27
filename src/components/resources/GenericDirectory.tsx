@@ -22,6 +22,7 @@ import { candlesToday, isVouchedFor } from '@/lib/listingRow'
 import { useZmanim } from '@/lib/useZmanim'
 import MinyanimView from './MinyanimView'
 import { AddButton } from '@/components/AddButton'
+import { useAddHere } from '@/lib/addHere'
 import { useIsMobile, useMeasuredIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
@@ -235,6 +236,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const contributions = useContributions()
   const canAdd = contributions.add && caps.add
   const { tellOpen, setTellOpen, tellMounted, openItem, editYourself, tellTimes, tellMenu, tellAbout, findQuery, tellAdd } = useTellUs()
+  // The computer's header "+ Add or update" (board D1b) opens this page's
+  // own Add, which knows the category.
+  useAddHere(canAdd, () => tellAdd())
   // Adding to a shul's times is an edit to the shul ("+ Add a minyan").
   const canEdit = contributions.edit && caps.edit
   const showSearch = ui.search.directory && caps.directorySearch
@@ -1060,6 +1064,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
       {canAdd && (!openDialogItemId || (!isMobile && columnItem)) && (
         <AddButton
+          phoneOnly
           onClick={() => tellAdd()}
         />
       )}

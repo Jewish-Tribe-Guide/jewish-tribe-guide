@@ -4,14 +4,16 @@ import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import { AddButton } from '@/components/AddButton'
+import { OPEN_ADD } from '@/lib/addHere'
 import { useCategories } from '@/lib/useCategories'
 import { useOptionalCommunitySlug, useContributions } from '@/lib/communityContext'
 
-// "+ Add" on every screen but the Map (decided Oct 5, reversing the earlier
-// "no general Add": the box needs no category, so nobody is asked to pick
-// one first). Opens Find the place (Nov 27, board R3b), the AI box a row on
-// it. A category page has its own "+", opening the same; a listing has
-// Edit listing.
+// A phone's "+" on every screen but the Map (decided Oct 5, reversing the
+// earlier "no general Add"). Opens Add or update (Nov 27, boards R3b, V1b).
+// A category page has its own "+", opening the same; a listing has Edit
+// listing. On a computer the "+" is the header's (HeaderAddButton, board
+// D1b), on every screen with the header, the Map included: it opens this
+// box wherever the screen has no Add of its own (src/lib/addHere.ts).
 
 // Loaded on the first tap: nobody browsing pays for the box.
 const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'), { loading: () => null })
@@ -39,17 +41,19 @@ export default function SiteAddButton() {
   const [mounted, setMounted] = useState(false)
   if (open && !mounted) setMounted(true)
   // "How do I add a listing?" in the home search opens this same box
-  // (searchLands.ts), as tapping "+ Add" would.
+  // (searchLands.ts), as tapping "+" would, and so does the computer's
+  // header button where the screen has no Add of its own.
   useEffect(() => {
     const onOpen = () => setOpen(true)
-    document.addEventListener('jpc:open-add', onOpen)
-    return () => document.removeEventListener('jpc:open-add', onOpen)
+    document.addEventListener(OPEN_ADD, onOpen)
+    return () => document.removeEventListener(OPEN_ADD, onOpen)
   }, [])
   const contributions = useContributions()
-  if (!community || !contributions.add || !showsSiteAdd(pathname, community, (categories ?? []).map((c) => c.id))) return null
+  if (!community || !contributions.add) return null
+  const shows = showsSiteAdd(pathname, community, (categories ?? []).map((c) => c.id))
   return (
     <>
-      <AddButton onClick={() => setOpen(true)} />
+      {shows && <AddButton phoneOnly onClick={() => setOpen(true)} />}
       {mounted && <TellUsSheet isOpen={open} onClose={() => setOpen(false)} findFirst />}
     </>
   )

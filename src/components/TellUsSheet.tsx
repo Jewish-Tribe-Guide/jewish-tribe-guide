@@ -184,7 +184,7 @@ export default function TellUsSheet({
     if (steps() > 0) void moveBackTo(router, steps, () => withoutSteps(window.location.pathname, window.location.search, ['box']))
   }, [isOpen, router])
   // Named for what it does (Oct 10): "Tell us about…" read like feedback.
-  const title = stepTitle ?? heading ?? (findFirst ? 'Find the place' : null) ?? (about ? (kind === 'menu' ? 'Add their menu' : `Update ${about.name}`) : 'Add or update a place')
+  const title = stepTitle ?? heading ?? (findFirst ? FIND_TITLE : null) ?? (about ? (kind === 'menu' ? 'Add their menu' : `Update ${about.name}`) : 'Add or update a place')
   const onBack = hasBack ? () => back.current() : undefined
   const body = (
     <TellUsBody
@@ -362,7 +362,7 @@ export function TellUsBody({
       setFindFrom(step)
       setFindCategory(category)
     }
-    setStep('find', 'Find the place')
+    setStep('find', findFirst ? FIND_TITLE : 'Find the place')
     void loadListings()
   }
   const loadListings = async (): Promise<DirectoryResource[]> => {
@@ -451,7 +451,7 @@ export function TellUsBody({
   const inEditor = step === 'add' || step === 'edit'
   const boxPath = open ? [...(pathOf(step) ?? []), ...(inEditor ? (editorStep?.path ?? []) : [])] : []
   const titleOf = (s: Step): string | null =>
-    s === 'write' && findFirst ? WRITE_TITLE : s === 'find' ? 'Find the place' : s === 'kind' ? 'What kind of place?' : s === 'add' && adding ? addTitle(adding.category) : s === 'edit' && editing ? editing.name : null
+    s === 'write' && findFirst ? WRITE_TITLE : s === 'find' ? (findFirst ? FIND_TITLE : 'Find the place') : s === 'kind' ? 'What kind of place?' : s === 'add' && adding ? addTitle(adding.category) : s === 'edit' && editing ? editing.name : null
   useStepsInAddress('box', boxPath, (to) => {
     for (const s of STEPS) {
       const at = pathOf(s)
@@ -989,16 +989,20 @@ export function TellUsBody({
                 className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg px-2.5 text-[0.90625rem] font-bold text-primary hover:bg-primary/5 disabled:cursor-default disabled:text-slate-400"
               >
                 <CameraIcon className="h-[18px] w-[18px]" />
-                {kind === 'menu' ? 'Photos or PDF of the menu' : kind === 'times' ? 'Photo or PDF of the schedule' : 'Photo or PDF'}
+                {kind === 'menu' ? 'Photos or PDF of the menu' : kind === 'times' ? 'Photo or PDF of the schedule' : 'Add a photo'}
               </button>
               {photos.length > 0 && <span className="pr-2 text-[0.78125rem] text-slate-500">{`${photos.length} of ${MAX_PHOTOS}`}</span>}
             </div>
           </div>
           <div className="pt-2">
             {sendsAsIs ? (
-              <button type="button" disabled={!canRead || busy === 'send'} onClick={() => start('send', (token) => void sendPost(token))} className={primary}>
-                {busy === 'send' ? 'Sending…' : 'Send'}
-              </button>
+              <>
+                <button type="button" disabled={!canRead || busy === 'send'} onClick={() => start('send', (token) => void sendPost(token))} className={primary}>
+                  {busy === 'send' ? 'Sending…' : 'Send'}
+                </button>
+                {/* Said once, where they send (board V2b). */}
+                <p className="mt-2 text-center text-[0.8125rem] text-slate-500">An admin checks it before it’s on the site</p>
+              </>
             ) : (
               <button type="button" disabled={!canRead || busy === 'read'} onClick={() => start('read', (token) => void read(token))} className={primary}>
                 {busy === 'read' ? 'Reading…' : kind === 'menu' ? 'Read the menu' : 'Read the times'}
@@ -1555,7 +1559,13 @@ function ResultCard({
 
 /** Why the box can't use something, and (beside a change that can be sent)
  *  the one thing that works instead (Oct 10). */
-const WRITE_TITLE = 'Paste a post or a photo'
+// Add's one way in (Nov 27, board V1b): what the sheet is for, as the
+// button that opens it is named. A step inside it (the AI's new place)
+// keeps "Find the place".
+const FIND_TITLE = 'Add or update'
+// Its other way, in your own words (board V2b): one box for words and
+// photos, sent as it is.
+const WRITE_TITLE = 'Tell us'
 
 /** Says AI read it, or will (boards R4, P6b). */
 function AiTag() {

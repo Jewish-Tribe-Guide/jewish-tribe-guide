@@ -14,7 +14,9 @@ export function tellUsPlaceholder({ times = false, menu = false, about }: { time
     const whose = about ? `${about.name}’s` : 'a shul’s'
     return `Paste ${whose} email or newsletter for this week, or add a photo of it. We’ll try to read the times off it, for you to check.`
   }
-  const what = about ? `Write what changed at ${about.name}, or paste a message about it.` : 'Write what you saw at a place, new or already here, or paste a post from the group.'
+  // In your own words (Nov 27, board V2b): typed, or pasted from where it
+  // was seen.
+  const what = about ? `Write what changed at ${about.name}, or paste a message about it.` : 'Type it, or paste it from WhatsApp or an email'
   // Sent as it is (Nov 27, board S1b): an admin checks it, not the sender.
   return what
 }

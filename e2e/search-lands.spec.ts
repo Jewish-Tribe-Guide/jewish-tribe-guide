@@ -252,5 +252,5 @@ test('a category’s box: “in Food” only where there’s room, and Add when 
   await expect(card.getByRole('link', { name: 'Search the whole guide' })).toHaveCount(0)
   await card.getByRole('button', { name: 'Add xqzvplk wobblefrump' }).click()
   // Find the place, already searching for it (R3b).
-  await expect(page.getByRole('dialog', { name: 'Find the place' }).getByPlaceholder('Search by name or address…')).toHaveValue('xqzvplk wobblefrump')
+  await expect(page.getByRole('dialog', { name: 'Add or update' }).getByPlaceholder('Search by name or address…')).toHaveValue('xqzvplk wobblefrump')
 })

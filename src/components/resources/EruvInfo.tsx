@@ -29,6 +29,7 @@ import { initialsOf } from '@/lib/listingRow'
 import { usePinned } from '@/lib/pinnedContext'
 import { pointerHover } from '@/lib/pointerHover'
 import { AddButton } from '@/components/AddButton'
+import { useAddHere } from '@/lib/addHere'
 import { resolveCapabilities } from '@/lib/categories'
 import dynamic from 'next/dynamic'
 
@@ -143,6 +144,8 @@ export default function EruvInfo({ onUp, title = 'Eruv', color = '#64748b', band
   const [tellOpen, setTellOpen] = useState(false)
   const [tellMounted, setTellMounted] = useState(false)
   if (tellOpen && !tellMounted) setTellMounted(true)
+  // The computer's header "+ Add or update" (board D1b) adds an eruv here.
+  useAddHere(canAdd, () => setTellOpen(true))
   const shabbosSide = ready && now ? [5, 6].includes(localParts(now, ready.timezone).weekday) : false
   const openIndex = ready && open ? ready.eruvim.indexOf(open) : -1
 
@@ -346,7 +349,7 @@ export default function EruvInfo({ onUp, title = 'Eruv', color = '#64748b', band
         </div>
       )}
 
-      {canAdd && (!open || column) && <AddButton onClick={() => setTellOpen(true)} />}
+      {canAdd && (!open || column) && <AddButton phoneOnly onClick={() => setTellOpen(true)} />}
       {tellMounted && eruvPage && <TellUsSheet isOpen={tellOpen} onClose={() => setTellOpen(false)} category={eruvPage} />}
 
       {ready && now && open && isMobile && !column && (

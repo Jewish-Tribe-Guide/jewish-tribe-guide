@@ -16,7 +16,7 @@ test('Adding finds the place first, then asks the category’s questions, with B
   await ready(page)
   await categoryAddButton(page).click()
 
-  const find = page.getByRole('dialog', { name: 'Find the place' })
+  const find = page.getByRole('dialog', { name: 'Add or update' })
   const search = find.getByPlaceholder('Search by name or address…')
   await expect(search).toBeVisible()
   await expect(find.getByRole('button', { name: /not on Google/ })).toHaveCount(0)
@@ -38,7 +38,7 @@ test('Adding finds the place first, then asks the category’s questions, with B
 
   // Back is the header's chevron, before the title.
   await add.getByRole('button', { name: 'Back', exact: true }).click()
-  await expect(page.getByRole('dialog', { name: 'Find the place' })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Add or update' })).toBeVisible()
   // Add's first screen: nothing before it to go back to.
   await expect(page.getByRole('dialog').getByRole('button', { name: 'Back', exact: true })).toHaveCount(0)
 })

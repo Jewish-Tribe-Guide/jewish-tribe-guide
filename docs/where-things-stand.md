@@ -267,8 +267,12 @@ old number can still be looked up. When an item is done, move it to
     the dot on You lights when one goes live; S4b and S4d (the pop-up)
     are not built. Needs migration 118 first: 98. The menu and shul
     times boxes still read while the sender waits.
-99. **Add, renamed and one box** (Nov 27): DRAWN, not built until the
-    user OKs it ("Add, rethought" canvas U1c, D1b, V1b, V2b). On a phone the
+99. **Add, renamed and one box** (Nov 27): BUILT on claude/kept-current,
+    not live yet ("Add, rethought" canvas U1c, D1b, V1b, V2b). The
+    header's button opens the screen's own Add when it has one (a
+    category, the eruv), else the site's (`src/lib/addHere.ts`).
+    The search's dotted last row keeps its wording ("Add bagel · Not in
+    the list? Add it to the guide"; the user, Nov 27). On a phone the
     floating button is a round blue button with a white "+" (U1c); on a
     computer it's gone, and an outlined "+ Add or update" sits in the header
     beside Set location, Map included (D1b, chosen over D1c and D1d; brings back Sep 22's header

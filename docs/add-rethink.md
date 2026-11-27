@@ -234,7 +234,7 @@ those, so they still see the end result. If built, this changes:
 R4's "You check it before it's sent", and P6b (a paste no longer opens
 Edit listing).
 
-## Renamed, and one box (drawn Nov 27, U1c, D1b, V1b, V2b)
+## Renamed, and one box (drawn and built Nov 27, U1c, D1b, V1b, V2b)
 
 The user: change the name from Add, and maybe camera and paste as two
 buttons. Drafts went through two paths (T1–T3; U2–U4c: Send a photo and

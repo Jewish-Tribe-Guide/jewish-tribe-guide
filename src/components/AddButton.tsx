@@ -29,19 +29,24 @@ function useAtPageEnd(enabled: boolean): boolean {
   return atEnd
 }
 
-/** The floating "+ Add", bottom right: the site's own one and each category
- *  page's. Apricot, the one colour on the site that means "you can add here"
- *  (drawn Oct 26, boards N and O), so it stands out from the blue of
- *  everything else you tap. A deeper apricot edge holds its shape against
- *  the white rows: 1px on the phone, 1.5px on desktop. Smaller on the phone, now the colour does the work; the word
- *  shows there too.
+/** The floating "+", bottom right, on a phone: the site's own one and each
+ *  category page's (Nov 27, board U1c). A round button in the community's
+ *  blue with a white +, the colour of every Send, so it reads as the main
+ *  thing you can do (Gmail's Compose, Google Maps' +); the words are the
+ *  sheet's title, "Add or update", and the button's name. It was apricot,
+ *  the one "you can add here" colour, from Oct 26 (boards N and O).
+ *
+ *  A computer has no floating button: "+ Add or update" is in the header
+ *  (HeaderAddButton, board D1b), so `phoneOnly` hides this one there. Admin's
+ *  Places keeps it on a computer too, as a pill with its word, since the
+ *  admin console has no site header.
  *
  *  On a phone it goes while you scroll down and comes back as you scroll
  *  up, with the header (useScrollShowHide), and at the end of the page,
  *  where nothing is under it. It sat over half a tile in the home's
  *  right-hand column, and a tap there opened Add (the user, Nov 24: "Hide
- *  while scrolling"). A computer keeps it. */
-export function AddButton({ onClick, label = 'Add' }: { onClick: () => void; label?: string }) {
+ *  while scrolling"). */
+export function AddButton({ onClick, label = 'Add or update', phoneOnly = false }: { onClick: () => void; label?: string; phoneOnly?: boolean }) {
   const phone = useMeasuredIsMobile() === true
   const shown = useScrollShowHide(phone)
   const atEnd = useAtPageEnd(phone)
@@ -50,16 +55,14 @@ export function AddButton({ onClick, label = 'Add' }: { onClick: () => void; lab
     <button
       type="button"
       onClick={onClick}
-      // "Add", never "Add {category}": an empty category's own button
-      // already says that, and both are on screen at once. aria-label wins
-      // for the accessible name whatever the visible text grows into. Admin's
-      // Places says what it adds, for a screen reader.
+      // aria-label wins for the accessible name: the phone's button is the
+      // + alone. Admin's Places says what it adds.
       aria-label={label}
       data-hidden={hidden || undefined}
-      className={`fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 z-40 flex h-12 desktop:h-14 items-center justify-center gap-1.5 desktop:gap-2 rounded-full border desktop:border-[1.5px] border-add-edge bg-add pl-3.5 pr-[1.125rem] desktop:pl-[1.125rem] desktop:pr-[1.375rem] text-ink text-[0.9375rem] desktop:text-[1.0625rem] font-semibold shadow-[0_4px_12px_rgba(19,36,58,0.14)] desktop:shadow-[0_6px_16px_rgba(19,36,58,0.14)] cursor-pointer active:scale-95 transition-[translate,scale,opacity,visibility] duration-200 motion-reduce:transition-none ${hidden ? 'invisible translate-y-4 opacity-0' : ''}`}
+      className={`fixed right-4 bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)] desktop:bottom-6 z-40 ${phoneOnly ? 'flex desktop:hidden' : 'flex'} h-14 w-14 desktop:w-auto items-center justify-center desktop:gap-2 rounded-full bg-primary desktop:pl-[1.125rem] desktop:pr-[1.375rem] text-white desktop:text-[1.0625rem] font-semibold shadow-[0_4px_12px_rgba(29,78,216,0.35)] hover:bg-primary-dark cursor-pointer active:scale-95 transition-[translate,scale,opacity,visibility] duration-200 motion-reduce:transition-none ${hidden ? 'invisible translate-y-4 opacity-0' : ''}`}
     >
-      <PlusIcon className="h-5 w-5 desktop:h-[22px] desktop:w-[22px] shrink-0" />
-      <span className="whitespace-nowrap">Add</span>
+      <PlusIcon className="h-[26px] w-[26px] desktop:h-[22px] desktop:w-[22px] shrink-0" />
+      <span className="hidden whitespace-nowrap desktop:inline">Add</span>
     </button>
   )
 }
