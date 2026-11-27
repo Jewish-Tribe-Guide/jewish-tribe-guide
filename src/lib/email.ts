@@ -14,6 +14,7 @@ import {
 import { MENU_LINK_PROPOSED, SHOWN_WHEN_PROPOSED } from './syncFields'
 import { MENU_LINK_LABEL } from './menuLink'
 import { getCommunityNotifyRecipients, getReviewActionRecipients, resolveCommunity } from './communityStore'
+import { communityInboundAddress } from './inboundEmail'
 import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
@@ -152,7 +153,8 @@ function formatDetailValue(v: unknown, field?: CategoryField): string {
   return v != null ? String(v) : ''
 }
 
-// Low-level send. Reads RESEND_FROM from env (falls back to the sandbox sender).
+// Low-level send. From the community's own address once the site receives
+// mail, else RESEND_FROM (falls back to the sandbox sender).
 // Callers sending to the public must ensure a verified domain is set in
 // RESEND_FROM — the sandbox can only deliver to the account owner's address.
 //
@@ -183,14 +185,20 @@ export function namedSender(address: string, name: string | null | undefined): s
   return `"${clean}" <${address}>`
 }
 
-/** The community's own name ("Philly Jewish Guide"), or the default
- *  community's when an email isn't about one (the sign-in links). Never
- *  fails a send: with no name, the bare address. */
-async function senderName(community: string | null | undefined): Promise<string | null> {
+/** Who an email is from: the community's own name, and its own address
+ *  once the site receives mail (`philly@<INBOUND_EMAIL_DOMAIN>`, tracker
+ *  100), so a visitor sees one address everywhere and Reply comes back to
+ *  it (the user, Nov 27). An email about no community (the sign-in links),
+ *  or any before receiving is set up, is from RESEND_FROM under the default
+ *  community's name. Never fails a send: with no name, the bare address. */
+async function sender(community: string | null | undefined): Promise<string> {
+  const fallback = process.env.RESEND_FROM || 'onboarding@resend.dev'
   try {
-    return (await resolveCommunity(community)).name
+    const found = await resolveCommunity(community)
+    const own = community ? communityInboundAddress(found.slug) : null
+    return namedSender(own ?? fallback, found.name)
   } catch {
-    return null
+    return fallback
   }
 }
 
@@ -216,7 +224,7 @@ export async function sendEmail({
 }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) throw new Error('Missing required environment variable: RESEND_API_KEY')
-  const from = namedSender(process.env.RESEND_FROM || 'onboarding@resend.dev', await senderName(community))
+  const from = await sender(community)
   const resend = new Resend(apiKey)
   const payload = {
     from,

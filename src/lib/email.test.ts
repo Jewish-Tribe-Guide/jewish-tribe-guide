@@ -153,6 +153,19 @@ describe('sendEmail', () => {
       mockResolveCommunity.mockReset()
     })
 
+    // Tracker 100, the user Nov 27: one address a visitor sees everywhere,
+    // and Reply comes back to it.
+    it('sends from the community’s own address once the site receives mail, and sign-in links from RESEND_FROM', async () => {
+      vi.stubEnv('RESEND_FROM', 'notifications@ourdomain.org')
+      vi.stubEnv('INBOUND_EMAIL_DOMAIN', 'ourdomain.org')
+      mockResolveCommunity.mockImplementation(async (slug?: string) => ({ slug: slug ?? 'philly', name: slug === 'ues' ? 'UES Jewish Guide' : 'Philly Jewish Guide' }))
+      await sendEmail({ to: 'a@example.com', subject: 'Hi', html: '<p>hi</p>', community: 'ues' })
+      expect(sendSpy).toHaveBeenLastCalledWith(expect.objectContaining({ from: '"UES Jewish Guide" <ues@ourdomain.org>' }))
+      await sendEmail({ to: 'a@example.com', subject: 'Hi', html: '<p>hi</p>' })
+      expect(sendSpy).toHaveBeenLastCalledWith(expect.objectContaining({ from: '"Philly Jewish Guide" <notifications@ourdomain.org>' }))
+      mockResolveCommunity.mockReset()
+    })
+
     it('sends from RESEND_FROM when set', async () => {
       vi.stubEnv('RESEND_FROM', 'noreply@ourdomain.org')
       await sendEmail({ to: 'a@example.com', subject: 'Hi', html: '<p>hi</p>' })

@@ -285,7 +285,7 @@ old number can still be looked up. When an item is done, move it to
     or a photo (V2b). Replaces today's box.
 100. **The site's own email address** (BUILT Nov 27 on
     `claude/kept-current`, not live until 102 is done): one address per
-    community, `<community>@in.phillyjewishguide.com`, a catch-all at
+    community, `<community>@phillyjewishguide.com`, a catch-all at
     Resend (it receives mail too, so no second service), which posts
     each email to `/api/inbound/email` within seconds instead of the
     Gmail script's hourly check. An eruv's email is read for up or
@@ -295,7 +295,9 @@ old number can still be looked up. When an item is done, move it to
     Auto-replies and bounces are never forwarded. Once set,
     `getCommunityEmail` gives this address when Settings has none
     saved, so it becomes the reply-to on every email the site sends
-    visitors. Eruv emails this way wait (`unverified`) until the first
+    visitors, and the site sends from it too (one address a visitor
+    sees everywhere; sign-in links stay on `RESEND_FROM`). No "in."
+    subdomain: the domain receives no other mail (the user, Nov 27). Eruv emails this way wait (`unverified`) until the first
     real one shows Resend's server name for `INBOUND_AUTH_SERVERS`
     (`src/lib/inboundEmail.ts`); the Gmail script keeps reading them
     meanwhile. Each received email counts against Resend's send quota
@@ -331,15 +333,18 @@ old number can still be looked up. When an item is done, move it to
 ### You do
 
 102. Turn on the site's email address (100), in order:
-    1. Resend › Domains: add `in.phillyjewishguide.com`, turn on
-       Receiving, and copy the MX record it shows into Namecheap's
-       Advanced DNS (host `in`). The domain has no MX today, so nothing
-       else is affected.
+    1. Resend › Domains: open `phillyjewishguide.com` (add it if the
+       site sends from another domain, with the records Resend lists),
+       turn on Receiving, and copy the MX record it shows into
+       Namecheap's Advanced DNS (host `@`). The domain has no MX today,
+       so no mail elsewhere is affected; from then on all mail to
+       `@phillyjewishguide.com` goes to Resend (the user, Nov 27).
     2. Resend › Webhooks: add `https://<live site>/api/inbound/email`
        for `email.received`; put its signing secret in Vercel as
        `RESEND_WEBHOOK_SECRET`, and `INBOUND_EMAIL_DOMAIN` =
-       `in.phillyjewishguide.com`; redeploy.
-    3. Send one email to `philly@in.phillyjewishguide.com` and tell me;
+       `phillyjewishguide.com`; redeploy. From then on the site's
+       emails come from `philly@phillyjewishguide.com` too.
+    3. Send one email to `philly@phillyjewishguide.com` and tell me;
        I read the server name from it for `INBOUND_AUTH_SERVERS`.
     4. Move JCOR's groups.io list and each shul newsletter to the new
        address, one at a time, unsubscribing the Gmail (a list on both

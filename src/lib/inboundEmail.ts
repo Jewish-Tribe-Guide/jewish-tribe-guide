@@ -1,10 +1,11 @@
 // ── The site's own email address (tracker 100, Nov 27) ──────────────────────
 // Each community has an address at the site's receiving domain,
-// `<community>@<INBOUND_EMAIL_DOMAIN>` (in.phillyjewishguide.com): a
+// `<community>@<INBOUND_EMAIL_DOMAIN>` (phillyjewishguide.com): a
 // catch-all at the mail service (Resend), so a new community has one with
 // nothing to create. Resend hands each email to /api/inbound/email within
 // seconds, where the Gmail script (scripts/newsletter-apps-script.js)
-// checked hourly.
+// checked hourly. The site sends from the same address (email.ts), so a
+// visitor sees one address everywhere.
 //
 // What becomes of one:
 // - from an eruv's sender: read for up or down, live at once (eruvEmailRun);
