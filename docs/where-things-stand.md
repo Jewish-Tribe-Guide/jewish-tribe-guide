@@ -270,12 +270,12 @@ old number can still be looked up. When an item is done, move it to
 
 ### You do
 
-98. Run migration 118, dev then live, BEFORE the next deploy of
-    `claude/kept-current`:
+98. Run migration 118 on live (dev done Nov 27), BEFORE this
+    branch (`claude/kept-current`) is deployed live:
     [`supabase/migrations/20240101000118_sent_message.sql`](../supabase/migrations/20240101000118_sent_message.sql)
     (adds `sent_message`: a post sent with the "+ Add" box, kept until
     it's read). Without it the box can't send a post.
-97. Run migration 117, dev then live:
+97. Run migration 117 on live (dev done Nov 27):
     [`supabase/migrations/20240101000117_message_read_time.sql`](../supabase/migrations/20240101000117_message_read_time.sql)
     (adds `message_read_time`: how long each "+ Add" box read took, and
     at what thinking level; no post text). Until then the time isn't
