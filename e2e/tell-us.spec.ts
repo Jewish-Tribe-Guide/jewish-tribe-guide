@@ -189,16 +189,23 @@ test('the Map has no “+” on a phone', { tag: '@mobile' }, async ({ page }) =
   await expect(addButton(page)).toHaveCount(0)
 })
 
-// D1b (Nov 27): a computer's header has Add or update on every screen.
-// The full-screen Map paints over the header, so its own top bar carries
-// one beside its Set location, opening the site's own Add. A click fails
-// if anything covers it (the header's copy, under the Map, did).
-test('the Map’s header Add or update opens the site’s Add on a computer', { tag: '@desktop' }, async ({ page }) => {
+// D1b (Nov 27): a computer's header has Add or update, but the full-screen
+// Map paints over the header and carries none of its own (the user, Nov 27:
+// "don't have add or update button in map").
+test('the Map has no Add or update on a computer', { tag: '@desktop' }, async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}/map`)
   await page.getByPlaceholder(/Search name, address/).filter({ visible: true }).waitFor()
-  await page.getByTestId('map-add').click()
-  await expect(page.getByRole('dialog', { name: 'Add or update' }).getByPlaceholder('Search by name or address…')).toBeVisible()
+  const add = page.getByRole('button', { name: 'Add or update', exact: true })
+  // The header's copy is still in the page, under the Map: nothing a
+  // click reaches.
+  for (const one of await add.all()) {
+    if (!(await one.isVisible())) continue
+    const box = (await one.boundingBox())!
+    const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('button')?.getAttribute('aria-label') ?? null, { x: box.x + box.width / 2, y: box.y + box.height / 2 })
+    expect(hit, 'a click there reaches the Map, not Add or update').not.toBe('Add or update')
+  }
+  await expect(page.getByTestId('map-add')).toHaveCount(0)
 })
 
 // Oct 15: an open listing's Edit listing opens the editor itself, not the

@@ -247,7 +247,9 @@ before settling on:
   Google Maps' +). Replaced U1b, an apricot button with a blue "+".
 - **D1b:** on a computer, no floating button: an outlined "+ Add or
   update" (white, grey edge, blue words, as Set location) in the header, right side, beside Set location, on every screen
-  with the header, the Map included (YouTube's Create, GitHub's +). It
+  with the header (YouTube's Create, GitHub's +). Not on the Map: the
+  user, Nov 27, after it was built there ("don't have add or update
+  button in map"), so Oct 5's "no + on the Map" stands on a computer too. It
   opens the same sheet as a centred dialog. Three earlier decisions change:
   the header button removed Sep 22 comes back, filled and renamed; the
   apricot add colour (Oct 26) goes; Oct 5's "no + on the Map" was about a

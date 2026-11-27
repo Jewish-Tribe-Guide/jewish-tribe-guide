@@ -358,15 +358,14 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
  *  pinned on a computer, so it's always in reach. A phone keeps its
  *  floating + (AddButton), so this is computer-only. It opens the screen's
  *  own Add if it has one (a category page's knows its category), else the
- *  site's (src/lib/addHere.ts). The full-screen Map paints over the
- *  header, so it carries its own copy beside its Set location
- *  (DesktopMapChrome). */
-export function HeaderAddButton({ testId = 'header-add' }: { testId?: string } = {}) {
+ *  site's (src/lib/addHere.ts). Not on the full-screen Map, which paints
+ *  over the header (the user, Nov 27: no Add on the Map). */
+function HeaderAddButton() {
   return (
     <button
       type="button"
       onClick={requestAdd}
-      data-testid={testId}
+      data-testid="header-add"
       // Just the + under 1100px: beside the nav and Set location, the words
       // pushed a 660px window sideways and wrapped the site's name at 1024.
       aria-label="Add or update"

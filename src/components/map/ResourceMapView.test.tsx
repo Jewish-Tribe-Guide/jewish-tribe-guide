@@ -1358,10 +1358,9 @@ describe('ResourceMapView — the map’s own location control', () => {
     const corner = screen.getByTestId('map-top-corner')
     expect(corner).toContainElement(control)
     expect(corner.className).toMatch(/\bshrink-0\b/)
-    // Add or update (D1b, Nov 27), Set location, then the corner's button.
+    // Set location first, then the corner's button.
     expect(corner.lastElementChild).toBeInstanceOf(HTMLButtonElement)
-    expect(corner.firstElementChild).toBe(screen.getByTestId('map-add'))
-    expect(corner.children[1]).toBe(control)
+    expect(corner.firstElementChild).toBe(control)
     // The same row as the chips, which shrink rather than run under it.
     const row = screen.getByTestId('map-top-row')
     expect(row).toContainElement(screen.getByTestId('map-top-chips'))
