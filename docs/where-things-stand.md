@@ -291,6 +291,12 @@ old number can still be looked up. When an item is done, move it to
     in with it first). Needs: the service (Cloudflare Email Routing
     if the domain's DNS is there), and subscribing the address to
     JCOR's groups.io list and each newsletter.
+101. **Guess the kind of a new place from Google** (agreed Nov 27, a
+    follow-up to 99): adding a place from a screen with no category
+    (home, You) asks "What kind of place?". When the place came from
+    Google search, preselect the category its Google type points to
+    (a restaurant, Food) instead of the list's first; the person still
+    confirms, and a category page keeps skipping the question.
 
 ### You do
 
