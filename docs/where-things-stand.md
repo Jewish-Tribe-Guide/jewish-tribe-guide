@@ -267,16 +267,15 @@ old number can still be looked up. When an item is done, move it to
     the dot on You lights when one goes live; S4b and S4d (the pop-up)
     are not built. Needs migration 118 first: 98. The menu and shul
     times boxes still read while the sender waits.
-99. **Add, renamed and split** (Nov 27): DRAWN, not built until the
-    user OKs it ("Add, rethought" canvas U1, U2b, U2c, U3b, U4c). On a
-    phone the floating button is a round "+" (U1; a computer keeps
-    "Add or update"); the sheet is titled "Add or update", search
-    first, then "Or just tell us" with two small buttons, Send a photo
-    and Send a message (U2b). Send a photo opens the phone's own menu
-    (U2c), then a messaging-style screen: the photo big, a strip to add
-    more, "Add a note (optional)", the site's wide Send (U3b). Send a message
-    opens a text box, "Say it in your own words, or paste it from
-    WhatsApp or an email", the wide Send, no camera button (U4c). Replaces today's box.
+99. **Add, renamed and one box** (Nov 27): DRAWN, not built until the
+    user OKs it ("Add, rethought" canvas U1, V1, V2). On a phone the
+    floating button is a round "+" (U1; a computer keeps "Add or
+    update"); the sheet is titled "Add or update", search first, then
+    one small button, Just tell us (V1). That opens one box: "Say it in
+    your own words, or paste it from WhatsApp or an email", an Add a
+    photo button (the phone's own menu; each photo a thumbnail with ✕),
+    and the site's wide Send, live once there's words or a photo (V2).
+    Replaces today's box.
 100. **The site's own email address** (proposed Nov 27, next after
     99): one address per community (`<community>@in.<domain>`, a
     catch-all, so a new community has one with nothing to create) that

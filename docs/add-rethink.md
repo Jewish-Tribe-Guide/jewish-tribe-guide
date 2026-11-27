@@ -233,27 +233,29 @@ those, so they still see the end result. If built, this changes:
 R4's "You check it before it's sent", and P6b (a paste no longer opens
 Edit listing).
 
-## Renamed and split (drawn Nov 27, U1, U2b, U2c, U3b, U4c)
+## Renamed, and one box (drawn Nov 27, U1, V1, V2)
 
 The user: change the name from Add, and maybe camera and paste as two
-buttons. Drafts T1–T3, then U2 and U4, were replaced by:
+buttons. Drafts went through two paths (T1–T3; U2–U4c: Send a photo and
+Send a message, each its own screen) before settling on one:
 
 - **U1:** on a phone, a round apricot "+" (aria-label "Add or update");
   a computer keeps the words.
-- **U2b:** the sheet titled "Add or update", search first; under it
-  "Or just tell us" and two small buttons, **Send a photo** and **Send a
-  message**. A button says what it does; no lead-in sentence ("Have a
-  flyer or a post?" and "Paste" were unclear to the user).
-- **U2c:** Send a photo opens the phone's own menu (library, camera,
-  file; several at once). No screen of ours before it.
-- **U3b:** the photos picked, in a messaging-style screen (WhatsApp,
-  iMessage): the photo big with ✕, a strip with + for more, "Add a note
-  (optional)" (it grows, so a pasted message fits), and the site's usual wide Send (a round arrow, U3, was dropped: every other Send on the site is the wide one).
-  Nothing goes until Send.
-- **U4c:** Send a message: a text box, "Say it in your own words, or
-  paste it from WhatsApp or an email", Send grey until there's text. No
-  camera button: a photo with words is U3b, so each screen does one
-  thing.
+- **V1:** the sheet titled "Add or update", search first; under it one
+  small button, **Just tell us**. "Have a flyer or a post?", "Paste"
+  and "Paste a message" were unclear to the user; a button says what it
+  does.
+- **V2:** one box, as feedback forms and Maps' "report a problem" do:
+  the text box ("Say it in your own words, or paste it from WhatsApp or
+  an email", keyboard up), **Add a photo** with its word (the phone's
+  own menu: library, camera, file; several at once), each photo a
+  thumbnail with ✕, and the site's usual wide **Send**, live once
+  there's words or a photo. No round arrow: every other Send on the
+  site is the wide one.
+
+Why one box over two paths: one choice beside search instead of two,
+a photo and words go together without picking a path first, and it's
+nearest today's box. It costs a photo-only sender one more tap.
 
 ## Waiting on the user
 
