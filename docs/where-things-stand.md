@@ -247,6 +247,13 @@ old number can still be looked up. When an item is done, move it to
     taps until it reloads: a gap noted Nov 16, never seen; every way of
     causing it in a browser worked fine (Nov 22). Only if you see it:
     which screen, how long away, installed or in Safari.
+96. **Add, rethought** (Nov 26): the problem and a seven-step plan are
+    in `docs/add-rethink.md` (one way in, the method following from what
+    people have; Add with search and in a category's heading; AI saying
+    so when it starts; the floating button going). Agree or change it,
+    and pick for steps 6 (the search box takes a paste or photo) and 7
+    (forward to the guide). The "Add, form first" canvas boards came
+    before it and aren't the plan.
 
 ### You do
 
