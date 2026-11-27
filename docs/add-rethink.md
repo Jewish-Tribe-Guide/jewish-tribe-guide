@@ -69,7 +69,12 @@ judgment or a worry, said as one.
    to stop. Never hidden, never a surprise.
 3. **Add is where the need comes up**, as part of the screen, not over
    it.
-4. **Add is for new places only.** Changes stay with Edit listing.
+4. **Nobody has to know whether the place is already here.** The way
+   in finds out: a place we have opens to its listing, to change; one
+   we don't opens to add it. (Changed Nov 26, the user: "is there a way
+   that one way in can include edit?" The trouble today isn't that one
+   box does both; it's two parallel doors, "Add or update" and Edit
+   listing, and the person choosing between them.)
 5. **One look and one sheet everywhere**, so it's learned once.
 
 ## The plan
@@ -93,7 +98,9 @@ In order. Each step is worth having on its own.
    place. A name searches Google; no match offers "Fill it in yourself";
    a pasted post or a photo is read by AI, saying so as it starts, with
    "Fill it in myself" beside the wait and the paste kept. Same title,
-   steps and Back whichever way it goes. "Update" leaves the sheet.
+   steps and Back whichever way it goes. A name or a post that turns
+   out to be a place we have opens that place's change (Edit listing's
+   own screen), so new and existing go in by the same door.
 5. **The floating button goes**, once 2–4 are in. The few regulars who
    add many places (a gabbai, whoever keeps a category) get a plain "Add
    a place" somewhere quiet, such as the You tab.
@@ -110,6 +117,17 @@ In order. Each step is worth having on its own.
    website appear there), so it doesn't replace this.
 
 Drawings come after this is agreed, for steps 2–4 first.
+
+## An idea for later (the user, Nov 26)
+
+A "+" that opens into two or three smaller buttons, one being a
+camera: take a picture of a poster or a storefront, and the guide says
+whether it has the place, opening it if so and adding it if not. Text
+would be the other. Noted, not part of the plan yet. In its favour: the
+camera is the poster person’s way in, and "do we have it?" first is
+point 4 of what a fix has to do. Against: it brings back a floating button, and a choice
+of camera or text before starting, though that's a choice of how to
+show us, not of a method.
 
 ## Changes to earlier decisions
 
