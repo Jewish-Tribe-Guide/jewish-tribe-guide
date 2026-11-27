@@ -9,8 +9,9 @@ import { useOptionalCommunitySlug, useContributions } from '@/lib/communityConte
 
 // "+ Add" on every screen but the Map (decided Oct 5, reversing the earlier
 // "no general Add": the box needs no category, so nobody is asked to pick
-// one first). Opens "Saw something? Tell us". A category page has its own
-// "+", with "Add a place" inside; a listing has Edit listing.
+// one first). Opens Find the place (Nov 27, board R3b), the AI box a row on
+// it. A category page has its own "+", opening the same; a listing has
+// Edit listing.
 
 // Loaded on the first tap: nobody browsing pays for the box.
 const TellUsSheet = dynamic(() => import('@/components/TellUsSheet'), { loading: () => null })
@@ -49,7 +50,7 @@ export default function SiteAddButton() {
   return (
     <>
       <AddButton onClick={() => setOpen(true)} />
-      {mounted && <TellUsSheet isOpen={open} onClose={() => setOpen(false)} />}
+      {mounted && <TellUsSheet isOpen={open} onClose={() => setOpen(false)} findFirst />}
     </>
   )
 }

@@ -1,7 +1,7 @@
 # Add: the problem and the plan
 
-Written Nov 26, 2026; the drawings settled Nov 27. Nothing here is built:
-the user decides whether to build it. The drawings are on the "Add,
+Written Nov 26, 2026; the drawings settled Nov 27, and plan steps 2–7
+built the same day (below, "What was built"). The drawings are on the "Add,
 rethought" canvas (https://claude.ai/artifact/FkD8Lp8jbXC3JgZXsUgY6A):
 R1, R2, R3b, R4 and P6b, with N1 (today) for comparison.
 
@@ -149,7 +149,31 @@ approves every new place, the last net.
   before it reads.
 - **Oct 5:** "+ Add on every screen but the Map." Kept.
 
+## What was built (Nov 27)
+
+Steps 2–7, as drawn. Where it stops short of the drawings, or goes past
+them:
+
+- **P6b opens Edit listing only for a read that is one place's fields**:
+  one listing, no notes, no "once or always?" question. A read about
+  several places, items, times or a new place keeps today's result
+  cards (and their "Change something else about …"). Its Send files the
+  edit as a change to that listing, through `/api/message/send`
+  (`targetId`), which refuses one that changes nothing.
+- **The home page's nothing-found card has no Add**: R2 drew a
+  category's, and from the home page there's no category to add to.
+- **`?action=create` links** (the old deep link into the add form) still
+  open the form directly.
+- Step 1, **counting it**, isn't built.
+- **Found on the way:** on a phone, the box drew the computer's dialog
+  for its first frame, then the phone's sheet in its place. Once Find
+  the place's field took the focus on opening, closing gave the focus
+  back to nothing. The box now waits until it knows the screen, and
+  `useDialogFocus` never gives the focus back to something that has
+  left the page (`e2e/focus-and-announcements.spec.ts`, phone, failed
+  3 of 3 before).
+
 ## Waiting on the user
 
-- Whether to build it, and in what order.
+- Counting Add (step 1): build it or not.
 - The phone number for forwarding: which service, and when.

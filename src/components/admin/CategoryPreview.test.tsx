@@ -25,7 +25,7 @@ vi.mock('next/navigation', () => ({
 // one (a send that did sat on "Sending…" for good).
 vi.hoisted(() => vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'test-site-key'))
 vi.mock('@/components/TurnstileWidget', () => ({ default: () => null }))
-vi.mock('@/lib/useIsMobile', () => ({ useIsMobile: () => true }))
+vi.mock('@/lib/useIsMobile', () => ({ useIsMobile: () => true, useMeasuredIsMobile: () => true }))
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 
 // The frame is an iframe portal and the header/footer are the site's own;
@@ -168,7 +168,7 @@ describe('CategoryPreview', () => {
 
     // The other path: the by-hand editor, a new place.
     await u.click(screen.getByRole('button', { name: 'Find the place' }))
-    await u.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
+    await u.click(screen.getByRole('button', { name: /not on Google/ }))
     await u.click(screen.getByTestId('editor-row-name'))
     await u.type(screen.getByRole('textbox', { name: 'Name' }), 'Kosher Corner')
     await u.click(screen.getByRole('button', { name: 'Done' }))

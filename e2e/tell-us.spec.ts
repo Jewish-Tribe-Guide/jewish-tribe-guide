@@ -1,33 +1,42 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { categoryAddButton, categoryWithListings, defaultCommunity, ready } from './helpers'
 
-// "+ Add" opens the box ("Add or update a place" since Oct 10) on every
-// screen but the Map (decided Oct 5). Read-only like everything in e2e/: nothing here reads a
-// message or sends one (that would call the AI and file a suggestion).
+// "+ Add" opens Find the place (board R3b, Nov 27; the box, "Add or update
+// a place", until then) on every screen but the Map (decided Oct 5), with
+// the AI box one row on it (R4). Read-only like everything in e2e/: nothing
+// here reads a message or sends one (that would call the AI and file a
+// suggestion).
 
-test('the home page’s “+ Add” opens the box', async ({ page }) => {
+/** Find the place's row into the AI box, and the box it opens. */
+async function openPaste(page: Page) {
+  await page.getByRole('dialog', { name: 'Find the place' }).getByRole('button', { name: /^Or paste a post or a photo/ }).click()
+  return page.getByRole('dialog', { name: 'Paste a post or a photo' })
+}
+
+test('the home page’s “+ Add” opens Find the place', async ({ page }) => {
   const community = await defaultCommunity(page)
   await page.goto(`/${community}`)
   await ready(page)
 
   await page.getByRole('button', { name: 'Add', exact: true }).click()
-  const box = page.getByRole('dialog', { name: 'Add or update a place' })
-  await expect(box).toBeVisible()
-  await expect(box.getByLabel('Your message')).toBeVisible()
-  await expect(box.getByRole('button', { name: 'See what changes' })).toBeDisabled()
+  const find = page.getByRole('dialog', { name: 'Find the place' })
+  await expect(find.getByPlaceholder('Search by name or address…')).toBeVisible()
+  await expect(find.getByRole('button', { name: /^Fill it in yourself/ })).toBeVisible()
+  await expect(find.getByRole('button', { name: /^Or paste a post or a photo/ })).toBeVisible()
 })
 
-test('a category’s “+” opens the box, with filling it in yourself one link away', async ({ page, request }) => {
+test('a category’s “+” opens Find the place, with the AI box one row away, saying so, and Back', async ({ page, request }) => {
   const community = await defaultCommunity(page)
   const { category } = await categoryWithListings(request, community)
   await page.goto(`/${community}/${category.id}`)
   await ready(page)
 
   await categoryAddButton(page).click()
-  const box = page.getByRole('dialog', { name: 'Add or update a place' })
+  const box = await openPaste(page)
+  await expect(box.getByTestId('read-by-ai')).toHaveText(/Read by AI\s*You check it before it’s sent\./)
   await box.getByLabel('Your message').fill('Acme on 5th has challah')
   await expect(box.getByRole('button', { name: 'See what changes' })).toBeEnabled()
-  await box.getByRole('button', { name: 'Find the place' }).click()
+  await box.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Find the place' })).toBeVisible()
 })
 
@@ -43,17 +52,17 @@ test('the browser’s Back and Forward walk the box’s steps, a row’s Back ke
 
   const page0 = page.url()
   await categoryAddButton(page).click()
-  await page.getByRole('dialog', { name: 'Add or update a place' }).getByRole('button', { name: 'Find the place' }).click()
   const find = page.getByRole('dialog', { name: 'Find the place' })
   await expect(find).toBeVisible()
   const box = () => new URL(page.url()).searchParams.get('box')
-  await expect.poll(box).toBe('find')
-  await find.getByRole('button', { name: 'Not on Google? Fill it in yourself' }).click()
+  // Add's first screen is the box's own root: no step in the address.
+  expect(box()).toBeNull()
+  await find.getByRole('button', { name: /^Fill it in yourself/ }).click()
   const adding = page.getByRole('dialog', { name: /^Add to / })
   await expect(adding).toBeVisible()
-  await expect.poll(box).toBe('find/add')
+  await expect.poll(box).toBe('add')
   await adding.getByTestId('editor-row-name').click()
-  await expect.poll(box).toBe('find/add/name')
+  await expect.poll(box).toBe('add/name')
   await page.locator('#edit-name').fill('A place typed in')
 
   await page.goBack()
@@ -62,12 +71,8 @@ test('the browser’s Back and Forward walk the box’s steps, a row’s Back ke
   await expect(adding.getByTestId('editor-row-name')).toContainText('A place typed in')
   await page.goBack()
   await expect(find).toBeVisible()
-  await page.goBack()
-  await expect(page.getByRole('dialog', { name: 'Add or update a place' })).toBeVisible()
   expect(page.url()).toBe(page0)
 
-  await page.goForward()
-  await expect(find).toBeVisible()
   await page.goForward()
   await expect(adding).toBeVisible()
 
@@ -86,7 +91,7 @@ test('the browser’s Back and Forward walk the box’s steps, a row’s Back ke
 // one frame; it slides and fades away now, as a listing does.
 test.describe('the box on a phone', { tag: '@mobile' }, () => {
 
-  test('opens tall enough to show Find the place, and no taller', async ({ page }) => {
+  test('opens tall enough to show the AI row, and no taller', async ({ page }) => {
     // A phone with Safari's bars showing: shorter than the emulated screen.
     await page.setViewportSize({ width: 375, height: 660 })
     const community = await defaultCommunity(page)
@@ -94,15 +99,15 @@ test.describe('the box on a phone', { tag: '@mobile' }, () => {
     await ready(page)
 
     await page.getByRole('button', { name: 'Add', exact: true }).click()
-    const box = page.getByRole('dialog', { name: 'Add or update a place' })
-    const link = box.getByRole('button', { name: 'Find the place' })
+    const box = page.getByRole('dialog', { name: 'Find the place' })
+    const link = box.getByRole('button', { name: /^Or paste a post or a photo/ })
     await expect(link).toBeVisible()
     // Once it has finished sliding up.
     await expect.poll(async () => (await box.boundingBox())?.y).toBeLessThan(660)
     await page.waitForTimeout(400)
     const sheet = (await box.boundingBox())!
     const yourself = (await link.boundingBox())!
-    expect(yourself.y + yourself.height, 'Find the place is on the screen').toBeLessThanOrEqual(660)
+    expect(yourself.y + yourself.height, 'the AI row is on the screen').toBeLessThanOrEqual(660)
     expect(sheet.y + sheet.height - (yourself.y + yourself.height), 'and the box ends under it').toBeLessThan(60)
     expect(sheet.height, 'not the full height').toBeLessThan(660 - 76)
   })
@@ -113,20 +118,20 @@ test.describe('the box on a phone', { tag: '@mobile' }, () => {
     await ready(page)
 
     await page.getByRole('button', { name: 'Add', exact: true }).click()
-    await page.getByRole('dialog', { name: 'Add or update a place' }).getByLabel('Your message').fill('Acme on 5th has challah')
+    await (await openPaste(page)).getByLabel('Your message').fill('Acme on 5th has challah')
     await page.waitForTimeout(400)
     // Timed in the page: Playwright's own round trips are slower than the slide.
     const shownAfter60ms = await page.evaluate(async () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
       await new Promise((r) => setTimeout(r, 60))
-      return !!document.querySelector('[role=dialog][aria-label="Add or update a place"]')
+      return !!document.querySelector('[role=dialog][aria-label="Paste a post or a photo"]')
     })
     expect(shownAfter60ms, 'still sliding away 60ms after closing').toBe(true)
-    await expect(page.getByRole('dialog', { name: 'Add or update a place' })).toHaveCount(0)
+    await expect(page.getByRole('dialog', { name: 'Paste a post or a photo' })).toHaveCount(0)
 
-    // And opened again, it starts over.
+    // And opened again, it starts over, on Find the place.
     await page.getByRole('button', { name: 'Add', exact: true }).click()
-    await expect(page.getByRole('dialog', { name: 'Add or update a place' }).getByLabel('Your message')).toHaveValue('')
+    await expect((await openPaste(page)).getByLabel('Your message')).toHaveValue('')
   })
 })
 
@@ -157,7 +162,7 @@ test('an open listing’s Edit listing opens the editor, not the box about that 
     await expect(categoryAddButton(page)).toHaveCount(0)
   } else {
     await categoryAddButton(page).click()
-    const general = page.getByRole('dialog', { name: 'Add or update a place' })
+    const general = page.getByRole('dialog', { name: 'Find the place' })
     await expect(general).toBeVisible()
     await general.getByRole('button', { name: 'Close' }).click()
     await expect(general).toBeHidden()

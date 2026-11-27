@@ -2,10 +2,11 @@
 
 import { useId, useRef, useState } from 'react'
 import type { DirectoryResource } from '@/types'
-import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
+import AddressInput, { SuggestionTag, type PlaceSelectResult } from '@/components/intake/AddressInput'
+import { MessageIcon, PencilIcon } from '@/components/icons'
 
-// "Find the place" (agreed Oct 5): the "+ Add" box's way in for someone who
-// would rather fill it in themselves. One search for adding and editing
+// "Find the place" (agreed Oct 5), since Nov 27 Add's first screen (board
+// R3b): every Add opens here, the AI box a row under the list. One search for adding and editing
 // alike: the guide's own listings by name, and Google's places, the ones the
 // guide already has marked "Already in the guide". A place the guide has
 // opens its edit; a new one, the add form filled in from Google.
@@ -29,14 +30,18 @@ export default function FindPlace({
   onListing,
   onPlace,
   onBlank,
+  onPaste,
 }: {
   /** The guide's listings, to find and mark; null while they load. */
   listings: DirectoryResource[] | null
-  /** Already searched for: the name the message reader found. */
+  /** Already searched for: the name the message reader found, or what a
+   *  search that found nothing was for. */
   initialQuery?: string
   onListing: (listing: DirectoryResource) => void
   onPlace: (place: PlaceSelectResult, address: string, coords: { lat: number; lng: number } | null) => void
   onBlank: () => void
+  /** The AI box, a row under the list (board R3b): Add's first screen. */
+  onPaste?: () => void
 }) {
   const id = useId()
   const [typed, setTyped] = useState(initialQuery)
@@ -44,6 +49,11 @@ export default function FindPlace({
   const picked = useRef<{ address: string; coords: { lat: number; lng: number } | null }>({ address: '', coords: null })
   const byPlace = new Map((listings ?? []).filter((l) => typeof l.placeId === 'string' && l.placeId).map((l) => [l.placeId as string, l]))
   const matches = guideMatches(listings ?? [], typed)
+  // One list (Nov 27, board R3b): the guide's places first, then Google's,
+  // a Google place the guide has once, as ours, then filling it in.
+  const listed = new Set(matches.map((l) => l.id))
+  const name = typed.trim()
+  const row = 'flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50'
 
   return (
     <div className="space-y-3" data-testid="find-place">
@@ -68,31 +78,46 @@ export default function FindPlace({
             else onPlace(place, picked.current.address, picked.current.coords)
           }}
           placeholder="Search by name or address…"
-          suggestionNote={(placeId) => (byPlace.has(placeId) ? 'Already in the guide' : null)}
+          suggestionNote={(placeId) => (byPlace.has(placeId) ? 'In the guide' : null)}
+          hideSuggestion={(placeId) => listed.has(byPlace.get(placeId)?.id ?? '')}
           inlineSuggestions
           searchOnMount
+          listBefore={
+            matches.length > 0 &&
+            matches.map((l) => (
+              <button key={l.id} type="button" onClick={() => onListing(l)} className={row} data-testid="in-guide">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-slate-900">{l.name}</span>
+                  <span className="block text-xs text-slate-400">{l.address ? l.address.split(',')[0] : 'No address'}</span>
+                </span>
+                <SuggestionTag>In the guide</SuggestionTag>
+              </button>
+            ))
+          }
+          listAfter={
+            <button type="button" onClick={onBlank} className={`${row} font-semibold text-primary`}>
+              <PencilIcon className="h-4 w-4 shrink-0" />
+              <span>{name ? `Fill in “${name}” yourself` : 'Fill it in yourself'}</span>
+              <span className="text-xs font-normal text-slate-500">not on Google</span>
+            </button>
+          }
         />
       </div>
-      {matches.length > 0 && (
-        <div>
-          <p className="text-[0.75rem] font-bold tracking-wide text-slate-500 uppercase">In the guide</p>
-          <ul className="mt-1 divide-y divide-slate-100 rounded-lg border border-slate-200">
-            {matches.map((l) => (
-              <li key={l.id}>
-                <button type="button" onClick={() => onListing(l)} className="w-full cursor-pointer px-3 py-2 text-left hover:bg-slate-50">
-                  <span className="block text-[0.90625rem] font-semibold text-slate-900">{l.name}</span>
-                  {l.address && <span className="block text-[0.78125rem] text-slate-500">{l.address.split(',')[0]}</span>}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <p className="text-center">
-        <button type="button" onClick={onBlank} className="cursor-pointer text-[0.84375rem] font-semibold text-primary hover:underline">
-          Not on Google? Fill it in yourself
+      {onPaste && (
+        <button
+          type="button"
+          onClick={onPaste}
+          className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left hover:bg-slate-100"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-primary">
+            <MessageIcon className="h-[18px] w-[18px]" />
+          </span>
+          <span>
+            <span className="block text-[0.9375rem] font-bold text-slate-900">Or paste a post or a photo</span>
+            <span className="block text-[0.8125rem] text-slate-600">AI reads it for you to check</span>
+          </span>
         </button>
-      </p>
+      )}
     </div>
   )
 }

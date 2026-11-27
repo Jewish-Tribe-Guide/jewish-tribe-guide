@@ -5,7 +5,7 @@ import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import SiteAddButton, { showsSiteAdd } from './SiteAddButton'
-import TellUsSheet, { addableCategories } from './TellUsSheet'
+import TellUsSheet, { addableCategories, readForEditor } from './TellUsSheet'
 import { track } from '@vercel/analytics'
 
 vi.mock('@/components/resources/useListingSubmit', async (original) => ({ ...(await original<object>()), TURNSTILE_ACTIVE: false }))
@@ -355,7 +355,7 @@ describe('Saw something? Tell us', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Find it and fill it in' }))
     // Searched for already, and added as the grocery it was read as.
     expect(screen.getByPlaceholderText('Search by name or address…')).toHaveValue('South Square Market, 22nd & South')
-    fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
+    fireEvent.click(screen.getByRole('button', { name: /not on Google/ }))
     expect(screen.getByRole('dialog', { name: 'Add to Groceries' })).toBeInTheDocument()
     expect(screen.getByTestId('editor-row-name')).toHaveTextContent('South Square Market')
     fireEvent.click(screen.getByTestId('editor-row-name'))
@@ -536,14 +536,14 @@ describe('Saw something? Tell us', () => {
 
     it('adds a place as the listing’s boxes, asking the kind only when it isn’t known', () => {
       find()
-      fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
+      fireEvent.click(screen.getByRole('button', { name: /not on Google/ }))
       expect(screen.getByTestId('pick-kind')).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Synagogue' }))
       expect(screen.getByRole('dialog', { name: 'Add to Synagogues' })).toBeInTheDocument()
       expect(screen.getByTestId('editor-row-name')).toHaveTextContent('Needed')
       cleanup()
       find({ category: grocery })
-      fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
+      fireEvent.click(screen.getByRole('button', { name: /not on Google/ }))
       expect(screen.getByRole('dialog', { name: 'Add to Groceries' })).toBeInTheDocument()
     })
 
@@ -554,7 +554,7 @@ describe('Saw something? Tell us', () => {
       respond = (url) => (url.includes('/api/resources') ? { ok: true, resources: [tj] } : {})
       renderWithProviders(<TellUsSheet isOpen onClose={() => {}} />, { community: { slug: 'philly' }, content: { categories: [grocery, eruv] } })
       fireEvent.click(screen.getByRole('button', { name: 'Find the place' }))
-      fireEvent.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
+      fireEvent.click(screen.getByRole('button', { name: /not on Google/ }))
       fireEvent.click(within(screen.getByTestId('pick-kind')).getByRole('button', { name: 'Eruv' }))
       expect(screen.getByRole('dialog', { name: 'Add an eruv' })).toBeInTheDocument()
       expect(within(screen.getByTestId('eruv-adding')).getByLabelText('Status page or email')).toBeInTheDocument()
@@ -575,6 +575,115 @@ describe('Saw something? Tell us', () => {
       open({ about: { id: 'tj', name: 'Trader Joe’s' }, onEditYourself: () => {} })
       expect(screen.queryByRole('button', { name: 'Find the place' })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Edit it yourself' })).toBeInTheDocument()
+    })
+  })
+
+  // Nov 27: every Add opens on Find the place, one list (board R3b), the
+  // AI box a row under it (R4), and a read about a place the guide has
+  // opens its Edit listing with the read filled in (P6b).
+  describe('Add, opened on Find the place', () => {
+    const food = makeCategory({
+      id: 'restaurant',
+      label: 'Food',
+      pluralLabel: 'Food',
+      detailFields: [
+        { key: 'kosherCert', label: 'Kosher Certification', type: 'select', options: [{ value: 'IKC', label: 'IKC' }, { value: 'Keystone-K', label: 'Keystone-K' }] },
+        { key: 'website', label: 'Website', type: 'url' },
+      ],
+    })
+    const bagels = makeListing({ id: 'pb', name: 'Philly Bagels', category: 'restaurant', address: '2046 Sansom St, Philadelphia', kosherCert: 'Keystone-K' })
+    const add = (props: Partial<Parameters<typeof TellUsSheet>[0]> = {}) => {
+      renderWithProviders(<TellUsSheet isOpen onClose={() => {}} findFirst category={food} {...props} />, { community: { slug: 'philly' }, content: { categories: [food] } })
+    }
+    beforeEach(() => {
+      respond = (url) => (url.includes('/api/resources') ? { ok: true, resources: [bagels] } : url.includes('/read') ? reading : { ok: true, filed: 1, ids: ['s9'] })
+    })
+
+    it('opens on the search, already searching, with the guide’s places first and filling it in last, in one list', async () => {
+      add({ query: 'Bagel' })
+      expect(screen.getByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Search by name or address…')).toHaveValue('Bagel')
+      const ours = await screen.findByTestId('in-guide')
+      expect(ours).toHaveTextContent('Philly Bagels2046 Sansom StIn the guide')
+      const fill = screen.getByRole('button', { name: /^Fill in “Bagel” yourself\s*not on Google$/ })
+      // One list: ours, then (Google's, none here) filling it in, in one box.
+      expect(ours.parentElement).toBe(fill.parentElement)
+      expect(ours.compareDocumentPosition(fill) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(screen.queryByLabelText('Your message')).not.toBeInTheDocument()
+      // Ours opens its edit.
+      fireEvent.click(ours)
+      expect(screen.getByRole('dialog', { name: 'Philly Bagels' })).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      expect(screen.getByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: /not on Google/ }))
+      expect(screen.getByRole('dialog', { name: 'Add to Food' })).toBeInTheDocument()
+    })
+
+    it('has the AI box a row under the list, saying it’s AI before anything is typed, with Back to the search', async () => {
+      add()
+      fireEvent.click(screen.getByRole('button', { name: /Or paste a post or a photo/ }))
+      expect(screen.getByRole('dialog', { name: 'Paste a post or a photo' })).toBeInTheDocument()
+      expect(screen.getByTestId('read-by-ai')).toHaveTextContent('Read by AIYou check it before it’s sent.')
+      expect(screen.getByLabelText('Your message')).toBeInTheDocument()
+      // Back is the way to the search: no second "Find the place" link.
+      expect(screen.queryByRole('button', { name: 'Find the place' })).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      expect(screen.getByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
+      expect(screen.getByTestId('find-place')).toBeInTheDocument()
+    })
+
+    it('opens a read about a place the guide has in its Edit listing, the change marked, sent as read from the post', async () => {
+      const fields = {
+        kind: 'fields',
+        listingId: 'pb',
+        listing: { id: 'pb', name: 'Philly Bagels', address: '2046 Sansom St', category: 'restaurant', categoryLabel: 'Food' },
+        asWritten: 'Philly Bagels',
+        ask: null,
+        values: { kosherCert: 'IKC' },
+        before: { kosherCert: 'Keystone-K' },
+        lines: ['Kosher Certification: Keystone-K → IKC'],
+        held: [],
+        notes: [],
+        askWhen: null,
+      }
+      const read = { ok: true, photoUrls: [], proposals: [fields] }
+      respond = (url) => (url.includes('/api/resources') ? { ok: true, resources: [bagels] } : url.includes('/read') ? read : { ok: true, filed: 1, ids: ['s9'] })
+      add()
+      fireEvent.click(screen.getByRole('button', { name: /Or paste a post or a photo/ }))
+      fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'Philly Bagels is under IKC now' } })
+      fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+      expect(await screen.findByRole('dialog', { name: 'Philly Bagels' })).toBeInTheDocument()
+      expect(screen.getByTestId('read-into-editor')).toHaveTextContent('Read by AIfrom your post. Tap a row to fix it.')
+      expect(screen.queryByTestId('tell-us-card')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Change something else/ })).not.toBeInTheDocument()
+      expect(screen.getAllByText('Changed')).toHaveLength(1)
+      fireEvent.click(screen.getByRole('button', { name: 'Send 1 change' }))
+      await screen.findByTestId('tell-us-sent')
+      const body = JSON.parse(String(calls.find((c) => c.url.includes('/api/message/send'))!.init!.body))
+      expect(body).toMatchObject({ text: 'Philly Bagels is under IKC now', forms: [{ targetId: 'pb', submission: { details: { kosherCert: 'IKC' } } }] })
+      // Back from the editor is the post, as it was written.
+      cleanup()
+      add()
+      fireEvent.click(screen.getByRole('button', { name: /Or paste a post or a photo/ }))
+      fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'Philly Bagels is under IKC now' } })
+      fireEvent.click(screen.getByRole('button', { name: 'See what changes' }))
+      await screen.findByTestId('read-into-editor')
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      expect(screen.getByLabelText('Your message')).toHaveValue('Philly Bagels is under IKC now')
+      expect(screen.getByRole('dialog', { name: 'Paste a post or a photo' })).toBeInTheDocument()
+    })
+
+    it('keeps the result’s card for what the editor can’t hold', () => {
+      const base = { kind: 'fields', listingId: 'pb', listing: { id: 'pb' }, values: { kosherCert: 'IKC' }, notes: [], askWhen: null }
+      const one = (over: object) => readForEditor([{ ...base, ...over }] as never)
+      expect(one({})).toEqual({ listingId: 'pb', values: { kosherCert: 'IKC' } })
+      expect(one({ notes: ['Closed this Friday only'] })).toBeNull()
+      expect(one({ askWhen: { key: 'hours', question: '?', oneDay: 'x' } })).toBeNull()
+      expect(one({ listing: null })).toBeNull()
+      expect(one({ values: {} })).toBeNull()
+      expect(readForEditor([{ ...base }, { ...base }] as never)).toBeNull()
+      expect(readForEditor([{ kind: 'items', listingId: 'pb' }] as never)).toBeNull()
     })
   })
 
@@ -681,7 +790,8 @@ describe('SiteAddButton — opened by the search', () => {
     renderWithProviders(<SiteAddButton />, { content: { categories: [makeCategory()] }, community: { slug: 'philly' } })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     fireEvent(document, new CustomEvent('jpc:open-add'))
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    // Add's one way in (Nov 27, board R3b).
+    expect(await screen.findByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
   })
   // Drawn Oct 26 (boards N and O): apricot, the one colour meaning "you
   // can add here", with a deeper edge; 48px on the phone, with the word.

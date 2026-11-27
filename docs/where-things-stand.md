@@ -247,14 +247,14 @@ old number can still be looked up. When an item is done, move it to
     taps until it reloads: a gap noted Nov 16, never seen; every way of
     causing it in a browser worked fine (Nov 22). Only if you see it:
     which screen, how long away, installed or in Safari.
-96. **Add, rethought** (Nov 26–27): drawings agreed Nov 27, in
-    `docs/add-rethink.md` and on the "Add, rethought" canvas (R1, R2,
-    R3b, R4, P6b): Add after search results and on the nothing-found
-    card; the floating "+ Add" stays; all three open one Find the place
-    list (ours tagged "In the guide", then Google's, then Fill it in
-    yourself, then the AI row); a read about a place we have opens its
-    Edit listing. Build it or not, and the forwarding phone number the
-    user hopes will replace paste and camera. The AI read's speed: 97.
+96. **Add, rethought** (Nov 26–27): BUILT Nov 27 as drawn, on
+    `claude/kept-current` (`docs/add-rethink.md`, "Add, rethought"
+    canvas R1, R2, R3b, R4, P6b). Every Add opens one Find the place
+    list; the AI box is a row on it, says it's AI, and a read about one
+    place we have opens its Edit listing. Left: counting it (the plan's
+    step 1), the home page's nothing-found card (not drawn), and the
+    forwarding phone number the user hopes will replace paste and
+    camera. The AI read's speed: 97.
 
 ### You do
 

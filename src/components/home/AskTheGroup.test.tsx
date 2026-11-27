@@ -34,10 +34,15 @@ describe('Ask in a WhatsApp group', () => {
     expect(screen.getAllByRole('button')).toHaveLength(1)
   })
 
-  // Oct 16: on a category page only that category was searched.
-  it('on a category page, says which, and offers the whole guide first', () => {
-    renderWithProviders(<AskTheGroup {...base} scope={{ label: 'Food', searchAll: '/philly/ask/rugelach' }} />)
-    expect(screen.getByTestId('ask-the-group')).toHaveTextContent(/^Nothing in Food for “rugelach”\.Search the whole guideAsk in a WhatsApp group$/)
-    expect(screen.getByRole('link', { name: 'Search the whole guide' })).toHaveAttribute('href', '/philly/ask/rugelach')
+  // Oct 16: on a category page only that category was searched. Nov 27
+  // (board R2): no "Search the whole guide"; Add what was searched for,
+  // under the ask, when the page takes additions.
+  it('on a category page, says which, and offers to add what was searched for', () => {
+    const onAdd = vi.fn()
+    renderWithProviders(<AskTheGroup {...base} scope={{ label: 'Food' }} onAdd={onAdd} />)
+    expect(screen.getByTestId('ask-the-group')).toHaveTextContent(/^Nothing in Food for “rugelach”\.Ask in a WhatsApp groupAdd rugelach$/)
+    expect(screen.queryAllByRole('link')).toEqual([])
+    fireEvent.click(screen.getByRole('button', { name: 'Add rugelach' }))
+    expect(onAdd).toHaveBeenCalledOnce()
   })
 })

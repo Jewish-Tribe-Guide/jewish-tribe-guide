@@ -9,7 +9,7 @@ import { fmt } from '@/lib/submissionDiff'
 import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
-import { useIsMobile } from '@/lib/useIsMobile'
+import { useMeasuredIsMobile } from '@/lib/useIsMobile'
 import { routes } from '@/lib/routes'
 import { regularMinyanim } from '@/lib/schedules'
 import type { TimesUpdate } from '@/lib/scheduleUpdate'
@@ -119,6 +119,8 @@ export default function TellUsSheet({
   yourselfLabel,
   heading,
   kind,
+  findFirst = false,
+  query,
 }: {
   isOpen: boolean
   onClose: () => void
@@ -139,8 +141,18 @@ export default function TellUsSheet({
   heading?: string
   /** Opened for one thing: a shul's times, or "Add their menu". */
   kind?: TellKind
+  /** Add's one way in (Nov 27, board R3b): opens on Find the place, the AI
+   *  box a row on it. */
+  findFirst?: boolean
+  /** Already searched for on Find the place: what was typed in a search
+   *  that found nothing (boards R1, R2). */
+  query?: string
 }) {
-  const isMobile = useIsMobile()
+  // Null until the screen is measured: drawn before that, a phone got the
+  // computer's dialog for a frame, then its own sheet in its place, and
+  // the focus went back to neither when it closed (Nov 27, once Find the
+  // place's field took the focus as it opened).
+  const isMobile = useMeasuredIsMobile()
   // Each step names itself: "Find the place", "Add to Food".
   const [stepTitle, setStepTitle] = useState<string | null>(null)
   // Back is the header's chevron, before the title, on every step that has
@@ -171,7 +183,7 @@ export default function TellUsSheet({
     if (steps() > 0) void moveBackTo(router, steps, () => withoutSteps(window.location.pathname, window.location.search, ['box']))
   }, [isOpen, router])
   // Named for what it does (Oct 10): "Tell us about…" read like feedback.
-  const title = stepTitle ?? heading ?? (about ? (kind === 'menu' ? 'Add their menu' : `Update ${about.name}`) : 'Add or update a place')
+  const title = stepTitle ?? heading ?? (findFirst ? 'Find the place' : null) ?? (about ? (kind === 'menu' ? 'Add their menu' : `Update ${about.name}`) : 'Add or update a place')
   const onBack = hasBack ? () => back.current() : undefined
   const body = (
     <TellUsBody
@@ -183,6 +195,8 @@ export default function TellUsSheet({
       onEditYourself={onEditYourself}
       yourselfLabel={yourselfLabel}
       kind={kind}
+      findFirst={findFirst}
+      query={query}
       onClose={onClose}
       onTitle={setStepTitle}
       onBack={(go) => {
@@ -191,6 +205,7 @@ export default function TellUsSheet({
       }}
     />
   )
+  if (isMobile === null) return null
   return isMobile ? (
     <MobileSheet isOpen={isOpen} onClose={onClose} title={title} onBack={onBack} draggable fit>
       {body}
@@ -213,6 +228,18 @@ const addTitle = (c: CategoryConfig) => (c.kind === 'eruv' ? 'Add an eruv' : `Ad
  *  other categories"). An eruv is added with its own form, not a listing's. */
 export function addableCategories(categories: readonly CategoryConfig[] | null | undefined): CategoryConfig[] {
   return (categories ?? []).filter((c) => (c.kind === 'listing' || c.kind === 'eruv') && c.active !== false && resolveCapabilities(c.capabilities).add)
+}
+
+/** A read that is one place's fields and nothing else opens that place's
+ *  Edit listing with them filled in (Nov 27, board P6b): its rows marked
+ *  Changed, a wrong one fixed by tapping it. Anything the editor can't hold
+ *  (a note for the admin, "from now on or just once?", a choice of branch)
+ *  keeps the result's card. */
+export function readForEditor(proposals: readonly Proposal[]): { listingId: string; values: Record<string, unknown> } | null {
+  if (proposals.length !== 1) return null
+  const p = proposals[0]
+  if (p.kind !== 'fields' || !p.listing || p.askWhen || p.notes.length > 0 || Object.keys(p.values).length === 0) return null
+  return { listingId: p.listing.id, values: p.values }
 }
 
 type Step = 'write' | 'result' | 'sent' | 'find' | 'kind' | 'add' | 'edit'
@@ -286,6 +313,8 @@ export function TellUsBody({
   onTitle,
   onBack,
   backFromStart,
+  findFirst = false,
+  query,
 }: {
   about?: { id: string; name: string }
   pageCategory?: CategoryConfig
@@ -302,16 +331,21 @@ export function TellUsBody({
   backFromStart?: () => void
   /** Whether the box is open: closed, its steps leave the address. */
   open?: boolean
+  /** Opens on Find the place, the AI box one row on it (board R3b). */
+  findFirst?: boolean
+  /** What Find the place starts searching for. */
+  query?: string
 }) {
   const community = useCommunitySlug()
   const categories = useCategories()
-  const [step, setStepOnly] = useState<Step>('write')
+  const root: Step = findFirst ? 'find' : 'write'
+  const [step, setStepOnly] = useState<Step>(root)
   // Filling it in yourself: the listing found, or the place to add, and
   // where Back goes from there.
   const [listings, setListings] = useState<DirectoryResource[] | null>(null)
   const [editing, setEditing] = useState<DirectoryResource | null>(null)
   const [adding, setAdding] = useState<{ category: CategoryConfig; place?: PlaceSelectResult; address?: string; coords?: { lat: number; lng: number } | null } | null>(null)
-  const [findFrom, setFindFrom] = useState<Step>('write')
+  const [findFrom, setFindFrom] = useState<Step>(root)
   const setStep = (next: Step, title: string | null = null) => {
     setStepOnly(next)
     onTitle(title)
@@ -339,6 +373,11 @@ export function TellUsBody({
     setListings(all)
     return all
   }
+  // Find the place marks the guide's own places as soon as it opens.
+  const loadOnOpen = useEffectEvent(() => void loadListings())
+  useEffect(() => {
+    if (findFirst) loadOnOpen()
+  }, [findFirst])
   // "Change something else about Trader Joe's": the listing's own editor.
   const openEdit = async (id: string) => {
     const l = (await loadListings()).find((x) => x.id === id)
@@ -376,7 +415,9 @@ export function TellUsBody({
   const [itemEdits, setItemEdits] = useState<Record<number, ReadItem[]>>({})
   // Where Back goes from a listing's editor: the result it was opened from,
   // or the search.
-  const [editFrom, setEditFrom] = useState<'find' | 'result'>('find')
+  const [editFrom, setEditFrom] = useState<'find' | 'result' | 'read'>('find')
+  // What a read put in the listing's editor (board P6b), sent as a message.
+  const [editRead, setEditRead] = useState<Record<string, unknown> | null>(null)
   // A row of the editor open (or a minyan, a person in one): its title in
   // the header, and Back closes it (Oct 11).
   const [editorStep, setEditorStep] = useState<EditorStep | null>(null)
@@ -390,21 +431,26 @@ export function TellUsBody({
   // browser's Back goes back a step, as the header's does, instead of
   // closing the box and losing what was typed (the user, Nov 10). The path
   // is where the header's Back goes from each step, read the other way.
-  const findPath = (): string[] => (findFrom === 'result' ? ['result', 'find'] : ['find'])
+  // Opened on Find the place, the search is the first step and the box
+  // under it (?box=write).
+  const writePath: string[] = findFirst ? ['write'] : []
+  const resultPath = [...writePath, 'result']
+  const findPath = (): string[] => (findFrom === 'result' ? [...resultPath, 'find'] : findFirst ? [] : ['find'])
   const pathOf = (s: Step): string[] | null => {
-    if (s === 'write') return []
-    if (s === 'result') return reading ? ['result'] : null
+    if (s === 'write') return writePath
+    if (s === 'result') return reading ? resultPath : null
     if (s === 'sent') return ['sent']
     if (s === 'find') return findPath()
     if (!adding && (s === 'kind' || s === 'add')) return null
     if (s === 'kind') return [...findPath(), 'kind']
     if (s === 'add') return adding?.category.kind === 'eruv' && pageCategory?.kind === 'eruv' ? ['add'] : [...findPath(), 'add']
-    return editing ? (editFrom === 'result' ? ['result', 'edit'] : [...findPath(), 'edit']) : null
+    if (!editing) return null
+    return editFrom === 'result' ? [...resultPath, 'edit'] : editFrom === 'read' ? [...writePath, 'edit'] : [...findPath(), 'edit']
   }
   const inEditor = step === 'add' || step === 'edit'
   const boxPath = open ? [...(pathOf(step) ?? []), ...(inEditor ? (editorStep?.path ?? []) : [])] : []
   const titleOf = (s: Step): string | null =>
-    s === 'find' ? 'Find the place' : s === 'kind' ? 'What kind of place?' : s === 'add' && adding ? addTitle(adding.category) : s === 'edit' && editing ? editing.name : null
+    s === 'write' && findFirst ? WRITE_TITLE : s === 'find' ? 'Find the place' : s === 'kind' ? 'What kind of place?' : s === 'add' && adding ? addTitle(adding.category) : s === 'edit' && editing ? editing.name : null
   useStepsInAddress('box', boxPath, (to) => {
     for (const s of STEPS) {
       const at = pathOf(s)
@@ -491,6 +537,16 @@ export function TellUsBody({
       setFixes({})
       setWhens({})
       setItemEdits({})
+      const forEditor = readForEditor(json.proposals)
+      const listing = forEditor && (await loadListings()).find((l) => l.id === forEditor.listingId)
+      if (forEditor && listing) {
+        setEditing(listing)
+        setEditRead(forEditor.values)
+        setEditFrom('read')
+        setStep('edit', listing.name)
+        return
+      }
+      setEditRead(null)
       setStep('result')
     } catch (e) {
       setError(e instanceof Error && e.message !== 'failed' ? e.message : 'Couldn’t read it right now. Please try again.')
@@ -592,11 +648,11 @@ export function TellUsBody({
     if (queue.every((q) => q === g)) setStep('sent')
   }
 
-  const viaMessage: SendVia = ({ payload, submittedBy, company, turnstileToken }) =>
+  const viaMessage = (targetId?: string): SendVia => ({ payload, submittedBy, company, turnstileToken }) =>
     fetchOrPreview(withCommunity('/api/message/send', community), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, photoUrls: reading?.photoUrls ?? [], forms: [{ submission: payload }], email: submittedBy?.email ?? '', turnstileToken, company }),
+      body: JSON.stringify({ text, photoUrls: reading?.photoUrls ?? [], forms: [{ submission: payload, ...(targetId ? { targetId } : {}) }], email: submittedBy?.email ?? '', turnstileToken, company }),
     })
 
   const send = async (token: string, g: number[]) => {
@@ -651,13 +707,13 @@ export function TellUsBody({
   // step before (the test caught it, about one run in three).
   useLayoutEffect(() => {
     const go: Record<Step, (() => void) | null> = {
-      write: backFromStart ?? null,
+      write: findFirst ? () => openFind(true) : (backFromStart ?? null),
       sent: null,
-      result: () => setStep('write'),
-      find: () => setStep(findFrom),
+      result: () => setStep('write', titleOf('write')),
+      find: findFrom === root ? (findFirst ? (backFromStart ?? null) : () => setStep(root)) : () => setStep(findFrom, titleOf(findFrom)),
       kind: () => openFind(true),
       add: editorStep ? editorStep.back : adding?.category.kind === 'eruv' && pageCategory?.kind === 'eruv' ? () => setStep('write') : () => openFind(true),
-      edit: editorStep ? editorStep.back : () => (editFrom === 'result' ? setStep('result') : openFind(true)),
+      edit: editorStep ? editorStep.back : () => (editFrom === 'result' ? setStep('result') : editFrom === 'read' ? setStep('write', titleOf('write')) : openFind(true)),
     }
     onBack(go[step])
   })
@@ -666,7 +722,7 @@ export function TellUsBody({
   // found nothing does, AskTheGroup).
   const { share } = useShareLink(routes.ask(community, text.trim()), text.trim(), () => askMessage(text.trim()))
   const backToWrite = () => {
-    setStep('write')
+    setStep('write', titleOf('write'))
     requestAnimationFrame(() => textArea.current?.focus())
   }
   const retry = () => start('read', (token) => void read(token))
@@ -688,7 +744,7 @@ export function TellUsBody({
   // "+", the place found and filled in by hand.
   const yourself = onEditYourself
     ? { label: yourselfLabel ?? 'Edit it yourself', run: onEditYourself }
-    : !about && addable.length > 0
+    : !about && addable.length > 0 && !findFirst
       ? {
           // Named for what it opens (the user, Nov 10): "Fill it in
           // yourself" here and again on the search meant two things. The
@@ -794,7 +850,7 @@ export function TellUsBody({
           addPhotos(e.target.files)
           e.target.value = ''
           setDown(false)
-          if (step !== 'write') setStep('write')
+          if (step !== 'write') setStep('write', titleOf('write'))
         }}
       />
       {step === 'write' && down && (
@@ -810,6 +866,11 @@ export function TellUsBody({
         <>
           {/* What it's about, under the title, when that's a place's menu. */}
           {kind === 'menu' && about && <p className="-mt-1 text-[0.875rem] text-muted">{about.name}</p>}
+          {/* AI says so before it reads (Nov 27, board R4). */}
+          <p className="flex items-center gap-2 text-[0.875rem] text-slate-600" data-testid="read-by-ai">
+            <AiTag />
+            You check it before it’s sent.
+          </p>
           <div className="rounded-xl border-[1.5px] border-slate-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
             {/* The line inside says what to write, by place, and that it'll
                 be read for them to check (Oct 16); this names it. */}
@@ -973,7 +1034,15 @@ export function TellUsBody({
         <FindPlace
           key={aiPlace?.card ?? 'own'}
           listings={listings}
-          initialQuery={aiPlace?.query}
+          initialQuery={aiPlace?.query ?? query}
+          onPaste={
+            findFirst && !aiPlace
+              ? () => {
+                  setStep('write', WRITE_TITLE)
+                  requestAnimationFrame(() => textArea.current?.focus())
+                }
+              : undefined
+          }
           onListing={(l) => {
             setEditing(l)
             setEditFrom('find')
@@ -1023,7 +1092,7 @@ export function TellUsBody({
           reopen={editorAsk}
           // A place the reader found goes in labelled with what it was read
           // from, and the box goes back to the rest of what it read.
-          via={aiPlace ? viaMessage : undefined}
+          via={aiPlace ? viaMessage() : undefined}
           onSent={
             aiPlace
               ? (answer) => {
@@ -1037,7 +1106,34 @@ export function TellUsBody({
         />
       )}
       {step === 'edit' && editing && categories?.find((c) => c.id === editing.category) && (
-        <ListingEditor item={editing} category={categories.find((c) => c.id === editing.category)!} onClose={onClose} onStep={setEditorStep} reopen={editorAsk} />
+        <>
+          {editFrom === 'read' && editRead && !editorStep && (
+            <p className="flex flex-wrap items-center gap-x-2 text-[0.875rem] text-slate-600" data-testid="read-into-editor">
+              <AiTag />
+              from your post. Tap a row to fix it.
+            </p>
+          )}
+          <ListingEditor
+            key={editFrom === 'read' ? 'read' : editing.id}
+            item={editing}
+            category={categories.find((c) => c.id === editing.category)!}
+            onClose={onClose}
+            onStep={setEditorStep}
+            reopen={editorAsk}
+            preset={editFrom === 'read' ? (editRead ?? undefined) : undefined}
+            via={editFrom === 'read' && editRead ? viaMessage(editing.id) : undefined}
+            onSent={
+              editFrom === 'read' && editRead
+                ? (answer) => {
+                    const ids = (answer as { ids?: string[] } | null)?.ids ?? []
+                    setSentList((l) => [...l, { name: editing.name, what: 'Changes' }])
+                    setSentIds((x) => [...x, ...ids])
+                    setStep('sent')
+                  }
+                : undefined
+            }
+          />
+        </>
       )}
 
       {error && (
@@ -1389,6 +1485,13 @@ function ResultCard({
 
 /** Why the box can't use something, and (beside a change that can be sent)
  *  the one thing that works instead (Oct 10). */
+const WRITE_TITLE = 'Paste a post or a photo'
+
+/** Says AI read it, or will (boards R4, P6b). */
+function AiTag() {
+  return <span className="inline-flex h-[22px] items-center rounded-full bg-indigo-50 px-2 text-[0.75rem] font-bold text-indigo-800">Read by AI</span>
+}
+
 function WhyBlock({ head, line, action }: { head: string; line: string; action?: { label: string; run: () => void } }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3" data-testid="tell-us-why">

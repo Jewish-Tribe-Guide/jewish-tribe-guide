@@ -135,6 +135,26 @@ describe('POST /api/message/send', () => {
     expect(m.submitListingCreate).toHaveBeenCalledTimes(1)
   })
 
+  // Nov 27 (board P6b): a read about a place the guide has opens its Edit
+  // listing with the read filled in; what the person sends from there is an
+  // edit of that listing, labelled with what it was read from.
+  it('files an edit from Edit listing as a change to that listing, and refuses one that changes nothing or names no listing', async () => {
+    const form = { category: 'other', name: 'Trader Joe’s', address: '1324 Arch St', phone: '', anchorId: 'all', distance: null, geo: null, details: { m: ['Chicken', 'Challah'] } }
+    expect(await (await post({ text: 'TJ on Arch has challah', forms: [{ submission: form, targetId: ARCH }] })).json()).toMatchObject({ ok: true, filed: 1 })
+    expect(m.submitListingCreate).not.toHaveBeenCalled()
+    const [, id, payload, note] = m.submitListingUpdate.mock.calls[0]
+    expect(id).toBe(ARCH)
+    expect(payload).toMatchObject({ category: 'grocery', details: { m: ['Chicken', 'Challah'] }, source: { readBy: 'ai', from: 'a message', original: 'TJ on Arch has challah' } })
+    expect(note).toContain('checked by them in Edit listing')
+
+    const same = await post({ text: 'x', forms: [{ submission: { ...form, details: { m: ['Chicken'] } }, targetId: ARCH }] })
+    expect(same.status).toBe(400)
+    expect((await post({ text: 'x', forms: [{ submission: form, targetId: 'nope' }] })).status).toBe(404)
+    m.ui.contributions.edit = false
+    expect((await post({ text: 'x', forms: [{ submission: form, targetId: ARCH }] })).status).toBe(403)
+    expect(m.submitListingUpdate).toHaveBeenCalledTimes(1)
+  })
+
   // The add form's place goes through the same preparation as the listing
   // form's (/api/submissions): before Nov 18 this path dropped only the
   // source keys, so a hand-made send could set the app's own keys (an

@@ -121,9 +121,15 @@ test.describe('accessibility', () => {
     await page.goto(`/${community}/${category.id}`)
     await ready(page)
 
+    // Add's first screen, Find the place, and the AI box one row on it
+    // (boards R3b and R4, Nov 27).
     await categoryAddButton(page).click()
-    await expect(page.getByRole('dialog').getByRole('button', { name: 'See what changes' })).toBeVisible()
+    const find = page.getByRole('dialog', { name: 'Find the place' })
+    await expect(find.getByRole('button', { name: /^Or paste a post or a photo/ })).toBeVisible()
+    await expectNoViolations(page)
 
+    await find.getByRole('button', { name: /^Or paste a post or a photo/ }).click()
+    await expect(page.getByRole('dialog').getByRole('button', { name: 'See what changes' })).toBeVisible()
     await expectNoViolations(page)
   })
 

@@ -57,7 +57,8 @@ test('dragging across the box’s text selects it, and leaves the sheet where it
   await page.goto(`/${community}/${category.id}`)
   await ready(page)
   await categoryAddButton(page).click()
-  const sheet = page.getByRole('dialog', { name: 'Add or update a place' })
+  await page.getByRole('dialog', { name: 'Find the place' }).getByRole('button', { name: /^Or paste a post or a photo/ }).click()
+  const sheet = page.getByRole('dialog', { name: 'Paste a post or a photo' })
   const box = sheet.getByLabel('Your message')
   await box.fill('Shacharis moved to 7:15 this week, Mincha stays at 1:45')
   // Measured once the sheet has slid up. Measured during it, the box's

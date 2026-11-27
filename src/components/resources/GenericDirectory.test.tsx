@@ -335,15 +335,34 @@ describe('GenericDirectory', () => {
     // Oct 16: only this category was searched, so the card says so, and
     // offers the rest of the guide. That was the ✕ on "in Grocery Stores",
     // which a phone no longer shows.
-    it('found nothing: says where it looked, offers the whole guide, and asks the group', async () => {
+    // Nov 27 (board R2): no "Search the whole guide"; Add what was
+    // searched for, opening Find the place already searching for it.
+    it('found nothing: says where it looked, asks the group, and adds what was searched for', async () => {
       const user = userEvent.setup()
       renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
       await user.type(screen.getByRole('searchbox'), 'rugelach')
       const card = within(screen.getByTestId('ask-the-group'))
       expect(card.getByText('Nothing in Grocery Stores for “rugelach”.')).toBeInTheDocument()
-      expect(card.getByRole('link', { name: 'Search the whole guide' })).toHaveAttribute('href', expect.stringMatching(/\/ask\/rugelach$/))
+      expect(card.queryByRole('link', { name: 'Search the whole guide' })).not.toBeInTheDocument()
       expect(card.getByRole('button', { name: 'Ask in a WhatsApp group' })).toBeInTheDocument()
-      expect(card.queryByRole('button', { name: /Know where to find it/ })).not.toBeInTheDocument()
+      expect(screen.queryByTestId('add-typed')).not.toBeInTheDocument()
+      await user.click(card.getByRole('button', { name: 'Add rugelach' }))
+      expect(await screen.findByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Search by name or address…')).toHaveValue('rugelach')
+    })
+
+    // Nov 27 (board R1): a search that finds others ends with adding what
+    // was typed, the whole row the tap.
+    it('ends a search’s results with a row adding what was typed', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
+      expect(screen.queryByTestId('add-typed')).not.toBeInTheDocument()
+      await user.type(screen.getByRole('searchbox'), stores[0].name.split(' ')[0])
+      const row = await screen.findByTestId('add-typed')
+      expect(row).toHaveTextContent(`Add ${stores[0].name.split(' ')[0]}Not in the list? Add it to the guide`)
+      await user.click(row)
+      expect(await screen.findByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Search by name or address…')).toHaveValue(stores[0].name.split(' ')[0])
     })
 
     it('shows an answer only after a search: nothing sits under the box unasked', () => {
@@ -373,7 +392,7 @@ describe('GenericDirectory', () => {
     renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} onAdd={onAdd} />)
 
     await user.click(screen.getByRole('button', { name: /Add grocery store/ }))
-    expect(await screen.findByRole('dialog', { name: 'Add or update a place' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
     expect(onAdd).not.toHaveBeenCalled()
   })
 
@@ -383,8 +402,8 @@ describe('GenericDirectory', () => {
   // to gate it to mobile only; asserting it out of the className is the
   // regression check for that, now that desktop shares this same button
   // instead of DirectoryHeader's old toolbar "Add".
-  // Since Oct 5 the "+" opens "Saw something? Tell us"; filling it in
-  // yourself is "Find the place" inside it, adding to this category.
+  // Since Nov 27 the "+" opens Find the place (board R3b), adding to this
+  // category.
   it('has a floating Add button, visible on every viewport, that opens the box, adding to this category', async () => {
     const user = userEvent.setup()
     const onAdd = vi.fn()
@@ -398,8 +417,8 @@ describe('GenericDirectory', () => {
     const floatingAdd = screen.getByRole('button', { name: 'Add' })
     expect(floatingAdd.className).not.toContain('desktop:hidden')
     await user.click(floatingAdd)
-    await user.click(await screen.findByRole('button', { name: 'Find the place' }))
-    await user.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
+    expect(await screen.findByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /not on Google/ }))
     expect(screen.getByRole('dialog', { name: 'Add to Grocery Stores' })).toBeInTheDocument()
     expect(onAdd).not.toHaveBeenCalled()
   })
@@ -466,7 +485,7 @@ describe('GenericDirectory', () => {
       </ForcedViewport>,
     )
     fireEvent.click(await screen.findByRole('button', { name: 'Add' }))
-    expect(await screen.findByRole('dialog', { name: 'Add or update a place' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Edit listing to Trader Joe’s' }))
     expect(await screen.findByRole('dialog', { name: 'Update Trader Joe’s' })).toBeInTheDocument()

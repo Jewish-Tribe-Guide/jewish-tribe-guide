@@ -16,9 +16,10 @@ import { itemWording } from '@/lib/itemMarks'
 import { itemsChange, messageSource, newPlaceSubmission, sentItems, sentPlace } from '@/lib/messageReader'
 import { fieldsEdit } from '@/lib/fieldChanges'
 import { prepareSubmission } from '@/lib/prepareSubmission'
+import { hasListingChanged } from '@/lib/listingDiff'
 import type { ResourceSubmission, SubmissionRow } from '@/types'
 
-// POST /api/message/send   { text, photoUrls, stores: [{ listingId, items, menu? }], edits: [{ listingId, values, notes }], places: [{ category, place, items }], forms: [{ submission }], email?, turnstileToken, company }
+// POST /api/message/send   { text, photoUrls, stores: [{ listingId, items, menu? }], edits: [{ listingId, values, notes }], places: [{ category, place, items }], forms: [{ submission, targetId? }], email?, turnstileToken, company }
 // The "+ Add" box's Send (agreed Oct 5): what the person saw after the
 // reader (/api/message/read), filed as ordinary suggestions for an admin,
 // one per store or place, each labelled "Read by AI" with the message or
@@ -40,7 +41,9 @@ import type { ResourceSubmission, SubmissionRow } from '@/types'
 // `forms`: a new place the reader found, filled in by the person with the
 // add form (Google's details and the category's questions). Taken as the
 // public submissions route takes a new listing, checked the same way, and
-// filed with what it was read from.
+// filed with what it was read from. With a `targetId`, a place the guide
+// already has: what was read, put into its Edit listing and checked there
+// (Nov 27, board P6b), taken as the public route takes an edit.
 
 const MAX_STORES = 10
 const MAX_NOTES = 10
@@ -100,18 +103,25 @@ export async function POST(request: Request) {
 
     // Every form checked before anything is filed, so a refusal files
     // nothing (Nov 21, the save survey).
-    const checkedForms: ResourceSubmission[] = []
+    const checkedForms: { submission: ResourceSubmission; targetId: string | null }[] = []
     for (const f of forms) {
       const submission = (f.submission && typeof f.submission === 'object' ? f.submission : null) as ResourceSubmission | null
       if (!submission) continue
+      const target = typeof f.targetId === 'string' ? f.targetId : null
+      const listing = target ? byId.get(target) : undefined
+      if (target && !listing) return Response.json({ ok: false, errors: ['That listing isn’t in the guide.'] }, { status: 404 })
+      // An edit stays in its listing's category, whatever the form says.
+      if (listing) submission.category = listing.category
       const category = catById.get(submission.category)
-      if (!category || !contributions.add || !resolveCapabilities(category.capabilities).add) {
+      const caps = category && resolveCapabilities(category.capabilities)
+      if (!category || !caps || !(listing ? contributions.edit && caps.edit : contributions.add && caps.add)) {
         return Response.json({ ok: false, errors: ['This action is not available for this category.'] }, { status: 403 })
       }
       // The listing form's own preparation (/api/submissions).
-      const errors = prepareSubmission(submission, category, { operation: 'create' })
+      const errors = prepareSubmission(submission, category, listing ? { operation: 'update', storedPlaceId: listing.placeId } : { operation: 'create' })
+      if (listing && !hasListingChanged(listing, submission, category.detailFields)) errors.push('No changes were made to this listing — nothing to submit.')
       if (errors.length) return Response.json({ ok: false, errors }, { status: 400 })
-      checkedForms.push(submission)
+      checkedForms.push({ submission, targetId: listing?.id ?? null })
     }
 
     // The admins hear of whatever was filed, even when a later one fails
@@ -161,13 +171,15 @@ export async function POST(request: Request) {
       )
     }
 
-    for (const submission of checkedForms) {
+    for (const { submission, targetId } of checkedForms) {
       filed.push(
-        await submitListingCreate(
-          community.slug,
-          Object.assign({}, submission, { submittedBy: submittedBy ?? undefined, source }),
-          'A new place, read from a message sent with “Tell us” and filled in by them.',
-        ),
+        targetId
+          ? await submitListingUpdate(community.slug, targetId, Object.assign({}, submission, { source }), 'Read from a message sent with “Tell us”, and checked by them in Edit listing.', submittedBy)
+          : await submitListingCreate(
+              community.slug,
+              Object.assign({}, submission, { submittedBy: submittedBy ?? undefined, source }),
+              'A new place, read from a message sent with “Tell us” and filled in by them.',
+            ),
       )
     }
 
