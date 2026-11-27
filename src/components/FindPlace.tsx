@@ -39,7 +39,8 @@ export default function FindPlace({
   initialQuery?: string
   onListing: (listing: DirectoryResource) => void
   onPlace: (place: PlaceSelectResult, address: string, coords: { lat: number; lng: number } | null) => void
-  onBlank: () => void
+  /** Filling it in by hand, with what was typed. */
+  onBlank: (typed: string) => void
   /** The AI box, a row under the list (board R3b): Add's first screen. */
   onPaste?: () => void
 }) {
@@ -94,12 +95,17 @@ export default function FindPlace({
               </button>
             ))
           }
+          // Only once something is typed (the user, Nov 27): filling it in
+          // comes after the guide and Google have been searched for it, so
+          // nobody adds a place we have without seeing it first.
           listAfter={
-            <button type="button" onClick={onBlank} className={`${row} font-semibold text-primary`}>
-              <PencilIcon className="h-4 w-4 shrink-0" />
-              <span>{name ? `Fill in “${name}” yourself` : 'Fill it in yourself'}</span>
-              <span className="text-xs font-normal text-slate-500">not on Google</span>
-            </button>
+            name && (
+              <button type="button" onClick={() => onBlank(name)} className={`${row} font-semibold text-primary`}>
+                <PencilIcon className="h-4 w-4 shrink-0" />
+                <span>Fill in “{name}” yourself</span>
+                <span className="text-xs font-normal text-slate-500">not on Google</span>
+              </button>
+            )
           }
         />
       </div>

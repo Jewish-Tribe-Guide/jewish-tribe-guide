@@ -168,10 +168,10 @@ describe('CategoryPreview', () => {
 
     // The other path: the by-hand editor, a new place.
     await u.click(screen.getByRole('button', { name: 'Find the place' }))
+    await u.type(screen.getByPlaceholderText('Search by name or address…'), 'Kosher Corner')
     await u.click(screen.getByRole('button', { name: /not on Google/ }))
-    await u.click(screen.getByTestId('editor-row-name'))
-    await u.type(screen.getByRole('textbox', { name: 'Name' }), 'Kosher Corner')
-    await u.click(screen.getByRole('button', { name: 'Done' }))
+    // Starts with the name typed.
+    expect(screen.getByTestId('editor-row-name')).toHaveTextContent('Kosher Corner')
     await u.click(screen.getByTestId('editor-row-contact'))
     await u.type(screen.getByLabelText('Address'), '1500 Walnut St')
     await u.click(screen.getByRole('button', { name: 'Done' }))

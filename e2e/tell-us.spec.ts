@@ -21,7 +21,8 @@ test('the home page’s “+ Add” opens Find the place', async ({ page }) => {
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   const find = page.getByRole('dialog', { name: 'Find the place' })
   await expect(find.getByPlaceholder('Search by name or address…')).toBeVisible()
-  await expect(find.getByRole('button', { name: /^Fill it in yourself/ })).toBeVisible()
+  // Filling it in by hand is offered once something is typed (Nov 27).
+  await expect(find.getByRole('button', { name: /not on Google/ })).toHaveCount(0)
   await expect(find.getByRole('button', { name: /^Or paste a post or a photo/ })).toBeVisible()
 })
 
@@ -57,7 +58,8 @@ test('the browser’s Back and Forward walk the box’s steps, a row’s Back ke
   const box = () => new URL(page.url()).searchParams.get('box')
   // Add's first screen is the box's own root: no step in the address.
   expect(box()).toBeNull()
-  await find.getByRole('button', { name: /^Fill it in yourself/ }).click()
+  await find.getByPlaceholder('Search by name or address…').fill('A place')
+  await find.getByRole('button', { name: /^Fill in “A place” yourself/ }).click()
   const adding = page.getByRole('dialog', { name: /^Add to / })
   await expect(adding).toBeVisible()
   await expect.poll(box).toBe('add')
@@ -89,6 +91,9 @@ test('the browser’s Back and Forward walk the box’s steps, a row’s Back ke
 // the screen's edge; the box now opens at its content's height. And it was
 // taken off the page the moment it closed, its dimmed backdrop with it, in
 // one frame; it slides and fades away now, as a listing does.
+// MobileSheet's HALF_FRACTION: a sheet opens no shorter than this.
+const HALF = 0.5
+
 test.describe('the box on a phone', { tag: '@mobile' }, () => {
 
   test('opens tall enough to show the AI row, and no taller', async ({ page }) => {
@@ -108,7 +113,11 @@ test.describe('the box on a phone', { tag: '@mobile' }, () => {
     const sheet = (await box.boundingBox())!
     const yourself = (await link.boundingBox())!
     expect(yourself.y + yourself.height, 'the AI row is on the screen').toBeLessThanOrEqual(660)
-    expect(sheet.y + sheet.height - (yourself.y + yourself.height), 'and the box ends under it').toBeLessThan(60)
+    // Ends under it, or at the sheet's half-screen floor when there's less
+    // than that to show (an empty search, since Fill it in yourself waits
+    // for something typed, Nov 27).
+    const gap = sheet.y + sheet.height - (yourself.y + yourself.height)
+    expect(gap < 60 || Math.abs(sheet.height - 660 * HALF) <= 2, `and the box ends under it (${gap}px below, ${sheet.height}px tall)`).toBe(true)
     expect(sheet.height, 'not the full height').toBeLessThan(660 - 76)
   })
 

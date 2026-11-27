@@ -344,7 +344,7 @@ export function TellUsBody({
   // where Back goes from there.
   const [listings, setListings] = useState<DirectoryResource[] | null>(null)
   const [editing, setEditing] = useState<DirectoryResource | null>(null)
-  const [adding, setAdding] = useState<{ category: CategoryConfig; place?: PlaceSelectResult; address?: string; coords?: { lat: number; lng: number } | null } | null>(null)
+  const [adding, setAdding] = useState<{ category: CategoryConfig; place?: PlaceSelectResult; address?: string; coords?: { lat: number; lng: number } | null; name?: string } | null>(null)
   const [findFrom, setFindFrom] = useState<Step>(root)
   const setStep = (next: Step, title: string | null = null) => {
     setStepOnly(next)
@@ -1050,12 +1050,13 @@ export function TellUsBody({
             setStep('edit', l.name)
           }}
           onPlace={(place, address, coords) => startAdding({ place, address, coords })}
-          onBlank={() => startAdding({})}
+          // "Fill in ‘Bagel’ yourself": the form starts with that name.
+          onBlank={(name) => startAdding({ name })}
         />
       )}
       {step === 'kind' && adding && (
         <div className="space-y-2" data-testid="pick-kind">
-          <p className="text-[0.90625rem] text-slate-700">{adding.place?.name ? `What kind of place is ${adding.place.name}?` : 'What kind of place is it?'}</p>
+          <p className="text-[0.90625rem] text-slate-700">{(adding.place?.name ?? adding.name) ? `What kind of place is ${adding.place?.name ?? adding.name}?` : 'What kind of place is it?'}</p>
           <div className="flex flex-wrap gap-2">
             {addable.map((c) => (
               <button
@@ -1075,7 +1076,7 @@ export function TellUsBody({
       )}
       {step === 'add' && adding?.category.kind === 'eruv' && (
         <div data-testid="eruv-adding">
-          <EruvEditor eruv={null} page={adding.category} name={adding.place?.name ?? aiPlace?.query ?? ''} onClose={onClose} />
+          <EruvEditor eruv={null} page={adding.category} name={adding.place?.name ?? adding.name ?? aiPlace?.query ?? ''} onClose={onClose} />
         </div>
       )}
       {step === 'add' && adding && adding.category.kind !== 'eruv' && (
@@ -1085,7 +1086,7 @@ export function TellUsBody({
           place={adding.place}
           address={adding.address}
           coords={adding.coords}
-          values={aiPlace?.values}
+          values={aiPlace?.values ?? (adding.name ? { name: adding.name } : undefined)}
           existing={(listings ?? []).filter((l) => l.category === adding.category.id)}
           onClose={onClose}
           onStep={setEditorStep}

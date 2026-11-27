@@ -338,13 +338,16 @@ export function categoryAddButton(page: Page): Locator {
   return page.getByRole('main').getByRole('button', { name: 'Add', exact: true })
 }
 
-/** The add form: "+", which opens "Find the place", and "Fill it in
- *  yourself · not on Google" (the Google search itself needs a real Maps
+/** The add form: "+", which opens "Find the place", a name typed, and
+ *  "Fill in ‘…’ yourself · not on Google" (the Google search itself needs a real Maps
  *  key and bills per search). Lands on the category's form of
  *  questions, in the box. */
 export async function openAddForm(page: Page): Promise<void> {
   await categoryAddButton(page).click()
-  await page.getByRole('dialog', { name: 'Find the place' }).getByRole('button', { name: /^Fill it in yourself/ }).click()
+  const find = page.getByRole('dialog', { name: 'Find the place' })
+  // Offered once something is typed (Nov 27).
+  await find.getByPlaceholder('Search by name or address…').fill('Kosher Corner')
+  await find.getByRole('button', { name: /^Fill in “Kosher Corner” yourself/ }).click()
 }
 
 /** Waits for the page to be settled enough to assert on.

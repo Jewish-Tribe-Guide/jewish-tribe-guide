@@ -418,6 +418,7 @@ describe('GenericDirectory', () => {
     expect(floatingAdd.className).not.toContain('desktop:hidden')
     await user.click(floatingAdd)
     expect(await screen.findByRole('dialog', { name: 'Find the place' })).toBeInTheDocument()
+    await user.type(screen.getByPlaceholderText('Search by name or address…'), 'Kosher Corner')
     await user.click(screen.getByRole('button', { name: /not on Google/ }))
     expect(screen.getByRole('dialog', { name: 'Add to Grocery Stores' })).toBeInTheDocument()
     expect(onAdd).not.toHaveBeenCalled()

@@ -534,15 +534,20 @@ describe('Saw something? Tell us', () => {
       expect(calls.filter((c) => c.url.includes('/api/resources'))).toHaveLength(1)
     })
 
-    it('adds a place as the listing’s boxes, asking the kind only when it isn’t known', () => {
+    it('adds a place as the listing’s boxes, asking the kind only when it isn’t known, filling it in only once something is typed', () => {
       find()
-      fireEvent.click(screen.getByRole('button', { name: /not on Google/ }))
-      expect(screen.getByTestId('pick-kind')).toBeInTheDocument()
+      // Nothing typed, nothing to fill in yet (the user, Nov 27).
+      expect(screen.queryByRole('button', { name: /not on Google/ })).not.toBeInTheDocument()
+      fireEvent.change(screen.getByPlaceholderText('Search by name or address…'), { target: { value: 'Kosher Corner' } })
+      fireEvent.click(screen.getByRole('button', { name: /^Fill in “Kosher Corner” yourself\s*not on Google$/ }))
+      expect(screen.getByTestId('pick-kind')).toHaveTextContent('What kind of place is Kosher Corner?')
       fireEvent.click(screen.getByRole('button', { name: 'Synagogue' }))
       expect(screen.getByRole('dialog', { name: 'Add to Synagogues' })).toBeInTheDocument()
-      expect(screen.getByTestId('editor-row-name')).toHaveTextContent('Needed')
+      // The form starts with the name typed.
+      expect(screen.getByTestId('editor-row-name')).toHaveTextContent('Kosher Corner')
       cleanup()
       find({ category: grocery })
+      fireEvent.change(screen.getByPlaceholderText('Search by name or address…'), { target: { value: 'Kosher Corner' } })
       fireEvent.click(screen.getByRole('button', { name: /not on Google/ }))
       expect(screen.getByRole('dialog', { name: 'Add to Groceries' })).toBeInTheDocument()
     })
@@ -554,6 +559,7 @@ describe('Saw something? Tell us', () => {
       respond = (url) => (url.includes('/api/resources') ? { ok: true, resources: [tj] } : {})
       renderWithProviders(<TellUsSheet isOpen onClose={() => {}} />, { community: { slug: 'philly' }, content: { categories: [grocery, eruv] } })
       fireEvent.click(screen.getByRole('button', { name: 'Find the place' }))
+      fireEvent.change(screen.getByPlaceholderText('Search by name or address…'), { target: { value: 'Kosher Corner' } })
       fireEvent.click(screen.getByRole('button', { name: /not on Google/ }))
       fireEvent.click(within(screen.getByTestId('pick-kind')).getByRole('button', { name: 'Eruv' }))
       expect(screen.getByRole('dialog', { name: 'Add an eruv' })).toBeInTheDocument()
