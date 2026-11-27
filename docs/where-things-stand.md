@@ -267,6 +267,11 @@ old number can still be looked up. When an item is done, move it to
     the dot on You lights when one goes live; S4b and S4d (the pop-up)
     are not built. Needs migration 118 first: 98. The menu and shul
     times boxes still read while the sender waits.
+99. **Add, renamed and split** (Nov 27): DRAWN, not built until the
+    user OKs it ("Add, rethought" canvas T1–T3). The floating pill says
+    "Add or update" (T1); Find the place has two rows, "Take a photo"
+    (opens the phone's picker at once) and "Paste a post" (T2); a
+    picked photo lands in a "Send a photo" box with Send (T3).
 
 ### You do
 
