@@ -283,18 +283,23 @@ old number can still be looked up. When an item is done, move it to
     "Add a photo" as a strip along its bottom edge (the phone's own
     menu); the site's wide Send alone below it, live once there's words
     or a photo (V2b). Replaces today's box.
-100. **The site's own email address** (proposed Nov 27, next after
-    99): one address per community (`<community>@in.<domain>`, a
-    catch-all, so a new community has one with nothing to create) that
-    a mail service hands to the site within seconds, instead of the
-    Gmail script checking hourly (an eruv email sat up to an hour,
-    Nov 27). Mail from a watched list (eruv, shul newsletters) is read;
-    anything else (a person's reply) is forwarded to the admins. It
-    becomes the community email (reply-to) shown in onboarding and
-    Settings, and the guide's Gmail can then go (check what else signs
-    in with it first). Needs: the service (Cloudflare Email Routing
-    if the domain's DNS is there), and subscribing the address to
-    JCOR's groups.io list and each newsletter.
+100. **The site's own email address** (BUILT Nov 27 on
+    `claude/kept-current`, not live until 102 is done): one address per
+    community, `<community>@in.phillyjewishguide.com`, a catch-all at
+    Resend (it receives mail too, so no second service), which posts
+    each email to `/api/inbound/email` within seconds instead of the
+    Gmail script's hourly check. An eruv's email is read for up or
+    down; a watched newsletter is read and filed, as the script's are;
+    anything else from a person is forwarded to the community's admins
+    with Reply-To the sender, so the admin's Reply answers them.
+    Auto-replies and bounces are never forwarded. Once set,
+    `getCommunityEmail` gives this address when Settings has none
+    saved, so it becomes the reply-to on every email the site sends
+    visitors. Eruv emails this way wait (`unverified`) until the first
+    real one shows Resend's server name for `INBOUND_AUTH_SERVERS`
+    (`src/lib/inboundEmail.ts`); the Gmail script keeps reading them
+    meanwhile. Each received email counts against Resend's send quota
+    (Free: 100 a day, 3,000 a month), and Resend keeps it 30 days.
 101. **Guess the kind of a new place from Google** (agreed Nov 27, a
     follow-up to 99): adding a place from a screen with no category
     (home, You) asks "What kind of place?". When the place came from
@@ -302,8 +307,44 @@ old number can still be looked up. When an item is done, move it to
     (a restaurant, Food) instead of the list's first; the person still
     confirms, and a category page keeps skipping the question.
 
+103. **Who hears what, the gaps** (found Nov 27 while mapping mail
+    for 100). Today: admins get an email for each person-sent
+    submission and intake request, and the nightly digest; a visitor
+    gets a confirmation, and a decision email when an admin approves or
+    rejects, reply-to the community email. Missing:
+    - a "+ Add" post the AI couldn't file reaches the To do list with no
+      email to the admins;
+    - "Email me when it's on the site" sends nothing when the post is
+      approved automatically, or when an admin marks an unfiled post
+      Done;
+    - the To do screen's reject has no reason field, so the visitor's
+      email can't say why;
+    - a form response's Reply is a plain mailto link from the admin's
+      own address (100's forwarding covers the visitor answering back,
+      not the admin writing first).
+    My recommendation: the first two, small and worth doing; the reason
+    field when rejects are common; leave Reply as it is.
+
 ### You do
 
+102. Turn on the site's email address (100), in order:
+    1. Resend › Domains: add `in.phillyjewishguide.com`, turn on
+       Receiving, and copy the MX record it shows into Namecheap's
+       Advanced DNS (host `in`). The domain has no MX today, so nothing
+       else is affected.
+    2. Resend › Webhooks: add `https://<live site>/api/inbound/email`
+       for `email.received`; put its signing secret in Vercel as
+       `RESEND_WEBHOOK_SECRET`, and `INBOUND_EMAIL_DOMAIN` =
+       `in.phillyjewishguide.com`; redeploy.
+    3. Send one email to `philly@in.phillyjewishguide.com` and tell me;
+       I read the server name from it for `INBOUND_AUTH_SERVERS`.
+    4. Move JCOR's groups.io list and each shul newsletter to the new
+       address, one at a time, unsubscribing the Gmail (a list on both
+       is read twice).
+    5. Settings › Team › Community email: clear it, or set it to the new
+       address, if one was saved.
+    6. Later: retire the Gmail script, after checking nothing else signs
+       in with that Gmail.
 98. Run migration 118 on live (dev done Nov 27), BEFORE this
     branch (`claude/kept-current`) is deployed live:
     [`supabase/migrations/20240101000118_sent_message.sql`](../supabase/migrations/20240101000118_sent_message.sql)

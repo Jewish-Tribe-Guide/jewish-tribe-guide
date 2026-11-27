@@ -13,7 +13,7 @@
 // of its own sends.
 
 /** Gmail's own name for itself in the header. */
-const GMAIL = 'mx.google.com'
+export const GMAIL = 'mx.google.com'
 
 /** The domain of an address, or of a domain. */
 function domainOf(value: string): string {
@@ -27,16 +27,18 @@ function aligned(a: string, b: string): boolean {
 }
 
 /**
- * Whether Gmail found `address`'s domain sent the email, from Gmail's
- * Authentication-Results header. null with no header to go by (a script
- * copied before Nov 20), false when there is one and it doesn't show that,
- * or isn't Gmail's own.
+ * Whether the server that received the email found `address`'s domain sent
+ * it, from that server's Authentication-Results header. null with no header
+ * to go by (a script copied before Nov 20), false when there is one and it
+ * doesn't show that, or isn't from a server we trust: Gmail's, by default,
+ * or the site's own mail service's (inboundEmail.ts) for an email it took
+ * in itself.
  */
-export function sentFrom(authResults: string | null | undefined, address: string): boolean | null {
+export function sentFrom(authResults: string | null | undefined, address: string, trusted: readonly string[] = [GMAIL]): boolean | null {
   const header = (authResults ?? '').replace(/\s+/g, ' ').trim()
   if (!header) return null
   const [server, ...results] = header.replace(/\([^)]*\)/g, ' ').split(';')
-  if (server.trim().toLowerCase() !== GMAIL) return false
+  if (!trusted.includes(server.trim().toLowerCase())) return false
   const want = domainOf(address)
   return results.some((r) => {
     const result = /^\s*(dkim|spf|dmarc)\s*=\s*(\w+)/i.exec(r)

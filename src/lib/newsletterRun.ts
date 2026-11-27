@@ -50,6 +50,10 @@ export type NewsletterEmail = {
   /** Gmail's Authentication-Results header for it: who Gmail found really
    *  sent it (emailAuth.ts). Missing from a script copied before Nov 20. */
   auth?: string | null
+  /** Whose Authentication-Results `auth` is to be believed from: Gmail's
+   *  when unset (the script), the site's own mail service's for an email
+   *  it took in (inboundEmail.ts). */
+  authServers?: readonly string[]
 }
 
 /** What became of it, for the script: `unknown`, `unlinked` and a failure

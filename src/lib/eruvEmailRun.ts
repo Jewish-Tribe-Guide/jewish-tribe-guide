@@ -41,9 +41,9 @@ export async function receiveEruvEmail(community: string, email: NewsletterEmail
   // read either (the user, Nov 21): a status goes live at once, so one
   // nobody can vouch for waits for the next email, and Sentry asks for the
   // script to be copied again.
-  const verified = sentFrom(email.auth, eruv.statusEmail!)
+  const verified = sentFrom(email.auth, eruv.statusEmail!, email.authServers)
   if (verified === false) {
-    reportServerError(`[inbound/eruv] an email for ${eruv.id} Gmail didn’t find was from ${eruv.statusEmail}: not read`, email.auth)
+    reportServerError(`[inbound/eruv] an email for ${eruv.id} wasn’t found to be from ${eruv.statusEmail} by a server we trust: not read`, email.auth)
     return done('unverified')
   }
   if (verified === null) {
