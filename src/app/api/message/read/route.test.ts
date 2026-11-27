@@ -16,6 +16,8 @@ const m = vi.hoisted(() => ({
   findMenu: vi.fn(),
   readMenu: vi.fn(),
   upload: vi.fn(),
+  saveMessageReadTime: vi.fn(),
+  afterCallbacks: [] as (() => unknown)[],
   ui: { contributions: { add: true, edit: true, report: true } },
   communityUi: {} as Record<string, unknown>,
 }))
@@ -57,6 +59,8 @@ vi.mock('@/lib/menuReader', async (importOriginal) => ({
     return first
   },
 }))
+vi.mock('next/server', async (importOriginal) => ({ ...(await importOriginal<typeof import('next/server')>()), after: (fn: () => unknown) => m.afterCallbacks.push(fn) }))
+vi.mock('@/lib/messageReadTime', () => ({ saveMessageReadTime: m.saveMessageReadTime }))
 vi.mock('@/lib/messageReader', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/messageReader')>()), readMessage: m.readMessage }))
 
 const { POST } = await import('./route')
@@ -84,10 +88,11 @@ const req = (fields: Record<string, string | Blob | Blob[]>) => {
   return new Request('http://x/api/message/read?community=philly', { method: 'POST', body })
 }
 const photo = (type = 'image/webp') => new File([new Uint8Array([1, 2, 3])], 'p.webp', { type })
-const reads = (r: MessageReading) => m.readMessage.mockResolvedValue({ ...r, model: 'gpt-6-luna', ms: 1, usage: { input: 0, cachedInput: 0, output: 0 } })
+const reads = (r: MessageReading) => m.readMessage.mockResolvedValue({ ...r, model: 'gpt-6-luna', effort: null, ms: 1, usage: { input: 0, cachedInput: 0, output: 0 } })
 
 beforeEach(() => {
   vi.resetAllMocks()
+  m.afterCallbacks = []
   vi.stubEnv('OPENAI_API_KEY', 'test-key')
   m.ui.contributions.add = m.ui.contributions.edit = true
   m.communityUi = {}
@@ -263,6 +268,28 @@ describe('POST /api/message/read — the reading', () => {
     const body = await (await POST(req({ text: 'Mekor this week: Mincha 6:15' }))).json()
     expect(m.readShulWeek).toHaveBeenCalledWith(expect.objectContaining({ id: MEKOR }), 'minyanim', { text: 'Mekor this week: Mincha 6:15' }, 'test-key', { where: expect.objectContaining({ timezone: 'America/New_York' }) })
     expect(body.proposals[0]).toMatchObject({ kind: 'times', listing: { name: 'Mekor Habracha' }, update: { kind: 'week' } })
+  })
+
+  // Nov 26: how long the visitor waited, kept after the answer has gone,
+  // with the second read it took (the week reader) counted.
+  it('keeps how long the read took, after answering, and nothing of the post', async () => {
+    reads({ proposals: [{ kind: 'times', listingId: MEKOR, quote: 'Mincha 6:15', checked: true }] })
+    m.readShulWeek.mockResolvedValue({ update: { kind: 'week', days: [] }, model: 'm' })
+    await POST(req({ text: 'Mekor this week: Mincha 6:15' }))
+    expect(m.saveMessageReadTime).not.toHaveBeenCalled()
+    expect(m.afterCallbacks).toHaveLength(1)
+    await m.afterCallbacks[0]()
+    expect(m.saveMessageReadTime).toHaveBeenCalledWith({
+      community: 'philly',
+      ms: expect.any(Number),
+      modelMs: 1,
+      model: 'gpt-6-luna',
+      effort: null,
+      photos: 0,
+      proposals: 1,
+      followUps: 1,
+      usage: { input: 0, cachedInput: 0, output: 0 },
+    })
   })
 
   it('keeps the photos for the admin, and reads times from a photo when that’s all there is', async () => {

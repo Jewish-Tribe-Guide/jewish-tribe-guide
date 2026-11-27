@@ -5,6 +5,8 @@ import { useOptionalCommunitySlug } from './communityContext'
 import { useOptionalPinned } from './pinnedContext'
 import { withCommunity } from './useCommunityData'
 import { loadSeenAt, SEEN_EVENT, youHasNews } from './youChanges'
+import { useYourUpdates } from './useYourUpdates'
+import { hasLiveNews } from './yourUpdates'
 
 // The blue dot on You, on the phone's tab and the computer header's link
 // (board PhoneYouDot, the user, Nov 15): a saved place changed since You was
@@ -52,8 +54,19 @@ export function useYouDot(): boolean {
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [community, ids])
+  // Or an update this phone sent went live since You was last opened
+  // (Nov 27, board S4c: the dot, not a pop-up). Opening You puts it out.
+  const updates = useYourUpdates(community)
+  const [seenAt, setSeenAt] = useState<number | null>(null)
+  useEffect(() => {
+    const read = () => setSeenAt(loadSeenAt())
+    read()
+    window.addEventListener(SEEN_EVENT, read)
+    return () => window.removeEventListener(SEEN_EVENT, read)
+  }, [])
+  const live = !!updates && hasLiveNews(updates.statuses, seenAt)
   // Nothing saved any more: no dot, whatever the last answer was.
-  return dot && !!community && !!ids
+  return (dot && !!community && !!ids) || live
 }
 
 /** For tests: forget the shared answer. */

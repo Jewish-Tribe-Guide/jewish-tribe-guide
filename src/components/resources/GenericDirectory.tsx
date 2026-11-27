@@ -22,6 +22,7 @@ import { candlesToday, isVouchedFor } from '@/lib/listingRow'
 import { useZmanim } from '@/lib/useZmanim'
 import MinyanimView from './MinyanimView'
 import { AddButton } from '@/components/AddButton'
+import { useAddHere } from '@/lib/addHere'
 import { useIsMobile, useMeasuredIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { foundFor, searchAsk } from '@/lib/askSearch'
@@ -38,6 +39,7 @@ import UpvoteButton from './UpvoteButton'
 import { useActiveCommunity, useOptionalCommunitySlug, useContributions } from '@/lib/communityContext'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import CategoryAsk from './CategoryAsk'
+import { PlusIcon } from '@/components/icons'
 import MinyanSwitch from './MinyanSwitch'
 import { WalkOnMapContext } from './walkOnMap'
 import RowLookSwitch from './RowLookSwitch'
@@ -233,7 +235,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const caps = resolveCapabilities(category.capabilities)
   const contributions = useContributions()
   const canAdd = contributions.add && caps.add
-  const { tellOpen, setTellOpen, tellMounted, openItem, setOpenItem, editYourself, tellTimes, tellMenu, tellAbout } = useTellUs()
+  const { tellOpen, setTellOpen, tellMounted, openItem, editYourself, tellTimes, tellMenu, tellAbout, findQuery, tellAdd } = useTellUs()
+  // The computer's header "+ Add or update" (board D1b) opens this page's
+  // own Add, which knows the category.
+  useAddHere(canAdd, () => tellAdd())
   // Adding to a shul's times is an edit to the shul ("+ Add a minyan").
   const canEdit = contributions.edit && caps.edit
   const showSearch = ui.search.directory && caps.directorySearch
@@ -857,6 +862,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   else if (searchFoundNothing) learnFrom(search, communitySlug)
                 }}
                 foundNothing={!minyanimView && searchFoundNothing}
+                onAdd={canAdd ? (q) => tellAdd(q) : undefined}
                 save={searchSave}
               />
             </div>
@@ -959,10 +965,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           canAdd={canAdd}
           clearFilters={clearFilters}
           clearAll={clearAll}
-          onAdd={() => {
-            setOpenItem(null)
-            setTellOpen(true)
-          }}
+          onAdd={() => tellAdd(typed ? search.trim() : '')}
         />
       ) : (
         <DirectoryList
@@ -996,6 +999,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           questionCard={questionCard}
         />
       )}
+      {/* The end of search results (Nov 27, board R1): what was typed may
+          be a place that could be here. One more row, dashed, the whole
+          row the tap, no chevron. */}
+      {canAdd && typed && filtered.length > 0 && !minyanimView && <AddTypedRow typed={search.trim()} onAdd={() => tellAdd(search.trim())} />}
       {/* A link an admin set for what this guide doesn't list ("Other
           Mikvahs" → mikvah.org's directory). After the last row, where
           someone who hasn't found it here has just finished looking, and
@@ -1035,8 +1042,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           mobile-only, with desktop instead carrying a toolbar button up in
           DirectoryHeader and a site-wide "Add a listing" picker in
           SiteHeader — both removed in favor of this one control everywhere).
-          Since Oct 5 it opens the "+ Add" box (TellUsSheet), which knows
-          this category: a place found with "Find the place" is added here
+          Since Nov 27 it opens the "+ Add" box on Find the place (board
+          R3b), knowing this category: a place found there is added here
           without asking which kind it is. Home and the other screens have
           the site-wide "+" (SiteAddButton), which asks.
           `bottom-[calc(3.75rem+env(safe-area-inset-bottom)+1rem)]` clears
@@ -1057,10 +1064,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
       {canAdd && (!openDialogItemId || (!isMobile && columnItem)) && (
         <AddButton
-          onClick={() => {
-            setOpenItem(null)
-            setTellOpen(true)
-          }}
+          phoneOnly
+          onClick={() => tellAdd()}
         />
       )}
       {/* Its own boundary: loading it the first time otherwise hid the page
@@ -1072,6 +1077,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             onClose={() => setTellOpen(false)}
             about={openItem ? { id: openItem.id, name: openItem.name } : undefined}
             category={category}
+            findFirst={!openItem && findQuery !== null}
+            query={findQuery ?? undefined}
             placeholder={tellUsPlaceholder({ times: minyanimViewOn || (!!openItem && tellTimes), menu: !!openItem && tellMenu, about: openItem ?? undefined })}
             heading={openItem && tellTimes ? `Update ${openItem.name}’s times` : undefined}
             kind={openItem && tellMenu ? 'menu' : minyanimViewOn || (openItem && tellTimes) ? 'times' : undefined}
@@ -1112,5 +1119,28 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     </TappedMinyanContext.Provider>
     </WalkOnMapContext.Provider>
     </TellAboutContext.Provider>
+  )
+}
+
+/** "Add Bagel Factory · Not in the list? Add it to the guide": the last row
+ *  of a search's results (board R1). */
+export function AddTypedRow({ typed, onAdd }: { typed: string; onAdd: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onAdd}
+      data-testid="add-typed"
+      // Room under it to scroll clear of the floating Add and the
+      // Cards/List switch, which sit over the page's foot.
+      className="mt-3 mb-20 flex w-full cursor-pointer items-center gap-3 rounded-2xl border-2 border-dashed border-slate-300 px-4 py-3 text-left hover:bg-slate-50"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-primary">
+        <PlusIcon className="h-5 w-5" />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-[1rem] font-bold text-ink">Add {typed}</span>
+        <span className="block text-[0.84375rem] text-slate-600">Not in the list? Add it to the guide</span>
+      </span>
+    </button>
   )
 }

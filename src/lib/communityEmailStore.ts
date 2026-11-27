@@ -1,6 +1,7 @@
 import { getAdminClient } from './supabase/admin'
 import { schemaMissing } from './supabase/schemaMissing'
 import { setupTableMissing } from './newsletterSetupStore'
+import { communityInboundAddress } from './inboundEmail'
 
 // The community email (boards E1-E3, Nov 25): the guide's own Gmail. Saved on
 // the community row (migration 116). Before that's saved, or before the
@@ -29,7 +30,7 @@ export async function getCommunityEmail(slug: string): Promise<CommunityEmail> {
   const saved = (own.data as { contact_email: string | null } | null)?.contact_email?.trim()
   const row = script.data as { account: string | null; checked_at: string | null } | null
   const account = row?.account?.trim()
-  return { email: saved || account || null, canSave, checkedAt: row?.checked_at ?? null }
+  return { email: saved || communityInboundAddress(slug) || account || null, canSave, checkedAt: row?.checked_at ?? null }
 }
 
 /** A shape check, the same low bar as the Team tab's. */

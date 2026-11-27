@@ -9,6 +9,7 @@ import { HeaderCollapseProvider, ScreenHeaderProvider, useCollapseHeader, useHea
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import type { LocationControls } from '@/components/home/LocationControl'
+import { OPEN_ADD } from '@/lib/addHere'
 import SiteHeader from './SiteHeader'
 
 // The natural next target after GenericListingCard for the provider harness
@@ -355,3 +356,37 @@ describe('SiteHeader — a tab’s own page', () => {
   })
 })
 
+
+describe('SiteHeader — Add or update (D1b)', () => {
+  it('has an outlined "Add or update" that asks the screen, then the site, to open Add', async () => {
+    const user = userEvent.setup()
+    const opened = vi.fn()
+    document.addEventListener(OPEN_ADD, opened)
+    try {
+      renderWithProviders(
+        <HeaderCollapseProvider>
+          <SiteHeader onGoHome={vi.fn()} location={location()} />
+        </HeaderCollapseProvider>,
+      )
+      const add = screen.getByTestId('header-add')
+      expect(add).toHaveTextContent('Add or update')
+      // A computer's button only: a phone has the floating +.
+      expect(add.className).toMatch(/\bhidden\b/)
+      expect(add.className).toMatch(/desktop:inline-flex/)
+      await user.click(add)
+      expect(opened).toHaveBeenCalledTimes(1)
+    } finally {
+      document.removeEventListener(OPEN_ADD, opened)
+    }
+  })
+
+  it('is not there when the community takes no additions', () => {
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+      { community: { ui: { contributions: { add: false } } } as never },
+    )
+    expect(screen.queryByTestId('header-add')).not.toBeInTheDocument()
+  })
+})

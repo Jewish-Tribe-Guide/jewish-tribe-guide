@@ -226,9 +226,11 @@ test('nothing anywhere: Enter stays on home and says so, with where to ask', asy
 })
 
 // The user, Oct 16: "in Food ×" took about half a phone's search box, so a
-// phone doesn't show it (the page's title says Food right above). Its ✕,
-// the way to the whole guide, is in the card when nothing here matched.
-test('a category’s box: “in Food” only where there’s room, and the whole guide when nothing’s here', async ({ page, request, isMobile }) => {
+// phone doesn't show it (the page's title says Food right above). When
+// nothing here matched, the card offers to add what was searched for
+// (board R2, Nov 27; "Search the whole guide" until then: they can go
+// back and search).
+test('a category’s box: “in Food” only where there’s room, and Add when nothing’s here', async ({ page, request, isMobile }) => {
   const community = await defaultCommunity(page)
   const { category } = await categoryWithListings(request, community)
   await page.goto(`/${community}/${category.id}`)
@@ -247,6 +249,8 @@ test('a category’s box: “in Food” only where there’s room, and the whole
   await box.fill('xqzvplk wobblefrump')
   const card = page.getByTestId('ask-the-group').filter({ visible: true })
   await expect(card).toContainText(`Nothing in ${category.pluralLabel} for “xqzvplk wobblefrump”.`)
-  await card.getByRole('link', { name: 'Search the whole guide' }).click()
-  await page.waitForURL((url) => url.pathname.startsWith(`/${community}/ask/`))
+  await expect(card.getByRole('link', { name: 'Search the whole guide' })).toHaveCount(0)
+  await card.getByRole('button', { name: 'Add xqzvplk wobblefrump' }).click()
+  // Find the place, already searching for it (R3b).
+  await expect(page.getByRole('dialog', { name: 'Add or update' }).getByPlaceholder('Search by name or address…')).toHaveValue('xqzvplk wobblefrump')
 })

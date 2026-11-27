@@ -9,9 +9,10 @@ import Link from 'next/link'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import CommunitySwitcher from '@/components/CommunitySwitcher'
 import HeaderNav from '@/components/HeaderNav'
-import { StarOfDavid } from '@/components/icons'
+import { PlusIcon, StarOfDavid } from '@/components/icons'
+import { requestAdd } from '@/lib/addHere'
 import { useSiteSettings } from '@/lib/useSiteSettings'
-import { useActiveCommunity } from '@/lib/communityContext'
+import { useActiveCommunity, useContributions } from '@/lib/communityContext'
 import { type ScreenHeaderState, useHeaderCollapsed, useHeaderOverlaid, useScreenHeader, useScrollShowHide, useScrolledPastTop } from '@/lib/headerVisibility'
 import { useCategoriesIfAny } from '@/lib/contentContext'
 import { screenHeaderFromPath } from '@/lib/screenHeaderFromPath'
@@ -50,6 +51,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
   const switchable = previewSettings ? null : communities
 
   const collapsed = useHeaderCollapsed()
+  const contributions = useContributions()
   const measured = useMeasuredIsMobile()
   const isMobile = measured ?? false
 
@@ -319,6 +321,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
         {!hideNav && <HeaderNav />}
 
         <div className="ml-auto flex items-center gap-2">
+          {contributions.add && <HeaderAddButton />}
           <LocationControl controls={location} />
         </div>
       </div>
@@ -343,6 +346,35 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
         />
       )}
     </header>
+  )
+}
+
+/** "+ Add or update" on a computer (Nov 27, board D1b): in the header,
+ *  beside Set location and in its outlined style, on every screen with the
+ *  header, the Map included, in place of a floating button. Outlined, not
+ *  filled: finding is the main job, so the search stays the loudest thing
+ *  and filled blue is for Send (sites built on visitors' help keep their
+ *  contribute action quieter, Yelp's Write a Review). The header stays
+ *  pinned on a computer, so it's always in reach. A phone keeps its
+ *  floating + (AddButton), so this is computer-only. It opens the screen's
+ *  own Add if it has one (a category page's knows its category), else the
+ *  site's (src/lib/addHere.ts). Not on the full-screen Map, which paints
+ *  over the header (the user, Nov 27: no Add on the Map). */
+function HeaderAddButton() {
+  return (
+    <button
+      type="button"
+      onClick={requestAdd}
+      data-testid="header-add"
+      // Just the + under 1100px: beside the nav and Set location, the words
+      // pushed a 660px window sideways and wrapped the site's name at 1024.
+      aria-label="Add or update"
+      title="Add or update"
+      className="hidden desktop:inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 min-[1100px]:px-4 py-2 text-sm font-semibold text-primary shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:bg-slate-50 cursor-pointer whitespace-nowrap"
+    >
+      <PlusIcon className="h-4 w-4 shrink-0" />
+      <span className="hidden min-[1100px]:inline">Add or update</span>
+    </button>
   )
 }
 

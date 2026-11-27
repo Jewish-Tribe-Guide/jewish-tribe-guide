@@ -225,10 +225,10 @@ old number can still be looked up. When an item is done, move it to
   rows. The pairs and card grids went (`aboutBlocks` deleted). The text
   now opens with What sets it apart, its points in the user's order (one
   community, every kind of Jew, every fact dated, anyone can fix), the
-  first point's sentence leading with what it is. Seed and dev have the
-  new text; **live's About needs the same edit, with your go-ahead**
-  (until then live keeps the old order in the new layout: The problem
-  open, the rest folded).
+  first point's sentence leading with what it is. Seed, dev and live
+  have the new text (live written Nov 26 with the user's go-ahead, old
+  text backed up first) and showing since its cache was refreshed.
+  Done.
 - **Fixed Nov 26, every community screen logged "URL data outside of
   <Suspense>" in dev** (Next's instant-navigation check, not only About).
   The community layout and every screen read the community from the
@@ -247,13 +247,127 @@ old number can still be looked up. When an item is done, move it to
     taps until it reloads: a gap noted Nov 16, never seen; every way of
     causing it in a browser worked fine (Nov 22). Only if you see it:
     which screen, how long away, installed or in Safari.
+96. **Add, rethought** (Nov 26–27): BUILT Nov 27 as drawn, on
+    `claude/kept-current` (`docs/add-rethink.md`, "Add, rethought"
+    canvas R1, R2, R3b, R4, P6b). Every Add opens one Find the place
+    list; the AI box is a row on it, says it's AI, and a read about one
+    place we have opens its Edit listing. Left: counting it (the plan's
+    step 1), the home page's nothing-found card (not drawn), and the
+    forwarding phone number the user hopes will replace paste and
+    camera. The AI read's speed: 97.
+    Then BUILT Nov 27 (the user's OK, the dot chosen over a pop-up): a
+    post or photo is sent as it is (S1b, S2: Send, then "Sent", no AI
+    tag) and read afterwards at the "high" level into ordinary
+    suggestions (`src/lib/messageFiling.ts`; S3b, today's card). What
+    the read can't file (which of two places, a menu, a question, a
+    failed read) waits on To do as "Posts to sort by hand", the post as
+    sent with what was left, and Done (not drawn). A read that never
+    finished is tried again when To do loads. "Your updates" on You
+    lists what this phone sent (Live / Waiting / Not changed, S4c), and
+    the dot on You lights when one goes live; S4b and S4d (the pop-up)
+    are not built. Needs migration 118 first: 98. The menu and shul
+    times boxes still read while the sender waits.
+99. **Add, renamed and one box** (Nov 27): BUILT on claude/kept-current,
+    not live yet ("Add, rethought" canvas U1c, D1b, V1b, V2b). The
+    header's button opens the screen's own Add when it has one (a
+    category, the eruv), else the site's (`src/lib/addHere.ts`).
+    The search's dotted last row keeps its wording ("Add bagel · Not in
+    the list? Add it to the guide"; the user, Nov 27). On a phone the
+    floating button is a round blue button with a white "+" (U1c); on a
+    computer it's gone, and an outlined "+ Add or update" sits in the header
+    beside Set location, not on the Map (the user, Nov 27) (D1b, chosen over D1c and D1d; brings back Sep 22's header
+    button, drops Oct 26's apricot); the sheet is titled "Add or update", search first, then a
+    whole-text link, "Or tell us in your own words ›" (V1b). That opens
+    "Tell us": one bordered box holding the words ("Type it, or paste it
+    from WhatsApp or an email") and any photos (thumbnails with ✕), with
+    "Add a photo" as a strip along its bottom edge (the phone's own
+    menu); the site's wide Send alone below it, live once there's words
+    or a photo (V2b). Replaces today's box.
+100. **The site's own email address** (BUILT Nov 27 on
+    `claude/kept-current`, not live until 102 is done): one address per
+    community, `<community>@phillyjewishguide.com`, a catch-all at
+    Resend (it receives mail too, so no second service), which posts
+    each email to `/api/inbound/email` within seconds instead of the
+    Gmail script's hourly check. An eruv's email is read for up or
+    down; a watched newsletter is read and filed, as the script's are;
+    anything else from a person is forwarded to the community's admins
+    with Reply-To the sender, so the admin's Reply answers them.
+    Auto-replies and bounces are never forwarded. Once set,
+    `getCommunityEmail` gives this address when Settings has none
+    saved, so it becomes the reply-to on every email the site sends
+    visitors, and the site sends from it too (one address a visitor
+    sees everywhere; sign-in links stay on `RESEND_FROM`). No "in."
+    subdomain: the domain receives no other mail (the user, Nov 27). Eruv emails this way wait (`unverified`) until the first
+    real one shows Resend's server name for `INBOUND_AUTH_SERVERS`
+    (`src/lib/inboundEmail.ts`); the Gmail script keeps reading them
+    meanwhile. Each received email counts against Resend's send quota
+    (Free: 100 a day, 3,000 a month), and Resend keeps it 30 days.
+101. **Guess the kind of a new place from Google** (agreed Nov 27, a
+    follow-up to 99): adding a place from a screen with no category
+    (home, You) asks "What kind of place?". When the place came from
+    Google search, preselect the category its Google type points to
+    (a restaurant, Food) instead of the list's first; the person still
+    confirms, and a category page keeps skipping the question.
+
+103. **Who hears what, the gaps** (found Nov 27 while mapping mail
+    for 100). Today: admins get an email for each person-sent
+    submission and intake request, and the nightly digest; a visitor
+    gets a confirmation, and a decision email when an admin approves or
+    rejects, reply-to the community email. Missing:
+    - a "+ Add" post the AI couldn't file reaches the To do list with no
+      email to the admins;
+    - "Email me when it's on the site" on a post the AI couldn't file
+      is kept with the post, but nothing is ever sent to it: the admin
+      makes the change themselves and marks the post Done, and Done
+      emails no one. (Nothing a visitor sends goes live without an
+      admin, so there is no automatic approval to cover.)
+    - the To do screen's reject has no reason field, so the visitor's
+      email can't say why;
+    - a form response's Reply is a plain mailto link from the admin's
+      own address (100's forwarding covers the visitor answering back,
+      not the admin writing first).
+    My recommendation: the first two, small and worth doing (the first
+    following the Team tab's "Something new to decide" switch); the reason
+    field when rejects are common; leave Reply as it is.
+
+104. **The phone home jumps on a Friday** (found Nov 27, CI on PR 469;
+    shipping first was the user's call). The home is built ahead of time,
+    so Right now's placeholder is a weekday's height (176px). On a
+    Friday the candles card and Shabbos shopping are about 437px, so
+    half a second after the page shows, the category tiles drop about
+    210px (0.148 against the 0.1 target, every run). On the live site
+    since the candles card. Shabbos moves less (0.048), a weekday hardly
+    at all. Fix, my recommendation: on a phone keep Friday's box a
+    weekday's height and move Shabbos shopping under the tiles (a design
+    change, to draw first); else a small script before paint that sizes
+    the placeholder by the day. Its test then joins
+    `e2e/layout-shift.spec.ts`'s days (Tuesday and Shabbos there now),
+    as a plain test: as test.fail it flipped with machine load.
 
 ### You do
 
-94. Run migration 116, dev then live:
-    [`supabase/migrations/20240101000116_community_email.sql`](../supabase/migrations/20240101000116_community_email.sql)
-    (adds `community.contact_email`). Then save Philly's address on
-    Settings › Team › Community email.
+102. Turn on the site's email address (100), in order (1 and 2 done
+    Nov 27, Production only; 116-118 on live too):
+    1. Resend › Domains: open `phillyjewishguide.com` (add it if the
+       site sends from another domain, with the records Resend lists),
+       turn on Receiving, and copy the MX record it shows into
+       Namecheap's Advanced DNS (host `@`). The domain has no MX today,
+       so no mail elsewhere is affected; from then on all mail to
+       `@phillyjewishguide.com` goes to Resend (the user, Nov 27).
+    2. Resend › Webhooks: add `https://<live site>/api/inbound/email`
+       for `email.received`; put its signing secret in Vercel as
+       `RESEND_WEBHOOK_SECRET`, and `INBOUND_EMAIL_DOMAIN` =
+       `phillyjewishguide.com`; redeploy. From then on the site's
+       emails come from `philly@phillyjewishguide.com` too.
+    3. Send one email to `philly@phillyjewishguide.com` and tell me;
+       I read the server name from it for `INBOUND_AUTH_SERVERS`.
+    4. Move JCOR's groups.io list and each shul newsletter to the new
+       address, one at a time, unsubscribing the Gmail (a list on both
+       is read twice).
+    5. Settings › Team › Community email: clear it, or set it to the new
+       address, if one was saved.
+    6. Later: retire the Gmail script, after checking nothing else signs
+       in with that Gmail.
 87. Settings, a few minutes each (the user will do them, Nov 24):
     - Sentry: turn on the quota emails, 80% and 100% (Settings →
       Account → Notifications → Quota);

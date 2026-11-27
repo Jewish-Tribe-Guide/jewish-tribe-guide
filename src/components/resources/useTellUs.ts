@@ -19,12 +19,21 @@ export function useTellUs() {
   const editYourself = useRef<(() => void) | null>(null)
   const [tellTimes, setTellTimes] = useState(false)
   const [tellMenu, setTellMenu] = useState(false)
+  // Add (Nov 27, boards R1-R3b): the box opens on Find the place, already
+  // searching for what was typed; null when it was opened about a listing.
+  const [findQuery, setFindQuery] = useState<string | null>(null)
+  const tellAdd = (query = '') => {
+    setOpenItem(null)
+    setFindQuery(query)
+    setTellOpen(true)
+  }
   const tellAbout = (item: DirectoryResource, edit?: () => void, opts?: { times?: boolean; menu?: boolean }) => {
+    setFindQuery(null)
     editYourself.current = edit ?? null
     setOpenItem(item)
     setTellTimes(!!opts?.times)
     setTellMenu(!!opts?.menu)
     setTellOpen(true)
   }
-  return { tellOpen, setTellOpen, tellMounted, openItem, setOpenItem, editYourself, tellTimes, tellMenu, tellAbout }
+  return { tellOpen, setTellOpen, tellMounted, openItem, setOpenItem, editYourself, tellTimes, tellMenu, tellAbout, findQuery, tellAdd }
 }

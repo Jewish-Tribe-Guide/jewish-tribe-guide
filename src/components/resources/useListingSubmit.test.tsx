@@ -80,6 +80,21 @@ describe('useListingSubmit — what it sends', () => {
     expect(result.current.done).toBe(true)
   })
 
+  // Nov 27, board S4c: what was sent is kept on this phone for "Your
+  // updates" on You, by the id the server answered with; an admin's own
+  // save, already live, isn't.
+  it('keeps what it sent for Your updates on You, but not an admin’s own save', async () => {
+    localStorage.clear()
+    const ID = '00000000-aaaa-4aaa-8aaa-000000000001'
+    stubFetch({ body: { ok: true, id: ID } })
+    await renderSubmit().submit()
+    expect(JSON.parse(localStorage.getItem('jpc:your-updates:test-community')!)).toEqual([{ kind: 'submission', id: ID, name: 'Kosher Mart', what: 'New place', at: expect.any(Number) }])
+    localStorage.clear()
+    stubFetch({ body: { ok: true, id: ID } })
+    await renderSubmit({ adminSubmit: { token: 'admin' } }).submit()
+    expect(localStorage.getItem('jpc:your-updates:test-community')).toBeNull()
+  })
+
   it('sends an edit as an update against the existing listing’s id, with no submittedBy when no email was given', async () => {
     const fetchMock = stubFetch({ body: { ok: true } })
     const { submit } = renderSubmit({ mode: 'edit', existing: makeListing({ id: 'listing-42' }) })

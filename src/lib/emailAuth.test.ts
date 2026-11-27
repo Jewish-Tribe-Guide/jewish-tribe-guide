@@ -36,3 +36,16 @@ describe('sentFrom: did Gmail find the address’s domain sent it', () => {
     expect(sentFrom('  ', 'status@eruv.org')).toBeNull()
   })
 })
+
+// Tracker 100 (Nov 27): an email the site takes in itself is vouched for
+// by its mail service's receiving server, not Gmail's; only a server named
+// is believed, Gmail's by default.
+describe('sentFrom: whose header is believed', () => {
+  const header = 'inbound.example.net; dkim=pass header.d=groups.io'
+  it('believes a server it’s told to, and only that one', () => {
+    expect(sentFrom(header, 'jcor@groups.io', ['inbound.example.net'])).toBe(true)
+    expect(sentFrom(header, 'jcor@groups.io')).toBe(false)
+    expect(sentFrom(header, 'jcor@groups.io', [])).toBe(false)
+    expect(sentFrom('mx.google.com; dkim=pass header.d=groups.io', 'jcor@groups.io', ['inbound.example.net'])).toBe(false)
+  })
+})

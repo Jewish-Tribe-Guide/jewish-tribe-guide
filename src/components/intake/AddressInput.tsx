@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { TextInput } from './FormControls'
 import { placesApiHoursToStructured, type StructuredHours } from '@/lib/hours'
 import { MAPS_API_KEY, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
@@ -76,6 +76,14 @@ type Props = {
    *  typed: the "+ Add" box's Find the place, started from a name the
    *  message reader found ("Paulie Gees"). */
   searchOnMount?: boolean
+  /** With `inlineSuggestions`: rows in the same list as Google's, before
+   *  and after them (Find the place's one list, board R3b: the guide's own
+   *  places first, "Fill it in yourself" last). The list shows whenever
+   *  either has rows, Google's or not. */
+  listBefore?: ReactNode
+  listAfter?: ReactNode
+  /** A suggestion left out of the list: one already shown in `listBefore`. */
+  hideSuggestion?: (placeId: string) => boolean
 }
 
 // Renders our own input and dropdown over Google's Autocomplete DATA API
@@ -88,7 +96,7 @@ type Props = {
 // inline under the field like everywhere else in this app. This is that same
 // underlying API, just rendered with our own markup, so it's a normal inline
 // dropdown on every screen size.
-export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords, onPlaceSelect, includedPrimaryTypes, disableAutocomplete, preferPlaceName, suggestionNote, inlineSuggestions, id, ariaLabel, autoFocus, searchOnMount }: Props) {
+export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords, onPlaceSelect, includedPrimaryTypes, disableAutocomplete, preferPlaceName, suggestionNote, inlineSuggestions, id, ariaLabel, autoFocus, searchOnMount, listBefore, listAfter, hideSuggestion }: Props) {
   const near = useCommunityCenter()
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
   const [open, setOpen] = useState(false)
@@ -250,7 +258,10 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
 
   return (
     <div ref={containerRef} className="relative w-full">
-      <TextInput
+      {/* The input and its ✕ together: an inline list below would otherwise
+          put the ✕ halfway down the list. */}
+      <div className="relative">
+        <TextInput
         id={id}
         aria-label={ariaLabel}
         autoFocus={autoFocus}
@@ -280,34 +291,48 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
         </button>
       )}
 
-      {open && suggestions.length > 0 && (
-        <div
-          className={`mt-1 overflow-hidden rounded-md border border-slate-200 bg-white ${inlineSuggestions ? '' : 'absolute inset-x-0 top-full z-10 shadow-lg'}`}
-        >
-          {suggestions.map((s, i) => (
-            <button
-              key={s.prediction.placeId}
-              type="button"
-              // Prevents the input's blur (which would close this dropdown
-              // before the click lands) from firing at all.
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => selectSuggestion(s)}
-              className={`block w-full px-3 py-2 text-left text-sm ${
-                i === highlighted ? 'bg-slate-100' : 'hover:bg-slate-50'
-              }`}
-            >
-              <span className="block text-slate-900">{s.mainText}</span>
-              {s.secondaryText && <span className="block text-xs text-slate-400">{s.secondaryText}</span>}
-              {(() => {
-                const note = suggestionNote?.(s.prediction.placeId)
-                return note ? (
-                  <span className="mt-1 inline-block rounded-full bg-green-50 px-2 py-0.5 text-[0.6875rem] font-semibold text-green-700">{note}</span>
-                ) : null
-              })()}
-            </button>
-          ))}
-        </div>
-      )}
+      </div>
+
+      {(() => {
+        const shown = open ? suggestions.filter((x) => !hideSuggestion?.(x.prediction.placeId)) : []
+        const extra = inlineSuggestions && (listBefore || listAfter)
+        if (shown.length === 0 && !extra) return null
+        return (
+          <div
+            className={`mt-1 overflow-hidden rounded-md border border-slate-200 bg-white ${inlineSuggestions ? 'divide-y divide-slate-100' : 'absolute inset-x-0 top-full z-10 shadow-lg'}`}
+          >
+            {extra && listBefore}
+            {shown.map((s) => {
+              const note = suggestionNote?.(s.prediction.placeId)
+              return (
+                <button
+                  key={s.prediction.placeId}
+                  type="button"
+                  // Prevents the input's blur (which would close this dropdown
+                  // before the click lands) from firing at all.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => selectSuggestion(s)}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${
+                    suggestions.indexOf(s) === highlighted ? 'bg-slate-100' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-slate-900">{s.mainText}</span>
+                    {s.secondaryText && <span className="block text-xs text-slate-400">{s.secondaryText}</span>}
+                  </span>
+                  {note && <SuggestionTag>{note}</SuggestionTag>}
+                </button>
+              )
+            })}
+            {extra && listAfter}
+          </div>
+        )
+      })()}
     </div>
   )
+}
+
+/** A suggestion's tag, on its right: "In the guide". */
+export function SuggestionTag({ children }: { children: ReactNode }) {
+  return <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-[0.6875rem] font-semibold text-green-700">{children}</span>
 }

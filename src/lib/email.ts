@@ -14,6 +14,7 @@ import {
 import { MENU_LINK_PROPOSED, SHOWN_WHEN_PROPOSED } from './syncFields'
 import { MENU_LINK_LABEL } from './menuLink'
 import { getCommunityNotifyRecipients, getReviewActionRecipients, resolveCommunity } from './communityStore'
+import { communityInboundAddress } from './inboundEmail'
 import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
@@ -152,7 +153,8 @@ function formatDetailValue(v: unknown, field?: CategoryField): string {
   return v != null ? String(v) : ''
 }
 
-// Low-level send. Reads RESEND_FROM from env (falls back to the sandbox sender).
+// Low-level send. From the community's own address once the site receives
+// mail, else RESEND_FROM (falls back to the sandbox sender).
 // Callers sending to the public must ensure a verified domain is set in
 // RESEND_FROM — the sandbox can only deliver to the account owner's address.
 //
@@ -183,14 +185,20 @@ export function namedSender(address: string, name: string | null | undefined): s
   return `"${clean}" <${address}>`
 }
 
-/** The community's own name ("Philly Jewish Guide"), or the default
- *  community's when an email isn't about one (the sign-in links). Never
- *  fails a send: with no name, the bare address. */
-async function senderName(community: string | null | undefined): Promise<string | null> {
+/** Who an email is from: the community's own name, and its own address
+ *  once the site receives mail (`philly@<INBOUND_EMAIL_DOMAIN>`, tracker
+ *  100), so a visitor sees one address everywhere and Reply comes back to
+ *  it (the user, Nov 27). An email about no community (the sign-in links),
+ *  or any before receiving is set up, is from RESEND_FROM under the default
+ *  community's name. Never fails a send: with no name, the bare address. */
+async function sender(community: string | null | undefined): Promise<string> {
+  const fallback = process.env.RESEND_FROM || 'onboarding@resend.dev'
   try {
-    return (await resolveCommunity(community)).name
+    const found = await resolveCommunity(community)
+    const own = community ? communityInboundAddress(found.slug) : null
+    return namedSender(own ?? fallback, found.name)
   } catch {
-    return null
+    return fallback
   }
 }
 
@@ -201,6 +209,7 @@ export async function sendEmail({
   replyTo,
   bcc,
   community,
+  idempotencyKey,
 }: {
   to: string | string[]
   subject: string
@@ -209,19 +218,23 @@ export async function sendEmail({
   bcc?: string[]
   /** The community the email is about (its slug): its name is the sender's. */
   community?: string | null
+  /** Sent once per key (Resend keeps it a day): a retried request sends
+   *  nothing new. */
+  idempotencyKey?: string
 }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) throw new Error('Missing required environment variable: RESEND_API_KEY')
-  const from = namedSender(process.env.RESEND_FROM || 'onboarding@resend.dev', await senderName(community))
+  const from = await sender(community)
   const resend = new Resend(apiKey)
-  const { error } = await resend.emails.send({
+  const payload = {
     from,
     to,
     subject: taggedSubject(subject),
     html,
     ...(replyTo ? { replyTo } : {}),
     ...(bcc && bcc.length > 0 ? { bcc } : {}),
-  })
+  }
+  const { error } = idempotencyKey ? await resend.emails.send(payload, { idempotencyKey }) : await resend.emails.send(payload)
   if (error) throw new Error(`Resend email failed: ${JSON.stringify(error)}`)
 }
 
@@ -366,6 +379,35 @@ export async function sendNotification(
     ...(payload.requestType === 'Feedback' && payload.contact.email?.trim()
       ? { replyTo: payload.contact.email.trim() }
       : {}),
+  })
+}
+
+// ── Mail to the community's own address, passed on (tracker 100) ────────────
+
+/** An email to the community's address that no watch reads (a visitor
+ *  answering "Just reply to this email", a shul's office writing in),
+ *  passed to the community's admins. Reply-To is the sender, so an admin's
+ *  Reply answers them. Sent once per received email (`emailId`), so a
+ *  webhook Resend retries forwards nothing twice. */
+export async function sendForwardedEmail(
+  communitySlug: string,
+  email: { emailId: string; from: string; to: string; subject: string; date: string; text: string; attachments: string[] },
+): Promise<void> {
+  const replyTo = email.from.match(/<([^<>\s]+@[^<>\s]+)>/)?.[1] ?? email.from.trim()
+  const attached = email.attachments.length
+    ? `<p style="color:#64748b;font-size:13px">Attached (kept in the mail service for 30 days, not passed on): ${email.attachments.map(escapeHtml).join(', ')}</p>`
+    : ''
+  await sendEmail({
+    to: await notificationRecipients(communitySlug),
+    community: communitySlug,
+    replyTo,
+    idempotencyKey: `forward/${email.emailId}`,
+    subject: `Fwd: ${email.subject || '(no subject)'}`,
+    html: `<div style="font-family:sans-serif;max-width:600px;color:#0f172a">
+    <p style="color:#64748b;font-size:13px;margin:0 0 12px">To ${escapeHtml(email.to)}, from ${escapeHtml(email.from)}, ${escapeHtml(email.date)}. Reply to answer them.</p>
+    <div style="white-space:pre-wrap;font-size:15px;line-height:1.5">${escapeHtml(email.text) || '<em>(no words)</em>'}</div>
+    ${attached}
+  </div>`,
   })
 }
 

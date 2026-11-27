@@ -695,6 +695,8 @@ export const COMMUNITY_SCOPED_TABLES = [
   'look_again',
   'night_note',
   'job_run',
+  'message_read_time',
+  'sent_message',
 ] as const
 
 /** A table whose migration hasn't been run on this project yet has nothing

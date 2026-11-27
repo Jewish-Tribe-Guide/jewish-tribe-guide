@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
-import { PREVIEW_READ_ERROR } from '@/lib/previewSend'
+import { PREVIEW_SEND_ERROR } from '@/lib/previewSend'
 import { makeListing } from '@/test/providerFixtures'
 import { FOOD } from '@/test/editorFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -25,7 +25,7 @@ vi.mock('next/navigation', () => ({
 // one (a send that did sat on "Sending…" for good).
 vi.hoisted(() => vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'test-site-key'))
 vi.mock('@/components/TurnstileWidget', () => ({ default: () => null }))
-vi.mock('@/lib/useIsMobile', () => ({ useIsMobile: () => true }))
+vi.mock('@/lib/useIsMobile', () => ({ useIsMobile: () => true, useMeasuredIsMobile: () => true }))
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 
 // The frame is an iframe portal and the header/footer are the site's own;
@@ -159,19 +159,20 @@ describe('CategoryPreview', () => {
     renderWithProviders(<CategoryPreview category={FOOD} onClose={() => {}} />)
 
     await u.click(await screen.findByRole('button', { name: 'Add' }))
-    // The box as a visitor sees it, but its reader isn't asked (an AI
-    // read is paid for): it says it's the preview, and keeps what was written.
+    // The box as a visitor sees it, but nothing is sent (it would be kept
+    // and read, which is paid for): it says it's the preview, and keeps
+    // what was written.
     await u.type(screen.getByLabelText('Your message'), 'Sweet Box has a new phone number')
-    await u.click(screen.getByRole('button', { name: 'See what changes' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(PREVIEW_READ_ERROR)
+    await u.click(screen.getByRole('button', { name: 'Send' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(PREVIEW_SEND_ERROR)
     expect(screen.getByLabelText('Your message')).toHaveValue('Sweet Box has a new phone number')
 
     // The other path: the by-hand editor, a new place.
     await u.click(screen.getByRole('button', { name: 'Find the place' }))
-    await u.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
-    await u.click(screen.getByTestId('editor-row-name'))
-    await u.type(screen.getByRole('textbox', { name: 'Name' }), 'Kosher Corner')
-    await u.click(screen.getByRole('button', { name: 'Done' }))
+    await u.type(screen.getByPlaceholderText('Search by name or address…'), 'Kosher Corner')
+    await u.click(screen.getByRole('button', { name: /not on Google/ }))
+    // Starts with the name typed.
+    expect(screen.getByTestId('editor-row-name')).toHaveTextContent('Kosher Corner')
     await u.click(screen.getByTestId('editor-row-contact'))
     await u.type(screen.getByLabelText('Address'), '1500 Walnut St')
     await u.click(screen.getByRole('button', { name: 'Done' }))

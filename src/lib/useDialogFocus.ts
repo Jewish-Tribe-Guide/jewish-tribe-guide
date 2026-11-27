@@ -72,7 +72,11 @@ export function useDialogFocus<T extends HTMLElement = HTMLDivElement>(active = 
     // runs in 5). So one in another document, or under inert, takes none.
     if (dialog.ownerDocument !== document || dialog.closest('[inert]')) return
     const at = document.activeElement
-    const before = [...(at instanceof HTMLElement ? [at] : []), ...[...recent].reverse()].find((el) => el !== document.body && !dialog.contains(el)) ?? null
+    // Never one that's left the page: a dialog drawn again in its own place
+    // (a phone's sheet replacing the computer's dialog) would otherwise
+    // take the first copy's field as what had the focus, and give it back
+    // to nothing.
+    const before = [...(at instanceof HTMLElement ? [at] : []), ...[...recent].reverse()].find((el) => el !== document.body && el.isConnected && !dialog.contains(el)) ?? null
     open.push(dialog)
     if (!dialog.contains(document.activeElement)) {
       if (!dialog.hasAttribute('tabindex')) dialog.setAttribute('tabindex', '-1')

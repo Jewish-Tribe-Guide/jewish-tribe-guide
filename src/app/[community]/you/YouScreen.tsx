@@ -32,6 +32,8 @@ import PhotoHeader from '@/components/PhotoHeader'
 import { useSetTabHeader } from '@/lib/headerVisibility'
 import { useTabLabel } from '@/lib/useTabLabel'
 import SearchAnnouncer from '@/components/SearchAnnouncer'
+import { useYourUpdates } from '@/lib/useYourUpdates'
+import type { UpdateStatus, YourUpdate } from '@/lib/yourUpdates'
 
 // ── You (Oct 14, canvas page "you") ──────────────────────────────────────────
 // Saved places and saved searches, each with one live fact: a place's is its
@@ -94,7 +96,11 @@ export default function YouScreen() {
     return { sub: s.kind === 'category' ? where('none right now') : '', href: s.href }
   }
 
-  const empty = places !== null && places.length === 0 && searches.length === 0
+  // What this phone sent, and where each stands (board S4c): shown once
+  // something has been sent.
+  const yours = useYourUpdates(community.slug)
+  const updates = yours?.updates ?? []
+  const empty = places !== null && places.length === 0 && searches.length === 0 && updates.length === 0
 
   // The search: the home's lines for what's typed (useHomeSearch). Enter
   // goes where the first line does.
@@ -210,6 +216,13 @@ export default function YouScreen() {
                     <Section title="Searches" testId="you-searches" className={places.length > 0 ? 'mt-6 desktop:mt-9' : ''}>
                       {searches.map((s) => (
                         <SearchRow key={s.key} search={s} {...searchRow(s)} onRemove={() => saved.toggle(s)} />
+                      ))}
+                    </Section>
+                  )}
+                  {updates.length > 0 && (
+                    <Section title="Your updates" testId="you-updates" className={places.length > 0 || searches.length > 0 ? 'mt-6 desktop:mt-9' : ''}>
+                      {updates.map((u) => (
+                        <UpdateRow key={u.id} update={u} status={yours?.statuses[u.id] ?? null} since={since ?? null} timezone={timezone} />
                       ))}
                     </Section>
                   )}
@@ -359,6 +372,51 @@ function SearchRow({ search, sub, href, onRemove }: { search: SavedSearch; sub: 
         </Link>
         <RowBookmark name={name} onRemove={onRemove} />
       </SwipeRow>
+    </div>
+  )
+}
+
+const UPDATE_WORDS: Record<UpdateStatus['state'], { text: string; className: string }> = {
+  live: { text: 'Live', className: 'text-emerald-700' },
+  waiting: { text: 'Waiting', className: 'text-amber-700' },
+  not_changed: { text: 'Not changed', className: 'text-slate-500' },
+}
+
+/** One update this phone sent (board S4c): its place, what it was and
+ *  when, and where it stands. Live opens the listing; "Not changed" is as
+ *  far as a rejection goes. A blue dot when it went live since You was
+ *  last opened here. */
+function UpdateRow({ update, status, since, timezone }: { update: YourUpdate; status: UpdateStatus | null; since: number | null; timezone: string }) {
+  const words = status ? UPDATE_WORDS[status.state] : null
+  const isNew = status?.state === 'live' && Date.parse(status.at) > (since ?? 0)
+  const day = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: timezone }).format(update.at)
+  const inner = (
+    <>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="truncate text-[0.96875rem] font-bold text-ink">{update.name}</span>
+          {isNew && <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-primary" data-testid="you-update-dot" />}
+        </span>
+        <span className="mt-0.5 block truncate text-[0.84375rem] text-slate-600">
+          {update.what} · {day}
+        </span>
+      </span>
+      {words && (
+        <span className={`shrink-0 text-[0.84375rem] font-bold ${words.className}`} data-testid="you-update-state">
+          {words.text}
+        </span>
+      )}
+    </>
+  )
+  return (
+    <div className={ROW} data-testid="you-update">
+      {status?.state === 'live' && status.href ? (
+        <Link href={status.href} prefetch={false} className={`${ROW_LINK} desktop:group-hover:bg-slate-50`}>
+          {inner}
+        </Link>
+      ) : (
+        <div className={ROW_LINK}>{inner}</div>
+      )}
     </div>
   )
 }

@@ -604,19 +604,32 @@ export function messageSource(text: string, photoUrls: string[]): SubmissionSour
 
 // ── The call ────────────────────────────────────────────────────────────────
 
-export type MessageReadResult = MessageReading & { model: string; ms: number; usage: { input: number; cachedInput: number; output: number } }
+export type MessageReadResult = MessageReading & { model: string; effort: string | null; ms: number; usage: { input: number; cachedInput: number; output: number } }
+
+/** How much the model thinks before answering: "low" (the user, Nov 26).
+ *  On 42 posts people sent (scripts/compare-reader/messages.run.ts) it
+ *  read the same as the model's own default as often as the default
+ *  matched itself, and the slowest tenth went from about 8.1s to 4.8s
+ *  (median 2.6s to 2.3s). "none" was quicker still (2.8s) but missed
+ *  menu links and a hechsher. null sends nothing: the model's default. */
+export const DEFAULT_MESSAGE_EFFORT: string | null = 'low'
 
 export async function readMessage(
   source: MessageSource,
   catalog: Catalog,
-  opts: { apiKey: string; communityName: string; about?: string; model?: string; fetchImpl?: typeof fetch },
+  opts: { apiKey: string; communityName: string; about?: string; model?: string; effort?: string | null; fetchImpl?: typeof fetch },
 ): Promise<MessageReadResult> {
-  const { apiKey, model = DEFAULT_READER_MODEL, fetchImpl = fetch } = opts
+  const { apiKey, model = DEFAULT_READER_MODEL, effort = DEFAULT_MESSAGE_EFFORT, fetchImpl = fetch } = opts
   const started = Date.now()
   const res = await fetchImpl('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, messages: messageMessages(source, catalog, opts), response_format: { type: 'json_object' } }),
+    body: JSON.stringify({
+      model,
+      messages: messageMessages(source, catalog, opts),
+      response_format: { type: 'json_object' },
+      ...(effort ? { reasoning_effort: effort } : {}),
+    }),
     signal: AbortSignal.timeout(50_000),
   })
   const body = (await res.json().catch(() => ({}))) as {
@@ -634,6 +647,7 @@ export async function readMessage(
   return {
     ...tidyMessageReading(raw, catalog, source),
     model,
+    effort,
     ms: Date.now() - started,
     usage: {
       input: body.usage?.prompt_tokens ?? 0,

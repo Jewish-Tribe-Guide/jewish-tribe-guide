@@ -173,4 +173,38 @@ describe('a dialog takes the focus, keeps it, and gives it back', () => {
     act(() => getByText('Close inner').click())
     expect(active()).toBe(openInner)
   })
+
+  // Nov 27: TellUsSheet drew the computer's dialog on a phone's first
+  // frame, then its sheet in the same place. The second copy's field took
+  // the focus before the first copy let go of it, and the second took the
+  // first copy's field, gone from the page, as what to give it back to.
+  it('gives it back to what opened it when the dialog is drawn again in its own place', () => {
+    function Redrawn() {
+      const [open, setOpen] = useState(false)
+      const [copy, setCopy] = useState(0)
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open
+          </button>
+          {open && (
+            <Dialog key={copy} label={`Copy ${copy}`} autoFocusField>
+              <button type="button" onClick={() => setCopy(1)}>
+                Redraw
+              </button>
+              <button type="button" onClick={() => setOpen(false)}>
+                Close
+              </button>
+            </Dialog>
+          )}
+        </>
+      )
+    }
+    const { getByText, getByLabelText } = render(<Redrawn />)
+    const opener = open(getByText)
+    act(() => getByText('Redraw').click())
+    expect(active()).toBe(getByLabelText('Copy 1 field'))
+    act(() => getByText('Close').click())
+    expect(active()).toBe(opener)
+  })
 })

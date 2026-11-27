@@ -333,19 +333,29 @@ export function categoryAddButton(page: Page): Locator {
   // written off as the standing local baseline (AGENTS.md), measured at
   // that same commit.
   // "Add" since Oct 5: it opens the box ("Add or update a place" since
-  // Oct 10), with today's add form a few taps inside it (openAddForm).
-  return page.getByRole('main').getByRole('button', { name: 'Add', exact: true })
+  // Oct 10; "Find the place" since Nov 27), with the add form one tap
+  // inside it (openAddForm). "Add or update" since Nov 27 (U1c, D1b): a
+  // round + on a phone, an outlined button in the site header on a
+  // computer, which opens this page's own Add.
+  return addButton(page)
 }
 
-/** The add form: "+", then in the box it opens "Find the place" (which
- *  opens "Find the place"), and "Not
- *  on Google? Fill it in yourself" (the Google search itself needs a real
- *  Maps key and bills per search). Lands on the category's form of
+/** Add or update: the floating + on a phone, the header's button on a
+ *  computer. Both are in the page on either; only one is visible. */
+export function addButton(page: Page) {
+  return page.getByRole('button', { name: 'Add or update', exact: true }).filter({ visible: true })
+}
+
+/** The add form: "+", which opens "Add or update", a name typed, and
+ *  "Fill in ‘…’ yourself · not on Google" (the Google search itself needs a real Maps
+ *  key and bills per search). Lands on the category's form of
  *  questions, in the box. */
 export async function openAddForm(page: Page): Promise<void> {
   await categoryAddButton(page).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Find the place' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Not on Google? Fill it in yourself' }).click()
+  const find = page.getByRole('dialog', { name: 'Add or update' })
+  // Offered once something is typed (Nov 27).
+  await find.getByPlaceholder('Search by name or address…').fill('Kosher Corner')
+  await find.getByRole('button', { name: /^Fill in “Kosher Corner” yourself/ }).click()
 }
 
 /** Waits for the page to be settled enough to assert on.

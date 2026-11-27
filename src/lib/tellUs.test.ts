@@ -6,8 +6,8 @@ import { tellUsPlaceholder } from './tellUs'
 // (Oct 16): it tries to read it, and the person checks what it read.
 describe('tellUsPlaceholder', () => {
   it('says what to do, by what it was opened for, then that it will try to read it', () => {
-    expect(tellUsPlaceholder()).toBe('Write what you saw at a place, new or already here, or paste a post from the group. We’ll try to read what changes, for you to check.')
-    expect(tellUsPlaceholder({ about: { name: 'Spruce Market' } })).toBe('Write what changed at Spruce Market, or paste a message about it. We’ll try to read what changes, for you to check.')
+    expect(tellUsPlaceholder()).toBe('Type it, or paste it from WhatsApp or an email')
+    expect(tellUsPlaceholder({ about: { name: 'Spruce Market' } })).toBe('Write what changed at Spruce Market, or paste a message about it.')
     expect(tellUsPlaceholder({ times: true, about: { name: 'Mekor Habracha' } })).toBe('Paste Mekor Habracha’s email or newsletter for this week, or add a photo of it. We’ll try to read the times off it, for you to check.')
     expect(tellUsPlaceholder({ times: true })).toBe('Paste a shul’s email or newsletter for this week, or add a photo of it. We’ll try to read the times off it, for you to check.')
     expect(tellUsPlaceholder({ menu: true, about: { name: 'Shtetl' } })).toBe('Paste their menu or a link to it, or add photos of it. We’ll try to read the main dishes off it, for you to check.')

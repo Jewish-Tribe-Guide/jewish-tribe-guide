@@ -285,9 +285,9 @@ function ListView({ rows }: { rows: { item: DirectoryResource; where: string | n
       </ul>
       <span
         aria-hidden="true"
-        className={`absolute right-4 bottom-[72px] flex h-12 items-center rounded-full border border-add-edge bg-add pl-3.5 pr-[1.125rem] text-[0.9375rem] font-semibold text-ink ${FADED}`}
+        className={`absolute right-4 bottom-[72px] flex h-14 w-14 items-center justify-center rounded-full bg-primary text-[1.75rem] leading-none font-light text-white ${FADED}`}
       >
-        + Add
+        +
       </span>
       <div aria-hidden="true" className="absolute inset-x-0 bottom-0 flex h-14 items-center justify-around border-t border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500">
         <span className={`text-primary ${FADED}`}>Home</span>

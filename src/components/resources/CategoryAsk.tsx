@@ -19,8 +19,8 @@ import type { ReactNode } from 'react'
 // box, cutting off the placeholder and leaving room for a few letters once
 // the save and clear buttons joined it. The page's title right above says
 // which category it is, and the placeholder mostly does too. Its ✕, the
-// way to the whole guide's search, is offered where it's needed instead:
-// when nothing here matched (AskTheGroup's "Search the whole guide").
+// way to the whole guide's search, is the only one since Nov 27 (board R2
+// took AskTheGroup's "Search the whole guide" out, for Add).
 //
 // Nothing answers under it any more (Oct 13, "search takes you to the
 // page"): the list is the answer, and what the words meant is ticked in the
@@ -51,6 +51,8 @@ type Props = {
   /** On a computer it sits on the category page's photo (board H4): a
    *  white pill with a shadow, no blue edge. A phone keeps the edged box. */
   onPhoto?: boolean
+  /** Add what was searched for, when nothing here matched (board R2). */
+  onAdd?: (query: string) => void
 }
 
 /** The search box's words on a category page (also How it looks' phone,
@@ -64,7 +66,7 @@ export function askPlaceholder(category: CategoryConfig): string {
       : `Ask anything about ${plural}`
 }
 
-export default function CategoryAsk({ category, search, onSearch, scope, onSubmit, foundNothing = false, save, onPhoto = false }: Props) {
+export default function CategoryAsk({ category, search, onSearch, scope, onSubmit, foundNothing = false, save, onPhoto = false, onAdd }: Props) {
   const communitySlug = useOptionalCommunitySlug()
   const categories = useCategories() ?? [category]
   const q = search.trim()
@@ -74,7 +76,7 @@ export default function CategoryAsk({ category, search, onSearch, scope, onSubmi
   const sharedQ = q ? categoryQuestion(q, category, categories) : ''
   const askGroup =
     foundNothing && q && communitySlug
-      ? { nothingClose: true, sharePath: routes.ask(communitySlug, sharedQ), scope: { label: category.pluralLabel, searchAll: routes.ask(communitySlug, q) } }
+      ? { nothingClose: true, sharePath: routes.ask(communitySlug, sharedQ), scope: { label: category.pluralLabel }, onAdd: onAdd ? () => onAdd(q) : undefined }
       : null
   const scopeLabel = onMinyanim ? 'Minyanim' : category.pluralLabel
   const placeholder = onMinyanim ? 'Ask: mincha tonight' : askPlaceholder(category)

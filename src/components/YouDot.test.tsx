@@ -12,6 +12,7 @@ vi.mock('next/navigation', () => ({
 import { renderWithProviders } from '@/test/renderWithProviders'
 import MobileTabBar from './MobileTabBar'
 import { resetYouDotForTests } from '@/lib/useYouDot'
+import { resetYourUpdatesForTests } from '@/lib/useYourUpdates'
 import { storeSeenAt } from '@/lib/youChanges'
 
 // The blue dot on You (board PhoneYouDot, the user, Nov 15): a saved place
@@ -32,6 +33,7 @@ function serve(latest: Record<string, string>) {
 beforeEach(() => {
   localStorage.clear()
   resetYouDotForTests()
+  resetYourUpdatesForTests()
 })
 afterEach(() => {
   cleanup()
@@ -83,5 +85,33 @@ describe('the dot on You', () => {
     renderWithProviders(<MobileTabBar mode="home" tabs={tabs} onSelect={vi.fn()} />)
     await act(async () => {})
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+// Nov 27, board S4c: an update this phone sent going live lights it too,
+// in place of a pop-up (the user chose the dot).
+describe('the dot on You, for an update sent from this phone', () => {
+  const ID = '00000000-aaaa-4aaa-8aaa-000000000001'
+  const sent = () => localStorage.setItem('jpc:your-updates:test-community', JSON.stringify([{ kind: 'submission', id: ID, name: 'ACME', what: 'Changes', at: Date.parse('2026-11-26T00:00:00Z') }]))
+  const answer = (status: object) => vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, statuses: { [ID]: status } }))))
+
+  it('shows when it went live after You was last opened, and goes out when You is', async () => {
+    sent()
+    localStorage.setItem('jpc:you-seen-at', String(Date.parse('2026-11-26T12:00:00Z')))
+    answer({ state: 'live', href: null, at: '2026-11-27T12:00:00Z' })
+    renderWithProviders(<MobileTabBar mode="home" tabs={tabs} onSelect={vi.fn()} />)
+    await waitFor(() => expect(you().querySelector('[data-testid="you-dot"]')).not.toBeNull())
+    act(() => storeSeenAt(Date.parse('2026-11-27T13:00:00Z')))
+    await waitFor(() => expect(you().querySelector('[data-testid="you-dot"]')).toBeNull())
+  })
+
+  it('none while it waits', async () => {
+    sent()
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, statuses: { [ID]: { state: 'waiting' } } })))
+    vi.stubGlobal('fetch', fetchMock)
+    renderWithProviders(<MobileTabBar mode="home" tabs={tabs} onSelect={vi.fn()} />)
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    await act(async () => {})
+    expect(you().querySelector('[data-testid="you-dot"]')).toBeNull()
   })
 })

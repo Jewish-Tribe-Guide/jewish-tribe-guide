@@ -15,6 +15,7 @@ import { ForcedViewport } from '@/lib/useIsMobile'
 import { ScreenHeaderProvider, useScreenHeader } from '@/lib/headerVisibility'
 import { useNextMinyan as useNextMinyanInColumn } from './nextMinyans'
 import GenericDirectory from './GenericDirectory'
+import { OPEN_ADD, requestAdd } from '@/lib/addHere'
 import { styleValue } from '@/test/styleValue'
 
 vi.mock('next/navigation', () => ({
@@ -335,15 +336,34 @@ describe('GenericDirectory', () => {
     // Oct 16: only this category was searched, so the card says so, and
     // offers the rest of the guide. That was the ✕ on "in Grocery Stores",
     // which a phone no longer shows.
-    it('found nothing: says where it looked, offers the whole guide, and asks the group', async () => {
+    // Nov 27 (board R2): no "Search the whole guide"; Add what was
+    // searched for, opening Find the place already searching for it.
+    it('found nothing: says where it looked, asks the group, and adds what was searched for', async () => {
       const user = userEvent.setup()
       renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
       await user.type(screen.getByRole('searchbox'), 'rugelach')
       const card = within(screen.getByTestId('ask-the-group'))
       expect(card.getByText('Nothing in Grocery Stores for “rugelach”.')).toBeInTheDocument()
-      expect(card.getByRole('link', { name: 'Search the whole guide' })).toHaveAttribute('href', expect.stringMatching(/\/ask\/rugelach$/))
+      expect(card.queryByRole('link', { name: 'Search the whole guide' })).not.toBeInTheDocument()
       expect(card.getByRole('button', { name: 'Ask in a WhatsApp group' })).toBeInTheDocument()
-      expect(card.queryByRole('button', { name: /Know where to find it/ })).not.toBeInTheDocument()
+      expect(screen.queryByTestId('add-typed')).not.toBeInTheDocument()
+      await user.click(card.getByRole('button', { name: 'Add rugelach' }))
+      expect(await screen.findByRole('dialog', { name: 'Add or update' })).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Search by name or address…')).toHaveValue('rugelach')
+    })
+
+    // Nov 27 (board R1): a search that finds others ends with adding what
+    // was typed, the whole row the tap.
+    it('ends a search’s results with a row adding what was typed', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<GenericDirectory category={grocery} items={stores} {...handlers} />)
+      expect(screen.queryByTestId('add-typed')).not.toBeInTheDocument()
+      await user.type(screen.getByRole('searchbox'), stores[0].name.split(' ')[0])
+      const row = await screen.findByTestId('add-typed')
+      expect(row).toHaveTextContent(`Add ${stores[0].name.split(' ')[0]}Not in the list? Add it to the guide`)
+      await user.click(row)
+      expect(await screen.findByRole('dialog', { name: 'Add or update' })).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Search by name or address…')).toHaveValue(stores[0].name.split(' ')[0])
     })
 
     it('shows an answer only after a search: nothing sits under the box unasked', () => {
@@ -373,7 +393,7 @@ describe('GenericDirectory', () => {
     renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} onAdd={onAdd} />)
 
     await user.click(screen.getByRole('button', { name: /Add grocery store/ }))
-    expect(await screen.findByRole('dialog', { name: 'Add or update a place' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Add or update' })).toBeInTheDocument()
     expect(onAdd).not.toHaveBeenCalled()
   })
 
@@ -383,9 +403,9 @@ describe('GenericDirectory', () => {
   // to gate it to mobile only; asserting it out of the className is the
   // regression check for that, now that desktop shares this same button
   // instead of DirectoryHeader's old toolbar "Add".
-  // Since Oct 5 the "+" opens "Saw something? Tell us"; filling it in
-  // yourself is "Find the place" inside it, adding to this category.
-  it('has a floating Add button, visible on every viewport, that opens the box, adding to this category', async () => {
+  // Since Nov 27 the "+" opens Find the place (board R3b), adding to this
+  // category.
+  it('has a floating + that opens the box, adding to this category', async () => {
     const user = userEvent.setup()
     const onAdd = vi.fn()
     const category = makeCategory({
@@ -395,29 +415,43 @@ describe('GenericDirectory', () => {
     })
     renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} onAdd={onAdd} />)
 
-    const floatingAdd = screen.getByRole('button', { name: 'Add' })
-    expect(floatingAdd.className).not.toContain('desktop:hidden')
+    const floatingAdd = screen.getByRole('button', { name: 'Add or update' })
     await user.click(floatingAdd)
-    await user.click(await screen.findByRole('button', { name: 'Find the place' }))
-    await user.click(screen.getByRole('button', { name: 'Not on Google? Fill it in yourself' }))
+    expect(await screen.findByRole('dialog', { name: 'Add or update' })).toBeInTheDocument()
+    await user.type(screen.getByPlaceholderText('Search by name or address…'), 'Kosher Corner')
+    await user.click(screen.getByRole('button', { name: /not on Google/ }))
     expect(screen.getByRole('dialog', { name: 'Add to Grocery Stores' })).toBeInTheDocument()
     expect(onAdd).not.toHaveBeenCalled()
   })
 
-  // Drawn Oct 26 (boards N and O): apricot, the one colour meaning "you
-  // can add here", with a deeper edge; 48px on the phone, with the word.
-  it('has the floating Add in apricot with an edge, smaller on the phone, with the word there too', () => {
+  // Nov 27 (board U1c): a round blue button with a white +, on a phone
+  // only; a computer's is in the header (board D1b).
+  it('has the floating + round in the site blue, white, on a phone only', () => {
     renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
-    const add = screen.getByRole('button', { name: 'Add' })
-    expect(add.className).toContain('bg-add')
-    expect(add.className).not.toContain('bg-primary')
-    expect(add.className).toContain('border-add-edge')
-    // 1px on the phone (board N), 1.5px on desktop (board O).
-    expect(add.className).toMatch(/(^|\s)border(\s|$)/)
-    expect(add.className).toContain('desktop:border-[1.5px]')
-    expect(add.className).toMatch(/(^|\s)h-12(\s|$)/)
-    expect(add.className).toContain('desktop:h-14')
-    expect(add.querySelector('span')?.className).not.toMatch(/(^|\s)hidden(\s|$)/)
+    const add = screen.getByRole('button', { name: 'Add or update' })
+    expect(add.className).toContain('bg-primary')
+    expect(add.className).toContain('text-white')
+    expect(add.className).not.toContain('bg-add')
+    expect(add.className).toMatch(/(^|\s)rounded-full(\s|$)/)
+    expect(add.className).toMatch(/(^|\s)h-14(\s|$)/)
+    expect(add.className).toMatch(/(^|\s)w-14(\s|$)/)
+    expect(add.className).toContain('desktop:hidden')
+  })
+
+  // The computer's header "+ Add or update" (board D1b) opens this page's
+  // own Add, which knows the category, not the site's.
+  it('takes the header’s Add, opening its own box for this category', async () => {
+    renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
+    let siteOpened = false
+    const site = () => (siteOpened = true)
+    document.addEventListener(OPEN_ADD, site)
+    try {
+      act(() => requestAdd())
+      expect(await screen.findByRole('dialog', { name: 'Add or update' })).toBeInTheDocument()
+      expect(siteOpened).toBe(false)
+    } finally {
+      document.removeEventListener(OPEN_ADD, site)
+    }
   })
 
   // Regression coverage for the OLD mobile Filters/sort-row Add button,
@@ -432,7 +466,7 @@ describe('GenericDirectory', () => {
     const category = makeCategory({ pluralLabel: 'WhatsApp Groups', hasAddress: false })
     renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
 
-    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add or update' })).toBeInTheDocument()
   })
 
   // Agreed Oct 5: Add stays on a listing. The page's floating "+" steps
@@ -449,7 +483,7 @@ describe('GenericDirectory', () => {
         <GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />
       </ForcedViewport>,
     )
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Add or update' })).not.toBeInTheDocument())
   })
 
   // Oct 6: on desktop the listing's own row is at the foot of a long
@@ -465,8 +499,8 @@ describe('GenericDirectory', () => {
         <GenericDirectory category={makeCategory()} items={[item]} {...handlers} reopenItemId={item.id} />
       </ForcedViewport>,
     )
-    fireEvent.click(await screen.findByRole('button', { name: 'Add' }))
-    expect(await screen.findByRole('dialog', { name: 'Add or update a place' })).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'Add or update' }))
+    expect(await screen.findByRole('dialog', { name: 'Add or update' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Edit listing to Trader Joe’s' }))
     expect(await screen.findByRole('dialog', { name: 'Update Trader Joe’s' })).toBeInTheDocument()
@@ -480,7 +514,7 @@ describe('GenericDirectory', () => {
 
   it('shows the floating Add button when no listing is open', () => {
     renderWithProviders(<GenericDirectory category={makeCategory()} items={[makeListing()]} {...handlers} />)
-    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add or update' })).toBeInTheDocument()
   })
 
   it('opens the box from Edit listing in a category that takes edits but no additions, and not in one that takes neither', () => {
@@ -501,8 +535,9 @@ describe('GenericDirectory', () => {
     const category = makeCategory({ label: 'Grocery Store' })
     renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
 
-    // One "Add", and it's the floating one (named "Add" too since Oct 5).
-    const adds = screen.getAllByRole('button', { name: /^Add$/ })
+    // One Add, and it's the floating one (a computer's is in the site
+    // header since Nov 27, D1b).
+    const adds = screen.getAllByRole('button', { name: /^Add( or update)?$/ })
     expect(adds).toHaveLength(1)
     expect(adds[0].className).toContain('fixed')
   })

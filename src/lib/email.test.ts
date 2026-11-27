@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Resend } from 'resend'
 import type { ContactHospitalData, SubmissionRow } from '@/types'
-import { adminAppUrl, escapeHtml, namedSender, sendAdminMagicLink, sendEmail, sendInboxMagicLink, sendNightlyEmail, sendNotification, sendReviewActionNotification, sendStatusChangeDigest, sendSubmissionNotification } from './email'
+import { adminAppUrl, escapeHtml, namedSender, sendAdminMagicLink, sendEmail, sendForwardedEmail, sendInboxMagicLink, sendNightlyEmail, sendNotification, sendReviewActionNotification, sendStatusChangeDigest, sendSubmissionNotification } from './email'
 
 const minimalContact: ContactHospitalData = {
   fullName: '',
@@ -150,6 +150,19 @@ describe('sendEmail', () => {
       mockResolveCommunity.mockRejectedValue(new Error('supabase down'))
       await sendEmail({ to: 'a@example.com', subject: 'Hi', html: '<p>hi</p>', community: 'philly' })
       expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ from: 'notifications@ourdomain.org' }))
+      mockResolveCommunity.mockReset()
+    })
+
+    // Tracker 100, the user Nov 27: one address a visitor sees everywhere,
+    // and Reply comes back to it.
+    it('sends from the community’s own address once the site receives mail, and sign-in links from RESEND_FROM', async () => {
+      vi.stubEnv('RESEND_FROM', 'notifications@ourdomain.org')
+      vi.stubEnv('INBOUND_EMAIL_DOMAIN', 'ourdomain.org')
+      mockResolveCommunity.mockImplementation(async (slug?: string) => ({ slug: slug ?? 'philly', name: slug === 'ues' ? 'UES Jewish Guide' : 'Philly Jewish Guide' }))
+      await sendEmail({ to: 'a@example.com', subject: 'Hi', html: '<p>hi</p>', community: 'ues' })
+      expect(sendSpy).toHaveBeenLastCalledWith(expect.objectContaining({ from: '"UES Jewish Guide" <ues@ourdomain.org>' }))
+      await sendEmail({ to: 'a@example.com', subject: 'Hi', html: '<p>hi</p>' })
+      expect(sendSpy).toHaveBeenLastCalledWith(expect.objectContaining({ from: '"Philly Jewish Guide" <notifications@ourdomain.org>' }))
       mockResolveCommunity.mockReset()
     })
 
@@ -919,5 +932,30 @@ describe('every sendEmail call names its community', () => {
     expect(calls.length).toBeGreaterThan(0)
     const without = calls.filter((c) => !/\bcommunity:/.test(c) && !/sign-in link/.test(c))
     expect(without).toEqual([])
+  })
+})
+
+// Tracker 100 (Nov 27): a person's email to the community's own address,
+// passed to the admins so a Reply answers the sender.
+describe('sendForwardedEmail', () => {
+  let sendSpy: ReturnType<typeof vi.fn>
+  beforeEach(() => {
+    vi.stubEnv('RESEND_API_KEY', 'key_123')
+    vi.stubEnv('VERCEL_ENV', 'production')
+    sendSpy = vi.fn().mockResolvedValue({ data: { id: 'abc' }, error: null })
+    vi.mocked(Resend).mockImplementation(function () { return { emails: { send: sendSpy } } } as unknown as typeof Resend)
+    mockGetCommunityNotifyRecipients.mockResolvedValue(['admin@example.com'])
+    mockResolveCommunity.mockResolvedValue({ name: 'Philly Jewish Guide' })
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('goes to the admins, Reply-To the sender, once per received email', async () => {
+    await sendForwardedEmail('philly', { emailId: 'em_1', from: 'Dana <dana@gmail.com>', to: 'philly@in.example.org', subject: 'Re: your listing', date: '2026-11-27T15:00:00Z', text: 'They close at 3 <Fridays>', attachments: ['menu.pdf'] })
+    const [email, options] = sendSpy.mock.calls[0]
+    expect(email).toMatchObject({ to: ['admin@example.com'], replyTo: 'dana@gmail.com', subject: 'Fwd: Re: your listing' })
+    expect(options).toEqual({ idempotencyKey: 'forward/em_1' })
+    expect(email.html).toContain('They close at 3 &lt;Fridays&gt;')
+    expect(email.html).toContain('menu.pdf')
+    expect(email.html).toContain('Dana &lt;dana@gmail.com&gt;')
   })
 })

@@ -1,4 +1,6 @@
+import { after } from 'next/server'
 import { reportServerError } from '@/lib/serverError'
+import { saveMessageReadTime } from '@/lib/messageReadTime'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit, clientIp, photoReaderSpend } from '@/lib/rateLimit'
 import { isHoneypotTripped } from '@/lib/honeypot'
@@ -53,6 +55,7 @@ const FILE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'
 const BUCKET = 'site-assets'
 
 export async function POST(request: Request) {
+  const started = Date.now()
   const limited = await enforceRateLimit(request, 'message-read', { limit: 6, windowSec: 300 })
   if (limited) return limited
   const apiKey = process.env.OPENAI_API_KEY
@@ -188,6 +191,7 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, proposals: [proposal], photoUrls: await keepPhotos(), model: null })
     }
     const reading = await readMessage({ text, images }, catalog, { apiKey, communityName: community.name, about })
+    let followUps = 0
     const proposals = await Promise.all(
       reading.proposals.map(async (p) => {
         if (p.kind === 'items') {
@@ -225,6 +229,7 @@ export async function POST(request: Request) {
         if (p.kind === 'menu') {
           const l = p.listingId ? byId.get(p.listingId) : undefined
           if (!l) return failedMenu(null, p.asWritten, 'which_place')
+          followUps++
           return menuProposal(l, p.asWritten, p.url, { quote: p.quote, checked: p.checked })
         }
         if (p.kind === 'times') {
@@ -235,6 +240,7 @@ export async function POST(request: Request) {
           if (!key || ++timesRead > MAX_TIMES) return { ...p, listing: brief(p.listingId), item: l, minyanimKey: key ?? null, update: null }
           const first = images[0]
           const source = first && !text ? (first.mime === 'application/pdf' ? { pdf: first.b64 } : { image: first.b64, mime: first.mime }) : { text: text || '(see photo)' }
+          followUps++
           try {
             const { update } = await readShulWeek(l, key, source, apiKey, { where: community })
             return { ...p, listing: brief(p.listingId), item: l, minyanimKey: key, update }
@@ -247,7 +253,23 @@ export async function POST(request: Request) {
       }),
     )
 
-    return Response.json({ ok: true, proposals, photoUrls: await keepPhotos(), model: reading.model })
+    const photoUrls = await keepPhotos()
+    // How long the visitor waited, kept after the answer has gone.
+    const ms = Date.now() - started
+    after(() =>
+      saveMessageReadTime({
+        community: community.slug,
+        ms,
+        modelMs: reading.ms,
+        model: reading.model,
+        effort: reading.effort,
+        photos: images.length,
+        proposals: proposals.length,
+        followUps,
+        usage: reading.usage,
+      }),
+    )
+    return Response.json({ ok: true, proposals, photoUrls, model: reading.model })
   } catch (err) {
     reportServerError('[message/read] failed:', err instanceof Error ? err.message : err)
     return Response.json({ ok: false, code: 'down', error: 'Couldn’t read it right now. Please try again in a minute.' }, { status: 502 })

@@ -6,6 +6,7 @@ import type { TurnstileHandle } from '@/components/TurnstileWidget'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { previewAnswer, previewListing, usePreviewSend } from '@/lib/previewSend'
+import { recordUpdates } from '@/lib/yourUpdates'
 
 // Whether the Turnstile challenge is actually active for this deploy — mirrors
 // TurnstileWidget's own check. When it's not configured, the widget renders
@@ -167,6 +168,12 @@ export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit,
         return
       }
       setRetriedVerification(false)
+      // Kept on this phone for "Your updates" on You (board S4c): an
+      // admin's own save is live already, and a preview sent nothing.
+      if (!adminSubmit && !preview) {
+        const ids = Array.isArray(body.ids) ? body.ids : [body.id]
+        recordUpdates(community, 'submission', ids, payload.name || existing?.name || '', mode === 'edit' ? 'Changes' : 'New place')
+      }
       // Admin mode: the listing is already live — nothing to review, so skip
       // the "Thank you!" pending screen and just close back out.
       if (adminSubmit) onAdminSubmitted?.(body)
