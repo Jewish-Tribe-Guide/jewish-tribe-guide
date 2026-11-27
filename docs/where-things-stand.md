@@ -254,7 +254,9 @@ old number can still be looked up. When an item is done, move it to
     place we have opens its Edit listing. Left: counting it (the plan's
     step 1), the home page's nothing-found card (not drawn), and the
     forwarding phone number the user hopes will replace paste and
-    camera. The AI read's speed: 97.
+    camera. The AI read's speed: 97. Drawn only, Nov 27: a paste or
+    photo sent straight to the queue, read in the background and
+    checked by the admin (canvas S1–S4); waits on the user's OK.
 
 ### You do
 

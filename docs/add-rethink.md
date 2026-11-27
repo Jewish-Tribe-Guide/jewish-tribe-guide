@@ -173,7 +173,32 @@ them:
   left the page (`e2e/focus-and-announcements.spec.ts`, phone, failed
   3 of 3 before).
 
+## Proposed, drawn only (Nov 27): a paste goes straight to the queue
+
+The user asked whether the sender should have to wait for the AI and
+check its read, or just send, with the AI reading in the background and
+the admin checking. Drawn as boards S1–S4 on the "Add, rethought" canvas
+(https://claude.ai/artifact/FkD8Lp8jbXC3JgZXsUgY6A); not built until
+the user OKs it.
+
+- **S1:** the AI box keeps its look; its tag says someone checks it, and
+  its button is Send. No read while the sender waits.
+- **S2:** Sent, with the optional "email me when it's on the site". No
+  list of what changes, since nothing is read yet.
+- **S3:** the admin's queue card as today, the read done in the
+  background at a higher thinking level, the original under it. When the
+  read can't tell the place, the admin picks it.
+- **S4 (later):** "Your update is live" the next time the sender opens
+  the site on that phone.
+
+Edit listing and Fill it in yourself are unchanged: the person typed
+those, so they still see the end result. If built, this changes:
+"show the contributor the end result" (no longer for a paste or photo),
+R4's "You check it before it's sent", and P6b (a paste no longer opens
+Edit listing).
+
 ## Waiting on the user
 
 - Counting Add (step 1): build it or not.
 - The phone number for forwarding: which service, and when.
+- A paste goes straight to the queue (S1–S4): build it or not.
