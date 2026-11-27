@@ -233,7 +233,7 @@ those, so they still see the end result. If built, this changes:
 R4's "You check it before it's sent", and P6b (a paste no longer opens
 Edit listing).
 
-## Renamed and split (drawn Nov 27, U1, U2b, U2c, U3, U4b)
+## Renamed and split (drawn Nov 27, U1, U2b, U2c, U3b, U4c)
 
 The user: change the name from Add, and maybe camera and paste as two
 buttons. Drafts T1–T3, then U2 and U4, were replaced by:
@@ -246,13 +246,13 @@ buttons. Drafts T1–T3, then U2 and U4, were replaced by:
   flyer or a post?" and "Paste" were unclear to the user).
 - **U2c:** Send a photo opens the phone's own menu (library, camera,
   file; several at once). No screen of ours before it.
-- **U3:** the photos picked, in a messaging-style screen (WhatsApp,
+- **U3b:** the photos picked, in a messaging-style screen (WhatsApp,
   iMessage): the photo big with ✕, a strip with + for more, "Add a note
-  (optional)" (it grows, so a pasted message fits), a round Send.
+  (optional)" (it grows, so a pasted message fits), and the site's usual wide Send (a round arrow, U3, was dropped: every other Send on the site is the wide one).
   Nothing goes until Send.
-- **U4b:** Send a message: a text box, "Say it in your own words, or
+- **U4c:** Send a message: a text box, "Say it in your own words, or
   paste it from WhatsApp or an email", Send grey until there's text. No
-  camera button: a photo with words is U3, so each screen does one
+  camera button: a photo with words is U3b, so each screen does one
   thing.
 
 ## Waiting on the user
