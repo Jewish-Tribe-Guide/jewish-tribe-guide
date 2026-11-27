@@ -135,6 +135,10 @@ export async function generateStaticParams() {
   return params.flat()
 }
 
+// Waits for the server on purpose, as every community screen but About
+// does: see `instant` in [community]/layout.tsx.
+export const instant = false
+
 export default async function SlugPage(props: PageProps<'/[community]/[slug]'>) {
   const { community, slug } = await props.params
   const resolved = await resolveSlug(community, slug)

@@ -15,6 +15,10 @@ export async function generateMetadata(props: PageProps<'/[community]/feedback'>
   return { alternates: { canonical: `${siteUrl()}${routes.feedback(community)}` } }
 }
 
+// Waits for the server on purpose, as every community screen but About
+// does: see `instant` in [community]/layout.tsx.
+export const instant = false
+
 // The computer page's "Rather email?" card gives the address the About page's
 // own text gives (one shared row, so one address for every community), and
 // is left out when it gives none. There is no per-community contact address.

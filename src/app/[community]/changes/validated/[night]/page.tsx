@@ -34,6 +34,10 @@ export async function generateMetadata(props: PageProps<'/[community]/changes/va
   return { title: found ? 'What was validated' : 'Not found', robots: { index: false } }
 }
 
+// Waits for the server on purpose, as every community screen but About
+// does: see `instant` in [community]/layout.tsx.
+export const instant = false
+
 export default async function NightPage(props: PageProps<'/[community]/changes/validated/[night]'>) {
   const { community, night: key } = await props.params
   const night = await findNight(community, key)

@@ -74,6 +74,20 @@ export async function generateMetadata(props: LayoutProps<'/[community]'>): Prom
 // below reads the request or uncached data.
 export const ensureStatic = 'navigation'
 
+// And so a navigation into a community's screens waits for the server, on
+// purpose: this layout reads the community from the address before anything
+// else, to answer 404 for one that doesn't exist, and every screen below
+// reads it too, for that community's listings. Next's instant-navigation
+// check (dev only) otherwise reports each screen as "URL data outside of
+// <Suspense>" (Nov 26). A boundary around a whole screen was tried on the
+// category pages and painted an empty page first, then jumped (Nov 24).
+// Nothing changes at runtime: this only states what's expected. Next checks
+// each page on its own, so every page below says the same, except About,
+// whose text is the same for every community: only its count waits, inside
+// a boundary of its own, and a navigation to it is instant.
+// src/test/instantNavigation.test.ts keeps that so.
+export const instant = false
+
 /** Prerenders a page per community at build time. The list is small and
  *  changes when an admin adds a community, not per request. */
 export async function generateStaticParams() {

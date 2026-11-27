@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import PageScreenHeader from '@/components/PageScreenHeader'
 import PhotoHeader from '@/components/PhotoHeader'
 import { PAGE_BOX as BOX, PAGE_COLUMN } from '@/lib/pageColumn'
@@ -12,8 +13,9 @@ import ShortVersion from './ShortVersion'
 type Props = {
   title: string
   /** "158 places · 14 categories": over the title on a computer, under the
-   *  header on a phone. */
-  eyebrow?: string | null
+   *  header on a phone. A node, so the page can stream it in: the count is
+   *  the only part of About that depends on the address (see page.tsx). */
+  eyebrow?: ReactNode
   /** The page row's raw body. Sanitized here; never render it any other way. */
   body: string | null | undefined
 }

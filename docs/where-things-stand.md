@@ -229,6 +229,15 @@ old number can still be looked up. When an item is done, move it to
   new text; **live's About needs the same edit, with your go-ahead**
   (until then live keeps the old order in the new layout: The problem
   open, the rest folded).
+- **Fixed Nov 26, every community screen logged "URL data outside of
+  <Suspense>" in dev** (Next's instant-navigation check, not only About).
+  The community layout and every screen read the community from the
+  address first, on purpose (404 before anything is sent; a whole-screen
+  boundary painted empty, then jumped, Nov 24), so each now says
+  `instant = false`: nothing changes at runtime. About is the exception:
+  its text is shared, so only its count reads the address, in a boundary
+  of its own, and a navigation to About shows the page at once.
+  `src/test/instantNavigation.test.ts` holds both (13 of 14 red before).
 
 ### You decide
 

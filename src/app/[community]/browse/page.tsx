@@ -14,6 +14,10 @@ export async function generateMetadata(props: PageProps<'/[community]/browse'>):
   }
 }
 
+// Waits for the server on purpose, as every community screen but About
+// does: see `instant` in [community]/layout.tsx.
+export const instant = false
+
 export default async function BrowsePage(props: PageProps<'/[community]/browse'>) {
   const { community } = await props.params
   // Every listing, for each category's count and live line, as the home and

@@ -20,6 +20,10 @@ export async function generateMetadata(props: PageProps<'/[community]/changes'>)
   }
 }
 
+// Waits for the server on purpose, as every community screen but About
+// does: see `instant` in [community]/layout.tsx.
+export const instant = false
+
 export default async function ChangesPage(props: PageProps<'/[community]/changes'>) {
   // Here while the admin has it on a tab or a header link (the user, Nov
   // 15); that's the one switch for it (Nov 21).

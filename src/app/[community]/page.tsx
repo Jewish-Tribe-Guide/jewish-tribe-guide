@@ -24,6 +24,10 @@ export async function generateMetadata(props: PageProps<'/[community]'>): Promis
   return { alternates: { canonical: `${siteUrl()}${routes.home(community)}` } }
 }
 
+// Waits for the server on purpose, as every community screen but About
+// does: see `instant` in [community]/layout.tsx.
+export const instant = false
+
 // No Suspense boundary here — nothing under HomeScreen calls a Dynamic API
 // (useSearchParams et al.), so nothing in this tree suspends and the whole
 // page prerenders for real.

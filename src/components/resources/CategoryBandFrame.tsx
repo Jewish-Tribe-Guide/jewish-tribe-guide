@@ -44,7 +44,7 @@ export const HERO_TITLE_PHOTO_PX = 165 + HERO_PHOTO_UNDER_SEARCH_PX
  *  one line under it. The category pages draw their own (GenericDirectory,
  *  whose line has a button); the Eruv and Zmanim pages use this, so they
  *  look like the category pages around them (the user, Nov 15). */
-export function HeroTitle({ eyebrow, title, line }: { eyebrow?: string | null; title: string; line?: ReactNode }) {
+export function HeroTitle({ eyebrow, title, line }: { eyebrow?: ReactNode; title: string; line?: ReactNode }) {
   return (
     <>
       {/* Held open while it loads, so the title doesn't move down. */}
