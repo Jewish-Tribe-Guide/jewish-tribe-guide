@@ -233,7 +233,7 @@ those, so they still see the end result. If built, this changes:
 R4's "You check it before it's sent", and P6b (a paste no longer opens
 Edit listing).
 
-## Renamed, and one box (drawn Nov 27, U1c, D1, V1b, V2b)
+## Renamed, and one box (drawn Nov 27, U1c, D1b, V1b, V2b)
 
 The user: change the name from Add, and maybe camera and paste as two
 buttons. Drafts went through two paths (T1–T3; U2–U4c: Send a photo and
@@ -244,13 +244,17 @@ before settling on:
   (`--color-primary`) and a white "+" (aria-label "Add or update"), the
   colour of every Send, so it reads as the main action (Gmail's Compose,
   Google Maps' +). Replaced U1b, an apricot button with a blue "+".
-- **D1:** on a computer, no floating button: a filled blue "+ Add or
-  update" in the header, right side, beside Set location, on every screen
+- **D1b:** on a computer, no floating button: an outlined "+ Add or
+  update" (white, grey edge, blue words, as Set location) in the header, right side, beside Set location, on every screen
   with the header, the Map included (YouTube's Create, GitHub's +). It
   opens the same sheet as a centred dialog. Three earlier decisions change:
   the header button removed Sep 22 comes back, filled and renamed; the
   apricot add colour (Oct 26) goes; Oct 5's "no + on the Map" was about a
-  button over the map, so the header one shows there.
+  button over the map, so the header one shows there. Outlined, not
+  filled (D1 was filled): sites built on visitors' help keep their
+  contribute action quieter than the main job (Yelp, Airbnb, Reddit), and
+  here that job is finding, so search stays the loudest thing and filled
+  blue stays for Send.
 - **V1b:** the sheet titled "Add or update", search first; under it a
   whole-text link, **Or tell us in your own words ›**, quieter than a
   button so search stays the main way in. ("Have a flyer or a post?",
