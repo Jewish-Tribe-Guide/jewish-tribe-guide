@@ -332,7 +332,8 @@ old number can still be looked up. When an item is done, move it to
 
 ### You do
 
-102. Turn on the site's email address (100), in order:
+102. Turn on the site's email address (100), in order (1 and 2 done
+    Nov 27, Production only; 116-118 on live too):
     1. Resend › Domains: open `phillyjewishguide.com` (add it if the
        site sends from another domain, with the records Resend lists),
        turn on Receiving, and copy the MX record it shows into
@@ -353,22 +354,6 @@ old number can still be looked up. When an item is done, move it to
        address, if one was saved.
     6. Later: retire the Gmail script, after checking nothing else signs
        in with that Gmail.
-98. Run migration 118 on live (dev done Nov 27), BEFORE this
-    branch (`claude/kept-current`) is deployed live:
-    [`supabase/migrations/20240101000118_sent_message.sql`](../supabase/migrations/20240101000118_sent_message.sql)
-    (adds `sent_message`: a post sent with the "+ Add" box, kept until
-    it's read). Without it the box can't send a post.
-97. Run migration 117 on live (dev done Nov 27):
-    [`supabase/migrations/20240101000117_message_read_time.sql`](../supabase/migrations/20240101000117_message_read_time.sql)
-    (adds `message_read_time`: how long each "+ Add" box read took, and
-    at what thinking level; no post text). Until then the time isn't
-    kept. The box reads at "low" since Nov 26 (the user's OK, after
-    `scripts/compare-reader/messages.run.ts` on 42 real posts: slowest
-    tenth 8.1s to 4.8s, read as well as the default).
-94. Run migration 116, dev then live:
-    [`supabase/migrations/20240101000116_community_email.sql`](../supabase/migrations/20240101000116_community_email.sql)
-    (adds `community.contact_email`). Then save Philly's address on
-    Settings › Team › Community email.
 87. Settings, a few minutes each (the user will do them, Nov 24):
     - Sentry: turn on the quota emails, 80% and 100% (Settings →
       Account → Notifications → Quota);
