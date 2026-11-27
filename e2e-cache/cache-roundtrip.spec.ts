@@ -3,6 +3,14 @@ import { expect, test } from '@playwright/test'
 import { previewSettings } from '../e2e/helpers'
 import { IN_FLIGHT_RENDER_GRACE_MS } from '../src/lib/inFlightRenderGrace'
 import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
+import { TEST_WRITES } from '../scripts/testWrites.mjs'
+
+/** A run cut off mid-test leaves its marker in About, and the next run would
+ *  read it as the original and put it back, for good (Nov 26: it reached
+ *  the committed seed). Stop instead. */
+function expectNoLeftover(body: string) {
+  expect(body, 'About still holds what a cut-off run wrote: start from the seed again (npm run test:db -- seed)').not.toMatch(TEST_WRITES)
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The other half of caching.spec.ts.
@@ -129,6 +137,7 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
   const aboutPage = before.pages.find((p: { slug: string }) => p.slug === 'about')
   expect(aboutPage, 'the seed migration should have created an "about" row').toBeTruthy()
   const originalBody: string = aboutPage.body
+  expectNoLeftover(originalBody)
 
   const newBody = `Cache round-trip check ${Date.now()}`
   expect(await (await request.get(`/${community}/about`)).text()).not.toContain(newBody)
@@ -244,6 +253,7 @@ test('an admin save lands even when /about is mid-regeneration', async ({ reques
   const pagesRes = await request.get(`/api/admin/pages?community=${community}`, { headers: authHeaders })
   expect(pagesRes.ok()).toBe(true)
   const originalBody: string = (await pagesRes.json()).pages.find((p: { slug: string }) => p.slug === 'about').body
+  expectNoLeftover(originalBody)
   const settingsRes = await request.get(`/api/admin/site-settings?community=${community}`, { headers: authHeaders })
   expect(settingsRes.ok()).toBe(true)
   // Re-saved unchanged: the point is the invalidation the save performs, not

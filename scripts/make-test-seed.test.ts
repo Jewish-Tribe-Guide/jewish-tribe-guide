@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { COMMUNITIES, scrubEmails, seedFrom } from './make-test-seed.mjs'
+import { COMMUNITIES, TEST_WRITES, scrubEmails, seedFrom } from './make-test-seed.mjs'
 
 describe('scrubEmails', () => {
   it('replaces every address, at any depth, the same one the same way', () => {
@@ -81,9 +81,42 @@ describe('supabase/seed as committed', () => {
       const emails = text.match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g) ?? []
       expect(emails.filter((e) => !e.endsWith('@example.test'))).toEqual([])
       expect(text).not.toMatch(/Integration Test|integration-test-|vote-test-|"e2e-|ZZ Found/)
+      expect(text).not.toMatch(TEST_WRITES)
       for (const row of JSON.parse(text) as Array<{ community_id?: string | null }>) {
         if (row.community_id != null) expect(COMMUNITIES).toContain(row.community_id)
       }
+    })
+  }
+})
+
+// Nov 26: About's body in the seed was a cache test's marker, left by a run
+// cut off before its finally put the row back.
+describe('what the write suites save', () => {
+  it('a backup still holding it is refused, not seeded', () => {
+    const page = [{ slug: 'about', community_id: null, body: 'Mid-regeneration check 1795270976731 round 2' }]
+    expect(() => seedFrom({ page })).toThrow(/page holds what a test wrote/)
+    expect(() => seedFrom({ page: [{ ...page[0], body: '<p>About the guide</p>' }] })).not.toThrow()
+  })
+
+  // Every time-stamped text a write suite builds is one TEST_WRITES knows,
+  // so a new one can't reach the seed unnoticed.
+  const suites = ['e2e-cache', 'e2e-admin-write', 'e2e-form']
+  const literals = suites.flatMap((dir) =>
+    readdirSync(dir)
+      .filter((f) => f.endsWith('.ts'))
+      .flatMap((f) => readFileSync(join(dir, f), 'utf8').match(/`[^`]*\$\{(?:Date\.now\(\)[^}]*|stamp|suffix)\}[^`]*`/g) ?? []),
+  )
+  it('finds the suites’ stamped texts', () => {
+    expect(literals.length).toBeGreaterThan(5)
+  })
+  for (const lit of literals) {
+    const sample = lit.slice(1, -1).replace(/\$\{[^}]*\}/g, '12345')
+    // Only stamps, nothing written round them: a suffix, not a text.
+    if (!/[A-Za-z]{3}/.test(lit.slice(1, -1).replace(/\$\{[^}]*\}/g, ''))) continue
+    // An address is the email check's (made-up ones only).
+    if (sample.includes('@')) continue
+    it(`knows ${lit}`, () => {
+      expect(sample).toMatch(TEST_WRITES)
     })
   }
 })

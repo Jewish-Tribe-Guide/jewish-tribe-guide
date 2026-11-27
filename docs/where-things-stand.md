@@ -207,6 +207,15 @@ old number can still be looked up. When an item is done, move it to
       a typed email; refusing an email typed for usual times (pages
       only); the eruv listing still opens its Change screens; email
       linking and confirmation emails (the later step above).
+- **Fixed Nov 26, the seed's About was a test's marker.** The committed
+  seed's About body was "Mid-regeneration check … round 2", left by a
+  cache run cut off before its `finally` and copied in by the backup the
+  seed was made from; the seed check didn't know that marker. It now has
+  About's live text (Nov 16, its Gmail made up), and `scripts/testWrites.mjs`
+  lists what the write suites save: the seed builder refuses a backup
+  holding one, the committed-seed check fails on one, a check fails if a
+  suite writes one the list doesn't know, and the About tests stop on one
+  rather than restoring it.
 
 ### You decide
 
