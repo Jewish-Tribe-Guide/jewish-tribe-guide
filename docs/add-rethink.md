@@ -60,7 +60,9 @@ judgment or a worry, said as one.
 - How long an AI read takes. From migration 117 (Nov 26) each read's
   time is kept (`message_read_time`), and
   `scripts/compare-reader/messages.run.ts` replays the posts people sent
-  at each thinking level, to see whether a lower one reads as well.
+  at each thinking level. On 42 posts the model call took 2.6s
+  typically and 8.1s for the slowest tenth; at "low" 2.3s and 4.8s,
+  reading as well. The box reads at low since then.
 - Whether people miss the button, or see it and don't want it.
 
 ## What a fix has to do

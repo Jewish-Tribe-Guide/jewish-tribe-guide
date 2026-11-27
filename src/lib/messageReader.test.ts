@@ -381,19 +381,20 @@ describe('readMessage', () => {
     expect(r.usage).toEqual({ input: 100, cachedInput: 50, output: 20 })
   })
 
-  // Nov 26: the thinking level, so a lower one can be tried on real posts.
-  it('sends a thinking level only when one is given, and says which it read with', async () => {
+  // Nov 26: read at "low" (the comparison on real posts), and with no
+  // level at all when null is asked for (the model's own default).
+  it('reads at low unless told otherwise, and says which it read with', async () => {
     const bodies: Record<string, unknown>[] = []
     const fetchImpl = vi.fn(async (_url: string, init: RequestInit) => {
       bodies.push(JSON.parse(String(init.body)))
       return Response.json({ choices: [{ message: { content: '{"proposals":[]}' } }] })
     }) as unknown as typeof fetch
     const a = await readMessage(text('x'), catalog, { apiKey: 'k', communityName: 'P', fetchImpl })
-    const b = await readMessage(text('x'), catalog, { apiKey: 'k', communityName: 'P', effort: 'low', fetchImpl })
-    expect(bodies[0]).not.toHaveProperty('reasoning_effort')
-    expect(a.effort).toBeNull()
-    expect(bodies[1].reasoning_effort).toBe('low')
-    expect(b.effort).toBe('low')
+    const b = await readMessage(text('x'), catalog, { apiKey: 'k', communityName: 'P', effort: null, fetchImpl })
+    expect(bodies[0].reasoning_effort).toBe('low')
+    expect(a.effort).toBe('low')
+    expect(bodies[1]).not.toHaveProperty('reasoning_effort')
+    expect(b.effort).toBeNull()
   })
 
   it('throws on an error from the model, saying so', async () => {

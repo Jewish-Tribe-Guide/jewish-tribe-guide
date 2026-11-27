@@ -264,9 +264,9 @@ old number can still be looked up. When an item is done, move it to
     [`supabase/migrations/20240101000117_message_read_time.sql`](../supabase/migrations/20240101000117_message_read_time.sql)
     (adds `message_read_time`: how long each "+ Add" box read took, and
     at what thinking level; no post text). Until then the time isn't
-    kept. The level stays the model's default until the comparison
-    (`scripts/compare-reader/messages.run.ts`) says a lower one reads
-    as well; that's the user's call (Nov 26).
+    kept. The box reads at "low" since Nov 26 (the user's OK, after
+    `scripts/compare-reader/messages.run.ts` on 42 real posts: slowest
+    tenth 8.1s to 4.8s, read as well as the default).
 94. Run migration 116, dev then live:
     [`supabase/migrations/20240101000116_community_email.sql`](../supabase/migrations/20240101000116_community_email.sql)
     (adds `community.contact_email`). Then save Philly's address on

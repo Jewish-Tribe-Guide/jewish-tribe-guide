@@ -606,11 +606,13 @@ export function messageSource(text: string, photoUrls: string[]): SubmissionSour
 
 export type MessageReadResult = MessageReading & { model: string; effort: string | null; ms: number; usage: { input: number; cachedInput: number; output: number } }
 
-/** How much the model thinks before answering. null sends nothing, so the
- *  model's own default applies (as every read did until Nov 26). The
- *  comparison (scripts/compare-reader/messages.run.ts) decides whether a
- *  lower level reads posts as well, in less time. */
-export const DEFAULT_MESSAGE_EFFORT: string | null = null
+/** How much the model thinks before answering: "low" (the user, Nov 26).
+ *  On 42 posts people sent (scripts/compare-reader/messages.run.ts) it
+ *  read the same as the model's own default as often as the default
+ *  matched itself, and the slowest tenth went from about 8.1s to 4.8s
+ *  (median 2.6s to 2.3s). "none" was quicker still (2.8s) but missed
+ *  menu links and a hechsher. null sends nothing: the model's default. */
+export const DEFAULT_MESSAGE_EFFORT: string | null = 'low'
 
 export async function readMessage(
   source: MessageSource,
