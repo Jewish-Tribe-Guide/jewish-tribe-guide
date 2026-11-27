@@ -256,7 +256,8 @@ old number can still be looked up. When an item is done, move it to
     forwarding phone number the user hopes will replace paste and
     camera. The AI read's speed: 97. Drawn only, Nov 27: a paste or
     photo sent straight to the queue, read in the background and
-    checked by the admin (canvas S1–S4); waits on the user's OK.
+    checked by the admin, and "Your update is live" for anything sent
+    (canvas S1b, S2, S3b, S4b, S4c); waits on the user's OK.
 
 ### You do
 

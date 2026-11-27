@@ -191,6 +191,20 @@ the user OKs it.
 - **S4 (later):** "Your update is live" the next time the sender opens
   the site on that phone.
 
+Redrawn after the user's notes (same day), boards S1b, S3b, S4b, S4c:
+
+- **S1b:** no AI tag in the box. The sender never sees a read, so the AI
+  shows only where someone checks it.
+- **S3b:** the admin's card is today's, unchanged: a "Read by AI" pill,
+  the original one tab away. (S3's original-under-the-read is dropped.)
+- **S4b:** "Your update is live" for anything sent (add, edit, paste).
+  The phone keeps the ids `/api/submissions` and `/api/message/send`
+  already return, and asks which are approved when the site opens. No
+  account; not a push; same phone and browser only (Safari forgets a
+  site after ~7 days unused unless installed), so S2's email stays. A
+  rejection never pops up.
+- **S4c:** a "Your updates" list on You (Live / Waiting / Not changed).
+
 Edit listing and Fill it in yourself are unchanged: the person typed
 those, so they still see the end result. If built, this changes:
 "show the contributor the end result" (no longer for a paste or photo),
@@ -201,4 +215,5 @@ Edit listing).
 
 - Counting Add (step 1): build it or not.
 - The phone number for forwarding: which service, and when.
-- A paste goes straight to the queue (S1–S4): build it or not.
+- A paste goes straight to the queue (S1b, S2, S3b), and Your updates
+  (S4b, S4c): build them or not.
