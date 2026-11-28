@@ -312,52 +312,18 @@ old number can still be looked up. When an item is done, move it to
     step is gone (nothing to set up), and Read now looks in Resend's received mail (14
     days, `receivedEmail.ts`) before the Gmail script. Each received email counts against Resend's send quota
     (Free: 100 a day, 3,000 a month), and Resend keeps it 30 days.
-101. **Guess the kind of a new place from Google** (agreed Nov 27, a
-    follow-up to 99): adding a place from a screen with no category
-    (home, You) asks "What kind of place?". When the place came from
-    Google search, preselect the category its Google type points to
-    (a restaurant, Food) instead of the list's first; the person still
-    confirms, and a category page keeps skipping the question.
 
 103. **Who hears what, the gaps** (found Nov 27 while mapping mail
-    for 100). Today: admins get an email for each person-sent
-    submission and intake request, and the nightly digest; a visitor
-    gets a confirmation, and a decision email when an admin approves or
-    rejects, reply-to the community email. Missing:
-    - a "+ Add" post the AI couldn't file reaches the To do list with no
-      email to the admins;
-    - "Email me when it's on the site" on a post the AI couldn't file
-      is kept with the post, but nothing is ever sent to it: the admin
-      makes the change themselves and marks the post Done, and Done
-      emails no one. (Nothing a visitor sends goes live without an
-      admin, so there is no automatic approval to cover.)
+    for 100). The first two are built (Nov 28): a "+ Add" post the AI
+    couldn't file emails the admins (through "Something new to decide"),
+    and marking it Done emails the visitor who asked. Left:
     - the To do screen's reject has no reason field, so the visitor's
       email can't say why;
     - a form response's Reply is a plain mailto link from the admin's
       own address (100's forwarding covers the visitor answering back,
       not the admin writing first).
-    My recommendation: the first two, small and worth doing (the first
-    following the Team tab's "Something new to decide" switch); the reason
-    field when rejects are common; leave Reply as it is.
-
-104. **The phone home jumps on a Friday** (found Nov 27, CI on PR 469;
-    shipping first was the user's call). The home is built ahead of time,
-    so Right now's placeholder is a weekday's height (176px). On a
-    Friday the candles card and Shabbos shopping are about 437px, so
-    half a second after the page shows, the category tiles drop about
-    210px (0.148 against the 0.1 target, every run). On the live site
-    since the candles card. Shabbos moves less (0.048), a weekday hardly
-    at all. Fix, my recommendation: on a phone keep Friday's box a
-    weekday's height and move Shabbos shopping under the tiles (a design
-    change, to draw first); else a small script before paint that sizes
-    the placeholder by the day. Its test then joins
-    `e2e/layout-shift.spec.ts`'s days (Tuesday and Shabbos there now),
-    as a plain test: as test.fail it flipped with machine load.
-105. **An e2e shard hangs in CI** (twice: shard 4 on PR 469, Nov 27,
-    after its tests passed; shard 6 on PR 471, Nov 28, 19 minutes in
-    its test step). The job's 20-minute limit ends it, and a rerun of
-    the failed shard passes. Not looked into yet: the next one's log
-    says whether Playwright or the server is what doesn't exit.
+    My recommendation: the reason field when rejects are common; leave
+    Reply as it is.
 
 ### You do
 

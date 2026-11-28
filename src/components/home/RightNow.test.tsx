@@ -8,7 +8,7 @@ import type { CategoryField } from '@/lib/categories'
 import type { MinyanSchedule } from '@/lib/useMinyanSchedule'
 import type { ZmanimData } from '@/types'
 import { clearEruvStatuses } from '@/lib/useEruvStatuses'
-import RightNow from './RightNow'
+import RightNow, { placeholderDayScript } from './RightNow'
 import { HOME_CARD_OUTLINE, LIFT_ON_HOVER } from './AnswerCard'
 
 // The admin preview's day (previewDay.ts), set per test; null like any
@@ -370,5 +370,45 @@ describe('Right now in the admin’s preview, on another day', () => {
     preview.day = 'weekday'
     show('2026-10-16T13:30:00-04:00', { ...week, dayOfWeek: 5, isFriday: true } as ZmanimData)
     expect(screen.getByTestId('right-now')).toHaveAttribute('data-moment', 'weekday')
+  })
+})
+
+// Tracker 104: on a Friday the tiles dropped about 260px on a phone, once
+// the zmanim said it was Friday: first under a weekday's rows guessed
+// while they were on their way, then under the candles card.
+describe('the placeholder, until the kind of day is known', () => {
+  it('waits for the zmanim rather than guessing a weekday', () => {
+    renderWithProviders(
+      <RightNow listings={listings} categories={categories} communitySlug="test-community" timezone={NY} schedule={scheduleAt('2026-10-16T13:30:00-04:00')} zmanim={null} zmanimLoading from={{ lat: 39.9526, lng: -75.1652 }} items={[]} onOpenListing={vi.fn()} />,
+      { content: { categories } },
+    )
+    expect(screen.getByTestId('right-now-placeholder')).toBeInTheDocument()
+    expect(screen.queryByTestId('right-now')).not.toBeInTheDocument()
+  })
+
+  // The script runs in the page as built, before it paints.
+  const run = (iso: string, timezone = NY) => {
+    vi.useFakeTimers({ now: new Date(iso), toFake: ['Date'] })
+    const placeholder = document.createElement('div')
+    try {
+      new Function('document', placeholderDayScript(timezone))({ currentScript: { previousElementSibling: placeholder } })
+    } finally {
+      vi.useRealTimers()
+    }
+    return placeholder.getAttribute('data-day')
+  }
+
+  it('takes Friday’s height on a Friday before 4pm where the community is', () => {
+    expect(run('2026-10-16T09:00:00-04:00')).toBe('erev')
+    expect(run('2026-10-16T15:59:00-04:00')).toBe('erev')
+    // Late Thursday in Philadelphia is already Friday in UTC.
+    expect(run('2026-10-15T22:00:00-04:00')).toBeNull()
+    expect(run('2026-10-16T16:00:00-04:00')).toBeNull()
+    expect(run('2026-10-13T12:00:00-04:00')).toBeNull()
+    expect(run('2026-10-17T11:00:00-04:00')).toBeNull()
+  })
+
+  it('is plain data in the page: a timezone can’t close the script', () => {
+    expect(placeholderDayScript('</script><script>alert(1)')).not.toContain('</script>')
   })
 })

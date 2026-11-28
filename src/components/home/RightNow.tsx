@@ -22,6 +22,7 @@ import { previewNow } from '@/lib/previewDay'
 import { dayAndMinutesInTimezone } from '@/lib/hours'
 import ShabbosShopping from './ShabbosShopping'
 import FridayEruv from './FridayEruv'
+import { useHydrated } from '@/lib/useHydrated'
 
 // ── Right now, on the phone home (the user, Oct 17) ─────────────────────────
 // The one part of the home that's different each time it's opened.
@@ -57,17 +58,53 @@ type Props = {
   /** The admin's choice of categories (site settings), null for the
    *  ready-made pair. */
   choice?: readonly string[] | null
+  /** The zmanim are still on their way: which kind of day it is isn't
+   *  known yet, so nothing is guessed (tracker 104). */
+  zmanimLoading?: boolean
+}
+
+/**
+ * Run before the page paints, beside the placeholder (`script` is its
+ * sibling): on a Friday before 4pm where the community is, the placeholder
+ * takes Friday's height. The page is built ahead of time, so only the
+ * browser knows the day; without this, the tiles dropped about 260px once
+ * the candles card came. After 4pm it stays a weekday's: candle lighting
+ * can be any time from about then, and Shabbos's card is about a weekday's.
+ * Erev Yom Tov isn't guessed.
+ */
+export function placeholderDayScript(timezone: string): string {
+  return `(function(s,tz){try{var p=new Intl.DateTimeFormat('en-US',{timeZone:tz,weekday:'short',hour:'numeric',hourCycle:'h23'}).formatToParts(new Date()),d='',h=0;for(var i=0;i<p.length;i++){if(p[i].type==='weekday')d=p[i].value;if(p[i].type==='hour')h=+p[i].value}if(d==='Fri'&&h<16)s.previousElementSibling.setAttribute('data-day','erev')}catch(e){}})(document.currentScript,${JSON.stringify(timezone).replace(/</g, '\\u003c')})`
+}
+
+/** Held open until the day is known, so the tiles under it don't jump. Its
+ *  script is in the page as built, and in the render that hydrates it; a
+ *  placeholder drawn later in the browser has no use for one (React
+ *  doesn't run it). */
+function Placeholder({ timezone }: { timezone: string }) {
+  const hydrated = useHydrated()
+  return (
+    <>
+      <div
+        aria-hidden="true"
+        data-testid="right-now-placeholder"
+        // The script adds data-day before React hydrates it.
+        suppressHydrationWarning
+        // A weekday's rows; Friday's candles card with Shabbos shopping
+        // under it (measured on a phone, tracker 104).
+        className="h-[176px] animate-pulse rounded-2xl bg-slate-100 data-[day=erev]:h-[437px]"
+      />
+      {!hydrated && <script dangerouslySetInnerHTML={{ __html: placeholderDayScript(timezone) }} />}
+    </>
+  )
 }
 
 export default function RightNow(props: Props) {
   const { listings, categories, communitySlug, timezone, schedule, zmanim, wide = false } = props
   // In the admin's preview, the day asked for (previewDay.ts); null elsewhere.
   const previewDay = usePreviewDay()
-  // Held open until the clock is known, so the tiles under it don't jump
-  // down once it arrives.
-  if (!schedule || !listings) {
-    return <div aria-hidden="true" className="h-[176px] animate-pulse rounded-2xl bg-slate-100" />
-  }
+  // Held open until the clock and the kind of day are known, so the tiles
+  // under it don't jump once they arrive.
+  if (!schedule || !listings || props.zmanimLoading) return <Placeholder timezone={timezone} />
   const now = previewNow(previewDay, zmanim, schedule.now, timezone)
   const nowMinutes = now === schedule.now ? schedule.nowMinutes : dayAndMinutesInTimezone(now, timezone).minutes
   const moment = shabbosMoment(zmanim, now, timezone)

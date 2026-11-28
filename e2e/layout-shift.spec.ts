@@ -71,11 +71,12 @@ async function expectSteady(page: Page, path: string) {
 // (CI, Friday Nov 27, 3:40pm: 0.135 on a phone). The zmanim are held back
 // a second here, as a slow phone gets them, on each kind of day.
 //
-// Friday still jumps (tracker 104): the page is built ahead of time, so its
-// placeholder is a weekday's height, and Friday's candles card and Shabbos
-// shopping are about 260px taller (0.148 on a phone, every run alone). It
-// joins the days below with its fix. Not as test.fail: run beside the rest,
-// a phone sometimes paints after the card has come, so it "passes".
+// Friday jumped too (tracker 104, 0.164 on a phone before its fix): the
+// page is built ahead of time, so its placeholder was a weekday's height,
+// and Friday's candles card and Shabbos shopping are about 260px taller.
+// Now Right now waits for the zmanim rather than guessing a weekday, and a
+// script before paint gives the placeholder Friday's height on a Friday
+// before 4pm (RightNow's placeholderDayScript).
 test.describe('the home page on each kind of day', () => {
   test.use({ timezoneId: 'America/New_York', serviceWorkers: 'block' })
 
@@ -86,7 +87,7 @@ test.describe('the home page on each kind of day', () => {
     await expectSteady(page, '/philly')
   })
 
-  for (const day of ['tuesday', 'shabbos'] as const) {
+  for (const day of ['tuesday', 'friday', 'shabbos'] as const) {
     test(`doesn’t jump when the zmanim arrive late: ${day}`, async ({ page }) => {
       await page.route('**/api/zmanim?**', async (route) => {
         await new Promise((r) => setTimeout(r, 1_000))

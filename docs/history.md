@@ -4,6 +4,37 @@ Finished work, moved out of `docs/where-things-stand.md` on Nov 21, 2026,
 in the order it was there (newest first, mostly). What's still open is in
 that file.
 
+## Four from the open list (Nov 28)
+
+The user: "let's do all of them".
+
+- **101, the kind from Google.** Adding a place from a screen with no
+  category asks "What kind of place?". When the place came from Google
+  search, the kind its Google types point to (`kindFromGoogleTypes`,
+  placeKinds.ts: a restaurant, Food; a synagogue, Shuls; a hotel with a
+  restaurant, Hotels) comes first and filled; the person still taps it.
+  The types come with the search suggestion, so nothing more is fetched.
+- **103, the first two gaps.** A "+ Add" post the AI couldn't file whole
+  emails the admins (`sendPostLeftNotification`, through "Something new
+  to decide", once per post). Marking it Done emails the visitor who
+  ticked "Email me when it's on the site" (`sendPostDoneEmail`, reply-to
+  the community, no copy to the admins). The reason field and Reply stay
+  open on the tracker.
+- **104, the Friday jump.** Right now drew a weekday's rows until the
+  zmanim came, then the candles card: the tiles dropped about 260px on a
+  phone (0.164). It now waits for the zmanim, and a script in the built
+  page gives its placeholder Friday's height on a Friday before 4pm where
+  the community is (`placeholderDayScript`, RightNow.tsx). After 4pm it
+  stays a weekday's: candle lighting can be any time from then, and
+  Shabbos's card is about a weekday's height. Erev Yom Tov isn't guessed.
+  Friday joined `e2e/layout-shift.spec.ts`'s days as a plain test.
+- **105, the e2e shard that hung.** Both times (shard 4 Nov 27, shard 6
+  Nov 28) every test had passed and Playwright never exited. CI's
+  Playwright containers ran without `--init`, so npm was PID 1 and
+  nothing reaped what Playwright killed when it stopped the web server.
+  All five `docker run`s have it now; `ciWorkflow.test.ts` fails on one
+  without.
+
 ## The community email, and Watches as what's kept current (Nov 25)
 
 Boards E1–E3 and W1–W4 (canvas TXWUmY6wTJyDKsB27Q6XV4), the user: "Build
