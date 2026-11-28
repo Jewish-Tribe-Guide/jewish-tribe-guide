@@ -193,6 +193,10 @@ test('deleting a community through the real UI removes it and everything in it',
   // reconciling this route and hard-navigated to the public site instead,
   // right when this same DELETE's own revalidation landed), so the
   // reliable signal here is the DELETE response itself, not any DOM state.
+  // The page is loaded already, so the next load is that reload. A goto
+  // while it's still under way aborts (ERR_ABORTED, both full local runs
+  // on Nov 28), so it's waited for first.
+  const reloaded = page.waitForEvent('load')
   const [deleteRes] = await Promise.all([
     page.waitForResponse(
       (res) => res.request().method() === 'DELETE' && res.url().includes(`/api/admin/communities/${slug}`),
@@ -202,6 +206,7 @@ test('deleting a community through the real UI removes it and everything in it',
   expect(deleteRes.status(), 'DELETE /api/admin/communities/:slug should succeed').toBe(200)
 
   // The reload lands back on this same page, which reads the list fresh.
+  await reloaded
   await page.goto('/admin')
   await expect(page.getByRole('button', { name: 'New community' })).toBeVisible()
   await expect(page.locator(`[data-community-slug="${slug}"]`)).toHaveCount(0)
