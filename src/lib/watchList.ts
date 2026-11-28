@@ -12,7 +12,7 @@ import type { PlaceCoverage } from './fieldCoverage'
 // place's own website (when Google hasn't got it), Minyan times is the
 // shuls' websites and their newsletters. The switch turns both.
 
-export type WatchSourceKey = 'google' | 'website' | 'newsletter' | 'email' | 'refuah' | `list:${string}`
+export type WatchSourceKey = 'google' | 'website' | 'newsletter' | 'email' | 'refuah' | 'links' | `list:${string}`
 
 export type WatchJob = {
   /** Its page (watches/job/<id>): the first nightly job it is. */
@@ -24,8 +24,8 @@ export type WatchJob = {
   line: string
   /** With nothing read yet and never run. */
   runsWhen: string
-  /** What it reads, under From: every job but Broken links, which reads
-   *  no source of its own (it opens the links already on listings). */
+  /** What it reads, under From. Broken links' is the links on listings
+   *  themselves (any link field, not only websites), which it opens. */
   from: readonly { key: WatchSourceKey; label: string }[]
   /** Words a search also finds it by. */
   also: readonly string[]
@@ -65,7 +65,7 @@ export const WATCH_JOBS: readonly WatchJob[] = [
   { id: 'hours', kinds: ['hours'], heading: 'Mikvahs', name: 'Mikvah hours', line: 'From each mikvah’s website, every night.', runsWhen: FIRST_PLACE, from: [{ key: 'website', label: 'Website' }], also: ['Website'] },
   { id: 'hospitals', kinds: ['hospitals'], heading: 'Hospitals', name: 'Bikkur Cholim details', line: 'From each hospital’s page on Refuah, every night.', runsWhen: 'Runs when the first hospital is added', from: [{ key: 'refuah', label: 'Refuah' }], also: ['Refuah'] },
   { id: 'eruvs', kinds: ['eruvs'], heading: 'Eruv', name: 'Eruv status', line: 'From the eruv’s website and emails.', runsWhen: FIRST_PLACE, from: [{ key: 'website', label: 'Website' }, { key: 'email', label: 'Email' }], also: ['Website', 'Email'] },
-  { id: 'links', kinds: ['links'], heading: 'Links', name: 'Broken links', line: 'Opens every link nothing else reads, every Sunday.', runsWhen: FIRST_PLACE, from: [], also: [] },
+  { id: 'links', kinds: ['links'], heading: 'Links', name: 'Broken links', line: 'Opens every link nothing else reads, every Sunday.', runsWhen: FIRST_PLACE, from: [{ key: 'links', label: 'Links on each listing' }], also: [] },
   // Pages added by hand: listed only when there are some.
   { id: 'other', kinds: ['other'], heading: 'Links', name: 'Other pages', line: 'Pages added by hand. What they find waits on To do.', runsWhen: '', from: [], also: [] },
 ]

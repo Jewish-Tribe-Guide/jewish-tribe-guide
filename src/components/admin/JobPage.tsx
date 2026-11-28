@@ -134,7 +134,7 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
 
   const sources = watchSources(watch, views)
   // From: what it reads, as plain rows (board L2b; the user, Nov 28: not
-  // links). Broken links has none: it opens the links listings already have.
+  // links), on every job.
   const from =
     watch.id === 'kosher' ? (
       <KosherLists views={views} token={token} onChanged={reload} />

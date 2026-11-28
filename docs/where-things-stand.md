@@ -432,8 +432,8 @@ old number can still be looked up. When an item is done, move it to
     phone tab, between Places and Site (gone from Reports), grouped as
     drawn with a search for jobs and sources (`watchList.ts`). Each
     job's page is the Watching card (switch, line, Off · last read, or
-    Runs when…) and From, what it reads, on every job but Broken links
-    (plain rows, not links: the user, Nov 28). Kosher certification's lists have Edit and Remove (pencil
+    Runs when…) and From, what it reads, on every job (plain rows, not
+    links: the user, Nov 28; Broken links' is "Links on each listing"). Kosher certification's lists have Edit and Remove (pencil
     and × on a computer, a swipe on a phone), Undo and "+ Add a kosher
     list" (`KosherLists.tsx`). Places has Watch and Source in place of
     Checked by, each row saying its jobs, and on a phone one Filters

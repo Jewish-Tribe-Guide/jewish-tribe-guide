@@ -172,7 +172,7 @@ describe('a job on Watches, opened (boards L2b, L2f)', () => {
     expect(posts).toEqual([{ action: 'add', url: 'https://star-k.org/list', purpose: 'kosher' }])
   })
 
-  it('every job says what it reads under From, Broken links aside', async () => {
+  it('every job says what it reads under From', async () => {
     serve([view({ id: 'eruvs', name: 'Eruvs', tracked: [{ name: 'Lower Merion', status: 'Read', bad: false, page: 'place/lm' }] })])
     show('eruvs')
     expect(await screen.findByRole('heading', { name: 'Eruv status' })).toBeInTheDocument()
@@ -188,10 +188,11 @@ describe('a job on Watches, opened (boards L2b, L2f)', () => {
     }
     cleanup()
     forgetWatchJobs()
+    // Broken links opens any link on a listing, not only websites.
     serve([view({ id: 'links' })])
     show('links')
     await screen.findByTestId('watching-line')
-    expect(screen.queryByRole('region', { name: 'From' })).toBeNull()
+    expect(within(screen.getByRole('region', { name: 'From' })).getAllByTestId('from-row').map((r) => r.textContent)).toEqual(['Links on each listing'])
   })
 })
 
