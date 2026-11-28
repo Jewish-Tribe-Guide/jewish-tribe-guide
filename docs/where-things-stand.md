@@ -156,8 +156,11 @@ old number can still be looked up. When an item is done, move it to
       only, so they no longer offer an email. An opened field closes on
       a click away while it's empty or unchanged, and on Escape. A
       field opened by Change or Add sits under its line (Nov 28: Change
-      had covered the line). A shul's email line has Stop reading it,
-      as a page's does (Nov 28).
+      had covered the line). Every source line has Remove beside
+      Change, a shul's email's included; it stops the source, kept so
+      the morning's search doesn't add it back, and the line then says
+      Removed · Read again · Change (Nov 28: it was Stop reading it,
+      inside Change).
     - **Read from is gone from Edit listing (Nov 25, the user's yes):**
       its two jobs no row had moved onto rows. A place Google hasn't
       matched says so on its name row, "Not found on Google · Find it

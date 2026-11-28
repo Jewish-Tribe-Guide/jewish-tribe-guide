@@ -23,8 +23,6 @@ export type FieldSpec = {
   value: string
   placeholder: string
   attempt: Attempt
-  /** "Stop reading it", beside the field once it's opened from Change. */
-  stop?: () => Promise<void>
 }
 
 /** What a row's field asks for: this week's schedule can come from an
@@ -39,7 +37,7 @@ export function addSourceWords(row: EditorRow): string {
   return sourcePlaceholder(row) === 'A page’s link or an email' ? 'Add a page or an email' : 'Add a page'
 }
 
-type Open = { value: string; first: string; attempt: Attempt; stop?: () => Promise<void> }
+type Open = { value: string; first: string; attempt: Attempt }
 
 export function useSourceFields() {
   // Per row, by key: the fields showing and what they hold.
@@ -78,7 +76,7 @@ export function useSourceFields() {
   /** Change on a line: its field, filled in. */
   function reveal(row: EditorRow, spec: FieldSpec) {
     openedAt.current = performance.now()
-    set(row.id, spec.key, { value: spec.value, first: spec.value, attempt: spec.attempt, ...(spec.stop ? { stop: spec.stop } : {}) })
+    set(row.id, spec.key, { value: spec.value, first: spec.value, attempt: spec.attempt })
   }
 
   const isOpen = (row: EditorRow, key: string) => !!open[row.id]?.[key]
@@ -89,14 +87,13 @@ export function useSourceFields() {
     const now = open[row.id]?.[spec.key]
     if (!now && !shown) return null
     const value = now?.value ?? ''
-    const stop = now?.stop
     return (
       <div className="space-y-1.5" data-source-field>
         <input
           value={value}
           onChange={(e) => {
             setError(null)
-            set(row.id, spec.key, { value: e.target.value, first: now?.first ?? '', attempt: now?.attempt ?? spec.attempt, ...(stop ? { stop } : {}) })
+            set(row.id, spec.key, { value: e.target.value, first: now?.first ?? '', attempt: now?.attempt ?? spec.attempt })
           }}
           onKeyDown={(e) => {
             if (e.key !== 'Escape') return
@@ -112,20 +109,6 @@ export function useSourceFields() {
           className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-[0.9375rem] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none"
           data-testid="source-field"
         />
-        {stop && (
-          <button
-            type="button"
-            onClick={() =>
-              void stop().then(
-                () => set(row.id, spec.key, null),
-                (err: unknown) => setError({ row: row.id, text: err instanceof Error ? err.message : 'Could not stop it.' }),
-              )
-            }
-            className="cursor-pointer text-[0.8125rem] font-semibold text-red-700 hover:underline"
-          >
-            Stop reading it
-          </button>
-        )}
         {error?.row === row.id && <p className="m-0 text-[0.8125rem] font-semibold text-red-700">{error.text}</p>}
       </div>
     )

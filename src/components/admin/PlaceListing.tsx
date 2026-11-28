@@ -20,7 +20,6 @@ import ListingEditorScreen from './ListingEditorScreen'
 import { listingSources, rowFinding, type GiveSource, type ReadNow, type RowSource, type SourceLine } from './listingSource'
 import OpenedPlace from './OpenedPlace'
 import { sourceActions, type Attempt } from './sourceActions'
-import type { Stop } from './openedPlaceBoxes'
 import { jobsChangedBy, type Jobs } from './useWatchJobs'
 import { kindsOf } from './WatchKinds'
 import { useStepsInAddress } from './useStepsInAddress'
@@ -188,7 +187,7 @@ export function keptWords<L extends { text: string; when?: string | null }>(line
  *  field under the line is what to do about it. */
 export function fromWords(text: string): string {
   if (!text || text === 'Nothing reads this') return ''
-  if (text === 'Stopped' || /^(From|Found|Reading|Couldn’t|No |Looking|Not found)/.test(text)) return text
+  if (text === 'Removed' || /^(From|Found|Reading|Couldn’t|No |Looking|Not found)/.test(text)) return text
   if (text === 'Link check') return 'From the link check'
   return `From ${text.startsWith('Its ') ? `its ${text.slice(4)}` : text}`
 }
@@ -198,7 +197,6 @@ export type SourceScreenProps = {
   value: string
   button: string
   attempt: Attempt
-  stop?: () => Promise<void>
   /** Under the address: an eruv's "Its page dates each week's post". */
   extra?: ReactNode
   placeholder?: string
@@ -211,7 +209,7 @@ export type SourceScreenProps = {
 
 /** Change, and Add a source: where it's read from, filled in; Save, or Start
  *  reading once it's stopped, which reads at once and says if it couldn't. */
-export function SourceScreen({ label, value: first, button: words, attempt: firstAttempt, stop, extra, placeholder, failedAtFirst = false, onDone, onTried }: SourceScreenProps) {
+export function SourceScreen({ label, value: first, button: words, attempt: firstAttempt, extra, placeholder, failedAtFirst = false, onDone, onTried }: SourceScreenProps) {
   const [value, setValue] = useState(first)
   const [attempt, setAttempt] = useState<{ run: Attempt }>({ run: firstAttempt })
   const [busy, setBusy] = useState(false)
@@ -258,11 +256,6 @@ export function SourceScreen({ label, value: first, button: words, attempt: firs
       <button type="submit" disabled={busy || !value.trim()} className={SUBMIT_PILL}>
         {busy ? 'Reading…' : words}
       </button>
-      {stop && (
-        <button type="button" disabled={busy} onClick={() => void go(async () => { await stop(); await onDone() })} className="min-h-11 cursor-pointer text-center text-[0.9375rem] font-bold text-red-700 disabled:opacity-60">
-          Stop reading it
-        </button>
-      )}
     </form>
   )
 }
@@ -347,7 +340,6 @@ export default function PlaceListing({
       return result
     }
     const changeSpec = (key: 'change' | 'also', c: NonNullable<SourceLine['change']>): FieldSpec => {
-      const stop: Stop | undefined = c.stop
       return {
         key,
         value: c.value,
@@ -356,7 +348,6 @@ export default function PlaceListing({
           await actions.change(c.act, url)
           return { failed: false }
         }),
-        ...(stop ? { stop: async () => { await actions.stopSource(stop); await reload() } } : {}),
       }
     }
     const s = line.start
@@ -390,6 +381,21 @@ export default function PlaceListing({
         {place.status === 'archived' ? <ArchivedPlace place={place} category={category} token={token} onDone={onSaved} /> : <AdminEmpty>Its category is gone, so it can’t be edited here.</AdminEmpty>}
       </div>
     )
+  }
+
+  /** A line's own act (Remove, Read again): the row says if it failed. */
+  async function lineAct(row: EditorRow, act: () => Promise<{ failed: boolean } | void>) {
+    setBusy(true)
+    setRowError(null)
+    try {
+      const result = await act()
+      if (result?.failed) setRowError({ row: row.id, text: 'Couldn’t read that page' })
+      await reload()
+    } catch (err) {
+      setRowError({ row: row.id, text: err instanceof Error ? err.message : 'Could not do that.' })
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function google(row: EditorRow, action: 'stop_field' | 'use_field', field: CheckedField) {
@@ -514,7 +520,15 @@ export default function PlaceListing({
       const spec = specs[which]
       return spec && !fields.isOpen(row, which) ? [control('Change', () => fields.reveal(row, spec))] : []
     }
-    const controls: ReactNode[] = [...readControl(line), ...changeOf('change'), ...changeOf('start')]
+    // Remove, beside Change (the user, Nov 28: not inside it). It stops
+    // reading the source, kept so the morning's search doesn't add it
+    // back; the line then says Removed, with Read again.
+    const removeOf = (l: SourceLine) => {
+      const stop = l.change?.stop
+      return stop ? [control('Remove', () => void lineAct(row, () => actions.stopSource(stop)))] : []
+    }
+    const readAgain = specs.start ? [control('Read again', () => void lineAct(row, () => specs.start!.attempt(specs.start!.value)))] : []
+    const controls: ReactNode[] = [...readControl(line), ...changeOf('change'), ...removeOf(line), ...readAgain, ...changeOf('start')]
     // No source yet: a link opens its field.
     if (specs.add && !fields.isOpen(row, 'add')) {
       const spec = specs.add
@@ -542,7 +556,7 @@ export default function PlaceListing({
         {specs.change && fields.field(row, specs.change)}
         {specs.start && fields.field(row, specs.start)}
         {specs.add && fields.field(row, specs.add)}
-        {source.also && <SourceWords line={said(source.also)} controls={[...readControl(source.also), ...changeOf('also')]} />}
+        {source.also && <SourceWords line={said(source.also)} controls={[...readControl(source.also), ...changeOf('also'), ...removeOf(source.also)]} />}
         {specs.also && fields.field(row, specs.also)}
         {row.id === 'minyans:this_week' && !source.job.includes('Email') && emailLine()}
       </div>

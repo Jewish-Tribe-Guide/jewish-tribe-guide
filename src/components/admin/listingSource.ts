@@ -38,7 +38,7 @@ export type SourceLine = {
   url?: string | null
   when?: string | null
   mail?: boolean
-  /** The Change screen: its address filled in, Save, Stop reading it. */
+  /** Change: its address filled in. `stop`: Remove, beside it. */
   change?: { label: string; value: string; act: Change; stop?: Stop }
   /** The same screen, once stopped: one Start reading, which reads at once. */
   start?: { label: string; value: string; again: Again }
@@ -112,7 +112,7 @@ function fromFoot(id: NightKindId, foot: Foot, value: string): RowSource {
 }
 
 function stopped(label: string, value: string, again: Again): RowSource {
-  return { job: 'Stopped', amber: true, line: { text: 'Stopped', start: { label, value, again } } }
+  return { job: 'Stopped', amber: true, line: { text: 'Removed', start: { label, value, again } } }
 }
 
 type Listing = Record<string, unknown> & { id: string; phone?: string | null }

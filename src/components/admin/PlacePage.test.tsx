@@ -422,11 +422,11 @@ describe('PlacePage', () => {
       const minyans = screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!
       await user.click(minyans)
       // The user, Nov 26: the line says its sticker's own words.
-      expect(screen.getByTestId('row-source')).toHaveTextContent(`Checked nightly from kesher.example/davening · last ${day(at)} · Read now · Change`)
+      expect(screen.getByTestId('row-source')).toHaveTextContent(`Checked nightly from kesher.example/davening · last ${day(at)} · Read now · Change · Remove`)
       expectLineUnderCard()
       // The user, Nov 26: what to do on the right, apart from what it says.
       const actions = screen.getByTestId('row-source-actions')
-      expect(actions).toHaveTextContent(/^Read now · Change$/)
+      expect(actions).toHaveTextContent(/^Read now · Change · Remove$/)
       expect(actions).toHaveClass('ml-auto')
       expect(actions.previousElementSibling).toHaveClass('sr-only')
       expect(screen.queryByTestId('source-field')).toBeNull()
@@ -570,16 +570,17 @@ describe('PlacePage', () => {
       })
     })
 
-    it('Stop reading it, on the Change screen: nothing asked first, it can be started again', async () => {
+    // The user, Nov 28: Remove on the line, beside Change, not inside it.
+    it('Remove, on its line beside Change: nothing asked first', async () => {
       await listingPage({ job: withTimes })
       const user = userEvent.setup()
       await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
-      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
-      await user.click(screen.getByRole('button', { name: 'Stop reading it' }))
+      expect(screen.getByTestId('row-source-actions')).toHaveTextContent(/^Read now · Change · Remove$/)
+      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Remove' }))
       expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'stop', resourceId: 'a', id: 'w1' }]])
     })
 
-    it('a page stopped says Stopped; Change and Done start it, and a failed read says so and stays open', async () => {
+    it('a page removed says Removed; Change and Done start it, and a failed read says so and stays open', async () => {
       const off = { ...shul, off: true }
       await renderPage('a', [place('a', 'Kesher Israel')], (url, init) => {
         if (init?.method === 'POST') {
@@ -596,7 +597,7 @@ describe('PlacePage', () => {
       const job = screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Stopped')!
       expect(job).toHaveTextContent('Not checked')
       await user.click(job.closest('button')!)
-      expect(screen.getByTestId('row-source')).toHaveTextContent('Stopped · Change')
+      expect(screen.getByTestId('row-source')).toHaveTextContent('Removed · Read again · Change')
       await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
       const input = screen.getByTestId('source-field')
       expect(input).toHaveValue(page.url)
@@ -614,6 +615,28 @@ describe('PlacePage', () => {
       // It couldn't be read: the row stays open, saying so.
       expect(await screen.findByText('Couldn’t read that page')).toBeTruthy()
       expect(screen.getByTestId('source-field')).toBeTruthy()
+    })
+
+    it('a page removed: Read again reads it at once, from the address it had', async () => {
+      const off = { ...shul, off: true }
+      await renderPage('a', [place('a', 'Kesher Israel')], (url, init) => {
+        if (init?.method === 'POST') {
+          const body = JSON.parse(String(init.body))
+          posts.push([url.replace(/[?&]community=philly/, ''), body])
+          if (body.action === 'check') return body.id ? { pages: [{ watch: { id: 'w1', url: page.url, lastError: 'It wouldn’t open' }, source: '' }] } : { read: ['w1'] }
+          return { ok: true }
+        }
+        if (url.includes('/api/admin/categories')) return { ok: true, categories: [shulCategory] }
+        if (url.includes('/api/admin/listings')) return { ok: true, places: [row()], categories: [shulCategory] }
+        return url.includes('job=times') ? { name: 'Shul times', places: [off] } : undefined
+      })
+      const user = userEvent.setup()
+      const job = screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Stopped')!
+      expect(job).toHaveTextContent('Not checked')
+      await user.click(job.closest('button')!)
+      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Read again' }))
+      await waitFor(() => expect(posts[0]).toEqual(['/api/admin/watches/hours?job=times', { action: 'on', resourceId: 'a' }]))
+      expect(screen.queryByTestId('source-field')).toBeNull()
     })
 
     it('a Google field: From Google, and no Stop on its line', async () => {
@@ -786,12 +809,11 @@ describe('an eruv', () => {
     expect(posts).toEqual([['/api/admin/eruvim', { id: 'lm', action: 'save', edit: { statusEmail: 'eruv@lowermerioneruv.org', statusUrl: '' } }]])
   })
 
-  it('stops reading its map from Change; its website has a line and nothing to do', async () => {
+  it('removes its map from its line; its website has a line and nothing to do', async () => {
     await eruvPage('lm')
     const user = userEvent.setup()
     await user.click(screen.getByTestId('editor-row-map'))
-    await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
-    await user.click(screen.getByRole('button', { name: 'Stop reading it' }))
+    await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Remove' }))
     expect(posts).toEqual([['/api/admin/eruvim', { id: 'lm', action: 'save', edit: { lineUrl: '' } }]])
     posts.length = 0
     await user.click(await screen.findByTestId('editor-row-website'))
@@ -923,7 +945,7 @@ describe('stopping a hospital’s or food place’s source', () => {
     expect(posts).toEqual([['/api/admin/watches/hospitals', { action: 'none', resourceId: 'h' }]])
   })
 
-  it('a food place’s menu: Stop reading it unlinks its menu link', async () => {
+  it('a food place’s menu: Remove unlinks its menu link', async () => {
     const grill = { id: 'r', name: 'Cherry Grill', href: '/philly/restaurants/cherry', category: 'restaurant', dishes: ['Schnitzel'], website: 'https://cherrygrill88.com', menuUrl: 'https://cherrygrill88.com/menu', reading: { status: 'approved', readAt: at, sourceUrl: 'https://cherrygrill88.com/menu', dishes: [{ name: 'Schnitzel', quote: 'Schnitzel', checked: true }] } }
     const restaurant = makeCategory({ id: 'restaurant', label: 'Restaurant', pluralLabel: 'Restaurants', detailFields: [{ key: 'mainDishes', label: 'Main dishes', type: 'tags', countLabel: 'dish', showCountInHeader: true }] as never })
     const row = { id: 'r', name: 'Cherry Grill', category: 'restaurant', status: 'approved', hasAddress: true, changedAt: at, listing: makeListing({ id: 'r', name: 'Cherry Grill', category: 'restaurant', mainDishes: ['Schnitzel'] } as never) }
@@ -949,8 +971,7 @@ describe('stopping a hospital’s or food place’s source', () => {
     const aside = screen.getByTestId('screen-aside')
     expect(aside.previousElementSibling?.tagName).toBe('H1')
     expect(aside.parentElement?.tagName).not.toBe('HEADER')
-    await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
-    await user.click(screen.getByRole('button', { name: 'Stop reading it' }))
+    await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Remove' }))
     expect(posts).toEqual([['/api/admin/main-dishes', { action: 'unlink', resourceId: 'r' }]])
   })
 })

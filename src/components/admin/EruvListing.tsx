@@ -165,6 +165,21 @@ export default function EruvListing({
     }
   }
 
+  /** A line's own act (Remove, Read again); the page says if it failed. */
+  async function lineAct(act: () => Promise<{ failed: boolean } | void>) {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await act()
+      if (result?.failed) setError('Couldn’t read that page')
+      await reload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not do that.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const control = (words: string, onClick: () => void) => (
     <button type="button" onClick={onClick} className={LINE_LINK}>
       {words}
@@ -197,7 +212,6 @@ export default function EruvListing({
               await actions.change(c.act, url)
               return { failed: false }
             },
-            ...(c.stop ? { stop: () => actions.stopSource(c.stop!) } : {}),
           },
         },
       }),
@@ -210,9 +224,14 @@ export default function EruvListing({
     const { line } = source
     const screens = screensOf(source)
     const controls: ReactNode[] = []
+    // Remove beside Change, and Read again once removed (the user, Nov 28).
+    const stop = line.change?.stop
+    const start = screens.start
     for (const which of ['change', 'start', 'add'] as const) {
       const spec = screens[which]
+      if (which === 'start' && start) controls.push(control('Read again', () => void lineAct(() => start.props.attempt(start.props.value))))
       if (spec) controls.push(control(spec.title, () => setScreen(spec)))
+      if (which === 'change' && stop) controls.push(control('Remove', () => void lineAct(() => actions.stopSource(stop))))
     }
     return <SourceWords line={line} controls={controls} />
   }
