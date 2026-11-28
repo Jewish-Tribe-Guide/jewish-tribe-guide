@@ -510,7 +510,7 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
     const r = statusRead
     status.line =
       r?.state === 'reading' ? (
-        <SourceWords line={{ text: email ? 'Looking in the guide’s Gmail…' : `Reading ${page}…` }} />
+        <SourceWords line={{ text: email ? 'Looking for its latest email…' : `Reading ${page}…` }} />
       ) : r?.state === 'done' ? (
         <SourceWords line={{ text: page, when: r.on ?? 'just now' }} controls={[change]} />
       ) : r?.state === 'no-email' ? (
@@ -527,7 +527,7 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
         </>
       ) : r?.state === 'failed' ? (
         <>
-          <SourceWords line={{ text: email ? 'Couldn’t reach the guide’s Gmail' : 'Couldn’t read that page', red: true }} />
+          <SourceWords line={{ text: email ? 'Couldn’t look for its email' : 'Couldn’t read that page', red: true }} />
           {idle}
         </>
       ) : (

@@ -1,5 +1,7 @@
 import type { NewsletterEmail } from './newsletterRun'
 import { getNewsletterSetup } from './newsletterSetupStore'
+import { communityInboundAddress } from './inboundEmail'
+import { latestReceivedFrom, receivingClient } from './receivedEmail'
 
 // Read now for email (boards *14): the guide's Gmail script, deployed as a web
 // app (scripts/newsletter-apps-script.js, doPost), asked for one address's
@@ -49,12 +51,20 @@ export function sentOn(date: string | null): string {
   return date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : 'recent'
 }
 
-/** That address's latest email, as the guide's Gmail has it. */
+/** That address's latest email: in what the community's own address
+ *  received (tracker 100), else as the guide's Gmail has it, while a list
+ *  still goes there. */
 export async function latestEmailFrom(community: string, address: string, fetchImpl: typeof fetch = fetch): Promise<EmailLook> {
+  const own = communityInboundAddress(community)
+  const resend = own ? receivingClient() : null
+  const received = resend ? await latestReceivedFrom(resend, community, address) : null
+  if (received && received !== 'failed') return { state: 'found', account: own, email: received, on: sentOn(received.date) }
   const setup = await getNewsletterSetup(community)
+  if (own && !setup?.webAppUrl) return received === 'failed' ? { state: 'no-answer' } : { state: 'no-email', account: own }
   if (!setup?.webAppUrl) return { state: 'no-gmail' }
   const got = await askGmail(setup.webAppUrl, setup.key, address, fetchImpl)
-  if (!got.ok) return { state: 'no-answer' }
-  const account = got.account ?? setup.account
+  if (!got.ok) return own ? { state: 'no-email', account: own } : { state: 'no-answer' }
+  // Sign up with the community's own address once there is one.
+  const account = own ?? got.account ?? setup.account
   return got.email ? { state: 'found', account, email: got.email, on: sentOn(got.email.date) } : { state: 'no-email', account }
 }

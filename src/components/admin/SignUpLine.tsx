@@ -9,7 +9,7 @@ const LINE_LINK = 'cursor-pointer font-semibold text-primary hover:underline dis
 
 export function SignUpLine({ account }: { account: string | null }) {
   const [copied, setCopied] = useState(false)
-  if (!account) return <p className="m-0 text-[0.8125rem] text-slate-500">Sign up for its emails with the guide’s Gmail</p>
+  if (!account) return <p className="m-0 text-[0.8125rem] text-slate-500">Sign up for its emails with the community email</p>
   return (
     <p className="m-0 text-[0.8125rem] text-slate-500 [overflow-wrap:anywhere]">
       Sign up for its emails with {account} ·{' '}

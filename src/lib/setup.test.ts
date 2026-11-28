@@ -18,6 +18,14 @@ describe('setupSteps', () => {
     expect(setupLeft(NEW)).toBe(4)
   })
 
+  // Nov 28: every community has the site's own address from the start, so
+  // there's nothing to set up and no step for it.
+  it('no email step once the site has its own address', () => {
+    const own = { ...NEW, communityEmail: true, communityAddress: 'philly@guide.example' }
+    expect(setupSteps(own, '').map((x) => x.key)).toEqual(['logo', 'category', 'admins'])
+    expect(setupLeft(own)).toBe(3)
+  })
+
   it('ticks each off by what is saved', () => {
     const done = (s: Partial<SetupState>) => setupSteps({ ...NEW, ...s }, '').filter((x) => x.done).map((x) => x.key)
     expect(done({ logo: true })).toEqual(['logo'])

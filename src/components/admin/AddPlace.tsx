@@ -433,7 +433,7 @@ export default function AddPlace({ category, listings, token, onClose, onBack = 
             Done
           </button>
         )}
-        {stage === 'reading' && <p className="m-0 text-[0.9375rem] text-slate-600">{website || given.page ? 'Reading its website…' : 'Looking in the guide’s Gmail…'}</p>}
+        {stage === 'reading' && <p className="m-0 text-[0.9375rem] text-slate-600">{website || given.page ? 'Reading its website…' : 'Looking for its latest email…'}</p>}
         {stage === 'no-email' && (
           <>
             <div className="space-y-1">

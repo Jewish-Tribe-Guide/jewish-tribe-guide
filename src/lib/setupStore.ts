@@ -22,7 +22,8 @@ export async function getSetupState({ slug: community }: { slug: string }): Prom
   return {
     logo: !!(settings.data as { logo_url: string | null } | null)?.logo_url?.trim(),
     admins: admins.length,
-    communityEmail: !!own.email && !!own.checkedAt,
+    communityEmail: own.received || (!!own.email && !!own.checkedAt),
+    communityAddress: own.received ? own.email : null,
     categories: categories.count ?? 0,
     places: places.count ?? 0,
   }

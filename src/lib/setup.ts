@@ -22,6 +22,9 @@ export type SetupState = {
   /** The community email is saved and the newsletter script in it has
    *  checked in at least once: both halves of its page. */
   communityEmail: boolean
+  /** The site's own address, when it has one (tracker 100): every
+   *  community has it from the start, so its step isn't shown. */
+  communityAddress?: string | null
   /** Categories, and places on the site in any of them. */
   categories: number
   places: number
@@ -32,7 +35,8 @@ export type SetupStep = { key: string; name: string; line: string; href: string;
 export function setupSteps(s: SetupState, base: string): SetupStep[] {
   return [
     { key: 'logo', name: 'Your logo', line: 'At the top of every page', href: `${base}/home`, done: s.logo },
-    { key: 'communityEmail', name: 'The community email', line: 'A Gmail for replies and the shuls’ and eruvs’ emails', href: `${base}/team/email`, done: s.communityEmail },
+    // Only where the site receives no mail of its own: a Gmail to make.
+    ...(s.communityAddress ? [] : [{ key: 'communityEmail', name: 'The community email', line: 'A Gmail for replies and the shuls’ and eruvs’ emails', href: `${base}/team/email`, done: s.communityEmail }]),
     {
       key: 'category',
       name: 'Your first category',

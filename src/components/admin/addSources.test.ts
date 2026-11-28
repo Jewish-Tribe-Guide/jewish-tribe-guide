@@ -132,11 +132,11 @@ describe('Add a place: what a row is read from', () => {
 
   it('an email’s read says what the Gmail had (EmailFound14 to EmailNoGmail14)', () => {
     const after = (read: AddState['reads']['email']) => rowOf({ ...state({ given: { email: 'office@ohev.org' } }), reads: { email: read } }, 'minyans:weekday')?.lines[0]
-    expect(after({ state: 'reading' })?.text).toBe('Looking in the guide’s Gmail…')
+    expect(after({ state: 'reading' })?.text).toBe('Looking for its latest email…')
     expect(after({ state: 'found', on: 'Oct 30' })).toMatchObject({ text: 'office@ohev.org', when: 'Oct 30' })
     expect(after({ state: 'no-email' })).toMatchObject({ text: 'No emails from office@ohev.org yet', signUp: true })
     expect(after({ state: 'no-times', on: 'Oct 28' })?.text).toBe('office@ohev.org’s Oct 28 email had no times')
-    expect(after({ state: 'no-answer' })).toMatchObject({ text: 'Couldn’t reach the guide’s Gmail', red: true })
+    expect(after({ state: 'no-answer' })).toMatchObject({ text: 'Couldn’t look for its email', red: true })
     expect(after({ state: 'no-gmail' })).toMatchObject({ text: 'The guide’s Gmail isn’t set up', setUpGmail: true })
   })
 

@@ -283,8 +283,8 @@ old number can still be looked up. When an item is done, move it to
     "Add a photo" as a strip along its bottom edge (the phone's own
     menu); the site's wide Send alone below it, live once there's words
     or a photo (V2b). Replaces today's box.
-100. **The site's own email address** (BUILT Nov 27 on
-    `claude/kept-current`, not live until 102 is done): one address per
+100. **The site's own email address** (BUILT Nov 27, live Nov 28:
+    the first test email was forwarded to the admins): one address per
     community, `<community>@phillyjewishguide.com`, a catch-all at
     Resend (it receives mail too, so no second service), which posts
     each email to `/api/inbound/email` within seconds instead of the
@@ -292,15 +292,21 @@ old number can still be looked up. When an item is done, move it to
     down; a watched newsletter is read and filed, as the script's are;
     anything else from a person is forwarded to the community's admins
     with Reply-To the sender, so the admin's Reply answers them.
-    Auto-replies and bounces are never forwarded. Once set,
+    Auto-replies and bounces are never forwarded; other machine mail (a list's "confirm your address", a receipt) is, since an admin may need it (Nov 28). Once set,
     `getCommunityEmail` gives this address when Settings has none
     saved, so it becomes the reply-to on every email the site sends
     visitors, and the site sends from it too (one address a visitor
     sees everywhere; sign-in links stay on `RESEND_FROM`). No "in."
-    subdomain: the domain receives no other mail (the user, Nov 27). Eruv emails this way wait (`unverified`) until the first
-    real one shows Resend's server name for `INBOUND_AUTH_SERVERS`
-    (`src/lib/inboundEmail.ts`); the Gmail script keeps reading them
-    meanwhile. Each received email counts against Resend's send quota
+    subdomain: the domain receives no other mail (the user, Nov 27). Eruv emails this way are believed on Resend's receiving
+    server's word, `receive.forge.rmta.net` (`INBOUND_AUTH_SERVERS`,
+    read off the first real email Nov 28), from the topmost
+    Authentication-Results only (`topHeader`). The first forwards
+    landed in Gmail's spam (a new sending domain; DKIM, SPF and DMARC
+    are all in place): each admin adds the address to their contacts.
+    The admin pages no longer ask for a Gmail once the address is set
+    (Nov 28): Team and Community email show the address, the setup
+    step is gone (nothing to set up), and Read now looks in Resend's received mail (14
+    days, `receivedEmail.ts`) before the Gmail script. Each received email counts against Resend's send quota
     (Free: 100 a day, 3,000 a month), and Resend keeps it 30 days.
 101. **Guess the kind of a new place from Google** (agreed Nov 27, a
     follow-up to 99): adding a place from a screen with no category
@@ -343,11 +349,16 @@ old number can still be looked up. When an item is done, move it to
     the placeholder by the day. Its test then joins
     `e2e/layout-shift.spec.ts`'s days (Tuesday and Shabbos there now),
     as a plain test: as test.fail it flipped with machine load.
+105. **An e2e shard hangs in CI** (twice: shard 4 on PR 469, Nov 27,
+    after its tests passed; shard 6 on PR 471, Nov 28, 19 minutes in
+    its test step). The job's 20-minute limit ends it, and a rerun of
+    the failed shard passes. Not looked into yet: the next one's log
+    says whether Playwright or the server is what doesn't exit.
 
 ### You do
 
-102. Turn on the site's email address (100), in order (1 and 2 done
-    Nov 27, Production only; 116-118 on live too):
+102. Turn on the site's email address (100), in order (1-3 done
+    Nov 27-28, Production only; 116-118 on live too):
     1. Resend › Domains: open `phillyjewishguide.com` (add it if the
        site sends from another domain, with the records Resend lists),
        turn on Receiving, and copy the MX record it shows into
@@ -366,9 +377,13 @@ old number can still be looked up. When an item is done, move it to
        I read the server name from it for `INBOUND_AUTH_SERVERS`.
     4. Move JCOR's groups.io list and each shul newsletter to the new
        address, one at a time, unsubscribing the Gmail (a list on both
-       is read twice).
-    5. Settings › Team › Community email: clear it, or set it to the new
-       address, if one was saved.
+       is read twice). Done Nov 28: JCOR, BZBI, Kol Tzedek. Left:
+       Mekor, the Shtiebel, Society Hill (Constant Contact). Sons of
+       Israel's watch is off. A sign-up's "confirm" email is forwarded
+       to the admins (PR 471); before that, click it in Resend ›
+       Receiving.
+    5. Nothing to clear: the site's own address now wins over a saved
+       one (Nov 28).
     6. Later: retire the Gmail script, after checking nothing else signs
        in with that Gmail.
 87. Settings, a few minutes each (the user will do them, Nov 24):
