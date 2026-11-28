@@ -295,6 +295,10 @@ old number can still be looked up. When an item is done, move it to
     problems and a watch that didn't run go to To do. Kosher shows its
     lists and the places they matched, with "Not this place" and no Add
     (item 107). Hospitals gets Add a hospital.
+    Second pass (W8–W10, same canvas): remove from the watch's own list
+    (Edit on the heading, a swipe on a phone, Undo instead of a confirm);
+    a row opens the place in Places; one watch per kosher list; the
+    Watches list as names with a count on the right.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
