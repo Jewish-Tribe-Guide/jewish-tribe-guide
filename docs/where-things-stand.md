@@ -365,6 +365,13 @@ old number can still be looked up. When an item is done, move it to
     sources), then the page or the sender's email. Open: the user finds
     the one menu with sources indented under jobs confusing, and
     suggests two filters, a job and a source.
+    L1 and L2 approved. L3b (drawn Nov 28) replaces L3: Places has two
+    menus, Watch (the jobs, plus Nothing) and Source (Google, Website,
+    Newsletter, each kosher list, Refuah), each narrowing the other; on
+    a phone, one Filters sheet. Dropped: L4, M1–M5 and J9's "Kept
+    current by" box. A place already shows each field's source with
+    Read now · Change · Remove, so adding a source stays there. Not
+    built.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
