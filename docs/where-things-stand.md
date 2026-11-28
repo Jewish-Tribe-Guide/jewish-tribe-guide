@@ -155,8 +155,9 @@ old number can still be looked up. When an item is done, move it to
       its line ("… · Change · Add an email"); usual times are pages
       only, so they no longer offer an email. An opened field closes on
       a click away while it's empty or unchanged, and on Escape. A
-      field opened by Change takes its line's place while it's open; one
-      opened by Add sits under its line.
+      field opened by Change or Add sits under its line (Nov 28: Change
+      had covered the line). A shul's email line has Stop reading it,
+      as a page's does (Nov 28).
     - **Read from is gone from Edit listing (Nov 25, the user's yes):**
       its two jobs no row had moved onto rows. A place Google hasn't
       matched says so on its name row, "Not found on Google · Find it

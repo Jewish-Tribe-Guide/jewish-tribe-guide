@@ -536,12 +536,13 @@ export default function PlaceListing({
       <div className="space-y-1.5">
         {error}
         {failed}
-        {/* Changing it: the field takes the line's place (Nov 25). */}
-        {(words.text || controls.length > 0) && !(['change', 'start', 'add'] as const).some((k) => specs[k] && fields.isOpen(row, k)) && <SourceWords line={words} controls={controls} />}
+        {/* Changing it: the line stays and the field opens under it (the
+            user, Nov 28; Nov 25 had the field over it). */}
+        {(words.text || controls.length > 0) && <SourceWords line={words} controls={controls} />}
         {specs.change && fields.field(row, specs.change)}
         {specs.start && fields.field(row, specs.start)}
         {specs.add && fields.field(row, specs.add)}
-        {source.also && !(specs.also && fields.isOpen(row, 'also')) && <SourceWords line={said(source.also)} controls={[...readControl(source.also), ...changeOf('also')]} />}
+        {source.also && <SourceWords line={said(source.also)} controls={[...readControl(source.also), ...changeOf('also')]} />}
         {specs.also && fields.field(row, specs.also)}
         {row.id === 'minyans:this_week' && !source.job.includes('Email') && emailLine()}
       </div>

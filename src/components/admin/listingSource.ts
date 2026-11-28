@@ -177,6 +177,9 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
 
   /** A week's times: the newsletter that gave them, or the page; by hand,
    *  nothing reads them. */
+  /** Its email's Stop reading it (Nov 28: it had Change only). */
+  const stopEmail = (watchId: string): Stop => ({ kind: 'watch', watchId, what: 'its email' })
+
   function oneWeekSource(useBox: boolean): RowSource {
     const shul = jobs.times?.places.find((p) => p.id === id)
     const news = off('newsletters') ? undefined : shul?.newsletters?.find((w) => w.active)
@@ -189,7 +192,7 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
       return {
         job: nameOf('newsletters'),
         amber: false,
-        line: { text: 'Its email', mail: true, when: news.pageChangedAt ? day(news.pageChangedAt) : null, change: { label: WHERE.newsletter, value, act: { kind: 'newsletter', replaces: news.id } } },
+        line: { text: 'Its email', mail: true, when: news.pageChangedAt ? day(news.pageChangedAt) : null, change: { label: WHERE.newsletter, value, act: { kind: 'newsletter', replaces: news.id }, stop: stopEmail(news.id) } },
       }
     }
     return pagesRow('times', null)
@@ -203,7 +206,7 @@ export function listingSources(id: string, jobs: Jobs, now: number, category: Ca
     if (!news || page.job !== 'Website') return one
     const mail = one.job === 'Email' ? one : oneWeekSource(false)
     if (mail.job !== 'Email') {
-      return { job: 'Website, Email', amber: false, line: { text: 'Its email', mail: true, when: news.pageChangedAt ? day(news.pageChangedAt) : null, change: { label: WHERE.newsletter, value: news.url.replace(/^mailto:/, ''), act: { kind: 'newsletter', replaces: news.id } } }, also: page.line }
+      return { job: 'Website, Email', amber: false, line: { text: 'Its email', mail: true, when: news.pageChangedAt ? day(news.pageChangedAt) : null, change: { label: WHERE.newsletter, value: news.url.replace(/^mailto:/, ''), act: { kind: 'newsletter', replaces: news.id }, stop: stopEmail(news.id) } }, also: page.line }
     }
     return { job: 'Website, Email', amber: false, line: mail.line, also: page.line }
   }

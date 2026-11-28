@@ -435,8 +435,12 @@ describe('PlacePage', () => {
       const input = screen.getByTestId('source-field')
       expect(input).toHaveValue('https://kesher.example/davening')
       expect(input.closest('.bg-white')).not.toBeNull()
-      // The field takes the line's place while it's open (Nov 25).
-      expect(screen.queryByTestId('row-source')).toBeNull()
+      // The line stays, its Change gone, and the field is under it (the
+      // user, Nov 28: not over it, as Nov 25 had it).
+      const line = screen.getByTestId('row-source')
+      expect(line).toHaveTextContent('Checked nightly from kesher.example/davening')
+      expect(within(line).queryByRole('button', { name: 'Change' })).toBeNull()
+      expect(line.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       await user.clear(input)
       await user.type(input, 'https://kesher.example/times')
       expect(posts).toEqual([])
