@@ -326,6 +326,17 @@ old number can still be looked up. When an item is done, move it to
     status, Links, Edit with a grey bin, swipe, Undo, Add steps). Not
     built. Still open: a new community's first day, kosher
     certificates (107).
+    Places as the list (J1–J10, Nov 28, canvas page "Places as the
+    list", now where it opens): Watches holds only the jobs (what each
+    reads, its switch, its settings: Newsletters' senders, Kosher's
+    lists); a job's page links to Places filtered ("Shuls it reads 12
+    ›") instead of listing places. Places' Checked by gains Newsletter
+    and splits Certifier's list into each list, and its rows show their
+    sources. A place gets "Kept current by" (Edit, a grey bin each,
+    "Watch a page or a newsletter"), where a watch starts and stops.
+    Minyan times' Add opens Places, Synagogues, Not checked. Newsletter
+    senders are stand-ins (the seed has none). Not built; replaces the
+    place lists on g04, g05, g08–g11, g13 if the user goes with it.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
