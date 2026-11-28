@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
-import { askGmail, readWebAppLink, sentOn } from './gmailNow'
+import { askGmail, latestEmailFrom, readWebAppLink, sentOn } from './gmailNow'
+
+const m = vi.hoisted(() => ({ latest: vi.fn(), setup: vi.fn() }))
+vi.mock('./receivedEmail', () => ({ receivingClient: () => ({}), latestReceivedFrom: m.latest }))
+vi.mock('./newsletterSetupStore', () => ({ getNewsletterSetup: m.setup }))
 
 describe('readWebAppLink', () => {
   it('takes a script’s web app link and nothing else: the site will fetch it', () => {
@@ -88,5 +92,38 @@ describe('the Gmail script’s doPost', () => {
 
   it('none in its 14 days', () => {
     expect(post({ key: 'nl_right', address: 'a@b.org' }).answer).toEqual({ ok: true, account: 'guide@gmail.com', email: null })
+  })
+})
+
+// Tracker 100 (Nov 28): Read now looks in what the site's own address
+// received first, then the Gmail while a list still goes there.
+describe('latestEmailFrom, once the site has its own address', () => {
+  const email = { messageId: '<a>', from: 'admin@mekor.org', list: null, subject: 's', date: '2026-11-27T10:00:00.000Z', text: 't', attachment: null, auth: null }
+  const gmail = (body: unknown) => vi.fn(async () => new Response(JSON.stringify(body))) as unknown as typeof fetch
+
+  it('finds it in the received mail, and signs up with the site’s address', async () => {
+    vi.stubEnv('INBOUND_EMAIL_DOMAIN', 'guide.example')
+    m.latest.mockResolvedValue(email)
+    expect(await latestEmailFrom('philly', 'admin@mekor.org')).toEqual({ state: 'found', account: 'philly@guide.example', email, on: 'Nov 27' })
+    vi.unstubAllEnvs()
+  })
+
+  it('else asks the Gmail, still naming the site’s address to sign up with', async () => {
+    vi.stubEnv('INBOUND_EMAIL_DOMAIN', 'guide.example')
+    m.latest.mockResolvedValue(null)
+    m.setup.mockResolvedValue({ webAppUrl: 'https://x/exec', key: 'k', account: 'guide@gmail.com' })
+    expect(await latestEmailFrom('philly', 'admin@mekor.org', gmail({ ok: true, account: 'guide@gmail.com', email: null }))).toEqual({ state: 'no-email', account: 'philly@guide.example' })
+    m.setup.mockResolvedValue(null)
+    expect(await latestEmailFrom('philly', 'admin@mekor.org')).toEqual({ state: 'no-email', account: 'philly@guide.example' })
+    m.latest.mockResolvedValue('failed')
+    expect(await latestEmailFrom('philly', 'admin@mekor.org')).toEqual({ state: 'no-answer' })
+    vi.unstubAllEnvs()
+  })
+
+  it('without one, the Gmail as before', async () => {
+    m.latest.mockReset()
+    m.setup.mockResolvedValue(null)
+    expect(await latestEmailFrom('philly', 'admin@mekor.org')).toEqual({ state: 'no-gmail' })
+    expect(m.latest).not.toHaveBeenCalled()
   })
 })

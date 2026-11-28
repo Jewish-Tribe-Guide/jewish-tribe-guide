@@ -30,9 +30,12 @@ describe('getCommunityEmail', () => {
     expect((await getCommunityEmail('philly')).email).toBe('philly@in.example.org')
   })
 
-  it('is still the one an admin saved', async () => {
-    vi.stubEnv('INBOUND_EMAIL_DOMAIN', 'in.example.org')
+  // Nov 28: one address a visitor sees everywhere, so the site's own wins
+  // over a Gmail saved before it, and there's nothing left to set up.
+  it('is the site’s own address over one an admin saved, and needs no setting up', async () => {
     rows.community = { contact_email: 'office@example.org' }
-    expect((await getCommunityEmail('philly')).email).toBe('office@example.org')
+    expect(await getCommunityEmail('philly')).toMatchObject({ email: 'office@example.org', received: false })
+    vi.stubEnv('INBOUND_EMAIL_DOMAIN', 'in.example.org')
+    expect(await getCommunityEmail('philly')).toMatchObject({ email: 'philly@in.example.org', received: true })
   })
 })

@@ -168,11 +168,11 @@ export function addRowSources(s: AddState): (row: EditorRow) => AddRowSource | n
   function emailLines(address: string): AddLine[] {
     const change: AddLine['change'] = { slot: 'email', label: TIMES_SOURCE }
     const read = reads.email
-    if (read?.state === 'reading') return [{ text: 'Looking in the guide’s Gmail…', state: 'checking' }]
+    if (read?.state === 'reading') return [{ text: 'Looking for its latest email…', state: 'checking' }]
     if (read?.state === 'found') return [{ text: address, when: read.on, change }]
     if (read?.state === 'no-email') return [{ text: `No emails from ${address} yet`, change, signUp: true, state: 'unchecked' }]
     if (read?.state === 'no-times') return [{ text: `${address}’s ${read.on} email had no times`, says: true, change, state: 'unchecked' }]
-    if (read?.state === 'no-answer') return [{ text: 'Couldn’t reach the guide’s Gmail', red: true, state: 'unchecked' }, { text: address, when: 'within the hour', change, state: 'unchecked' }]
+    if (read?.state === 'no-answer') return [{ text: 'Couldn’t look for its email', red: true, state: 'unchecked' }, { text: address, when: 'within the hour', change, state: 'unchecked' }]
     if (read?.state === 'no-gmail') return [{ text: 'The guide’s Gmail isn’t set up', says: true, setUpGmail: true }, { text: address, when: 'within the hour', change }]
     return [{ text: address, readNow: 'email', change }]
   }

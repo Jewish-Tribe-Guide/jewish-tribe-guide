@@ -16,6 +16,9 @@ export type CommunityEmail = {
   canSave: boolean
   /** When the newsletter script in it last checked in; null: never. */
   checkedAt: string | null
+  /** The site's own address (tracker 100): received by the site itself,
+   *  so there's nothing to make or set up. */
+  received: boolean
 }
 
 export async function getCommunityEmail(slug: string): Promise<CommunityEmail> {
@@ -30,7 +33,10 @@ export async function getCommunityEmail(slug: string): Promise<CommunityEmail> {
   const saved = (own.data as { contact_email: string | null } | null)?.contact_email?.trim()
   const row = script.data as { account: string | null; checked_at: string | null } | null
   const account = row?.account?.trim()
-  return { email: saved || communityInboundAddress(slug) || account || null, canSave, checkedAt: row?.checked_at ?? null }
+  // The site's own address first: one address a visitor sees everywhere
+  // (Nov 27), whatever Gmail was saved before it.
+  const inbound = communityInboundAddress(slug)
+  return { email: inbound || saved || account || null, canSave, checkedAt: row?.checked_at ?? null, received: !!inbound }
 }
 
 /** A shape check, the same low bar as the Team tab's. */

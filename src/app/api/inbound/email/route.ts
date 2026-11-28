@@ -4,7 +4,8 @@ import { listCommunities } from '@/lib/communityStore'
 import { receiveEruvEmail } from '@/lib/eruvEmailRun'
 import { receiveNewsletter } from '@/lib/newsletterRun'
 import { sendForwardedEmail } from '@/lib/email'
-import { communityOfRecipients, inboundDomain, isAutomatic, readableAttachment, toNewsletterEmail } from '@/lib/inboundEmail'
+import { communityOfRecipients, inboundDomain, isAutomatic, toNewsletterEmail } from '@/lib/inboundEmail'
+import { attachmentOf } from '@/lib/receivedEmail'
 
 // POST /api/inbound/email — Resend's `email.received` webhook (tracker 100).
 // A community's own address, `<community>@<INBOUND_EMAIL_DOMAIN>`, is a
@@ -104,28 +105,5 @@ export async function POST(request: Request) {
   } catch (err) {
     reportServerError('[inbound/email] failed:', err)
     return Response.json({ ok: false, error: err instanceof Error ? err.message : 'Couldn’t take it in.' }, { status: 500 })
-  }
-}
-
-/** The email's first PDF or picture, for the newsletter reader, as the
- *  Gmail script sends one; null when it has none or it can't be fetched
- *  (the words are still read). */
-async function attachmentOf(
-  resend: Resend,
-  emailId: string,
-  attachments: { id: string; content_type: string; size: number }[],
-): Promise<{ mime: string; b64: string } | null> {
-  const wanted = readableAttachment(attachments)
-  if (!wanted) return null
-  try {
-    const { data } = await resend.emails.receiving.attachments.list({ emailId })
-    const url = data?.data.find((a) => a.id === wanted.id)?.download_url
-    if (!url) return null
-    const res = await fetch(url)
-    if (!res.ok) return null
-    return { mime: wanted.content_type, b64: Buffer.from(await res.arrayBuffer()).toString('base64') }
-  } catch (err) {
-    reportServerError('[inbound/email] couldn’t fetch an attachment:', err)
-    return null
   }
 }

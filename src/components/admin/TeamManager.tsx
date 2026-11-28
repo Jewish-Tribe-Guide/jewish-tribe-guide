@@ -16,8 +16,8 @@ import type { CommunityEmailLoaded } from './CommunityEmailPage'
 // DELETE /api/admin/team), so the team can't be left with no one by
 // mistake; your own row says "You" instead.
 //
-// Above the admins, the community email (board E2, Nov 25): the guide's own
-// Gmail, what it's used for, and Change, which opens its page.
+// Above the admins, the community email (board E2, Nov 25): the site's own
+// address (tracker 100), or before it the guide's Gmail with Change.
 //
 // The two switches only ever touch the signed-in admin's OWN preferences
 // (PATCH /api/admin/team always writes admin.email from the verified token,
@@ -54,13 +54,17 @@ export function CommunityEmailBox({ own, href }: { own: CommunityEmailLoaded; hr
       </AdminBox>
     )
   }
+  const read = own.received || !!own.checkedAt
   return (
     <AdminBox
       title="Community email"
       action={
-        <Link href={href} className="min-h-10 inline-flex items-center px-1 text-sm font-semibold text-primary">
-          Change
-        </Link>
+        // The site's own address: nothing to change.
+        own.received ? undefined : (
+          <Link href={href} className="min-h-10 inline-flex items-center px-1 text-sm font-semibold text-primary">
+            Change
+          </Link>
+        )
       }
     >
       <p className="m-0 px-4 pt-3.5 pb-1.5 text-[1.0625rem] font-semibold text-slate-900 [overflow-wrap:anywhere]">{own.email}</p>
@@ -69,9 +73,9 @@ export function CommunityEmailBox({ own, href }: { own: CommunityEmailLoaded; hr
         <span className="flex-1">Replies to the site’s emails</span>
       </p>
       <Link href={href} className="flex items-center gap-2.5 px-4 pt-2 pb-3.5 min-h-11 text-[0.9375rem] text-slate-900 hover:bg-slate-50 rounded-b-[10px]">
-        {own.checkedAt ? TICK : NOT_YET}
+        {read ? TICK : NOT_YET}
         <span className="flex-1">The shuls’ and eruvs’ emails</span>
-        <span className="text-sm text-slate-600">{!own.checkedAt ? 'Not set up' : own.lastEmailAt ? `Last one ${shortDay(own.lastEmailAt)}` : 'None in yet'}</span>
+        <span className="text-sm text-slate-600">{!read ? 'Not set up' : own.lastEmailAt ? `Last one ${shortDay(own.lastEmailAt)}` : 'None in yet'}</span>
         {CHEVRON}
       </Link>
     </AdminBox>

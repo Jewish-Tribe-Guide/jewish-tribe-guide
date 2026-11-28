@@ -61,6 +61,18 @@ describe('CommunityEmailPage', () => {
     expect(within(box).getByLabelText('Web app URL')).toHaveAttribute('placeholder', 'https://script.google.com/macros/s/…/exec')
   })
 
+  // Tracker 100 (Nov 28): the site's own address, with nothing to make or
+  // paste; the Gmail script's status only while it still runs.
+  it('the site’s own address: no Gmail to make, no script steps', async () => {
+    show(own({ email: 'philly@guide.example', received: true }), script())
+    expect(await screen.findByText('philly@guide.example')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Its address' })).toHaveTextContent('Anything else comes to you')
+    expect(screen.queryByRole('link', { name: /Make a Gmail/ })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Read the newsletters' })).toBeNull()
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(screen.getByRole('link', { name: /The shuls’ and eruvs’ emails/ })).toBeInTheDocument()
+  })
+
   it('saves its address', async () => {
     show(own(), script())
     const user = userEvent.setup()

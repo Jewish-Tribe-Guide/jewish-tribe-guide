@@ -15,6 +15,10 @@ import type { NewslettersLoaded } from './NewslettersPage'
 // the script up in it. Setting the script up moved here from Watches ›
 // Newsletters, which is now only the list of emails it reads, opened from
 // here.
+//
+// Once the site has its own address (tracker 100, Nov 28) there's nothing
+// to make: the page is that address and what becomes of its mail. The
+// Gmail script's status stays while it still runs, as lists move over.
 
 export type CommunityEmailLoaded = {
   email: string | null
@@ -22,6 +26,8 @@ export type CommunityEmailLoaded = {
   canSave: boolean
   checkedAt: string | null
   lastEmailAt: string | null
+  /** The site's own address (tracker 100): nothing to make or set up. */
+  received?: boolean
 }
 
 /** The script checks in every hour: three hours without, it has stopped. */
@@ -194,6 +200,39 @@ function ReadEmails({ script, from, off, onLink }: { script: string; from: numbe
   )
 }
 
+const TICK = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#15803d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+    <path d="M5 12l5 5L19 7" />
+  </svg>
+)
+
+/** The site's own address, and what becomes of what's sent to it. */
+function OwnAddress({ address }: { address: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <AdminBox
+      title="Its address"
+      action={
+        <button
+          type="button"
+          className="min-h-10 inline-flex items-center px-1 text-sm font-semibold text-primary cursor-pointer"
+          onClick={() => void navigator.clipboard?.writeText(address).then(() => setCopied(true), () => {})}
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      }
+    >
+      <p className="m-0 px-4 pt-3.5 pb-1.5 text-[1.0625rem] font-semibold text-slate-900 [overflow-wrap:anywhere]">{address}</p>
+      {['The site’s emails come from it', 'Eruvs’ and shuls’ emails are read', 'Anything else comes to you'].map((line) => (
+        <p key={line} className="m-0 flex items-center gap-2.5 px-4 py-1.5 min-h-9 text-[0.9375rem] text-slate-900 last:pb-3.5">
+          {TICK}
+          <span className="flex-1">{line}</span>
+        </p>
+      ))}
+    </AdminBox>
+  )
+}
+
 function Address({ saved, canSave, numbered, onSave }: { saved: string | null; canSave: boolean; numbered: boolean; onSave: (email: string) => Promise<string | null> }) {
   const [value, setValue] = useState(saved ?? '')
   const [error, setError] = useState<string | null>(null)
@@ -310,18 +349,18 @@ export default function CommunityEmailPage({ token }: { token: string }) {
   }
 
   const running = !!script.checkedAt
-  const showSteps = script.script && (!running || setUpAgain)
+  const showSteps = !own.received && script.script && (!running || setUpAgain)
   return (
     <div className="max-w-[840px] space-y-3.5">
       {back}
-      <Address key={own.email ?? ''} saved={own.email} canSave={own.canSave} numbered={!own.email} onSave={saveEmail} />
+      {own.received && own.email ? <OwnAddress address={own.email} /> : <Address key={own.email ?? ''} saved={own.email} canSave={own.canSave} numbered={!own.email} onSave={saveEmail} />}
       {!script.available && (
         <p className="rounded-[10px] border border-slate-200 bg-white px-4 py-3.5 text-[0.9375rem] text-slate-600">The shuls’ and eruvs’ emails can’t be set up here yet.</p>
       )}
       {running && <Status data={script} now={now} onSetUp={() => setSetUpAgain((s) => !s)} onUpdate={() => setUpdating((u) => !u)} />}
       {showSteps && <ReadEmails script={script.script!} from={own.email ? 1 : 3} off={!own.email} onLink={saveLink} />}
       {!showSteps && updating && script.script && <UpdateScript script={script.script} />}
-      {(running || script.newsletters.length > 0) && (
+      {(own.received || running || script.newsletters.length > 0) && (
         <AdminBox>
           <AdminRow
             href={`${base}/watches/newsletters`}

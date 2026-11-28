@@ -18,6 +18,11 @@ describe('setupSteps', () => {
     expect(setupLeft(NEW)).toBe(4)
   })
 
+  it('the site’s own address: the step is its address, done', () => {
+    const step = setupSteps({ ...NEW, communityEmail: true, communityAddress: 'philly@guide.example' }, '').find((x) => x.key === 'communityEmail')
+    expect(step).toMatchObject({ line: 'philly@guide.example', done: true })
+  })
+
   it('ticks each off by what is saved', () => {
     const done = (s: Partial<SetupState>) => setupSteps({ ...NEW, ...s }, '').filter((x) => x.done).map((x) => x.key)
     expect(done({ logo: true })).toEqual(['logo'])

@@ -186,6 +186,14 @@ describe('TeamManager, the community email (board E2)', () => {
     expect(regions.indexOf('Community email')).toBeLessThan(regions.indexOf('Admins'))
   })
 
+  // Tracker 100 (Nov 28): the site's own address has nothing to change.
+  it('the site’s own address: no Change, and its emails already read', async () => {
+    const box = await withOwn({ email: 'ues@guide.example', canSave: true, checkedAt: null, lastEmailAt: null, received: true })
+    expect(box).toHaveTextContent('ues@guide.example')
+    expect(screen.queryByRole('link', { name: 'Change' })).toBeNull()
+    expect(screen.getByRole('link', { name: /The shuls’ and eruvs’ emails/ })).not.toHaveTextContent('Not set up')
+  })
+
   it('not set up: Set it up', async () => {
     const box = await withOwn({ email: null, canSave: true, checkedAt: null, lastEmailAt: null })
     expect(box).toHaveTextContent('Not set up yet')
