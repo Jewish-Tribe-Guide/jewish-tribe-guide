@@ -287,8 +287,6 @@ export default function PlaceListing({
   const [patch, setPatch] = useState<Record<string, unknown> | undefined>(undefined)
   // `key`: which it is, for the address (the row, then which of its line's
   // controls opened it).
-  // A row's source given or changed in the row itself, saved by its Done.
-  const fields = useSourceFields()
   const [rowError, setRowError] = useState<{ row: string; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -319,6 +317,8 @@ export default function PlaceListing({
   const sources = useMemo(() => (loaded && category ? listingSources(place.id, jobs, now, category, item as Record<string, unknown> & { id: string }) : null), [loaded, category, place.id, jobs, now, item])
   // A shul's emails, said on its this-week row while none reads it.
   const [emails, reloadEmails] = useWeekEmails(api, !!category && kindOf(category) === 'shuls')
+  // A row's source given or changed in the row itself, saved by its Done.
+  const fields = useSourceFields({ account: emails.loaded ? emails.account : null })
   const [finding, setFinding] = useState(false)
   const googlePlace = jobs.google?.places.find((p) => p.id === place.id) ?? null
 

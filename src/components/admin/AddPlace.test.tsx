@@ -492,10 +492,20 @@ describe('Add a place', () => {
       vi.mocked(fetchJson).mockImplementation(async (url, init) => (String(url).includes('/read-now') ? (JSON.parse(String(init?.body)).slot === 'email' ? reply : { state: 'none' }) : {}))
     }
     const sourceWords = () => screen.getAllByTestId('row-source').map((p) => p.textContent).join('\n')
+    // On this week's schedule: usual times take a page only (item 95).
     async function giveEmail(user: ReturnType<typeof userEvent.setup>) {
+      editWeek.now = { week: { from: '2026-11-22', to: '2026-11-28' }, next: { from: '2026-11-29', to: '2026-12-05' } }
+      onTestFinished(() => {
+        editWeek.now = null
+      })
       await user.click(screen.getByRole('button', { name: 'Pick it' }))
-      await giveSource(user, 'office@ohev.org')
-      await user.click(screen.getByTestId('editor-add-minyans:weekday'))
+      await user.click(screen.getByTestId('editor-add-minyans:this_week'))
+      await user.click(await screen.findByRole('button', { name: 'Add a page or an email' }))
+      await user.type(screen.getByTestId('source-field'), 'office@ohev.org')
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      // Still empty of times, it stays under the rows not filled in.
+      await waitFor(() => expect(screen.queryByTestId('source-field')).toBeNull())
+      await user.click(screen.getByTestId('editor-add-minyans:this_week'))
       await waitFor(() => expect(sourceWords()).toContain('office@ohev.org'))
     }
     const readEmail = async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getAllByRole('button', { name: 'Read now' })[0])

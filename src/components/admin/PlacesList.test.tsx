@@ -429,6 +429,39 @@ describe('Places', () => {
       expect(await screen.findByRole('region', { name: 'Places' })).toBeInTheDocument()
     })
 
+    // Item 95 (Nov 28): its status and map are given in their rows, as a
+    // place's sources are, kept by Done; no screen over them. Its status can
+    // be an email; its map only a page.
+    it('Add a place: its status and map are given in their rows, kept by Done', async () => {
+      const user = userEvent.setup()
+      renderEruvs()
+      await screen.findByRole('button', { name: 'Open Center City Eruv' })
+      await choose(/^Category/, /^Eruv/)
+      await user.click(screen.getByRole('button', { name: /Add a place/ }))
+      await user.click(await screen.findByTestId('editor-row-name'))
+      await user.type(screen.getByLabelText('Name'), 'New Eruv')
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+
+      await user.click(screen.getByTestId('editor-add-map'))
+      await user.click(screen.getByRole('button', { name: 'Add a page' }))
+      await user.type(screen.getByTestId('source-field'), 'eruv@ccEruv.org')
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      expect(screen.getByTestId('editor-open-map')).toHaveTextContent('This takes a page’s link, not an email')
+      await user.clear(screen.getByTestId('source-field'))
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+
+      await user.click(screen.getByTestId('editor-add-status'))
+      expect(screen.queryByRole('heading', { name: 'Add a source' })).toBeNull()
+      await user.click(screen.getByRole('button', { name: 'Add a page or an email' }))
+      await user.type(screen.getByTestId('source-field'), 'eruv@cceruv.org')
+      expect(screen.getByTestId('source-field-email')).toHaveTextContent('Sign up with the guide’s email to get its emails')
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      await waitFor(() => expect(screen.queryByTestId('editor-open-status')).toBeNull())
+      expect(screen.getByTestId('editor-row-status')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Add listing' }))
+      await waitFor(() => expect(posted).toEqual([{ action: 'add', name: 'New Eruv' }, { action: 'save', id: 'new-eruv', edit: { statusEmail: 'eruv@cceruv.org' } }]))
+    })
+
     // The user, Nov 9: a field made on the Eruv page is filled in while
     // adding an eruv, not only in Places after.
     it('Add a place has a row for each field made on the Eruv page, and adds what it holds', async () => {

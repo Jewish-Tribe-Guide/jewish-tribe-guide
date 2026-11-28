@@ -58,7 +58,6 @@ export default function AddPlace({ category, listings, token, onClose, onBack = 
   const [picked, setPicked] = useState<Partial<Record<CheckedField, string>> | null>(null)
   const [given, setGiven] = useState<GivenSources>({})
   // A source given or changed in a row itself, kept by its Done.
-  const fields = useSourceFields()
   const [addedAs, setAddedAs] = useState<AddedAs | null>(null)
   const [takeFailed, setTakeFailed] = useState(false)
   const [reads, setReads] = useState<Partial<Record<AddSlot, AddRead>>>({})
@@ -67,6 +66,8 @@ export default function AddPlace({ category, listings, token, onClose, onBack = 
   const [kosher, setKosher] = useState<KosherLookup | null>(null)
   const [kosherUsed, setKosherUsed] = useState<string | null>(null)
   const [guideGmail, setGuideGmail] = useState<string | null>(null)
+  // What a typed email's field says to sign up with.
+  const fields = useSourceFields({ account: guideGmail })
   const [taking, setTaking] = useState(false)
   const inGuide = useMemo(() => new Set(listings.map((l) => l.placeId).filter((id): id is string => typeof id === 'string' && !!id)), [listings])
   const api = useAdminApi(token)

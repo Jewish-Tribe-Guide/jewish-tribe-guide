@@ -769,17 +769,39 @@ describe('an eruv', () => {
     posts.length = 0
   })
 
-  it('Read from: its website, its status page, and Google not for an eruv; Change saves on the eruv', async () => {
-    await eruvPage('lm')
-    const box = screen.getByRole('region', { name: 'Read from' })
-    expect(within(box).getByTestId('read-from-website')).toHaveTextContent('lowermerioneruv.org · every night')
-    expect(within(box).getByTestId('read-from-emails')).toHaveTextContent('From lowermerioneruv.org/status')
-    expect(within(box).getByTestId('read-from-google')).toHaveTextContent('Not for an eruv')
-    const row = within(box).getByTestId('read-from-website')
-    await userEvent.click(within(row).getByRole('button', { name: 'Change' }))
-    await userEvent.type(within(row).getByLabelText('Its website'), 'lmeruv.org')
-    await userEvent.click(within(row).getByRole('button', { name: 'Save' }))
-    expect(posts).toContainEqual(['/api/admin/eruvim', { action: 'save', id: 'lm', edit: { website: 'lmeruv.org' } }])
+  // Item 95 (Nov 28): no Read from box; its jobs are on the rows. Its
+  // Website row edits the website; its Status row says what to sign up
+  // with while nothing gives its status, and links a sender who wrote in.
+  const withInbox = (newsletters: unknown[]) => (url: string, init?: RequestInit) => {
+    if (url.includes('/api/admin/community-email')) return { email: 'guide@gmail.com' }
+    if (url.includes('/api/admin/watches/newsletters')) return { newsletters }
+    if (url.includes('/api/admin/categories')) return { ok: true, categories: [{ id: 'eruv-information', pluralLabel: 'Eruv Information', kind: 'eruv' }] }
+    if (url.includes('/api/admin/watches/eruv') && !init?.method) return { available: true, timezone: 'America/New_York', eruvim: [LM, ELKINS, NORTHEAST], findings: [], watches: [site] }
+    if (init?.method === 'POST') {
+      posts.push([url.replace(/[?&]community=philly/, ''), JSON.parse(String(init.body))])
+      return { ok: true }
+    }
+  }
+
+  it('no Read from box; its status page, with no sign-up line beside it', async () => {
+    await renderPage('lm', [], withInbox([]))
+    const user = userEvent.setup()
+    expect(screen.queryByRole('region', { name: 'Read from' })).toBeNull()
+    await user.click(screen.getByTestId('editor-row-status'))
+    expect(screen.getByTestId('editor-open-status')).not.toHaveTextContent('Sign up')
+  })
+
+  it('a sender who wrote in is linked from its Status row', async () => {
+    await renderPage('lm', [], withInbox([{ watchId: 'n1', email: 'eruv@lowermerioneruv.org', shul: null }]))
+    const user = userEvent.setup()
+    await user.click(screen.getByTestId('editor-row-status'))
+    const open = screen.getByTestId('editor-open-status')
+    expect(open).toHaveTextContent('An email from eruv@lowermerioneruv.org came in')
+    await user.click(within(open).getByRole('button', { name: 'Link it' }))
+    expect(posts).toEqual([
+      ['/api/admin/eruvim', { action: 'save', id: 'lm', edit: { statusEmail: 'eruv@lowermerioneruv.org' } }],
+      ['/api/admin/watches', { action: 'remove', id: 'n1' }],
+    ])
   })
 
   // Nov 1, boards EruvListing6, EruvStatus5.
@@ -801,11 +823,14 @@ describe('an eruv', () => {
     expect(posts).toEqual([['/api/admin/eruvim', { action: 'save', id: 'lm', edit: { statusDated: true } }]])
     posts.length = 0
 
-    // Its status to its emails: the page emptied.
+    // Its status to its emails: the page emptied. The field opens under
+    // its line, in the row, and Done saves it (item 95, Nov 28).
     await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
-    await user.clear(screen.getByRole('textbox'))
-    await user.type(screen.getByRole('textbox'), 'eruv@lowermerioneruv.org')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByTestId('editor-open-status')).toContainElement(screen.getByTestId('source-field'))
+    await user.clear(screen.getByTestId('source-field'))
+    await user.type(screen.getByTestId('source-field'), 'eruv@lowermerioneruv.org')
+    expect(screen.getByTestId('source-field-email')).toHaveTextContent(/^Sign up with the guide’s email to get its emails$/)
+    await user.click(screen.getByRole('button', { name: 'Done' }))
     expect(posts).toEqual([['/api/admin/eruvim', { id: 'lm', action: 'save', edit: { statusEmail: 'eruv@lowermerioneruv.org', statusUrl: '' } }]])
   })
 

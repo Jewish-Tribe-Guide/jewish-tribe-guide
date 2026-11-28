@@ -159,7 +159,7 @@ test('an eruv in Places: a row', async ({ page }) => {
   await page.getByRole('button', { name: `Open ${eruvName}`, exact: true }).click()
   await walk(page, [
     { shows: page.getByTestId('editor-row-status').filter({ hasText: 'Not checked' }) },
-    { shows: page.getByRole('button', { name: 'Add a source' }), open: () => page.getByRole('button', { name: /^Status/ }).click(), close: () => page.getByRole('button', { name: 'Done', exact: true }).click() },
+    { shows: page.getByRole('button', { name: 'Add a page or an email' }), open: () => page.getByRole('button', { name: /^Status/ }).click(), close: () => page.getByRole('button', { name: 'Done', exact: true }).click() },
   ])
   await expect(page).toHaveURL(new RegExp(`\\?place=${eruvId}$`))
 })
