@@ -52,11 +52,13 @@ export const WATCH_JOBS: readonly WatchJob[] = [
     kinds: ['times', 'newsletters'],
     heading: 'Shuls',
     name: 'Minyan times',
-    line: 'From each shul’s website or newsletter.',
-    runsWhen: 'Runs once the first shul has a website or newsletter',
+    line: 'From each shul’s website or emails.',
+    runsWhen: 'Runs once the first shul has a website or email',
     from: [
       { key: 'website', label: 'Website' },
-      { key: 'newsletter', label: 'Newsletter' },
+      // Its key stays `newsletter` (addresses, coverage); it says Email, as
+      // Eruv status does (the user, Nov 28).
+      { key: 'newsletter', label: 'Email' },
     ],
     also: ['Website', 'Newsletter', 'Email'],
   },
@@ -179,7 +181,7 @@ export const isPlaceWatchChoice = (v: unknown): v is PlaceWatchChoice => v === '
 
 /** The Source menu: every place, or one read from this. */
 export type PlaceSourceChoice = 'any' | WatchSourceKey
-const SOURCE_LABELS: Record<string, string> = { google: 'Google', website: 'Website', newsletter: 'Newsletter', email: 'Email', refuah: 'Refuah' }
+const SOURCE_LABELS: Record<string, string> = { google: 'Google', website: 'Website', newsletter: 'Email', email: 'Email', refuah: 'Refuah' }
 export const isPlaceSourceChoice = (v: unknown): v is PlaceSourceChoice => typeof v === 'string' && (v === 'any' || v in SOURCE_LABELS || (v.startsWith('list:') && v.length > 5))
 /** "Google", "KCL’s list". */
 export const sourceLabel = (key: WatchSourceKey) => (key.startsWith('list:') ? key.slice(5) : SOURCE_LABELS[key])

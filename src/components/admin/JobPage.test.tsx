@@ -66,11 +66,11 @@ describe('a job on Watches, opened (boards L2b, L2f)', () => {
     show('times')
     expect(await screen.findByRole('heading', { name: 'Minyan times' })).toBeInTheDocument()
     expect(screen.getByRole('switch', { name: 'Minyan times on' })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByTestId('watching-line')).toHaveTextContent('From each shul’s website or newsletter.')
+    expect(screen.getByTestId('watching-line')).toHaveTextContent('From each shul’s website or emails.')
     // Running well, it says nothing more.
     expect(screen.queryByTestId('watching-state')).toBeNull()
     const from = screen.getByRole('region', { name: 'From' })
-    expect(within(from).getAllByTestId('job-source').map((r) => r.textContent)).toEqual(['Website', 'Newsletter'])
+    expect(within(from).getAllByTestId('job-source').map((r) => r.textContent)).toEqual(['Website', 'Email'])
     expect(within(from).queryByRole('link')).toBeNull()
     expect(within(from).queryByRole('button')).toBeNull()
     // The places it covers are Places' Watch filter now.
@@ -87,8 +87,8 @@ describe('a job on Watches, opened (boards L2b, L2f)', () => {
   it('one with nothing read and no run yet says when it runs, and keeps its line (L2f)', async () => {
     serve([view({ lastAt: null, tracked: [] })])
     show('times')
-    expect(await screen.findByTestId('watching-state')).toHaveTextContent(/^Runs once the first shul has a website or newsletter$/)
-    expect(screen.getByTestId('watching-line')).toHaveTextContent('From each shul’s website or newsletter.')
+    expect(await screen.findByTestId('watching-state')).toHaveTextContent(/^Runs once the first shul has a website or email$/)
+    expect(screen.getByTestId('watching-line')).toHaveTextContent('From each shul’s website or emails.')
   })
 
   it('the switch turns off both its jobs at once, nothing asked, and From stays', async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { NightKindView } from './nightKinds'
 import { NIGHT_KINDS } from './nightKinds'
-import { findWatches, fitsPlaceWatch, isPlaceSourceChoice, isPlaceWatchChoice, listedJobs, placeWatches, placeWatchLine, sourceChoices, WATCH_JOBS, watchAside, watchJobOf, watchSources, watchState } from './watchList'
+import { findWatches, fitsPlaceWatch, isPlaceSourceChoice, isPlaceWatchChoice, listedJobs, placeWatches, placeWatchLine, sourceChoices, sourceLabel, WATCH_JOBS, watchAside, watchJobOf, watchSources, watchState } from './watchList'
 import type { FieldCoverage } from './fieldCoverage'
 
 const view = (over: Partial<NightKindView>): NightKindView => ({ id: 'times', name: '', about: '', when: null, count: '', trouble: null, misses: [], tracked: [], nights: [], fixes: [], lastAt: null, schedule: '', ...over })
@@ -46,7 +46,7 @@ describe('watchState and its row', () => {
   it('new: nothing read, never run, says when it runs', () => {
     const s = watchState(times, [view({})], [])
     expect(s).toEqual({ state: 'new' })
-    expect(watchAside(times, s)?.text).toBe('Runs once the first shul has a website or newsletter')
+    expect(watchAside(times, s)?.text).toBe('Runs once the first shul has a website or email')
     expect(watchAside(job('kosher'), watchState(job('kosher'), [], []))?.text).toBe('Runs when a kosher list is added')
   })
 
@@ -101,6 +101,8 @@ describe('a place, by the jobs that check it', () => {
   it('what an address may ask for, and the sources in the drawn order', () => {
     expect([isPlaceWatchChoice('times'), isPlaceWatchChoice('nothing'), isPlaceWatchChoice('nope')]).toEqual([true, true, false])
     expect([isPlaceSourceChoice('list:KCL’s list'), isPlaceSourceChoice('list:'), isPlaceSourceChoice('refuah'), isPlaceSourceChoice('x')]).toEqual([true, false, true, false])
+    // A shul's emails say Email in Places' Source menu, as on Minyan times' page.
+    expect(sourceLabel('newsletter')).toBe('Email')
     expect(sourceChoices(['refuah', 'list:KCL’s list', 'newsletter', 'google', 'website', 'list:Keystone-K’s list'])).toEqual(['google', 'website', 'newsletter', 'list:KCL’s list', 'list:Keystone-K’s list', 'refuah'])
   })
 })

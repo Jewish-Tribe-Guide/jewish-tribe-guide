@@ -178,7 +178,7 @@ describe('WatchesManager', () => {
     const card = await screen.findByRole('link', { name: /The community email/ })
     expect(card).toHaveAttribute('href', '/philly/admin/team/email')
     expect(row(/^Basic information/)).toHaveTextContent('Runs when the first place is added')
-    expect(row(/^Minyan times/)).toHaveTextContent('Runs once the first shul has a website or newsletter')
+    expect(row(/^Minyan times/)).toHaveTextContent('Runs once the first shul has a website or email')
     expect(row(/^Kosher certification/)).toHaveTextContent('Runs when a kosher list is added')
     expect(row(/^Bikkur Cholim details/)).toHaveTextContent('Runs when the first hospital is added')
   })
