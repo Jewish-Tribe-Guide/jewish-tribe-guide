@@ -371,7 +371,9 @@ old number can still be looked up. When an item is done, move it to
     a phone, one Filters sheet. Dropped: L4, M1–M5 and J9's "Kept
     current by" box. A place already shows each field's source with
     Read now · Change · Remove, so adding a source stays there. Not
-    built.
+    built. L3cp (phone, Nov 28) replaces L3bp: the chosen filters are
+    not written beside Filters (its count says how many), and Add sits
+    at the end of that row.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
