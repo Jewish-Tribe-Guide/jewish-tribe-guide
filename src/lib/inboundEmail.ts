@@ -25,12 +25,26 @@ import type { NewsletterEmail } from './newsletterRun'
 
 /** The servers whose Authentication-Results we believe for an email the
  *  site took in itself, as eruvEmailRun needs to: Resend's receiving
- *  server's name in that header. Empty until the first real email shows
- *  it, so an eruv email arriving this way is `unverified` (and Sentry says
- *  which server wrote the header) while the Gmail script still reads it.
+ *  server's name in that header, read off the first real email (Nov 28).
  *  Never a server a sender could write the header as: only the receiving
- *  server's own, which sits on top. */
-export const INBOUND_AUTH_SERVERS: readonly string[] = []
+ *  server's own, which sits on top (`topHeader`). */
+export const INBOUND_AUTH_SERVERS: readonly string[] = ['receive.forge.rmta.net']
+
+/** The topmost copy of a header that can appear more than once. Resend
+ *  gives a repeated header as one JSON array in a string, top first (its
+ *  `received` shows it), so a sender's own Authentication-Results, written
+ *  under the receiving server's, would otherwise make the pair unreadable
+ *  or, worse, be read instead. */
+export function topHeader(value: string | null): string | null {
+  if (!value?.trimStart().startsWith('[')) return value
+  try {
+    const list: unknown = JSON.parse(value)
+    if (Array.isArray(list)) return typeof list[0] === 'string' ? list[0] : null
+  } catch {
+    // Not a list after all: a header can start with "[".
+  }
+  return value
+}
 
 /** The site's receiving domain, lower case, or null when it isn't set up. */
 export function inboundDomain(): string | null {
@@ -121,7 +135,7 @@ export function toNewsletterEmail(
     date: sent,
     text: plainText(received.text, received.html).slice(0, 200_000),
     attachment,
-    auth: headerOf(received.headers, 'authentication-results'),
+    auth: topHeader(headerOf(received.headers, 'authentication-results')),
     authServers: INBOUND_AUTH_SERVERS,
   }
 }

@@ -283,8 +283,8 @@ old number can still be looked up. When an item is done, move it to
     "Add a photo" as a strip along its bottom edge (the phone's own
     menu); the site's wide Send alone below it, live once there's words
     or a photo (V2b). Replaces today's box.
-100. **The site's own email address** (BUILT Nov 27 on
-    `claude/kept-current`, not live until 102 is done): one address per
+100. **The site's own email address** (BUILT Nov 27, live Nov 28:
+    the first test email was forwarded to the admins): one address per
     community, `<community>@phillyjewishguide.com`, a catch-all at
     Resend (it receives mail too, so no second service), which posts
     each email to `/api/inbound/email` within seconds instead of the
@@ -297,10 +297,12 @@ old number can still be looked up. When an item is done, move it to
     saved, so it becomes the reply-to on every email the site sends
     visitors, and the site sends from it too (one address a visitor
     sees everywhere; sign-in links stay on `RESEND_FROM`). No "in."
-    subdomain: the domain receives no other mail (the user, Nov 27). Eruv emails this way wait (`unverified`) until the first
-    real one shows Resend's server name for `INBOUND_AUTH_SERVERS`
-    (`src/lib/inboundEmail.ts`); the Gmail script keeps reading them
-    meanwhile. Each received email counts against Resend's send quota
+    subdomain: the domain receives no other mail (the user, Nov 27). Eruv emails this way are believed on Resend's receiving
+    server's word, `receive.forge.rmta.net` (`INBOUND_AUTH_SERVERS`,
+    read off the first real email Nov 28), from the topmost
+    Authentication-Results only (`topHeader`). The first forwards
+    landed in Gmail's spam (a new sending domain; DKIM, SPF and DMARC
+    are all in place): each admin adds the address to their contacts. Each received email counts against Resend's send quota
     (Free: 100 a day, 3,000 a month), and Resend keeps it 30 days.
 101. **Guess the kind of a new place from Google** (agreed Nov 27, a
     follow-up to 99): adding a place from a screen with no category
@@ -346,8 +348,8 @@ old number can still be looked up. When an item is done, move it to
 
 ### You do
 
-102. Turn on the site's email address (100), in order (1 and 2 done
-    Nov 27, Production only; 116-118 on live too):
+102. Turn on the site's email address (100), in order (1-3 done
+    Nov 27-28, Production only; 116-118 on live too):
     1. Resend › Domains: open `phillyjewishguide.com` (add it if the
        site sends from another domain, with the records Resend lists),
        turn on Receiving, and copy the MX record it shows into

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { communityInboundAddress, communityOfRecipients, headerOf, inboundDomain, isAutomatic, listAddress, plainText, readableAttachment, toNewsletterEmail, INBOUND_AUTH_SERVERS } from './inboundEmail'
+import { sentFrom } from './emailAuth'
+import { communityInboundAddress, communityOfRecipients, headerOf, inboundDomain, isAutomatic, listAddress, plainText, readableAttachment, toNewsletterEmail, topHeader, INBOUND_AUTH_SERVERS } from './inboundEmail'
 
 afterEach(() => vi.unstubAllEnvs())
 
@@ -101,9 +102,29 @@ describe('reading the email', () => {
     })
   })
 
-  // Until the first real email shows Resend's server's name, no server is
-  // believed: an eruv's email this way waits, and the Gmail script reads it.
-  it('believes no server yet', () => {
-    expect(INBOUND_AUTH_SERVERS).toEqual([])
+  // Read off the first real email to philly@ (Nov 28): Resend's receiving
+  // server, ahead of the results, as the eruv check reads it.
+  it('believes Resend’s receiving server, and only on top', () => {
+    const real = 'receive.forge.rmta.net; spf=pass smtp.mailfrom=yhagler@gmail.com; dkim=pass header.d=gmail.com header.s=20230601'
+    expect(sentFrom(real, 'someone@gmail.com', INBOUND_AUTH_SERVERS)).toBe(true)
+    expect(sentFrom(real, 'eruv@example.org', INBOUND_AUTH_SERVERS)).toBe(false)
+    expect(sentFrom('mx.attacker.net; dkim=pass header.d=example.org', 'eruv@example.org', INBOUND_AUTH_SERVERS)).toBe(false)
+  })
+
+  // A sender can write their own Authentication-Results into the email;
+  // Resend then gives both as one JSON list, its own first.
+  it('reads the receiving server’s header when there are two', () => {
+    const ours = 'receive.forge.rmta.net; dkim=fail header.d=example.org'
+    const forged = 'receive.forge.rmta.net; dkim=pass header.d=example.org'
+    const both = JSON.stringify([ours, forged])
+    expect(topHeader(both)).toBe(ours)
+    expect(topHeader('[not json')).toBe('[not json')
+    expect(topHeader(null)).toBeNull()
+    const email = toNewsletterEmail(
+      { from: 'eruv@example.org', subject: 'Eruv is up', message_id: '<x@example.org>', created_at: '2026-11-28T15:00:00Z', text: 'up', html: null, headers: { 'authentication-results': both } },
+      null,
+    )
+    expect(email.auth).toBe(ours)
+    expect(sentFrom(email.auth, 'eruv@example.org', INBOUND_AUTH_SERVERS)).toBe(false)
   })
 })
