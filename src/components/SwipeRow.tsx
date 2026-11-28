@@ -17,7 +17,7 @@ import {
   type Ref,
   type SetStateAction,
 } from 'react'
-import { BookmarkIcon, ExternalIcon } from '@/components/icons'
+import { BookmarkIcon, ExternalIcon, PencilIcon } from '@/components/icons'
 
 // ── Swipe-to-reveal for a list row — the ONE implementation ──────────────
 //
@@ -125,8 +125,9 @@ const getHoverCapableSnapshot = () => window.matchMedia(HOVER_QUERY).matches
 const getHoverCapableServerSnapshot = () => false
 
 export type SwipeAction = {
-  /** `remove` takes a row off a list of the visitor's own (You). */
-  id: 'save' | 'share' | 'remove'
+  /** `remove` takes a row off a list of the visitor's own (You), or an
+   *  admin's (a kosher list); `edit` opens it to change (board L2g). */
+  id: 'save' | 'share' | 'remove' | 'edit'
   /** The caption under the circle — "Save"/"Saved", "Share"/"Copied!",
    *  "Remove". */
   label: string
@@ -143,10 +144,12 @@ const SHARE_COLOR = '#0f172a'
 const SAVE_COLOR = '#2563eb'
 const SAVED_COLOR = '#64748b'
 const REMOVE_COLOR = '#b91c1c'
+const EDIT_COLOR = '#2563eb'
 
 function actionColor(action: SwipeAction) {
   if (action.id === 'share') return SHARE_COLOR
   if (action.id === 'remove') return REMOVE_COLOR
+  if (action.id === 'edit') return EDIT_COLOR
   return action.active ? SAVED_COLOR : SAVE_COLOR
 }
 
@@ -160,6 +163,7 @@ function ActionGlyph({ action }: { action: SwipeAction }) {
       </svg>
     )
   }
+  if (action.id === 'edit') return <PencilIcon className="h-4 w-4" />
   return <ExternalIcon className="h-4 w-4" />
 }
 

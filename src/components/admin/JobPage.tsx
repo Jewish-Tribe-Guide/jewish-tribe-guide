@@ -3,13 +3,12 @@
 import { useState } from 'react'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { hoursJobCategories } from '@/lib/hoursJob'
 import type { NightKindId } from '@/lib/jobRuns'
 import type { NightKindView } from '@/lib/nightKinds'
 import { jobPlaceRows, type JobPlaceRow } from '@/lib/jobPlaceRows'
-import { shortDay, watchJobOf, watchLine, watchSources, watchState, type WatchJob } from '@/lib/watchList'
-import { kindOf } from '@/lib/placeKinds'
-import { AdminBack, AdminBox, AdminRow, AdminSwitch, adminInputClass } from './AdminUI'
+import { shortDay, watchJobOf, watchSources, watchState, type WatchJob } from '@/lib/watchList'
+import { AdminBack, AdminBox, AdminGroup, AdminRow, AdminSwitch, adminInputClass } from './AdminUI'
+import KosherLists from './KosherLists'
 import { useAdminApi } from './useAdminApi'
 import { noteJobSwitched, useWatchJobsAndReload } from './useWatchJobs'
 
@@ -25,37 +24,18 @@ export type NightlyRunsLoaded = { available: boolean; kinds: NightKindView[]; of
 const button = 'inline-flex items-center justify-center min-h-11 px-3.5 rounded-lg text-sm font-semibold cursor-pointer disabled:opacity-60'
 const primary = `${button} border border-primary bg-primary text-white`
 
-/** What a job adds, and how: a place and its page, or just a page. */
-const ADDS: Partial<Record<NightKindId, { label: string; purpose: string; place?: string; placeholder: string }>> = {
-  times: { label: '+ Add a shul', purpose: 'times', place: 'Which shul', placeholder: 'its-website.org/davening' },
-  hours: { label: '+ Add a mikvah', purpose: 'hours', place: 'Which mikvah', placeholder: 'its-website.org/hours' },
-  hospitals: { label: '+ Add a hospital', purpose: 'hospital', place: 'Which hospital', placeholder: 'refuah.com/hospitals/…' },
-  kosher: { label: '+ Add a list', purpose: 'kosher', placeholder: 'the certifier’s list of places' },
-  other: { label: '+ Add a page', purpose: 'other', placeholder: 'the page’s address' },
-}
-
-function AddToJob({ kind, token, onDone }: { kind: NightKindId; token: string; onDone: () => Promise<void> }) {
+/** Other pages adds a page by hand; what it finds waits on To do. */
+function AddPage({ token, onDone }: { token: string; onDone: () => Promise<void> }) {
   const api = useAdminApi(token)
-  const { jobs } = useWatchJobsAndReload(token)
-  const add = ADDS[kind]!
-  const [place, setPlace] = useState('')
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const categories = jobs.categories ?? []
-  const ids = new Set((kind === 'hospitals' ? categories.filter((c) => kindOf(c) === 'hospitals') : hoursJobCategories(categories, kind === 'times' ? 'times' : 'hours')).map((c) => c.id))
-  const places = (jobs.places ?? []).filter((p) => p.status === 'approved' && ids.has(p.category)).sort((a, b) => a.name.localeCompare(b.name))
 
   async function send() {
     setBusy(true)
     setError(null)
     try {
-      await api.post(
-        '/api/admin/watches',
-        // Only a purpose the Add a watch form offers goes by it; a Refuah page is checked by its address.
-        { action: 'add', url, ...(add.place ? { resourceId: place } : {}), ...(kind === 'hospitals' ? {} : { purpose: add.purpose }) },
-        'Could not add it.',
-      )
+      await api.post('/api/admin/watches', { action: 'add', url, purpose: 'other' }, 'Could not add it.')
       await onDone()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not add it.')
@@ -66,25 +46,12 @@ function AddToJob({ kind, token, onDone }: { kind: NightKindId; token: string; o
   return (
     <AdminBox>
       <div className="flex flex-col gap-3 p-4">
-        {add.place && (
-          <label className="flex flex-col gap-1.5 text-[0.8125rem] text-slate-600">
-            {add.place}
-            <select value={place} onChange={(e) => setPlace(e.target.value)} className={adminInputClass}>
-              <option value="">Pick one</option>
-              {places.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
         <label className="flex flex-col gap-1.5 text-[0.8125rem] text-slate-600">
           Its page
-          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={add.placeholder} className={adminInputClass} />
+          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="the page’s address" className={adminInputClass} />
         </label>
         {error && <p className="m-0 text-sm text-red-700">{error}</p>}
-        <button type="button" disabled={busy || !url.trim() || (!!add.place && !place)} onClick={() => void send()} className={`${primary} self-start`}>
+        <button type="button" disabled={busy || !url.trim()} onClick={() => void send()} className={`${primary} self-start`}>
           {busy ? 'Adding…' : 'Add it'}
         </button>
       </div>
@@ -96,13 +63,12 @@ function AddToJob({ kind, token, onDone }: { kind: NightKindId; token: string; o
  *  doing when that needs saying (Off · last read Nov 27, Runs when…, or
  *  what's wrong with it), and the job's line. No confirm: turning it back
  *  on is the same switch. */
-function WatchingCard({ job, views, token }: { job: WatchJob; views: readonly NightKindView[]; token: string }) {
+function WatchingCard({ job, views, off, token }: { job: WatchJob; views: readonly NightKindView[]; off: readonly NightKindId[]; token: string }) {
   const community = useCommunitySlug()
   const api = useAdminApi(token)
-  const { jobs } = useWatchJobsAndReload(token)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const s = watchState(job, views, jobs.runs?.off ?? [])
+  const s = watchState(job, views, off)
   const on = s.state !== 'off'
 
   async function flip(turnOn: boolean) {
@@ -139,7 +105,7 @@ function WatchingCard({ job, views, token }: { job: WatchJob; views: readonly Ni
           <AdminSwitch checked={on} onChange={(v) => void flip(v)} label={`${job.name} on`} />
         </span>
       </div>
-      <p className="m-0 px-4 pb-3 text-sm text-slate-600" data-testid="watching-line">{watchLine(job, views)}</p>
+      <p className="m-0 px-4 pb-3 text-sm text-slate-600" data-testid="watching-line">{job.line}</p>
       {error && <p className="m-0 px-4 pb-3 text-sm text-red-700">{error}</p>}
     </div>
   )
@@ -169,27 +135,25 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
   const sources = watchSources(watch, views)
   // From: what it reads, each opening Places showing what that source
   // keeps (board L2b). A job with one kind of source has none; its line says it.
-  const from = sources.length > 0 && (
-    <AdminBox title="From">
-      {sources.map((src) => (
-        <AdminRow key={src.key} href={`${base}/places?watch=${watch.id}&source=${encodeURIComponent(src.key)}`} name={src.label} />
-      ))}
-    </AdminBox>
-  )
+  const from =
+    watch.id === 'kosher' ? (
+      <KosherLists views={views} token={token} onChanged={reload} />
+    ) : (
+      sources.length > 0 && (
+        <AdminGroup title="From">
+          {sources.map((src) => (
+            <AdminRow key={src.key} href={`${base}/places?watch=${watch.id}&source=${encodeURIComponent(src.key)}`} name={src.label} />
+          ))}
+        </AdminGroup>
+      )
+    )
 
   if (watch.id !== 'other') {
-    const add = watch.id === 'kosher' ? ADDS.kosher : undefined
     return (
       <div className="flex flex-col gap-3">
         {head}
-        <WatchingCard job={watch} views={views} token={token} />
+        <WatchingCard job={watch} views={views} off={jobs.runs.off ?? []} token={token} />
         {from}
-        {add && (
-          <button type="button" aria-expanded={adding} onClick={() => setAdding((a) => !a)} className="min-h-11 cursor-pointer self-start text-[0.9375rem] font-semibold text-primary">
-            {add.label}
-          </button>
-        )}
-        {adding && <AddToJob kind="kosher" token={token} onDone={async () => { setAdding(false); await reload() }} />}
       </div>
     )
   }
@@ -227,12 +191,12 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
         title={title}
         right={
           <button type="button" aria-expanded={adding} onClick={() => setAdding((a) => !a)} className={`${primary} whitespace-nowrap`}>
-            {ADDS.other!.label}
+            + Add a page
           </button>
         }
       />
-      <WatchingCard job={watch} views={views} token={token} />
-      {adding && <AddToJob kind="other" token={token} onDone={async () => { setAdding(false); await reload() }} />}
+      <WatchingCard job={watch} views={views} off={jobs.runs.off ?? []} token={token} />
+      {adding && <AddPage token={token} onDone={async () => { setAdding(false); await reload() }} />}
       {read.length > 0 && (
         <AdminBox title={`Read · ${read.length}`}>
           {shown.map(row)}

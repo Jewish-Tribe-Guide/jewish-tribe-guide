@@ -67,6 +67,17 @@ export function AdminBox({
   )
 }
 
+/** A box with its heading above it, small and in capitals ("FROM", "SHULS"),
+ *  as Watches' boards draw it (L1, L2b, Nov 28). */
+export function AdminGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section aria-label={title} className="flex flex-col gap-1.5">
+      <h2 className="m-0 mx-1 mt-1 text-[0.8125rem] font-bold uppercase tracking-[0.04em] text-slate-600">{title}</h2>
+      <div className="overflow-hidden rounded-[10px] border border-slate-200 bg-white [&>*+*]:border-t [&>*+*]:border-slate-100">{children}</div>
+    </section>
+  )
+}
+
 export function AdminCount({ n }: { n: number }) {
   return (
     <span className="text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded-full px-2 py-px">

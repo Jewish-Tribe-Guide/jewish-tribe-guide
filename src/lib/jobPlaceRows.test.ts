@@ -58,11 +58,11 @@ describe('a Watches row, opened: Nothing to read and Read', () => {
 
   it('other jobs split what they track by whether it went wrong, keeping a list’s Stop', () => {
     const tracked = [
-      { name: 'Star-K', status: 'Read last night', bad: false, page: '', watch: { id: 'w', active: true } },
+      { name: 'Star-K', status: 'Read last night', bad: false, page: '', watch: { id: 'w', active: true, url: 'https://star-k.org' } },
       { name: 'Hamotzi', status: 'Didn’t load', bad: true, page: 'place/h' },
     ]
     const { missing, read } = jobPlaceRows('kosher', { tracked })
-    expect(read).toEqual([{ key: 'Star-K-0', name: 'Star-K', line: 'Read last night', page: null, watch: { id: 'w', active: true } }])
+    expect(read).toEqual([{ key: 'Star-K-0', name: 'Star-K', line: 'Read last night', page: null, watch: { id: 'w', active: true, url: 'https://star-k.org' } }])
     expect(missing).toEqual([{ key: 'Hamotzi-1', name: 'Hamotzi', line: 'Didn’t load', page: 'place/h' }])
   })
 })

@@ -73,21 +73,11 @@ export function watchJobOf(kind: string): WatchJob | undefined {
   return WATCH_JOBS.find((j) => (j.kinds as readonly string[]).includes(kind))
 }
 
-/** "Keystone-K’s, Mekor Habracha’s and KCL’s lists". */
-const andList = (names: readonly string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`)
-
 /** Its sources, the kosher lists being each a source of their own. */
 export function watchSources(job: WatchJob, views: readonly NightKindView[]): { key: WatchSourceKey; label: string }[] {
   if (job.id !== 'kosher') return [...job.from]
   const names = [...new Set(views.find((v) => v.id === 'kosher')?.tracked.map((t) => t.name) ?? [])]
   return names.map((n) => ({ key: `list:${n}` as const, label: n }))
-}
-
-/** Its line: the kosher one names its lists once it has some. */
-export function watchLine(job: WatchJob, views: readonly NightKindView[]): string {
-  if (job.id !== 'kosher') return job.line
-  const names = watchSources(job, views).map((s) => s.label)
-  return names.length ? `From ${andList(names.map((n) => n.replace(/’s list$|'s list$/, '’s')))} lists, every night.` : job.line
 }
 
 export type WatchState =

@@ -20,6 +20,10 @@ vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 const lastNight = new Date(Date.now() - 3_600_000).toISOString()
 const view = (over: Partial<NightKindView>): NightKindView => ({ id: 'times', name: 'Shul times', about: '', when: '3:00 AM', count: '15 of 16 read', trouble: null, misses: [], tracked: [], nights: [], fixes: [], lastAt: lastNight, schedule: 'Runs every night at 3:00 AM', ...over })
 const TIMES = view({ tracked: ['Kesher', 'Mekor'].map((name) => ({ name, status: 'Read', bad: false, page: `place/${name}` })) })
+const KOSHER = view({ id: 'kosher', tracked: [
+  { name: 'Keystone-K’s list', status: 'Read Nov 27', bad: false, page: '', watch: { id: 'k', active: true, url: 'https://keystone-k.org/list' } },
+  { name: 'KCL’s list', status: 'Read Nov 27', bad: false, page: '', watch: { id: 'kcl', active: true, url: 'https://www.kcl.org/list' } },
+] })
 const shul = (id: string, name: string, over: Record<string, unknown> = {}) => ({ id, name, href: '', website: null, pages: [], off: false, offSince: null, reason: null, fields: [], ...over })
 const page = { watch: { active: true }, source: 'https://x.org' }
 const email = { active: true, pageChangedAt: lastNight }
@@ -120,6 +124,53 @@ describe('a job on Watches, opened (boards L2b, L2f)', () => {
     show('sites')
     expect(await screen.findByRole('heading', { name: 'Hours and phone' })).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'From' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Google', 'Its own website'])
+  })
+
+  it('Kosher certification: each list with its site and last read, Edit and Remove at its end, and Add (L2h)', async () => {
+    serve([KOSHER])
+    show('kosher')
+    const rows = await screen.findAllByTestId('kosher-list')
+    expect(rows.map((r) => r.textContent)).toEqual(['KCL’s listkcl.org · Read Nov 27', 'Keystone-K’s listkeystone-k.org · Read Nov 27'])
+    expect(screen.getByTestId('watching-line')).toHaveTextContent('From each kosher agency’s list, every night.')
+    // No Read now: the job reads every list each night.
+    expect(screen.queryByRole('button', { name: /Read now/ })).toBeNull()
+    expect(within(rows[0]).getByRole('button', { name: 'Edit KCL’s list' })).toHaveAttribute('data-action', 'edit')
+    // A phone's swipe (Edit and Remove circles) needs a real browser: jsdom has no layout to swipe.
+  })
+
+  it('Edit reads the new address at once, in place of the old', async () => {
+    serve([KOSHER])
+    show('kosher')
+    const u = userEvent.setup()
+    await u.click((await screen.findAllByRole('button', { name: 'Edit KCL’s list' }))[0])
+    const field = screen.getByTestId('kosher-list-field')
+    expect(field).toHaveValue('https://www.kcl.org/list')
+    await u.clear(field)
+    await u.type(field, 'https://kcl.org/places')
+    await u.click(screen.getByRole('button', { name: 'Done' }))
+    expect(posts).toEqual([{ action: 'add', url: 'https://kcl.org/places', purpose: 'kosher' }, { action: 'remove', id: 'kcl' }])
+  })
+
+  it('Remove asks nothing, and Undo puts it back', async () => {
+    serve([KOSHER])
+    show('kosher')
+    const u = userEvent.setup()
+    await u.click((await screen.findAllByRole('button', { name: 'Remove KCL’s list' }))[0])
+    expect(posts).toEqual([{ action: 'remove', id: 'kcl' }])
+    expect(await screen.findByText(/removed$/)).toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(posts.at(-1)).toEqual({ action: 'add', url: 'https://www.kcl.org/list', purpose: 'kosher' })
+  })
+
+  it('+ Add a kosher list reads the address given', async () => {
+    serve([view({ id: 'kosher', lastAt: null, tracked: [] })])
+    show('kosher')
+    const u = userEvent.setup()
+    expect(await screen.findByTestId('watching-state')).toHaveTextContent('Runs when a kosher list is added')
+    await u.click(screen.getByRole('button', { name: 'Add a kosher list' }))
+    await u.type(screen.getByTestId('kosher-list-field'), 'https://star-k.org/list')
+    await u.click(screen.getByRole('button', { name: 'Add it' }))
+    expect(posts).toEqual([{ action: 'add', url: 'https://star-k.org/list', purpose: 'kosher' }])
   })
 
   it('a job with one kind of source has no From: its line says it', async () => {

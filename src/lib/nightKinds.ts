@@ -125,7 +125,7 @@ export type KindMiss = { name: string; why: string; page: string }
 export type TrackedSource = { name: string; status: string; bad: boolean; page: string; watch?: ListSwitch }
 /** A kosher list's own watch, for its Stop and Read again: a list isn't
  *  one place's, so it's turned off here (the Kosher page's switch). */
-export type ListSwitch = { id: string; active: boolean }
+export type ListSwitch = { id: string; active: boolean; url: string }
 export type KindNight = { date: string; result: string; tone: 'good' | 'bad' | 'none' }
 
 export type NightKindView = {
@@ -318,7 +318,7 @@ function trackedWatches(kind: NightKind, watches: readonly Watch[], unread: read
     const status = place ? { status: 'Menu never read', bad: true, at: 0 } : w.active ? watchStatus(w) : { status: 'Stopped', bad: false, at: 0 }
     const key = w.resourceId ?? w.id
     const line = places.get(key)
-    if (!line) places.set(key, { name: place?.name ?? watchName(w), pages: 1, best: status, page: pageOf(kind, w, listings), ...(list ? { watch: { id: w.id, active: w.active } } : {}) })
+    if (!line) places.set(key, { name: place?.name ?? watchName(w), pages: 1, best: status, page: pageOf(kind, w, listings), ...(list ? { watch: { id: w.id, active: w.active, url: w.url } } : {}) })
     else {
       line.pages++
       if ((status.bad && !line.best.bad) || (status.bad === line.best.bad && status.at > line.best.at)) line.best = status

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { NightKindView } from './nightKinds'
 import { NIGHT_KINDS } from './nightKinds'
-import { findWatches, listedJobs, WATCH_JOBS, watchAside, watchJobOf, watchLine, watchSources, watchState } from './watchList'
+import { findWatches, listedJobs, WATCH_JOBS, watchAside, watchJobOf, watchSources, watchState } from './watchList'
 
 const view = (over: Partial<NightKindView>): NightKindView => ({ id: 'times', name: '', about: '', when: null, count: '', trouble: null, misses: [], tracked: [], nights: [], fixes: [], lastAt: null, schedule: '', ...over })
 const read = (name: string) => ({ name, status: 'Read', bad: false, page: '' })
@@ -58,10 +58,8 @@ describe('watchState and its row', () => {
 
 describe('sources and search', () => {
   const kosher = [view({ id: 'kosher', tracked: [read('Keystone-K’s list'), read('KCL’s list'), read('Keystone-K’s list')] })]
-  it('each kosher list is a source, and the line names them', () => {
+  it('each kosher list is a source', () => {
     expect(watchSources(job('kosher'), kosher).map((s) => s.label)).toEqual(['Keystone-K’s list', 'KCL’s list'])
-    expect(watchLine(job('kosher'), kosher)).toBe('From Keystone-K’s and KCL’s lists, every night.')
-    expect(watchLine(job('kosher'), [])).toBe('From each kosher agency’s list, every night.')
   })
 
   it('finds a job by its name, or by a source it reads', () => {
