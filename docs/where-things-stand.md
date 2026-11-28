@@ -311,6 +311,8 @@ old number can still be looked up. When an item is done, move it to
     W11d + W13: seven rows (Hours and phone, one row for Google and
     the website reads; Kosher certification opens its three lists; Eruv
     "Status").
+    W14: Hours and phone opened: "127 of 137 places", Edit, search, then
+    Not watched, Its own website, Google (first 8, Show all).
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
