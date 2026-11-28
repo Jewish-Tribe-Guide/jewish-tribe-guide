@@ -15,6 +15,8 @@ import { AdminEmpty, AdminMenu, AdminRow } from './AdminUI'
 import EruvListing, { AddEruv } from './EruvListing'
 import PlaceListing from './PlaceListing'
 import { AddButton } from '@/components/AddButton'
+import { PlusIcon } from '@/components/icons'
+import { useMeasuredIsMobile } from '@/lib/useIsMobile'
 import { coverageOf, useWatchJobsAndReload } from './useWatchJobs'
 import { moveBackTo, moveTo } from './useScreenHistory'
 import { useAdminApi } from './useAdminApi'
@@ -27,6 +29,10 @@ import { useAdminApi } from './useAdminApi'
 const field = 'min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-[0.9375rem] text-slate-900'
 
 /** How many rows show before "Show all". */
+/** Too narrow for the filters and Add on one row: the sidebar and three
+ *  menus need about 1024px. A phone's short side counts, as desktop: does. */
+const NARROW = '(max-width: 1023px), (max-height: 639px)'
+
 const SHOWN = 50
 
 type Data = { places: AdminPlace[]; categories: CategoryConfig[] }
@@ -86,6 +92,10 @@ function setAddressParam(name: string, value: string, fallback: string) {
 export default function PlacesList({ token }: { token: string }) {
   const api = useAdminApi(token)
   const router = useRouter()
+  // Add: at the end of the filters' row while there's room for both, else
+  // floating (the user, Nov 28). Nothing till the window's measured, so a
+  // phone never paints the computer's.
+  const narrow = useMeasuredIsMobile(NARROW)
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
   // The places first: the jobs only colour the rows and fill the coverage.
@@ -259,6 +269,15 @@ export default function PlacesList({ token }: { token: string }) {
     return street ? `Open ${p.name}, ${street}` : `Open ${p.name}`
   }
   const shown = all ? rows : rows.slice(0, SHOWN)
+  const add = () => {
+    // A category picked above is the one it's added to.
+    if (category && listingCategories.some((c) => c.id === category)) startAdding(category)
+    else {
+      setAdding('')
+      void moveTo(router, 'push', () => listHref({ add: '' }))
+      window.scrollTo?.(0, 0)
+    }
+  }
   // Category, as Checked by: only the categories the other menus and the
   // search leave something in, with how many (the user, Nov 4), and the one
   // picked even once it's emptied.
@@ -268,7 +287,7 @@ export default function PlacesList({ token }: { token: string }) {
 
   return (
     // pb-14: the floating Add clears the last row and Show all.
-    <div className="flex flex-col gap-4 pb-14">
+    <div className={`flex flex-col gap-4 ${narrow === false ? '' : 'pb-14'}`}>
       <label className={`${field} flex items-center gap-2`}>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#64748b" strokeWidth="1.8" aria-hidden="true">
           <circle cx="7" cy="7" r="4.5" />
@@ -287,7 +306,7 @@ export default function PlacesList({ token }: { token: string }) {
         />
       </label>
 
-      <div className="flex gap-1.5 sm:gap-2">
+      <div className="flex gap-1.5 sm:gap-2" data-testid="places-filters">
         <AdminMenu name="On the site" value={show} options={PLACE_SHOWS.map((s) => ({ value: s.show, label: s.label, count: counts[s.show] }))} onChange={pick} />
         <AdminMenu
           name="Category"
@@ -314,6 +333,17 @@ export default function PlacesList({ token }: { token: string }) {
             setAddressParam('checked', v, 'any')
           }}
         />
+        {adding === null && narrow === false && (
+          <button
+            type="button"
+            onClick={add}
+            aria-label="Add a place"
+            className="ml-auto flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-primary pl-3.5 pr-4 text-[0.9375rem] font-semibold text-white hover:bg-primary-dark active:scale-95"
+          >
+            <PlusIcon className="h-[18px] w-[18px] shrink-0" />
+            Add
+          </button>
+        )}
       </div>
 
       <p className="-mb-2 m-0 text-sm font-semibold text-slate-600">
@@ -346,20 +376,7 @@ export default function PlacesList({ token }: { token: string }) {
           </div>
         </section>
       )}
-      {adding === null && (
-        <AddButton
-          label="Add a place"
-          onClick={() => {
-            // A category picked above is the one it's added to.
-            if (category && listingCategories.some((c) => c.id === category)) startAdding(category)
-            else {
-              setAdding('')
-              void moveTo(router, 'push', () => listHref({ add: '' }))
-              window.scrollTo?.(0, 0)
-            }
-          }}
-        />
-      )}
+      {adding === null && narrow === true && <AddButton label="Add a place" onClick={add} />}
     </div>
   )
 }

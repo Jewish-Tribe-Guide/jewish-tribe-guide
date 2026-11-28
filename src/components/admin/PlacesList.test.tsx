@@ -102,15 +102,30 @@ describe('Places', () => {
     expect(screen.queryByRole('link', { name: /Watches/ })).toBeNull()
   })
 
-  // It floats, so it's tapped from down the list; What are you adding?
-  // opens at the top, out of sight unless the page goes there too.
-  it('Add a place floats like the site’s, and goes to the top to ask what you’re adding', async () => {
+  // The user, Nov 28: on a computer, Add sits at the right of the filters'
+  // row, under the search; a window too narrow for both floats it again.
+  it('Add a place is at the end of the filters’ row on a computer', async () => {
+    renderPlaces()
+    const add = await screen.findByRole('button', { name: 'Add a place' })
+    expect(add.className).not.toContain('fixed')
+    expect(add).toHaveTextContent(/^Add$/)
+    const row = add.closest('[data-testid="places-filters"]')
+    expect(row).not.toBeNull()
+    expect(within(row as HTMLElement).getByRole('button', { name: /On the site/ })).toBeTruthy()
+    expect(row!.lastElementChild).toBe(add)
+  })
+
+  // Narrow, it floats, so it's tapped from down the list; What are you
+  // adding? opens at the top, out of sight unless the page goes there too.
+  it('Add a place floats in a narrow window, and goes to the top to ask what you’re adding', async () => {
     const user = userEvent.setup()
     const scrollTo = vi.fn()
     vi.stubGlobal('scrollTo', scrollTo)
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('1023px'), addEventListener: () => {}, removeEventListener: () => {} }))
     renderPlaces()
     const add = await screen.findByRole('button', { name: 'Add a place' })
     expect(add.className).toContain('fixed')
+    expect(add.closest('[data-testid="places-filters"]')).toBeNull()
     expect(add).toHaveTextContent(/^Add$/)
     await user.click(add)
     expect(scrollTo).toHaveBeenCalledWith(0, 0)
