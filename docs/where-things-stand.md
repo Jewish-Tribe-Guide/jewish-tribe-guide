@@ -337,6 +337,13 @@ old number can still be looked up. When an item is done, move it to
     Minyan times' Add opens Places, Synagogues, Not checked. Newsletter
     senders are stand-ins (the seed has none). Not built; replaces the
     place lists on g04, g05, g08–g11, g13 if the user goes with it.
+    K1–K2 (same page, Nov 28), simpler still, replacing J1–J6: a watch
+    is a switch and one line, all on the Watches tab, grouped; no
+    watch pages, Add, lists or count rows (a new kosher list is a new
+    watch, built by us; a newsletter sender is the shul's, added from
+    its "Kept current by"). Places' Checked by becomes "Kept current
+    by", its choices are the watches' names with the same one line,
+    and "Not checked" becomes "Nothing". Not built.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
