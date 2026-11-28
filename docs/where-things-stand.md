@@ -398,6 +398,13 @@ old number can still be looked up. When an item is done, move it to
     (/admin/watches/job/kosher) has "Stop" per list and "Turn off this
     job" at the bottom: Stop becomes Remove, Turn off becomes the
     Watching switch.
+    L2e (Nov 28, the user), replacing L2d's row: no Read now (Change
+    reads the new address straight away). On the computer, Change and
+    Remove sit at the right of each list's row; on a phone the rows are
+    plain and a swipe shows them. Open: whether a place's source drops
+    Read now too.
+    L2f (Nov 28, the user): in "Runs when…" the job's own line stays,
+    so a new admin sees what the job does before it has run.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
