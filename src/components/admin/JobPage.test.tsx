@@ -61,7 +61,7 @@ afterEach(() => {
 })
 
 describe('a job on Watches, opened (boards L2b, L2f)', () => {
-  it('is its name, the Watching card with its line, and From, each opening Places on that source', async () => {
+  it('is its name, the Watching card with its line, and From, plain rows: what it reads, not links (Nov 28)', async () => {
     serve([TIMES])
     show('times')
     expect(await screen.findByRole('heading', { name: 'Minyan times' })).toBeInTheDocument()
@@ -70,10 +70,9 @@ describe('a job on Watches, opened (boards L2b, L2f)', () => {
     // Running well, it says nothing more.
     expect(screen.queryByTestId('watching-state')).toBeNull()
     const from = screen.getByRole('region', { name: 'From' })
-    expect(within(from).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-      ['Website', '/philly/admin/places?watch=times&source=website'],
-      ['Newsletter', '/philly/admin/places?watch=times&source=newsletter'],
-    ])
+    expect(within(from).getAllByTestId('from-row').map((r) => r.textContent)).toEqual(['Website', 'Newsletter'])
+    expect(within(from).queryByRole('link')).toBeNull()
+    expect(within(from).queryByRole('button')).toBeNull()
     // The places it covers are Places' Watch filter now.
     expect(screen.queryByRole('region', { name: /Nothing to read|Read ·/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /Turn off|\+ Add a shul/ })).toBeNull()
@@ -123,7 +122,7 @@ describe('a job on Watches, opened (boards L2b, L2f)', () => {
     serve([view({ id: 'google' })])
     show('sites')
     expect(await screen.findByRole('heading', { name: 'Basic information' })).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'From' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Google', 'Its own website'])
+    expect(within(screen.getByRole('region', { name: 'From' })).getAllByTestId('from-row').map((a) => a.textContent)).toEqual(['Google', 'Its own website'])
   })
 
   it('Kosher certification: each list with its site and last read, Edit and Remove at its end, and Add (L2h)', async () => {
@@ -173,11 +172,25 @@ describe('a job on Watches, opened (boards L2b, L2f)', () => {
     expect(posts).toEqual([{ action: 'add', url: 'https://star-k.org/list', purpose: 'kosher' }])
   })
 
-  it('a job with one kind of source has no From: its line says it', async () => {
+  it('every job says what it reads under From, Broken links aside', async () => {
     serve([view({ id: 'eruvs', name: 'Eruvs', tracked: [{ name: 'Lower Merion', status: 'Read', bad: false, page: 'place/lm' }] })])
     show('eruvs')
     expect(await screen.findByRole('heading', { name: 'Eruv status' })).toBeInTheDocument()
     expect(screen.getByTestId('watching-line')).toHaveTextContent('From the eruv’s website and emails.')
+    expect(within(screen.getByRole('region', { name: 'From' })).getAllByTestId('from-row').map((r) => r.textContent)).toEqual(['Website', 'Email'])
+    for (const [id, from] of [['menus', ['Website']], ['hours', ['Website']], ['hospitals', ['Refuah']]] as const) {
+      cleanup()
+      forgetWatchJobs()
+      serve([view({ id })])
+      show(id)
+      await screen.findByTestId('watching-line')
+      expect(within(screen.getByRole('region', { name: 'From' })).getAllByTestId('from-row').map((r) => r.textContent), id).toEqual(from)
+    }
+    cleanup()
+    forgetWatchJobs()
+    serve([view({ id: 'links' })])
+    show('links')
+    await screen.findByTestId('watching-line')
     expect(screen.queryByRole('region', { name: 'From' })).toBeNull()
   })
 })

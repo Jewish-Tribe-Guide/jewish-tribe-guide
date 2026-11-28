@@ -432,16 +432,17 @@ old number can still be looked up. When an item is done, move it to
     phone tab, between Places and Site (gone from Reports), grouped as
     drawn with a search for jobs and sources (`watchList.ts`). Each
     job's page is the Watching card (switch, line, Off · last read, or
-    Runs when…) and From; From rows open Places filtered to that job and
-    source. Kosher certification's lists have Edit and Remove (pencil
+    Runs when…) and From, what it reads, on every job but Broken links
+    (plain rows, not links: the user, Nov 28). Kosher certification's lists have Edit and Remove (pencil
     and × on a computer, a swipe on a phone), Undo and "+ Add a kosher
     list" (`KosherLists.tsx`). Places has Watch and Source in place of
     Checked by, each row saying its jobs, and on a phone one Filters
     sheet with Add beside it. Renamed on the way (the user, Nov 28):
     Hospital details → Bikkur Cholim details; Hours and phone → Basic
     information, its line naming name, hours, phone and website. Where
-    the build differs from the boards: From rows and the Watches rows
-    are links, with a chevron only on a phone (the admin's rows lift on
+    the build differs from the boards: From rows are plain (the boards
+    drew links); the Watches rows are links, with a chevron only on a
+    phone (the admin's rows lift on
     hover on a computer); the community email card stays at the top of
     Watches while the email isn't set up; job pages no longer list
     places (Places does, filtered).

@@ -7,7 +7,7 @@ import type { NightKindId } from '@/lib/jobRuns'
 import type { NightKindView } from '@/lib/nightKinds'
 import { jobPlaceRows, type JobPlaceRow } from '@/lib/jobPlaceRows'
 import { shortDay, watchJobOf, watchSources, watchState, type WatchJob } from '@/lib/watchList'
-import { AdminBack, AdminBox, AdminGroup, AdminRow, AdminSwitch, adminInputClass } from './AdminUI'
+import { AdminBack, AdminBox, AdminGroup, AdminSwitch, adminInputClass } from './AdminUI'
 import KosherLists from './KosherLists'
 import { useAdminApi } from './useAdminApi'
 import { noteJobSwitched, useWatchJobsAndReload } from './useWatchJobs'
@@ -133,8 +133,8 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
   if (jobs.runs === undefined) return <div className="space-y-4">{head}<p className="text-sm text-muted">Loading…</p></div>
 
   const sources = watchSources(watch, views)
-  // From: what it reads, each opening Places showing what that source
-  // keeps (board L2b). A job with one kind of source has none; its line says it.
+  // From: what it reads, as plain rows (board L2b; the user, Nov 28: not
+  // links). Broken links has none: it opens the links listings already have.
   const from =
     watch.id === 'kosher' ? (
       <KosherLists views={views} token={token} onChanged={reload} />
@@ -142,7 +142,9 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
       sources.length > 0 && (
         <AdminGroup title="From">
           {sources.map((src) => (
-            <AdminRow key={src.key} href={`${base}/places?watch=${watch.id}&source=${encodeURIComponent(src.key)}`} name={src.label} />
+            <div key={src.key} data-testid="from-row" className="flex min-h-[52px] items-center border-b border-slate-100 px-4 py-2.5 text-[0.9375rem] font-semibold text-slate-900 last:border-b-0">
+              {src.label}
+            </div>
           ))}
         </AdminGroup>
       )

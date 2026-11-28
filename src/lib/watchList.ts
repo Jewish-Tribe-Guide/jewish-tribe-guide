@@ -12,7 +12,7 @@ import type { PlaceCoverage } from './fieldCoverage'
 // place's own website (when Google hasn't got it), Minyan times is the
 // shuls' websites and their newsletters. The switch turns both.
 
-export type WatchSourceKey = 'google' | 'website' | 'newsletter' | 'refuah' | `list:${string}`
+export type WatchSourceKey = 'google' | 'website' | 'newsletter' | 'email' | 'refuah' | `list:${string}`
 
 export type WatchJob = {
   /** Its page (watches/job/<id>): the first nightly job it is. */
@@ -24,7 +24,8 @@ export type WatchJob = {
   line: string
   /** With nothing read yet and never run. */
   runsWhen: string
-  /** What it reads, under From; none for a job with one kind of source. */
+  /** What it reads, under From: every job but Broken links, which reads
+   *  no source of its own (it opens the links already on listings). */
   from: readonly { key: WatchSourceKey; label: string }[]
   /** Words a search also finds it by. */
   also: readonly string[]
@@ -59,11 +60,11 @@ export const WATCH_JOBS: readonly WatchJob[] = [
     ],
     also: ['Website', 'Newsletter', 'Email'],
   },
-  { id: 'menus', kinds: ['menus'], heading: 'Food', name: 'Menus', line: 'From each place’s menu page, a few every night.', runsWhen: FIRST_PLACE, from: [], also: ['Website'] },
+  { id: 'menus', kinds: ['menus'], heading: 'Food', name: 'Menus', line: 'From each place’s menu page, a few every night.', runsWhen: FIRST_PLACE, from: [{ key: 'website', label: 'Website' }], also: ['Website'] },
   { id: 'kosher', kinds: ['kosher'], heading: 'Food', name: 'Kosher certification', line: 'From each kosher agency’s list, every night.', runsWhen: 'Runs when a kosher list is added', from: [], also: ['Hechsher', 'List'] },
-  { id: 'hours', kinds: ['hours'], heading: 'Mikvahs', name: 'Mikvah hours', line: 'From each mikvah’s website, every night.', runsWhen: FIRST_PLACE, from: [], also: ['Website'] },
-  { id: 'hospitals', kinds: ['hospitals'], heading: 'Hospitals', name: 'Bikkur Cholim details', line: 'From each hospital’s page on Refuah, every night.', runsWhen: 'Runs when the first hospital is added', from: [], also: ['Refuah'] },
-  { id: 'eruvs', kinds: ['eruvs'], heading: 'Eruv', name: 'Eruv status', line: 'From the eruv’s website and emails.', runsWhen: FIRST_PLACE, from: [], also: ['Website', 'Email'] },
+  { id: 'hours', kinds: ['hours'], heading: 'Mikvahs', name: 'Mikvah hours', line: 'From each mikvah’s website, every night.', runsWhen: FIRST_PLACE, from: [{ key: 'website', label: 'Website' }], also: ['Website'] },
+  { id: 'hospitals', kinds: ['hospitals'], heading: 'Hospitals', name: 'Bikkur Cholim details', line: 'From each hospital’s page on Refuah, every night.', runsWhen: 'Runs when the first hospital is added', from: [{ key: 'refuah', label: 'Refuah' }], also: ['Refuah'] },
+  { id: 'eruvs', kinds: ['eruvs'], heading: 'Eruv', name: 'Eruv status', line: 'From the eruv’s website and emails.', runsWhen: FIRST_PLACE, from: [{ key: 'website', label: 'Website' }, { key: 'email', label: 'Email' }], also: ['Website', 'Email'] },
   { id: 'links', kinds: ['links'], heading: 'Links', name: 'Broken links', line: 'Opens every link nothing else reads, every Sunday.', runsWhen: FIRST_PLACE, from: [], also: [] },
   // Pages added by hand: listed only when there are some.
   { id: 'other', kinds: ['other'], heading: 'Links', name: 'Other pages', line: 'Pages added by hand. What they find waits on To do.', runsWhen: '', from: [], also: [] },
@@ -178,7 +179,7 @@ export const isPlaceWatchChoice = (v: unknown): v is PlaceWatchChoice => v === '
 
 /** The Source menu: every place, or one read from this. */
 export type PlaceSourceChoice = 'any' | WatchSourceKey
-const SOURCE_LABELS: Record<string, string> = { google: 'Google', website: 'Website', newsletter: 'Newsletter', refuah: 'Refuah' }
+const SOURCE_LABELS: Record<string, string> = { google: 'Google', website: 'Website', newsletter: 'Newsletter', email: 'Email', refuah: 'Refuah' }
 export const isPlaceSourceChoice = (v: unknown): v is PlaceSourceChoice => typeof v === 'string' && (v === 'any' || v in SOURCE_LABELS || (v.startsWith('list:') && v.length > 5))
 /** "Google", "KCL’s list". */
 export const sourceLabel = (key: WatchSourceKey) => (key.startsWith('list:') ? key.slice(5) : SOURCE_LABELS[key])
