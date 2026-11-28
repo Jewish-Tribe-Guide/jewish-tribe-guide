@@ -303,6 +303,8 @@ old number can still be looked up. When an item is done, move it to
     place, Shuls, Food, Mikvahs, Hospitals, Eruv, Links), each row with
     its coverage ("12 of 16 shuls", "All 4"); a watch opens with the
     places it doesn't watch first, marked Not watched. Not built.
+    W11b: the list quieter, a note only where something needs the admin
+    ("4 not watched", "Off"); full counts live inside each watch.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
