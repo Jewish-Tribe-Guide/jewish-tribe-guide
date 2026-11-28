@@ -14,7 +14,8 @@ import { communityOfRecipients, inboundDomain, isAutomatic, readableAttachment, 
 // - a watched shul newsletter: read and filed for an admin;
 // - anything else from a person: forwarded to the community's admins,
 //   Reply-To the sender. Automatic mail (out-of-office, bounces) and a
-//   sender an admin chose to ignore are dropped.
+//   sender an admin chose to ignore are dropped; a confirmation or receipt
+//   from a no-reply address is forwarded.
 //
 // Signed by Resend (Svix): RESEND_WEBHOOK_SECRET; read with
 // RESEND_RECEIVING_API_KEY, a full-access key (else RESEND_API_KEY), from the webhook's page

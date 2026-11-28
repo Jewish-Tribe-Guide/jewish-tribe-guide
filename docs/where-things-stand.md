@@ -292,7 +292,7 @@ old number can still be looked up. When an item is done, move it to
     down; a watched newsletter is read and filed, as the script's are;
     anything else from a person is forwarded to the community's admins
     with Reply-To the sender, so the admin's Reply answers them.
-    Auto-replies and bounces are never forwarded. Once set,
+    Auto-replies and bounces are never forwarded; other machine mail (a list's "confirm your address", a receipt) is, since an admin may need it (Nov 28). Once set,
     `getCommunityEmail` gives this address when Settings has none
     saved, so it becomes the reply-to on every email the site sends
     visitors, and the site sends from it too (one address a visitor

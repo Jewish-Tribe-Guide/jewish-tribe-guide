@@ -81,16 +81,20 @@ export function headerOf(headers: Record<string, string> | null | undefined, nam
   return null
 }
 
-/** Sent by a machine, not a person: an auto-reply, a bounce, a list's
- *  bulk mail flagged as such (RFC 3834's Auto-Submitted, and the headers
- *  auto-responders set before it). */
+/** An auto-reply or a bounce: the only mail never forwarded, so an
+ *  admin's out-of-office can't answer the forward and come round again
+ *  (RFC 3834's Auto-Submitted: auto-replied, and the headers
+ *  auto-responders set before it). Other machine mail is forwarded: a
+ *  list's "confirm your address" comes from noreply@groups.io marked
+ *  auto-generated, and the admin moving a list over has to click it
+ *  (Nov 28, the first one was dropped). */
 export function isAutomatic(headers: Record<string, string> | null | undefined, from: string): boolean {
-  const auto = headerOf(headers, 'auto-submitted')
-  if (auto && auto.trim().toLowerCase() !== 'no') return true
-  if (headerOf(headers, 'x-autoreply') || headerOf(headers, 'x-autorespond') || headerOf(headers, 'x-auto-response-suppress')?.toLowerCase().includes('all')) return true
+  const auto = headerOf(headers, 'auto-submitted')?.trim().toLowerCase()
+  if (auto?.startsWith('auto-replied')) return true
+  if (headerOf(headers, 'x-autoreply') || headerOf(headers, 'x-autorespond')) return true
   const precedence = headerOf(headers, 'precedence')?.trim().toLowerCase()
-  if (precedence === 'bulk' || precedence === 'junk' || precedence === 'auto_reply') return true
-  return /^(mailer-daemon|postmaster|no-?reply)@/i.test(senderAddress(from) ?? '')
+  if (precedence === 'junk' || precedence === 'auto_reply') return true
+  return /^(mailer-daemon|postmaster)@/i.test(senderAddress(from) ?? '')
 }
 
 /** The words of an email: its text part, or its HTML with the tags off. */
