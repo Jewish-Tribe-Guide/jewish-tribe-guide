@@ -44,7 +44,8 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { useNavTransitionProps } from '@/lib/navTransitions'
 import { consumeHomeReveal } from '@/lib/homeRevealSignal'
 import { useLocation } from '@/lib/locationContext'
-import { useActiveCommunity, useCommunityPlace, useCommunitySlug } from '@/lib/communityContext'
+import { useActiveCommunity, useCommunityPlace, useCommunitySlug, useContributions } from '@/lib/communityContext'
+import { openSiteAdd } from '@/lib/addHere'
 import { countEvent } from '@/lib/countEvent'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/types'
@@ -96,6 +97,7 @@ export type LandingProps = {
 // would be worse than a slightly longer page.
 export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }: LandingProps) {
   const communitySlug = useCommunitySlug()
+  const contributions = useContributions()
   const categories = useCategories()
   const homeSections = useHomeSections()
   const listings = useAllListings()
@@ -261,7 +263,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
   }
 
   const foundNothing = !!asked && lines.length === 0
-  const askGroup = foundNothing ? { nothingClose: true, sharePath: routes.ask(communitySlug, q) } : null
+  // Add what was searched for, as a category page's card has (board R2):
+  // the site's own Add, already searching, asks what kind of place.
+  const askGroup = foundNothing ? { nothingClose: true, sharePath: routes.ask(communitySlug, q), onAdd: contributions.add ? () => openSiteAdd(q) : undefined } : null
   // AskTheGroup says "Nothing in the guide for …" itself.
   const nothingNode = askGroup && (
     <div data-testid="search-nothing">

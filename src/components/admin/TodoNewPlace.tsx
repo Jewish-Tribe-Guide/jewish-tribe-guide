@@ -9,6 +9,7 @@ import PlaceFrame, { PlaceButtons, placeSubline, type PlaceButton, type PlacePos
 import { SubmissionSourceCard } from './TodoChange'
 import { useEditorSteps, useStepsInAddress } from './useStepsInAddress'
 import { useAdminApi } from './useAdminApi'
+import { useSayWhy } from './useSayWhy'
 
 // A new place on To do (board L3NewPlace): the listing as it would go in,
 // in the site's own editor, a row for each thing it has and "Not on the
@@ -67,7 +68,8 @@ export default function TodoNewPlace({
   busy?: boolean
   error?: string | null
   token: string
-  onModerate: (id: string, status: 'rejected') => void
+  /** "Leave it"; `reason`, why, for the sender's email. */
+  onModerate: (id: string, status: 'rejected', reason?: string) => void
   onUpdated: (id: string) => void
   onEditing: (editing: boolean) => void
 }) {
@@ -98,8 +100,9 @@ export default function TodoNewPlace({
   const sending = busy || edit.sending
   const buttons: PlaceButton[] = [
     { label: 'Add to the guide', busy: edit.sending && 'Adding…', disabled: sending || !edit.ready, onClick: () => void control.current?.send() },
-    { label: 'Leave it', busy: busy && !edit.sending && 'Saving…', disabled: sending, onClick: () => onModerate(s.id, 'rejected') },
+    { label: 'Leave it', busy: busy && !edit.sending && 'Saving…', disabled: sending, onClick: () => sayWhy.onNo() },
   ]
+  const sayWhy = useSayWhy({ submission: s, whole: true, label: 'Leave it', busy: busy && 'Saving…', refuse: (reason) => onModerate(s.id, 'rejected', reason) })
 
   return (
     <PlaceFrame
@@ -110,7 +113,7 @@ export default function TodoNewPlace({
       switches={inStep ? null : switches}
       source={!inStep && <SubmissionSourceCard submission={s} details={sent.details} />}
       error={error}
-      foot={!inStep && <PlaceButtons buttons={buttons} />}
+      foot={!inStep && (sayWhy.foot ?? <PlaceButtons buttons={buttons} />)}
     >
       <ListingEditor
         key={s.id}

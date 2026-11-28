@@ -41,6 +41,9 @@ type Options = {
   /** Runs instead of the "Thank you" screen once it's in (the box goes back
    *  to the rest of what it read), with the answer it got. */
   onSent?: (body: unknown) => void
+  /** Told once it's in, beside whatever comes next (the Add box counts it,
+   *  lib/addCounting.ts). Not for an admin's own save or a preview. */
+  onSubmitted?: () => void
 }
 
 export type SendVia = (body: {
@@ -61,7 +64,7 @@ export type SendVia = (body: {
  * sent: the listing it would have filed goes into the preview's list, with
  * no bot check to wait for, and the rest runs as if it went in.
  */
-export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit, onAdminSubmitted, via, onSent }: Options) {
+export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit, onAdminSubmitted, via, onSent, onSubmitted }: Options) {
   const community = useCommunitySlug()
   const preview = usePreviewSend()
   const [submitterEmail, setSubmitterEmail] = useState('')
@@ -173,6 +176,7 @@ export function useListingSubmit({ mode, existing, sharedTurnstile, adminSubmit,
       if (!adminSubmit && !preview) {
         const ids = Array.isArray(body.ids) ? body.ids : [body.id]
         recordUpdates(community, 'submission', ids, payload.name || existing?.name || '', mode === 'edit' ? 'Changes' : 'New place')
+        onSubmitted?.()
       }
       // Admin mode: the listing is already live — nothing to review, so skip
       // the "Thank you!" pending screen and just close back out.

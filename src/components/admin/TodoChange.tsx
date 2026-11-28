@@ -20,6 +20,7 @@ import { changeAnswers, oneMinyanTime } from './changeView'
 import { useAdminApi } from './useAdminApi'
 import { useEditorSteps, useStepsInAddress } from './useStepsInAddress'
 import ThingSwitches from './ThingSwitches'
+import { useSayWhy } from './useSayWhy'
 
 // A change on To do, in the listing's own editor (boards E1Times, R5Link,
 // R1Women, R6After): the rows it changes, filled in as it would leave them,
@@ -60,8 +61,9 @@ export default function TodoChange({
   busy?: boolean
   error?: string | null
   token: string
-  /** "Don't update": `part`, that part of it only. */
-  onModerate: (id: string, status: 'rejected', part?: string) => void
+  /** "Don't update": `part`, that part of it only; `reason`, why, for
+   *  the sender's email. */
+  onModerate: (id: string, status: 'rejected', part?: string, reason?: string) => void
   /** Taken, as the card had it; `partial`, the rest of it still waits. */
   onUpdated: (id: string, partial?: boolean) => void
   /** Something typed in the card, so leaving can ask first. */
@@ -122,8 +124,9 @@ export default function TodoChange({
       disabled: sending || !edit.changed,
       onClick: () => void control.current?.send(),
     },
-    { label: answers.no, busy: busy && !edit.sending && 'Saving…', disabled: sending, onClick: () => onModerate(s.id, 'rejected', part?.id) },
+    { label: answers.no, busy: busy && !edit.sending && 'Saving…', disabled: sending, onClick: () => sayWhy.onNo() },
   ]
+  const sayWhy = useSayWhy({ submission: s, whole: !part, label: answers.no, busy: busy && 'Saving…', refuse: (reason) => onModerate(s.id, 'rejected', part?.id, reason) })
   const inStep = !!step?.title
 
   return (
@@ -135,7 +138,7 @@ export default function TodoChange({
       switches={inStep ? null : switches}
       source={!inStep && <SubmissionSourceCard submission={s} details={sent.details} />}
       error={error}
-      foot={!inStep && <PlaceButtons buttons={buttons} />}
+      foot={!inStep && (sayWhy.foot ?? <PlaceButtons buttons={buttons} />)}
     >
       {changed.length === 0 ? (
         <p className="m-0 text-[0.9375rem] text-slate-600">Nothing differs from the listing as it is now.</p>
@@ -185,7 +188,7 @@ export function ChangeOnItsOwn({
   busy?: boolean
   error?: string | null
   token: string
-  onModerate: (id: string, status: 'rejected', part?: string) => void
+  onModerate: (id: string, status: 'rejected', part?: string, reason?: string) => void
   onUpdated: (id: string, partial?: boolean) => void
 }) {
   const parts = s.current ? reviewParts(s.current, s.payload as never, category) : []

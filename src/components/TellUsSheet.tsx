@@ -37,6 +37,7 @@ import type { PlaceSelectResult } from '@/components/intake/AddressInput'
 import { useTurnstileActive } from '@/components/resources/useListingSubmit'
 import { CameraIcon } from '@/components/icons'
 import { track } from '@vercel/analytics'
+import { countAddOpened, countAddSent, countAddWay, type AddWay } from '@/lib/addCounting'
 import { askMessage } from '@/lib/shareAnswer'
 import { useShareLink } from '@/lib/useShareLink'
 import { PREVIEW_READ_ERROR, PREVIEW_SEND_ERROR, useFetchOrPreview } from '@/lib/previewSend'
@@ -353,6 +354,24 @@ export function TellUsBody({
     onTitle(title)
   }
   const addable = addableCategories(categories)
+  // Counting Add (lib/addCounting.ts): once per open, then each way taken,
+  // and the send. Only the Add box (opened on Find the place).
+  const way = useRef<AddWay | null>(null)
+  const takeWay = (next: AddWay) => {
+    if (!findFirst || way.current === next) return
+    way.current = next
+    countAddWay(next)
+  }
+  const counted = useRef(false)
+  const countOpen = useEffectEvent(() => countAddOpened(pageCategory ? 'category' : 'site', !!query))
+  useEffect(() => {
+    if (!findFirst || !open || counted.current) return
+    counted.current = true
+    countOpen()
+  }, [findFirst, open])
+  const sentByWay = () => {
+    if (findFirst && way.current) countAddSent(way.current)
+  }
   // `back`: returning to the search from what was found, keeping where the
   // search itself goes back to.
   // What a place found is added as: the page's category, or the one the
@@ -584,6 +603,7 @@ export function TellUsBody({
         recordUpdates(community, 'message', [json.id], about?.name ?? postName(text), text.trim() ? 'Post' : 'Photo')
       }
       track('tell_us_sent_post', { photos: photos.length })
+      sentByWay()
       setStep('sent')
     } catch (e) {
       setError(e instanceof Error && e.message !== 'failed' ? e.message : 'That didn’t send. Please try again.')
@@ -1115,20 +1135,28 @@ export function TellUsBody({
           onPaste={
             findFirst && !aiPlace
               ? () => {
+                  takeWay('post')
                   setStep('write', WRITE_TITLE)
                   requestAnimationFrame(() => textArea.current?.focus())
                 }
               : undefined
           }
           onListing={(l) => {
+            if (!aiPlace) takeWay('place_we_have')
             setEditing(l)
             setEditFrom('find')
             // The editor says "Suggest an edit" itself.
             setStep('edit', l.name)
           }}
-          onPlace={(place, address, coords) => startAdding({ place, address, coords })}
+          onPlace={(place, address, coords) => {
+            if (!aiPlace) takeWay('google')
+            startAdding({ place, address, coords })
+          }}
           // "Fill in ‘Bagel’ yourself": the form starts with that name.
-          onBlank={(name) => startAdding({ name })}
+          onBlank={(name) => {
+            if (!aiPlace) takeWay('by_hand')
+            startAdding({ name })
+          }}
         />
       )}
       {step === 'kind' && adding && (
@@ -1174,6 +1202,7 @@ export function TellUsBody({
           // A place the reader found goes in labelled with what it was read
           // from, and the box goes back to the rest of what it read.
           via={aiPlace ? viaMessage() : undefined}
+          onSubmitted={sentByWay}
           onSent={
             aiPlace
               ? (answer) => {
@@ -1203,6 +1232,7 @@ export function TellUsBody({
             reopen={editorAsk}
             preset={editFrom === 'read' ? (editRead ?? undefined) : undefined}
             via={editFrom === 'read' && editRead ? viaMessage(editing.id) : undefined}
+            onSubmitted={sentByWay}
             onSent={
               editFrom === 'read' && editRead
                 ? (answer) => {
@@ -1669,6 +1699,7 @@ function AddByHand({
   reopen,
   via,
   onSent,
+  onSubmitted,
 }: {
   category: CategoryConfig
   place?: PlaceSelectResult
@@ -1681,8 +1712,9 @@ function AddByHand({
   reopen: StepAsk | null
   via?: SendVia
   onSent?: (body: unknown) => void
+  onSubmitted?: () => void
 }) {
   const [seed] = useState(() => ({ ...values, address: address || values?.address || '', ...(coords ? { geo: coords } : {}) }) as DirectoryResource)
   const draft = useListingDraft(category, seed, place)
-  return <ListingEditor category={category} draft={draft} fromGoogle={!!place} existingListings={existing} onClose={onClose} onStep={onStep} reopen={reopen} via={via} onSent={onSent} />
+  return <ListingEditor category={category} draft={draft} fromGoogle={!!place} existingListings={existing} onClose={onClose} onStep={onStep} reopen={reopen} via={via} onSent={onSent} onSubmitted={onSubmitted} />
 }

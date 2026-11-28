@@ -176,3 +176,18 @@ describe('useListingSubmit — when it’s refused', () => {
     expect(result.current.done).toBe(false)
   })
 })
+
+// Counting Add (Nov 28): told once a listing's in, beside the Thank you;
+// not when it's refused.
+describe('useListingSubmit — onSubmitted', () => {
+  it('runs once it’s in, and not on a refusal', async () => {
+    stubFetch({ status: 400, body: { ok: false, errors: ['Name is required.'] } }, { body: { ok: true, id: 's1' } })
+    const onSubmitted = vi.fn()
+    const { result, submit } = renderSubmit({ onSubmitted })
+    await submit()
+    expect(onSubmitted).not.toHaveBeenCalled()
+    await submit()
+    expect(onSubmitted).toHaveBeenCalledTimes(1)
+    expect(result.current.done).toBe(true)
+  })
+})

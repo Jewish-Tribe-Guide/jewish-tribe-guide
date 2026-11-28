@@ -158,8 +158,8 @@ old number can still be looked up. When an item is done, move it to
     `claude/kept-current` (`docs/add-rethink.md`, "Add, rethought"
     canvas R1, R2, R3b, R4, P6b). Every Add opens one Find the place
     list; the AI box is a row on it, says it's AI, and a read about one
-    place we have opens its Edit listing. Left: counting it (the plan's
-    step 1), the home page's nothing-found card (not drawn), and the
+    place we have opens its Edit listing. Counting it (the plan's step 1)
+    and the home page's nothing-found card's Add BUILT Nov 28. Left: the
     forwarding phone number the user hopes will replace paste and
     camera. The AI read's speed: 97.
     Then BUILT Nov 27 (the user's OK, the dot chosen over a pop-up): a
@@ -171,8 +171,8 @@ old number can still be looked up. When an item is done, move it to
     sent with what was left, and Done (not drawn). A read that never
     finished is tried again when To do loads. "Your updates" on You
     lists what this phone sent (Live / Waiting / Not changed, S4c), and
-    the dot on You lights when one goes live; S4b and S4d (the pop-up)
-    are not built. Needs migration 118 first: 98. The menu and shul
+    the dot on You lights when one goes live (chosen over the pop-up,
+    S4b and S4d, which aren't to be built). Needs migration 118 first: 98. The menu and shul
     times boxes still read while the sender waits.
 99. **Add, renamed and one box** (Nov 27): BUILT on claude/kept-current,
     not live yet ("Add, rethought" canvas U1c, D1b, V1b, V2b). The
@@ -219,14 +219,14 @@ old number can still be looked up. When an item is done, move it to
 103. **Who hears what, the gaps** (found Nov 27 while mapping mail
     for 100). The first two are built (Nov 28): a "+ Add" post the AI
     couldn't file emails the admins (through "Something new to decide"),
-    and marking it Done emails the visitor who asked. Left:
-    - the To do screen's reject has no reason field, so the visitor's
-      email can't say why;
-    - a form response's Reply is a plain mailto link from the admin's
-      own address (100's forwarding covers the visitor answering back,
-      not the admin writing first).
-    My recommendation: the reason field when rejects are common; leave
-    Reply as it is.
+    and marking it Done emails the visitor who asked. And (Nov 28)
+    "Leave it" / "Don't update" on To do, for something sent with an
+    email, asks "Why? It goes in the email to …" first, blank allowed
+    (`useSayWhy.tsx`; a part of a change asks nothing, no one hears
+    until its last). Left, and my recommendation is to leave it: a form
+    response's Reply is a plain mailto link from the admin's own address
+    (100's forwarding covers the visitor answering back, not the admin
+    writing first).
 
 ### You do
 

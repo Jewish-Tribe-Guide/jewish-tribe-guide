@@ -14,6 +14,12 @@ import { useEffect, useEffectEvent } from 'react'
 export const ADD_HERE = 'jpc:add-here'
 export const OPEN_ADD = 'jpc:open-add'
 
+/** Opens the site's own Add, already searching for `query` (the home
+ *  page's nothing-found card, Nov 28). */
+export function openSiteAdd(query?: string): void {
+  document.dispatchEvent(new CustomEvent(OPEN_ADD, { detail: query ? { query } : undefined }))
+}
+
 /** Opens Add: the screen's own, if it has one, else the site's. */
 export function requestAdd(): void {
   const here = new CustomEvent(ADD_HERE, { cancelable: true })

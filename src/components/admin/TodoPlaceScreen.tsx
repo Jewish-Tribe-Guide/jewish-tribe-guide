@@ -118,7 +118,7 @@ export default function TodoPlaceScreen({
             busy={busyId === s.id}
             error={error}
             token={token}
-            onModerate={(id, status, part) => void moderate(id, status, undefined, undefined, part)}
+            onModerate={(id, status, part, reason) => void moderate(id, status, reason, undefined, part)}
             onUpdated={onUpdated}
             onEditing={editingChanged(t.id)}
           />
@@ -136,7 +136,7 @@ export default function TodoPlaceScreen({
             busy={busyId === s.id}
             error={error}
             token={token}
-            onModerate={(id, status) => void moderate(id, status)}
+            onModerate={(id, status, reason) => void moderate(id, status, reason)}
             onUpdated={onUpdated}
             onEditing={editingChanged(t.id)}
           />
