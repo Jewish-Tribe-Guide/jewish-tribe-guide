@@ -180,6 +180,16 @@ export function ArrowLeftIcon({ className }: IconProps) {
 }
 
 // ✕ — the desktop map page's Close map, in its top-right corner.
+/** Two arrows chasing round: read it again now (a source's Read now). */
+export function RefreshIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+      <path d="M20 4v7h-7" />
+    </svg>
+  )
+}
+
 export function CloseIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>

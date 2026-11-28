@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import IconAction from './IconAction'
 import { statusPill } from '@/lib/eruvJob'
 import type { AdminPlace } from '@/lib/adminPlaces'
 import type { AdminEruv } from '@/lib/eruvStore'
@@ -236,13 +237,13 @@ export default function EruvListing({
     const controls: ReactNode[] = []
     // Change opens its field under the line; Remove beside it, and Read
     // again once removed (the user, Nov 28).
-    if (specs.change && !fields.isOpen(row, 'change')) controls.push(control('Change', () => fields.reveal(row, specs.change!)))
+    if (specs.change && !fields.isOpen(row, 'change')) controls.push(<IconAction key="edit" kind="edit" of={title} onClick={() => fields.reveal(row, specs.change!)} />)
     const stop = line.change?.stop
-    if (stop) controls.push(control('Remove', () => void lineAct(() => actions.stopSource(stop))))
+    if (stop) controls.push(<IconAction key="remove" kind="remove" of={title} onClick={() => void lineAct(() => actions.stopSource(stop))} />)
     const start = specs.start
     if (start) {
       controls.push(control('Read again', () => void lineAct(() => start.attempt(start.value))))
-      if (!fields.isOpen(row, 'start')) controls.push(control('Change', () => fields.reveal(row, start)))
+      if (!fields.isOpen(row, 'start')) controls.push(<IconAction key="edit" kind="edit" of={title} onClick={() => fields.reveal(row, start)} />)
     }
     if (specs.add && !fields.isOpen(row, 'add')) controls.push(control(id === 'status' ? 'Add a page or an email' : 'Add a page', () => fields.reveal(row, specs.add!)))
     return (
@@ -527,7 +528,7 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
       word: v.trim() ? 'Read when it’s added' : '',
       job: v.trim() ? (sourceKind(v) === 'email' ? 'Email' : 'Website') : 'Nothing',
       none,
-      line: v.trim() ? <SourceWords line={{ text: shortUrl(v.trim()) }} controls={fields.isOpen(rowOf(key), key) ? [] : [link('Change', reveal(key))]} /> : <SourceWords line={{ text: 'Nothing reads this' }} controls={fields.isOpen(rowOf(key), key) ? [] : [link(key === 'status' ? 'Add a page or an email' : 'Add a page', reveal(key))]} />,
+      line: v.trim() ? <SourceWords line={{ text: shortUrl(v.trim()) }} controls={fields.isOpen(rowOf(key), key) ? [] : [<IconAction key="edit" kind="edit" onClick={reveal(key)} />]} /> : <SourceWords line={{ text: 'Nothing reads this' }} controls={fields.isOpen(rowOf(key), key) ? [] : [link(key === 'status' ? 'Add a page or an email' : 'Add a page', reveal(key))]} />,
     }
   }
   const input = (key: 'name' | 'covers' | 'hotline' | 'alertsUrl' | 'website', label: string, long = false) => (
@@ -552,8 +553,8 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
         {words}
       </button>
     )
-    const change = fields.isOpen(rowOf('status'), 'status') ? [] : [link('Change', reveal('status'))]
-    const idle = <SourceWords line={{ text: page }} controls={[link('Read now', () => void readStatusNow()), ...change]} />
+    const change = fields.isOpen(rowOf('status'), 'status') ? [] : [<IconAction key="edit" kind="edit" onClick={reveal('status')} />]
+    const idle = <SourceWords line={{ text: page }} controls={[<IconAction key="read" kind="read" onClick={() => void readStatusNow()} />, ...change]} />
     if (statusRead?.state === 'done') status.word = statusRead.words
     const r = statusRead
     status.line =

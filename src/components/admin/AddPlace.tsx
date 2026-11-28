@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
+import IconAction from './IconAction'
 import { isCategorySyncEligible, type CategoryConfig } from '@/lib/categories'
 import { sectionFlags, type EditorRow, type EditorValues } from '@/lib/editorRows'
 import { websiteKeyOf, type CheckedField } from '@/lib/googleJob'
@@ -274,7 +275,7 @@ export default function AddPlace({ category, listings, token, onClose, onBack = 
     const out: ReactNode[] = []
     if (line.readNow) {
       const slot = line.readNow
-      out.push(control('Read now', () => void readNow(slot)))
+      out.push(<IconAction key="read" kind="read" of={row.title} onClick={() => void readNow(slot)} />)
     }
     if (line.use) {
       const { slot, words } = line.use
@@ -288,7 +289,8 @@ export default function AddPlace({ category, listings, token, onClose, onBack = 
     const slotOpen = (slot: AddSlot) => fields.isOpen(row, slot) || fields.isOpen(row, `add:${slot}`)
     if (line.change && !slotOpen(line.change.slot)) {
       const slot = line.change.slot
-      out.push(control(line.change.words ?? 'Change', () => fields.reveal(row, slotSpec(row, slot, slot === 'site' ? '' : (given[slot] ?? '')))))
+      const open = () => fields.reveal(row, slotSpec(row, slot, slot === 'site' ? '' : (given[slot] ?? '')))
+      out.push(line.change.words ? control(line.change.words, open) : <IconAction key="edit" kind="edit" of={row.title} onClick={open} />)
     }
     // After Change, on the same line: "... · Change · Add an email".
     if (line.add && !slotOpen(line.add.slot)) {

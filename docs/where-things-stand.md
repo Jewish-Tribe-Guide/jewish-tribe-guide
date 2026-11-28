@@ -421,10 +421,13 @@ old number can still be looked up. When an item is done, move it to
     (Watching card, line, From, Runs when…), the kosher page, the
     source icons, and Places' Watch and Source filters.
     Hover labels (Nov 28, the user: "sometimes your hovers take a long
-    time"): the admin's ~45 `title=` labels wait on the browser's own
-    ~1s delay. Build one label component (shows after ~0.15s, instant
-    between neighbouring icons, on keyboard focus too) for the new
-    icons, and move the other `title=` labels onto it in the same build.
+    time"): the browser's own `title=` labels wait ~1s. (Counted again:
+    3 in the admin, not ~45 as first said, the rest being other props.)
+    **Built:** `HoverLabel` shows after 0.15s, at once between
+    neighbouring icons, on keyboard focus too, never on touch; the
+    rich-text toolbar, the drag handle and Save without updating use it.
+    `IconAction` is the ↻ / pencil / × button, and a place's and an
+    eruv's source line (and Add a place's) end in it (L2i).
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any

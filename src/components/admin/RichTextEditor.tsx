@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import HoverLabel from './HoverLabel'
 
 type Props = {
   /** HTML — see lib/richText.ts. The caller is responsible for converting a
@@ -126,10 +127,9 @@ export default function RichTextEditor({ value, onChange, ariaLabel, rows = 16 }
     <div className="rounded-md border border-slate-300 focus-within:ring-2 focus-within:ring-primary">
       <div className="flex flex-wrap items-center gap-0.5 border-b border-slate-200 p-1" role="toolbar" aria-label={`${ariaLabel} formatting`}>
         {COMMANDS.map((c) => (
-          <button
-            key={c.id}
+          <HoverLabel key={c.id} label={c.title}>
+            <button
             type="button"
-            title={c.title}
             aria-label={c.title}
             aria-pressed={!!active[c.id]}
             // The toolbar must not take focus: the selection in the editor is
@@ -140,22 +140,20 @@ export default function RichTextEditor({ value, onChange, ariaLabel, rows = 16 }
             className={`${buttonClass(!!active[c.id])} ${c.className ?? ''}`}
           >
             {c.label}
-          </button>
+            </button>
+          </HoverLabel>
         ))}
         <span className="mx-1 h-4 w-px bg-slate-200" aria-hidden="true" />
-        <button type="button" title="Link" aria-label="Link" onMouseDown={(e) => e.preventDefault()} onClick={addLink} className={buttonClass(false)}>
-          Link
-        </button>
-        <button
-          type="button"
-          title="Clear formatting"
-          aria-label="Clear formatting"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => run('removeFormat')}
-          className={buttonClass(false)}
-        >
-          Clear
-        </button>
+        <HoverLabel label="Link">
+          <button type="button" aria-label="Link" onMouseDown={(e) => e.preventDefault()} onClick={addLink} className={buttonClass(false)}>
+            Link
+          </button>
+        </HoverLabel>
+        <HoverLabel label="Clear formatting">
+          <button type="button" aria-label="Clear formatting" onMouseDown={(e) => e.preventDefault()} onClick={() => run('removeFormat')} className={buttonClass(false)}>
+            Clear
+          </button>
+        </HoverLabel>
       </div>
       <div
         ref={ref}

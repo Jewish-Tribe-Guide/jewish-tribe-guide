@@ -1,6 +1,7 @@
 'use client'
 
 import { Children, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import HoverLabel from './HoverLabel'
 import { dropIndex, moveItem } from '@/lib/reorder'
 import { Chevron } from './AdminUI'
 
@@ -335,11 +336,11 @@ export default function DragList<T>({
         const carried = !lifted && !!drag?.block?.includes(key)
         const name = nameOf(item)
         const handle = (
+          <HoverLabel label="Drag to move" className="inline-flex shrink-0">
           <button
             type="button"
             aria-label={`Move ${name}`}
             aria-keyshortcuts="ArrowUp ArrowDown"
-            title="Drag to move"
             onPointerDown={(e) => {
               if (e.button !== 0) return
               e.preventDefault()
@@ -364,6 +365,7 @@ export default function DragList<T>({
           >
             {GRIP}
           </button>
+          </HoverLabel>
         )
         const rowProps: DragRow['rowProps'] = {
           onPointerDown: (e) => {

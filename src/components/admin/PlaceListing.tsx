@@ -1,7 +1,7 @@
 'use client'
 
 import { stickerOf, type LineState } from './rowSticker'
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, isValidElement, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { EnrichedSubmission } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import type { AdminPlace } from '@/lib/adminPlaces'
@@ -25,6 +25,7 @@ import { kindsOf } from './WatchKinds'
 import { useStepsInAddress } from './useStepsInAddress'
 import { addSourceWords, sourcePlaceholder, useSourceFields, type FieldSpec } from './useSourceFields'
 import { useAdminApi } from './useAdminApi'
+import IconAction from './IconAction'
 import { FindSheet } from './FindSheet'
 import { SignUpLine } from './SignUpLine'
 import { useWeekEmails } from './useWeekEmails'
@@ -163,12 +164,24 @@ export function SourceWords({ line, controls }: { line: Pick<SourceLine, 'text' 
         {p}
       </Fragment>
     ))
-  const acts = controls ?? []
+  // Read now, Edit and Remove are icons (boards L2h, L2i, Nov 28), grouped
+  // at the end with no dots; anything else ("Read again", "Open") stays a
+  // word, dotted, before them.
+  const all = controls ?? []
+  const isIcon = (c: ReactNode) => isValidElement(c) && c.type === IconAction
+  const acts = all.filter((c) => !isIcon(c))
+  const icons = all.filter(isIcon)
+  const any = acts.length > 0 || icons.length > 0
   return (
-    <p className={`m-0 flex flex-wrap items-baseline gap-x-3 text-[0.8125rem] [overflow-wrap:anywhere] ${line.red ? 'font-semibold text-red-700' : 'text-slate-500'}`} data-testid="row-source">
+    <p className={`m-0 flex flex-wrap items-center gap-x-3 text-[0.8125rem] [overflow-wrap:anywhere] ${line.red ? 'font-semibold text-red-700' : 'text-slate-500'}`} data-testid="row-source">
       {words.length > 0 && <span className="min-w-0 grow basis-40">{dotted(words)}</span>}
       {words.length > 0 && acts.length > 0 && <span className="sr-only"> · </span>}
-      {acts.length > 0 && <span className={words.length > 0 ? 'ml-auto shrink-0' : ''} data-testid="row-source-actions">{dotted(acts)}</span>}
+      {any && (
+        <span className={`${words.length > 0 ? 'ml-auto ' : ''}inline-flex shrink-0 items-center gap-x-3`} data-testid="row-source-actions">
+          {acts.length > 0 && <span>{dotted(acts)}</span>}
+          {icons.length > 0 && <span className="-my-1.5 -mr-1.5 inline-flex items-center gap-0.5">{icons}</span>}
+        </span>
+      )}
     </p>
   )
 }
@@ -496,6 +509,7 @@ export default function PlaceListing({
       {words}
     </button>
   )
+  const icon = (kind: 'read' | 'edit' | 'remove', of: string, onClick: () => void) => <IconAction key={kind} kind={kind} of={of} disabled={busy || !!reading} onClick={onClick} />
 
   function rowSource(row: EditorRow, changed: boolean): ReactNode {
     const source = sources?.(row)
@@ -513,19 +527,19 @@ export default function PlaceListing({
     if (food && food.reading?.status === 'proposed' && dishStatus(food) === 'differs') return <SourceWords line={{ text: 'Its menu has a change' }} controls={[control('Open', () => setMenuChange(true))]} />
     const failed = readFailed && readFailed.read === readKey && <SourceWords line={{ text: readFailed.text, red: true }} />
     const said = (l: SourceLine) => ({ ...l, text: fromWords(l.text), ...(l.read && readJust.includes(JSON.stringify(l.read)) ? { when: 'just now' } : {}) })
-    const readControl = (l: SourceLine) => (l.read ? [control('Read now', () => void readNow(row, l.read!))] : [])
+    const readControl = (l: SourceLine) => (l.read ? [icon('read', row.title, () => void readNow(row, l.read!))] : [])
     const specs = fieldSpecs(row)
     // Change: the field, filled in, under the line; its link goes once it's open.
     const changeOf = (which: 'change' | 'start' | 'also') => {
       const spec = specs[which]
-      return spec && !fields.isOpen(row, which) ? [control('Change', () => fields.reveal(row, spec))] : []
+      return spec && !fields.isOpen(row, which) ? [icon('edit', row.title, () => fields.reveal(row, spec))] : []
     }
     // Remove, beside Change (the user, Nov 28: not inside it). It stops
     // reading the source, kept so the morning's search doesn't add it
     // back; the line then says Removed, with Read again.
     const removeOf = (l: SourceLine) => {
       const stop = l.change?.stop
-      return stop ? [control('Remove', () => void lineAct(row, () => actions.stopSource(stop)))] : []
+      return stop ? [icon('remove', row.title, () => void lineAct(row, () => actions.stopSource(stop)))] : []
     }
     const readAgain = specs.start ? [control('Read again', () => void lineAct(row, () => specs.start!.attempt(specs.start!.value)))] : []
     const controls: ReactNode[] = [...readControl(line), ...changeOf('change'), ...removeOf(line), ...readAgain, ...changeOf('start')]

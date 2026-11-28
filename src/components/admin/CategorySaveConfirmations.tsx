@@ -1,6 +1,7 @@
 'use client'
 
 import type { CategoryConfig } from '@/lib/categories'
+import HoverLabel from './HoverLabel'
 
 // ── The two confirmation gates CategoryEditor's save() falls into before a
 // destructive or data-migrating change goes through. ──
@@ -110,14 +111,15 @@ export function RenameConfirm({
         >
           {saving ? 'Saving…' : 'Update listings & save'}
         </button>
+        <HoverLabel wide label="This wasn't a rename — I removed one option and added an unrelated one on purpose.">
         <button
           onClick={onSkip}
           disabled={saving}
           className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-          title="This wasn't a rename — I removed one option and added an unrelated one on purpose."
         >
           Save without updating
         </button>
+        </HoverLabel>
         <button
           onClick={onCancel}
           disabled={saving}

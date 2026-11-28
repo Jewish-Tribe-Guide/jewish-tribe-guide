@@ -61,6 +61,9 @@ function expectLineUnderCard() {
   expect(done.closest('.bg-white')).toBeNull()
 }
 
+/** The icon actions on a line, in order (IconAction's data-action). */
+const iconsOn = (el: HTMLElement) => Array.from(el.querySelectorAll<HTMLElement>('[data-action]')).map((b) => b.dataset.action)
+
 describe('PlacePage', () => {
   it('opens a place not checked by what’s wrong, each with its own fix', async () => {
     const added = new Date(Date.now() - 2 * 86_400_000).toISOString()
@@ -422,15 +425,16 @@ describe('PlacePage', () => {
       const minyans = screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!
       await user.click(minyans)
       // The user, Nov 26: the line says its sticker's own words.
-      expect(screen.getByTestId('row-source')).toHaveTextContent(`Checked nightly from kesher.example/davening · last ${day(at)} · Read now · Change · Remove`)
+      expect(screen.getByTestId('row-source')).toHaveTextContent(`Checked nightly from kesher.example/davening · last ${day(at)}`)
       expectLineUnderCard()
       // The user, Nov 26: what to do on the right, apart from what it says.
       const actions = screen.getByTestId('row-source-actions')
-      expect(actions).toHaveTextContent(/^Read now · Change · Remove$/)
+      // Read now, Edit and Remove are icons, each named for the row (L2i, Nov 28).
+      expect(iconsOn(actions)).toEqual(['read', 'edit', 'remove'])
+      expect(within(actions).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Read now Usual weekday times', 'Edit Usual weekday times', 'Remove Usual weekday times'])
       expect(actions).toHaveClass('ml-auto')
-      expect(actions.previousElementSibling).toHaveClass('sr-only')
       expect(screen.queryByTestId('source-field')).toBeNull()
-      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: /^Edit\b/ }))
       expect(screen.queryByTestId('source-screen')).toBeNull()
       const input = screen.getByTestId('source-field')
       expect(input).toHaveValue('https://kesher.example/davening')
@@ -439,7 +443,7 @@ describe('PlacePage', () => {
       // user, Nov 28: not over it, as Nov 25 had it).
       const line = screen.getByTestId('row-source')
       expect(line).toHaveTextContent('Checked nightly from kesher.example/davening')
-      expect(within(line).queryByRole('button', { name: 'Change' })).toBeNull()
+      expect(within(line).queryByRole('button', { name: /^Edit\b/ })).toBeNull()
       expect(line.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       await user.clear(input)
       await user.type(input, 'https://kesher.example/times')
@@ -463,11 +467,11 @@ describe('PlacePage', () => {
       await listingPage({ job: withTimes })
       const user = userEvent.setup()
       await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
-      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: /^Edit\b/ }))
       await user.click(screen.getByRole('button', { name: 'Done' }))
       await waitFor(() => expect(screen.queryByTestId('source-field')).toBeNull())
       await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
-      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: /^Edit\b/ }))
       await user.clear(screen.getByTestId('source-field'))
       await user.click(screen.getByRole('button', { name: 'Done' }))
       await waitFor(() => expect(screen.queryByTestId('source-field')).toBeNull())
@@ -506,7 +510,7 @@ describe('PlacePage', () => {
       }
       const openRow = async (user: ReturnType<typeof userEvent.setup>) => {
         await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
-        return within(screen.getByTestId('row-source')).getByRole('button', { name: 'Read now' })
+        return within(screen.getByTestId('row-source')).getByRole('button', { name: /^Read now\b/ })
       }
 
       it('agreeing, it reads each page as the job does and just dates the row', async () => {
@@ -555,8 +559,8 @@ describe('PlacePage', () => {
         expect((await screen.findByText('Couldn’t read its website')).closest('[data-testid="row-source"]')).toHaveClass('text-red-700')
         const lines = screen.getAllByTestId('row-source')
         const last = lines[lines.length - 1]
-        expect(within(last).getByRole('button', { name: 'Read now' })).toBeTruthy()
-        expect(within(last).getByRole('button', { name: 'Change' })).toBeTruthy()
+        expect(within(last).getByRole('button', { name: /^Read now\b/ })).toBeTruthy()
+        expect(within(last).getByRole('button', { name: /^Edit\b/ })).toBeTruthy()
         // Nothing's keeping it current: Not checked, not Checked nightly (Nov 25).
         const sticker = screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!
         expect(sticker).toHaveTextContent('Not checked')
@@ -566,7 +570,7 @@ describe('PlacePage', () => {
         await listingPage({ job: withTimes })
         const user = userEvent.setup()
         await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Google')!.closest('button')!)
-        expect(within(screen.getByTestId('row-source')).queryByRole('button', { name: 'Read now' })).toBeNull()
+        expect(within(screen.getByTestId('row-source')).queryByRole('button', { name: /^Read now\b/ })).toBeNull()
       })
     })
 
@@ -575,8 +579,8 @@ describe('PlacePage', () => {
       await listingPage({ job: withTimes })
       const user = userEvent.setup()
       await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
-      expect(screen.getByTestId('row-source-actions')).toHaveTextContent(/^Read now · Change · Remove$/)
-      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Remove' }))
+      expect(iconsOn(screen.getByTestId('row-source-actions'))).toEqual(['read', 'edit', 'remove'])
+      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: /^Remove\b/ }))
       expect(posts).toEqual([['/api/admin/watches/hours?job=times', { action: 'stop', resourceId: 'a', id: 'w1' }]])
     })
 
@@ -597,8 +601,8 @@ describe('PlacePage', () => {
       const job = screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Stopped')!
       expect(job).toHaveTextContent('Not checked')
       await user.click(job.closest('button')!)
-      expect(screen.getByTestId('row-source')).toHaveTextContent('Removed · Read again · Change')
-      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+      expect(screen.getByTestId('row-source')).toHaveTextContent('Removed · Read again')
+      await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: /^Edit\b/ }))
       const input = screen.getByTestId('source-field')
       expect(input).toHaveValue(page.url)
       // Start reading again: the page, given again, and Done.
@@ -817,7 +821,7 @@ describe('an eruv', () => {
     expect(within(rowOf('website')).getByTestId('row-job')).toHaveAttribute('data-job', 'Nothing')
 
     await user.click(rowOf('status'))
-    expect(screen.getByTestId('row-source')).toHaveTextContent(`Its status page · ${day(at)} · Change`)
+    expect(screen.getByTestId('row-source')).toHaveTextContent(`Its status page · ${day(at)}`)
     expectLineUnderCard()
     await user.click(screen.getByRole('checkbox', { name: 'Its page dates each week’s post' }))
     expect(posts).toEqual([['/api/admin/eruvim', { action: 'save', id: 'lm', edit: { statusDated: true } }]])
@@ -825,7 +829,7 @@ describe('an eruv', () => {
 
     // Its status to its emails: the page emptied. The field opens under
     // its line, in the row, and Done saves it (item 95, Nov 28).
-    await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Change' }))
+    await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: /^Edit\b/ }))
     expect(screen.getByTestId('editor-open-status')).toContainElement(screen.getByTestId('source-field'))
     await user.clear(screen.getByTestId('source-field'))
     await user.type(screen.getByTestId('source-field'), 'eruv@lowermerioneruv.org')
@@ -838,7 +842,7 @@ describe('an eruv', () => {
     await eruvPage('lm')
     const user = userEvent.setup()
     await user.click(screen.getByTestId('editor-row-map'))
-    await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Remove' }))
+    await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: /^Remove\b/ }))
     expect(posts).toEqual([['/api/admin/eruvim', { id: 'lm', action: 'save', edit: { lineUrl: '' } }]])
     posts.length = 0
     await user.click(await screen.findByTestId('editor-row-website'))
@@ -985,7 +989,7 @@ describe('stopping a hospital’s or food place’s source', () => {
     })
     const user = userEvent.setup()
     await user.click(screen.getAllByTestId('row-job').find((j) => j.dataset.job === 'Website')!.closest('button')!)
-    expect(screen.getByTestId('row-source')).toHaveTextContent(`· last ${day(at)} · Read now · Change`)
+    expect(screen.getByTestId('row-source')).toHaveTextContent(`· last ${day(at)}`)
     expectLineUnderCard()
     // Its own screen: the sticker beside the title, as a row has it, and
     // not again by the line (the user, Nov 26).
@@ -996,7 +1000,7 @@ describe('stopping a hospital’s or food place’s source', () => {
     const aside = screen.getByTestId('screen-aside')
     expect(aside.previousElementSibling?.tagName).toBe('H1')
     expect(aside.parentElement?.tagName).not.toBe('HEADER')
-    await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: 'Remove' }))
+    await user.click(within(screen.getByTestId('row-source')).getByRole('button', { name: /^Remove\b/ }))
     expect(posts).toEqual([['/api/admin/main-dishes', { action: 'unlink', resourceId: 'r' }]])
   })
 })
