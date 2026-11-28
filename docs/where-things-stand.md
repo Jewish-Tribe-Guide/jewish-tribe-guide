@@ -344,6 +344,10 @@ old number can still be looked up. When an item is done, move it to
     its "Kept current by"). Places' Checked by becomes "Kept current
     by", its choices are the watches' names with the same one line,
     and "Not checked" becomes "Nothing". Not built.
+    K3–K5 (same page, the user: K1 "too noisy"): Watches is names
+    only, grouped ("Off" the one word on a row); each opens its own page
+    with its one line and its switch. Places' menu keeps the names under
+    the same headings, with a line only on Nothing. Not built.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
