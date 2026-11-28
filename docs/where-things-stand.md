@@ -377,6 +377,12 @@ old number can still be looked up. When an item is done, move it to
     Going with (user, Nov 28): L1, L2, L3b and L3cp. The canvas now
     holds only those ten boards on one page, "Going with" (version 37);
     the earlier rounds are in its version history.
+    L2b (drawn Nov 28, beside L2): the switch leaves the phone header
+    and the computer title row for the page's first card, "Watching",
+    with the job's one line under it in the same card. On with nothing
+    to read shows "Waiting for a place". That needs nothing stored:
+    every job starts on today (jobOff.ts keeps only the offs), and a
+    job with no places reads nothing.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
