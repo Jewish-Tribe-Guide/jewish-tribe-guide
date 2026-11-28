@@ -383,6 +383,15 @@ old number can still be looked up. When an item is done, move it to
     to read shows "Waiting for a place". That needs nothing stored:
     every job starts on today (jobOff.ts keeps only the offs), and a
     job with no places reads nothing.
+    L2c (Nov 28): "Waiting for a place" (unclear: it didn't say why)
+    becomes "Runs when…", naming what starts the job, with the job's
+    line left out in that state. Most: "Runs when the first place is
+    added"; Minyan times: "…once the first shul has a website or
+    newsletter"; Hospital details: "…the first hospital" (Refuah is read
+    per hospital); Kosher certification: "Runs when a kosher list is
+    added" (a list's run files every place the site lacks to To do, so
+    Food needn't have any). Kosher certification's From ends with
+    "+ Add a kosher list"; each list opens its own page.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
