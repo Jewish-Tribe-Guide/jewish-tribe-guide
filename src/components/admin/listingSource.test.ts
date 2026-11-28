@@ -93,6 +93,16 @@ describe('a listing row’s job (Listing6, States6, GoogleListing7)', () => {
     expect(got?.also).toBeUndefined()
   })
 
+  // Nov 28: Society Hill's email line had Change and no way to stop it.
+  it('its email can be stopped, as a page can', () => {
+    const news = { id: 'n', url: 'mailto:office@a.example', active: true, pageChangedAt: at }
+    const stop = { kind: 'watch', watchId: 'n', what: 'its email' }
+    const alone = { places: [{ id: 'a', pages: [], newsletters: [news], stopped: [] }] }
+    expect(sourceOf(jobs({ times: alone as never }), row({ id: 'minyans:this_week', kind: 'minyans' }))?.line.change?.stop).toEqual(stop)
+    const both = { places: [{ id: 'a', pages: [{ watch: page }], newsletters: [news], stopped: [] }] }
+    expect(sourceOf(jobs({ times: both as never }), row({ id: 'minyans:this_week', kind: 'minyans' }))?.line.change?.stop).toEqual(stop)
+  })
+
   // Nov 25: Kesher's website wouldn't open and its times still said
   // Checked nightly.
   it('every page it reads failing: not being checked, unless an email still keeps it', () => {

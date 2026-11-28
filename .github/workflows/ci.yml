@@ -131,7 +131,7 @@ jobs:
           next-dist-dir: .next-e2e-3211
       - uses: ./.github/actions/own-test-database
       - run: >-
-          docker run --rm --network host --ipc host -v "$PWD:/work" -w /work
+          docker run --rm --init --network host --ipc host -v "$PWD:/work" -w /work
           -e CI -e TEST_DB_URL -e TEST_DB_ANON_KEY -e TEST_DB_SERVICE_ROLE_KEY
           mcr.microsoft.com/playwright:v1.63.0-noble npm run test:cache-roundtrip
       - uses: actions/upload-artifact@v7
@@ -159,7 +159,7 @@ jobs:
           next-dist-dir: .next-e2e-3212
       - uses: ./.github/actions/own-test-database
       - run: >-
-          docker run --rm --network host --ipc host -v "$PWD:/work" -w /work
+          docker run --rm --init --network host --ipc host -v "$PWD:/work" -w /work
           -e CI -e TEST_DB_URL -e TEST_DB_ANON_KEY -e TEST_DB_SERVICE_ROLE_KEY
           mcr.microsoft.com/playwright:v1.63.0-noble npm run test:form-roundtrip
       - uses: actions/upload-artifact@v7
@@ -190,7 +190,7 @@ jobs:
       # so it reaches the local Supabase. Installing the browser here
       # instead took 4m46s on Nov 23, 4 minutes of it a slow Ubuntu mirror.
       - run: >-
-          docker run --rm --network host --ipc host -v "$PWD:/work" -w /work
+          docker run --rm --init --network host --ipc host -v "$PWD:/work" -w /work
           -e CI -e TEST_DB_URL -e TEST_DB_ANON_KEY -e TEST_DB_SERVICE_ROLE_KEY
           mcr.microsoft.com/playwright:v1.63.0-noble npm run test:admin-write
       - uses: actions/upload-artifact@v7
@@ -253,7 +253,7 @@ jobs:
       # checked for Next's prerender stops our code caught and logged as
       # errors (scripts/buildLog.mjs).
       - run: >-
-          docker run --rm --network host --ipc host -v "$PWD:/work" -w /work
+          docker run --rm --init --network host --ipc host -v "$PWD:/work" -w /work
           -e CI -e NEXT_PUBLIC_SUPABASE_URL -e NEXT_PUBLIC_SUPABASE_ANON_KEY -e SUPABASE_SERVICE_ROLE_KEY
           -e SUPERADMIN_EMAILS -e INBOX_EMAILS -e NEXT_PUBLIC_TURNSTILE_SITE_KEY
           -e NEXT_PUBLIC_GOOGLE_MAPS_API_KEY -e NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID -e NEXT_PUBLIC_SUPABASE_STORAGE_URL
@@ -311,7 +311,7 @@ jobs:
             echo "SUPABASE_SERVICE_ROLE_KEY=$TEST_DB_SERVICE_ROLE_KEY"
           } >> "$GITHUB_ENV"
       - run: >-
-          docker run --rm --network host --ipc host -v "$PWD:/work" -w /work
+          docker run --rm --init --network host --ipc host -v "$PWD:/work" -w /work
           -e CI -e E2E_SEEDED=1 -e E2E_PREBUILT=1
           -e NEXT_PUBLIC_SUPABASE_URL -e NEXT_PUBLIC_SUPABASE_ANON_KEY -e SUPABASE_SERVICE_ROLE_KEY
           -e SUPERADMIN_EMAILS -e INBOX_EMAILS -e NEXT_PUBLIC_TURNSTILE_SITE_KEY

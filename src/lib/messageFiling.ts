@@ -5,7 +5,7 @@ import { contributionsFor } from './uiConfig'
 import { listCategories } from './categoryStore'
 import { listApprovedResources } from './resourceStore'
 import { submitListingCreate, submitListingUpdate } from './submissionStore'
-import { sendSubmissionNotification } from './email'
+import { sendPostLeftNotification, sendSubmissionNotification } from './email'
 import { reportServerError } from './serverError'
 import { buildCatalog, itemsChange, messageSource, newPlaceSubmission, readMessage, type Proposal, type ReadImage } from './messageReader'
 import { fieldsEdit, readFieldChanges } from './fieldChanges'
@@ -221,6 +221,7 @@ export async function readAndFile(community: Community, sent: SentMessage, opts:
 
     await finishRead(claimed.id, filed.map((f) => f.id), plan.left)
     for (const s of filed) await sendSubmissionNotification(s).catch((err) => reportServerError('[message/file] admin notification failed:', err))
+    if (plan.left.length) await tellAdminsLeft(community.slug, claimed, plan.left)
     await saveMessageReadTime({
       community: community.slug,
       ms: Date.now() - started,
@@ -239,11 +240,22 @@ export async function readAndFile(community: Community, sent: SentMessage, opts:
     // rest is the admin's once the tries run out.
     const last = claimed.attempts >= MAX_ATTEMPTS
     if (filed.length || last) {
-      await finishRead(claimed.id, filed.map((f) => f.id), [filed.length ? 'The read stopped part way. Check the post for anything else.' : 'The AI couldn’t read it.']).catch((e) =>
-        reportServerError('[message/file] could not save the failure:', e),
+      const left = [filed.length ? 'The read stopped part way. Check the post for anything else.' : 'The AI couldn’t read it.']
+      const saved = await finishRead(claimed.id, filed.map((f) => f.id), left).then(
+        () => true,
+        (e) => (reportServerError('[message/file] could not save the failure:', e), false),
       )
+      if (saved) await tellAdminsLeft(community.slug, claimed, left)
       return 'left'
     }
     return 'retry'
   }
+}
+
+/** What's left reaches To do; the admins hear of it (tracker 103). Never
+ *  stops the read: the post is on To do either way. */
+async function tellAdminsLeft(community: string, post: SentMessage, left: string[]): Promise<void> {
+  await sendPostLeftNotification(community, { id: post.id, text: post.text, photos: post.photoUrls.length, left }).catch((err) =>
+    reportServerError('[message/file] admin notification of what was left failed:', err),
+  )
 }

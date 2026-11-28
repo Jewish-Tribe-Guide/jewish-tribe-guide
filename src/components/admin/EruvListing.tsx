@@ -17,13 +17,14 @@ import { SUBMIT_PILL } from '@/components/resources/submitPill'
 import { AdminBack } from './AdminUI'
 import { Pill } from './JobBoxes'
 import { eruvSources, type RowSource } from './listingSource'
-import { ArchiveBin, ArchivedPlace, RowJob, SourceScreen, SourceWords, type SourceScreenProps } from './PlaceListing'
+import { ArchiveBin, ArchivedPlace, RowJob, SourceWords } from './PlaceListing'
+import { useSourceFields, type FieldSpec } from './useSourceFields'
+import { useWeekEmails } from './useWeekEmails'
+import type { EditorRow } from '@/lib/editorRows'
 import { sourceActions, type Attempt } from './sourceActions'
 import type { Jobs } from './useWatchJobs'
 import { shortUrl } from './watchText'
 import EruvMapPreview from './EruvMapPreview'
-import ReadFrom from './ReadFrom'
-import { eruvReadFrom } from './readFromFacts'
 import { partNames } from '@/lib/eruvLine'
 import { ownEruvFields, readEruvDetails, withEruvFields } from '@/lib/eruvFields'
 import { ownWords } from '@/lib/eruvSuggestion'
@@ -44,10 +45,7 @@ const LINE_LINK = 'cursor-pointer font-semibold text-primary hover:underline dis
 
 type Draft = { name: string; covers: string; hotline: string; alertsUrl: string; website: string }
 type RowId = 'name' | 'status' | 'map' | 'hotline' | 'alertsUrl' | 'website' | `own-${string}`
-/** Which of a source line's controls opened a screen over its row. */
-type Which = 'change' | 'start' | 'add'
 type AddEruvRow = RowId
-const WHERE_ITS_MAP = 'Where its map is'
 const draftOf = (e: AdminEruv): Draft => ({ name: e.name, covers: e.covers ?? '', hotline: e.hotline ?? '', alertsUrl: e.alertsUrl ?? '', website: e.website ?? '' })
 
 export default function EruvListing({
@@ -79,29 +77,28 @@ export default function EruvListing({
   const [leaveOut, setLeaveOut] = useState<string[]>(eruv.lineLeaveOut)
   const [hideMarks, setHideMarks] = useState(eruv.lineHidePoints)
   const [openRow, setOpenRow] = useState<RowId | null>(null)
-  // `which`: the control on the open row's source line that opened it.
-  const [screen, setScreen] = useState<{ title: string; which: Which; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [finishing, setFinishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
-  // A screen asked for by the address, opened once its row is drawn.
-  const [screenAsked, setScreenAsked] = useState<Which | null>(null)
+  // The address its emails would come to, and a sender waiting to be
+  // linked: said on its Status row (Read from's job, item 95).
+  const [emails, reloadEmails] = useWeekEmails(api, true)
+  // A row's source given or changed in the row itself, saved by its Done
+  // (board N4, as a place's rows; Nov 28 for an eruv).
+  const fields = useSourceFields({ account: emails.loaded ? emails.account : null })
 
   const post = <T,>(path: string, body: Record<string, unknown>) => api.post<T>(path, body)
   const save = (edit: Record<string, unknown>) => post('/api/admin/eruvim', { action: 'save', id: eruv.id, edit })
   const actions = sourceActions(eruv.id, post)
   const sources = eruvSources(eruv.id, jobs, now)
 
-  const title = screen?.title ?? place.name
-  const back = screen ? () => setScreen(null) : openRow ? () => setOpenRow(null) : onClose
+  const title = place.name
+  const back = openRow ? () => setOpenRow(null) : onClose
   useSetScreenHeader(true, title, back)
-  // An open row, and a screen over it, each have an address and an entry:
-  // Back closes them, Forward and a reload open them again.
-  useStepsInAddress('row', openRow ? [openRow, ...(screen ? [screen.which] : [])] : [], ([row, which]) => {
-    setOpenRow((row as RowId | undefined) ?? null)
-    setScreen(null)
-    setScreenAsked((which as Which | undefined) ?? null)
-  })
+  // An open row has an address and an entry: Back closes it, Forward and a
+  // reload open it again.
+  useStepsInAddress('row', openRow ? [openRow] : [], ([row]) => setOpenRow((row as RowId | undefined) ?? null))
 
   if (!eruv.active) {
     return (
@@ -165,56 +162,116 @@ export default function EruvListing({
     }
   }
 
+  /** A line's own act (Remove, Read again); the page says if it failed. */
+  async function lineAct(act: () => Promise<{ failed: boolean } | void>) {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await act()
+      if (result?.failed) setError('Couldn’t read that page')
+      await reload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not do that.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const control = (words: string, onClick: () => void) => (
     <button type="button" onClick={onClick} className={LINE_LINK}>
       {words}
     </button>
   )
-  /** The screens a source line opens, by which of its controls opens them. */
-  function screensOf(source: RowSource | null | undefined): Partial<Record<Which, { title: string; which: Which; props: Omit<SourceScreenProps, 'onDone' | 'onTried'> }>> {
+  /** A row as the source fields know it. */
+  const rowOf = (id: RowId, title: string): EditorRow => ({ id, title, kind: 'fields', fields: [] })
+  /** The fields a source line opens, by which control opens them; each reads
+   *  the eruv again once it's tried. Its status can come from an email too. */
+  function fieldSpecs(id: RowId, source: RowSource | null | undefined): Partial<Record<'change' | 'start' | 'add', FieldSpec>> {
     if (!source) return {}
     const { line } = source
+    const emails = id === 'status'
+    const placeholder = emails ? 'A page’s link or an email' : 'A page’s link'
+    const then = (run: Attempt): Attempt => async (url) => {
+      const result = await run(url)
+      await Promise.all([reload(), reloadEmails()])
+      return result
+    }
     const c = line.change
     const s = line.start
     const a = line.add
-    const give: Attempt | null = a
-      ? async (url) => {
-          if ('kind' in a.run) await actions.change(a.run, url)
-          else await actions.addSource(a.run, url)
-          return { failed: false }
-        }
-      : null
     return {
       ...(c && {
         change: {
-          title: 'Change',
-          which: 'change' as const,
-          props: {
-            label: c.label,
-            value: c.value,
-            button: 'Save',
-            attempt: async (url: string) => {
-              await actions.change(c.act, url)
-              return { failed: false }
-            },
-            ...(c.stop ? { stop: () => actions.stopSource(c.stop!) } : {}),
-          },
+          key: 'change',
+          value: c.value,
+          placeholder,
+          emails,
+          attempt: then(async (url) => {
+            await actions.change(c.act, url)
+            return { failed: false }
+          }),
         },
       }),
-      ...(s && { start: { title: 'Change', which: 'start' as const, props: { label: s.label, value: s.value, button: 'Start reading', attempt: actions.startReading(s.again, s.value) } } }),
-      ...(a && give && { add: { title: 'Add a source', which: 'add' as const, props: { label: a.label, value: '', button: 'Save', attempt: give } } }),
+      ...(s && { start: { key: 'start', value: s.value, placeholder, emails, attempt: then(actions.startReading(s.again, s.value)) } }),
+      ...(a && {
+        add: {
+          key: 'add',
+          value: '',
+          placeholder,
+          emails,
+          attempt: then(async (url) => {
+            if ('kind' in a.run) await actions.change(a.run, url)
+            else await actions.addSource(a.run, url)
+            return { failed: false }
+          }),
+        },
+      }),
     }
   }
-  function lineOf(source: RowSource | null | undefined): ReactNode {
+  function lineOf(id: RowId, title: string, source: RowSource | null | undefined): ReactNode {
     if (!source) return null
     const { line } = source
-    const screens = screensOf(source)
+    const row = rowOf(id, title)
+    const specs = fieldSpecs(id, source)
     const controls: ReactNode[] = []
-    for (const which of ['change', 'start', 'add'] as const) {
-      const spec = screens[which]
-      if (spec) controls.push(control(spec.title, () => setScreen(spec)))
+    // Change opens its field under the line; Remove beside it, and Read
+    // again once removed (the user, Nov 28).
+    if (specs.change && !fields.isOpen(row, 'change')) controls.push(control('Change', () => fields.reveal(row, specs.change!)))
+    const stop = line.change?.stop
+    if (stop) controls.push(control('Remove', () => void lineAct(() => actions.stopSource(stop))))
+    const start = specs.start
+    if (start) {
+      controls.push(control('Read again', () => void lineAct(() => start.attempt(start.value))))
+      if (!fields.isOpen(row, 'start')) controls.push(control('Change', () => fields.reveal(row, start)))
     }
-    return <SourceWords line={line} controls={controls} />
+    if (specs.add && !fields.isOpen(row, 'add')) controls.push(control(id === 'status' ? 'Add a page or an email' : 'Add a page', () => fields.reveal(row, specs.add!)))
+    return (
+      <div className="space-y-1.5">
+        <SourceWords line={line} controls={controls} />
+        {specs.change && fields.field(row, specs.change)}
+        {specs.start && fields.field(row, specs.start)}
+        {specs.add && fields.field(row, specs.add)}
+        {id === 'status' && !eruv.statusEmail && emailLine(!!specs.add)}
+      </div>
+    )
+  }
+
+  /** No email gives its status: a sender waiting to be linked, or, while
+   *  nothing gives it at all, the address to sign up with. */
+  function emailLine(nothing: boolean): ReactNode {
+    if (!emails.loaded) return null
+    const { waiting, account } = emails
+    if (waiting) {
+      // The sender is the eruv's from now on: its emails are read for its status.
+      const link = () =>
+        void lineAct(async () => {
+          await save({ statusEmail: waiting.sender })
+          await post('/api/admin/watches', { action: 'remove', id: waiting.id })
+          await reloadEmails()
+        })
+      return <SourceWords line={{ text: `An email from ${waiting.sender} came in` }} controls={[control('Link it', link)]} />
+    }
+    return nothing && account ? <SignUpLine account={account} /> : null
   }
 
   const pill = statusPill(eruv, new Date(now), jobs.eruvim?.timezone ?? 'America/New_York')
@@ -311,78 +368,59 @@ export default function EruvListing({
     })),
   ]
 
-  if (screenAsked) {
-    const spec = screensOf(rows.find((r) => r.id === openRow)?.source)[screenAsked]
-    setScreenAsked(null)
-    if (spec) setScreen(spec)
-  }
-
   return (
     <div className="flex flex-col gap-4">
-      <AdminBack back={{ label: screen || openRow ? 'Back' : backLabel, onClick: back }} title={title} />
-      {!screen && !openRow && (
-        <ReadFrom
-          placeId={eruv.id}
-          token={token}
-          {...eruvReadFrom(eruv, jobs)}
-          saveWebsite={async (url) => {
-            await save({ website: url })
-            setDraft((d) => ({ ...d, website: url }))
-          }}
-          // The sender is the eruv's from now on: its emails are read for its status.
-          linkEmail={async (w) => {
-            await save({ statusEmail: w.sender })
-            await post('/api/admin/watches', { action: 'remove', id: w.id })
-          }}
-          onChanged={reload}
-        />
-      )}
-      {screen ? (
-        <SourceScreen
-          {...screen.props}
-          onTried={reload}
-          onDone={async () => {
-            await reload()
-            setScreen(null)
-          }}
-        />
-      ) : (
-        <div className="space-y-4" data-testid="editor-list">
-          <ul className="space-y-2">
-            {rows.map((r) => (
-              <li key={r.id}>
-                {openRow === r.id ? (
-                  <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} tags={r.source ? <RowJob source={r.source} /> : null} onClose={() => setOpenRow(null)} source={{ line: lineOf(r.source) }}>
-                    {r.body}
-                  </EditorOpenCard>
-                ) : (
-                  <EditorRowCard onOpen={() => setOpenRow(r.id)} testId={`editor-row-${r.id}`} opens="here" changed={changedRow(r.id)} title={r.title} summary={r.summary} aside={r.source ? <RowJob source={r.source} /> : null} />
-                )}
-              </li>
-            ))}
-          </ul>
-          {error && <p className="m-0 rounded-md border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">{error}</p>}
-          <div className="flex items-center gap-2.5">
-            <button type="button" disabled={busy || changes.length === 0} onClick={() => void update()} className={`${SUBMIT_PILL} min-w-0 flex-1`}>
-              {changes.length === 0 ? 'No changes yet' : 'Update the listing'}
-            </button>
-            {!confirming && <ArchiveBin onClick={() => setConfirming(true)} />}
-          </div>
-          {confirming && (
-            <div className="flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
-              <p className="m-0 text-sm text-red-800">Take {place.name} off the site? It stays under Archived.</p>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" disabled={busy} onClick={() => void archive()} className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-red-600 bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-60">
-                  {busy ? 'Archiving…' : 'Archive it'}
-                </button>
-                <button type="button" disabled={busy} onClick={() => setConfirming(false)} className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 disabled:opacity-60">
-                  Leave it
-                </button>
-              </div>
-            </div>
-          )}
+      <AdminBack back={{ label: openRow ? 'Back' : backLabel, onClick: back }} title={title} />
+      <div className="space-y-4" data-testid="editor-list">
+        <ul className="space-y-2">
+          {rows.map((r) => (
+            <li key={r.id}>
+              {openRow === r.id ? (
+                <EditorOpenCard
+                  testId={`editor-open-${r.id}`}
+                  title={r.title}
+                  tags={r.source ? <RowJob source={r.source} /> : null}
+                  onClose={() => setOpenRow(null)}
+                  // Done saves a source typed in its field first.
+                  onDone={() => {
+                    setFinishing(true)
+                    void fields.done(rowOf(r.id, r.title)).then((ok) => {
+                      setFinishing(false)
+                      if (ok) setOpenRow(null)
+                    })
+                  }}
+                  finishing={finishing}
+                  source={{ line: lineOf(r.id, r.title, r.source) }}
+                >
+                  {r.body}
+                </EditorOpenCard>
+              ) : (
+                <EditorRowCard onOpen={() => setOpenRow(r.id)} testId={`editor-row-${r.id}`} opens="here" changed={changedRow(r.id)} title={r.title} summary={r.summary} aside={r.source ? <RowJob source={r.source} /> : null} />
+              )}
+            </li>
+          ))}
+        </ul>
+        {error && <p className="m-0 rounded-md border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">{error}</p>}
+        <div className="flex items-center gap-2.5">
+          <button type="button" disabled={busy || changes.length === 0} onClick={() => void update()} className={`${SUBMIT_PILL} min-w-0 flex-1`}>
+            {changes.length === 0 ? 'No changes yet' : 'Update the listing'}
+          </button>
+          {!confirming && <ArchiveBin onClick={() => setConfirming(true)} />}
         </div>
-      )}
+        {confirming && (
+          <div className="flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
+            <p className="m-0 text-sm text-red-800">Take {place.name} off the site? It stays under Archived.</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" disabled={busy} onClick={() => void archive()} className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-red-600 bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-60">
+                {busy ? 'Archiving…' : 'Archive it'}
+              </button>
+              <button type="button" disabled={busy} onClick={() => setConfirming(false)} className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 disabled:opacity-60">
+                Leave it
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -407,25 +445,36 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
   const own = category ? ownEruvFields(withEruvFields(category).detailFields) : []
   const kept = readEruvDetails(Object.fromEntries(own.map((f) => [f.key, details[f.key]]))) ?? {}
   const [openRow, setOpenRow] = useState<AddEruvRow | null>(null)
-  const [screen, setScreen] = useState<{ title: string; label: string; key: 'status' | 'map'; kind: WatchPurpose } | null>(null)
+  // Its status page or map, given in the row itself and kept by its Done
+  // (board N4, as Add a place's rows; Nov 28 for an eruv).
+  const fields = useSourceFields()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [statusRead, setStatusRead] = useState<StatusRead | null>(null)
-  const title = screen?.title ?? 'Add a place'
-  const back = screen ? () => setScreen(null) : openRow ? () => setOpenRow(null) : onBack
+  const title = 'Add a place'
+  const back = openRow ? () => setOpenRow(null) : onBack
   useSetScreenHeader(true, title, back)
-  /** The screen a row's Change or Add a source opens, as its line has it. */
-  function screenFor(key: 'status' | 'map') {
-    const given = key === 'status' ? draft.status : draft.map
-    const label = key === 'status' ? 'Its status page, or the address its emails come from' : WHERE_ITS_MAP
-    return { title: given.trim() ? 'Change' : 'Add a source', label, key, kind: (key === 'status' ? 'eruv' : 'hours') as WatchPurpose }
-  }
-  // An open row, and a screen over it, each have an address and an entry:
-  // Back closes them, Forward and a reload open them again.
-  useStepsInAddress('row', openRow ? [openRow, ...(screen ? [screen.key] : [])] : [], ([row, key]) => {
-    setOpenRow((row as AddEruvRow | undefined) ?? null)
-    setScreen(key === 'status' || key === 'map' ? screenFor(key) : null)
+  // An open row has an address and an entry: Back closes it, Forward and a
+  // reload open it again.
+  useStepsInAddress('row', openRow ? [openRow] : [], ([row]) => setOpenRow((row as AddEruvRow | undefined) ?? null))
+  const rowOf = (key: string): EditorRow => ({ id: key, title: key, kind: 'fields', fields: [] })
+  const [finishing, setFinishing] = useState(false)
+  /** The field a row's Change or Add opens: what's given goes on the draft,
+   *  and is read when it's added. Its status can be an email too. */
+  const specFor = (key: 'status' | 'map'): FieldSpec => ({
+    key,
+    value: draft[key],
+    placeholder: key === 'status' ? 'A page’s link or an email' : 'A page’s link',
+    emails: key === 'status',
+    attempt: async (url) => {
+      const problem = sourceProblem((key === 'status' ? 'eruv' : 'hours') as WatchPurpose, url)
+      if (problem) throw new Error(problem)
+      setDraft((d) => ({ ...d, [key]: url }))
+      if (key === 'status') setStatusRead(null)
+      return { failed: false }
+    },
   })
+  const reveal = (key: 'status' | 'map') => () => fields.reveal(rowOf(key), specFor(key))
 
   const post = <T,>(body: Record<string, unknown>) => api.post<T>('/api/admin/eruvim', body, 'Could not add it.')
 
@@ -468,8 +517,7 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
     }
   }
 
-  const given = (v: string, key: 'status' | 'map', label: string, kind: WatchPurpose, none: string) => {
-    const open = (t: string) => () => setScreen({ title: t, label, key, kind })
+  const given = (v: string, key: 'status' | 'map', none: string) => {
     const link = (words: string, onClick: () => void) => (
       <button type="button" onClick={onClick} className={LINE_LINK}>
         {words}
@@ -479,7 +527,7 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
       word: v.trim() ? 'Read when it’s added' : '',
       job: v.trim() ? (sourceKind(v) === 'email' ? 'Email' : 'Website') : 'Nothing',
       none,
-      line: v.trim() ? <SourceWords line={{ text: shortUrl(v.trim()) }} controls={[link('Change', open('Change'))]} /> : <SourceWords line={{ text: 'Nothing reads this' }} controls={[link('Add a source', open('Add a source'))]} />,
+      line: v.trim() ? <SourceWords line={{ text: shortUrl(v.trim()) }} controls={fields.isOpen(rowOf(key), key) ? [] : [link('Change', reveal(key))]} /> : <SourceWords line={{ text: 'Nothing reads this' }} controls={fields.isOpen(rowOf(key), key) ? [] : [link(key === 'status' ? 'Add a page or an email' : 'Add a page', reveal(key))]} />,
     }
   }
   const input = (key: 'name' | 'covers' | 'hotline' | 'alertsUrl' | 'website', label: string, long = false) => (
@@ -494,7 +542,7 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
       )}
     </div>
   )
-  const status = given(draft.status, 'status', 'Its status page, or the address its emails come from', 'eruv', 'No status yet')
+  const status = given(draft.status, 'status', 'No status yet')
   if (draft.status.trim()) {
     const source = draft.status.trim()
     const email = sourceKind(source) === 'email'
@@ -504,26 +552,26 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
         {words}
       </button>
     )
-    const change = link('Change', () => setScreen({ title: 'Change', label: 'Its status page, or the address its emails come from', key: 'status', kind: 'eruv' }))
-    const idle = <SourceWords line={{ text: page }} controls={[link('Read now', () => void readStatusNow()), change]} />
+    const change = fields.isOpen(rowOf('status'), 'status') ? [] : [link('Change', reveal('status'))]
+    const idle = <SourceWords line={{ text: page }} controls={[link('Read now', () => void readStatusNow()), ...change]} />
     if (statusRead?.state === 'done') status.word = statusRead.words
     const r = statusRead
     status.line =
       r?.state === 'reading' ? (
         <SourceWords line={{ text: email ? 'Looking for its latest email…' : `Reading ${page}…` }} />
       ) : r?.state === 'done' ? (
-        <SourceWords line={{ text: page, when: r.on ?? 'just now' }} controls={[change]} />
+        <SourceWords line={{ text: page, when: r.on ?? 'just now' }} controls={change} />
       ) : r?.state === 'no-email' ? (
         <>
-          <SourceWords line={{ text: `No emails from ${source} yet` }} controls={[change]} />
+          <SourceWords line={{ text: `No emails from ${source} yet` }} controls={change} />
           <SignUpLine account={r.account} />
         </>
       ) : r?.state === 'unclear' ? (
-        <SourceWords line={{ text: `${source}’s ${r.on} email didn’t say` }} controls={[change]} />
+        <SourceWords line={{ text: `${source}’s ${r.on} email didn’t say` }} controls={change} />
       ) : r?.state === 'no-gmail' ? (
         <>
           <SourceWords line={{ text: 'The guide’s Gmail isn’t set up' }} controls={[<a key="gmail" href={`${adminBase(community)}/team/email`} target="_blank" rel="noopener noreferrer" className={LINE_LINK}>Set it up</a>]} />
-          <SourceWords line={{ text: page, when: 'within the hour' }} controls={[change]} />
+          <SourceWords line={{ text: page, when: 'within the hour' }} controls={change} />
         </>
       ) : r?.state === 'failed' ? (
         <>
@@ -534,13 +582,13 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
         idle
       )
   }
-  const map = given(draft.map, 'map', WHERE_ITS_MAP, 'hours', 'No map yet')
+  const map = given(draft.map, 'map', 'No map yet')
   const read = (job: string, line: ReactNode) => ({ source: { job, amber: job === 'Nothing' }, line })
   const websiteRead = draft.website.trim() ? read('Website', <SourceWords line={{ text: 'Its website' }} />) : read('Nothing', <SourceWords line={{ text: 'Nothing reads this' }} />)
   const rows: { id: AddEruvRow; title: string; summary: string; filled: boolean; source?: { job: string; amber: boolean }; line?: ReactNode; body: ReactNode }[] = [
     { id: 'name', title: draft.name.trim() || 'Name', summary: draft.covers.trim(), filled: true, body: <>{input('name', 'Name')}{input('covers', 'What it covers', true)}</> },
-    { id: 'status', title: 'Status', summary: status.word, filled: !!draft.status.trim(), ...read(status.job, status.line), body: <p className="m-0 text-[0.9375rem] text-slate-500">{status.none}</p> },
-    { id: 'map', title: 'Map', summary: map.word, filled: !!draft.map.trim(), ...read(map.job, map.line), body: <p className="m-0 text-[0.9375rem] text-slate-500">{map.none}</p> },
+    { id: 'status', title: 'Status', summary: status.word, filled: !!draft.status.trim(), ...read(status.job, <>{status.line}{fields.field(rowOf('status'), specFor('status'))}</>), body: <p className="m-0 text-[0.9375rem] text-slate-500">{status.none}</p> },
+    { id: 'map', title: 'Map', summary: map.word, filled: !!draft.map.trim(), ...read(map.job, <>{map.line}{fields.field(rowOf('map'), specFor('map'))}</>), body: <p className="m-0 text-[0.9375rem] text-slate-500">{map.none}</p> },
     { id: 'hotline', title: 'Hotline', summary: draft.hotline.trim(), filled: !!draft.hotline.trim(), ...websiteRead, body: input('hotline', 'Hotline') },
     { id: 'alertsUrl', title: 'Alerts', summary: draft.alertsUrl.trim() && shortUrl(draft.alertsUrl.trim()), filled: !!draft.alertsUrl.trim(), ...websiteRead, body: input('alertsUrl', 'Alerts') },
     { id: 'website', title: 'Website', summary: draft.website.trim() && shortUrl(draft.website.trim()), filled: !!draft.website.trim(), ...read('Nothing', <SourceWords line={{ text: 'Nothing reads this' }} />), body: input('website', 'Website') },
@@ -553,7 +601,22 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
     })),
   ]
   const opened = (r: (typeof rows)[number]) => (
-    <EditorOpenCard testId={`editor-open-${r.id}`} title={r.title} tags={r.source ? <RowJob source={r.source} /> : null} onClose={() => setOpenRow(null)} source={r.line ? { line: r.line } : undefined}>
+    <EditorOpenCard
+      testId={`editor-open-${r.id}`}
+      title={r.title}
+      tags={r.source ? <RowJob source={r.source} /> : null}
+      onClose={() => setOpenRow(null)}
+      // Done keeps a source typed in its field first.
+      onDone={() => {
+        setFinishing(true)
+        void fields.done(rowOf(r.id)).then((ok) => {
+          setFinishing(false)
+          if (ok) setOpenRow(null)
+        })
+      }}
+      finishing={finishing}
+      source={r.line ? { line: r.line } : undefined}
+    >
       {r.body}
     </EditorOpenCard>
   )
@@ -566,61 +629,44 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
   return (
     <div className="flex flex-col gap-4">
       <AdminBack back={{ label: 'Back', onClick: back }} title={title} />
-      {screen ? (
-        <SourceScreen
-          label={screen.label}
-          value={draft[screen.key]}
-          button="Save"
-          attempt={async (url) => {
-            const problem = sourceProblem(screen.kind, url)
-            if (problem) throw new Error(problem)
-            setDraft((d) => ({ ...d, [screen.key]: url }))
-            if (screen.key === 'status') setStatusRead(null)
-            return { failed: false }
-          }}
-          onTried={() => {}}
-          onDone={() => setScreen(null)}
-        />
-      ) : (
-        <div className="space-y-4" data-testid="editor-list">
-          <p className="-mt-1 text-[0.875rem] text-muted">Goes live as soon as you add it, with no review.</p>
-          <ul className="space-y-2">
-            {rows
-              .filter((r) => !inEmpty(r))
-              .map((r) => (
-                <li key={r.id}>
-                  {openRow === r.id ? (
-                    opened(r)
-                  ) : (
-                    <EditorRowCard
-                      onOpen={() => {
-                        setOpenedEmpty(null)
-                        setOpenRow(r.id)
-                      }}
-                      testId={`editor-row-${r.id}`}
-                      opens="here"
-                      title={r.title} summary={r.summary} aside={r.source ? <RowJob source={r.source} /> : undefined} />
-                  )}
-                </li>
-              ))}
-          </ul>
-          {empty.length > 0 && (
-            <EditorEmptyRows>
-              {empty.map((r) => (
-                <li key={r.id}>{openRow === r.id ? opened(r) : <EditorAddLine
-                      onOpen={() => {
-                        setOpenedEmpty(r.id)
-                        setOpenRow(r.id)
-                      }} testId={`editor-add-${r.id}`} opens="here" title={r.title} />}</li>
-              ))}
-            </EditorEmptyRows>
-          )}
-          {error && <p className="m-0 rounded-md border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">{error}</p>}
-          <button type="button" disabled={busy || !draft.name.trim()} onClick={() => void add()} className={SUBMIT_PILL}>
-            {busy ? 'Adding…' : draft.name.trim() ? 'Add listing' : 'Still needed: Name'}
-          </button>
-        </div>
-      )}
+      <div className="space-y-4" data-testid="editor-list">
+        <p className="-mt-1 text-[0.875rem] text-muted">Goes live as soon as you add it, with no review.</p>
+        <ul className="space-y-2">
+          {rows
+            .filter((r) => !inEmpty(r))
+            .map((r) => (
+              <li key={r.id}>
+                {openRow === r.id ? (
+                  opened(r)
+                ) : (
+                  <EditorRowCard
+                    onOpen={() => {
+                      setOpenedEmpty(null)
+                      setOpenRow(r.id)
+                    }}
+                    testId={`editor-row-${r.id}`}
+                    opens="here"
+                    title={r.title} summary={r.summary} aside={r.source ? <RowJob source={r.source} /> : undefined} />
+                )}
+              </li>
+            ))}
+        </ul>
+        {empty.length > 0 && (
+          <EditorEmptyRows>
+            {empty.map((r) => (
+              <li key={r.id}>{openRow === r.id ? opened(r) : <EditorAddLine
+                    onOpen={() => {
+                      setOpenedEmpty(r.id)
+                      setOpenRow(r.id)
+                    }} testId={`editor-add-${r.id}`} opens="here" title={r.title} />}</li>
+            ))}
+          </EditorEmptyRows>
+        )}
+        {error && <p className="m-0 rounded-md border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">{error}</p>}
+        <button type="button" disabled={busy || !draft.name.trim()} onClick={() => void add()} className={SUBMIT_PILL}>
+          {busy ? 'Adding…' : draft.name.trim() ? 'Add listing' : 'Still needed: Name'}
+        </button>
+      </div>
     </div>
   )
 }

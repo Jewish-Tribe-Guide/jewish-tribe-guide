@@ -108,105 +108,12 @@ old number can still be looked up. When an item is done, move it to
 
 ### Building now
 
-95. **Kept current, on Add and the listing** (agreed with the user Nov
-    25, branch `claude/kept-current`, boards M1–M6 and N2–N4 on the
-    design canvas). Watches stop being a chore the admin sets up and
-    become something they can see and, rarely, change:
-    - Stickers on rows: "Checked nightly" / "Checked weekly" (green),
-      "Not checked" (grey), none where nothing can check the fact, and
-      "Checking…" only while a read runs. Times found but not yet taken
-      get no sticker; an email waited for is "Not checked".
-    - An opened row keeps its sticker; inside its box, under a thin
-      line, one small source line ("From Google", "From
-      bethshalom.org/schedule · Change"). Where a source is needed, just
-      a link to its field: "Add a page" (usual times; pages only), "Add
-      a page or an email" (this week's schedule). Done saves it; an
-      empty field changes nothing. An email reads "Sign up as … to get
-      its emails", no Copy.
-    - Picking a place from Google starts its website read straight away:
-      times rows say "Checking…" with "Use a different page"; found
-      times show with "Use these times"; nothing found is "Not checked"
-      with Change. Add before it finishes sends the result to To do.
-      Changing the website re-reads. No cancel. The screen after Add
-      stays as it is.
-    - Edit listing behaves the same. To do gets only what's broken or
-      unclear. Watches moves into Reports.
-    - Later, or not at all: an email from an unknown sender linked by
-      its domain or postal address when exactly one place matches,
-      otherwise To do with the guess picked; "confirm your
-      subscription" emails to To do.
-    - **Built Nov 25** (all pushed on the branch, no PR yet): stickers
-      and the source line in the box (3d6e7d62); the field in the row,
-      saved by Done, on Add and Edit listing (dc155bd1); the read on a
-      Google pick, held for Use these times (b164d04c); Watches at the
-      top of Reports (00a21438). A rejected reading ("Keep mine") needs
-      nothing new: the page watch never files the same suggestion
-      twice, approved or rejected (`filedBefore`, listingPageWatch.ts),
-      so a kept value stands until the page says something else.
-    - **Changed Nov 25, after the user's look at Kosher:** Remove is a
-      small centred link under Done that names its row ("Remove
-      Kosher"); a source field shows only once "Add a page" (or "Add an
-      email", for a shul's second source) or Change is tapped; Kosher
-      has no field at all, since the kept lists are matched by name
-      every night, and a place on none says "Not found on Keystone-K or
-      Mekor Habracha’s list · read last night" (the lists' last read).
-      Then, from the user's look at usual Shabbos times: only this
-      week's schedule offers the other kind of source, at the end of
-      its line ("… · Change · Add an email"); usual times are pages
-      only, so they no longer offer an email. An opened field closes on
-      a click away while it's empty or unchanged, and on Escape. A
-      field opened by Change takes its line's place while it's open; one
-      opened by Add sits under its line.
-    - **Read from is gone from Edit listing (Nov 25, the user's yes):**
-      its two jobs no row had moved onto rows. A place Google hasn't
-      matched says so on its name row, "Not found on Google · Find it
-      on Google". A shul's this week's schedule, while no email reads
-      it, ends with the guide's Gmail to sign up with (Copy), "The
-      guide’s Gmail isn’t set up · Set it up", or "An email from … came
-      in · Link it" when a sender is waiting. The eruv listing still
-      has its Read from box until its rows are done.
-    - **Then (Nov 25, the user's yes):** Remove is on every row that
-      opens in place and has something, not only one just added: it
-      empties the row, which goes under "Not on the listing yet"; the
-      save sends it. Never on the name, the address or a field the
-      category requires, and not on rows that open a screen of their
-      own (times, dishes, people). It's the shared editor, so a
-      visitor's Suggest an edit has it too, as a proposal. And a read
-      that failed is "Not checked", not "Checked nightly": on Add (a
-      page, Refuah, the guide's Gmail not answering) and after a Read
-      now that failed on Edit listing.
-    - **Nov 26 (the user's yes):** on Add, a website read that has
-      nothing for a row gets one link, not "Change · Add an email" (they
-      opened the same field): "No minyan times on its website · Add a
-      page" (usual times), "· Add a page or an email" (this week's). The
-      field opens under the line. A read that failed keeps Read now and
-      Change.
-    - **Nov 26, guided Add (boards U1–U4, the user's yes):** Add on
-      Places opens "What are you adding?", a screen of the categories
-      as rows with their glyphs (`?add=`); a tap goes on, with no menu
-      and no Next. Find and the rows say what's added ("Add a
-      synagogue", "Find the synagogue") when the category has a plural
-      of its own, else "Add to Food" and "Find the place"
-      (`addingWords.ts`). Each says "Step N of 3". Back steps through
-      them (`&from=pick` says the first step's entry is underneath).
-      The rows use the admin's own grey glyph squares, as Site's
-      category list does, not the board's dark circles.
-    - **Nov 26, actions on the right (the user's ask):** a row's source
-      line keeps "Checked nightly · From its menu · Oct 20" on the left
-      and puts Read now · Change on the right, as the M boards drew it.
-      On a phone with no room the actions drop to their own line, still
-      on the right.
-    - **Nov 26, the line says the sticker's words (the user's yes):** an
-      opened row's line reads "Checked nightly from Google · last Aug 28",
-      the sticker's own words in plain text, so a newcomer sees the line
-      is what the sticker is about. A row on its own screen (Main dishes)
-      has its sticker on the title's line, at its right (not up on
-      Back's line, Nov 26). Add's rows say the same words. The date is
-      when that source was last read.
-    - **Not built yet:** the "Sign up as … to get its emails" line under
-      a typed email; refusing an email typed for usual times (pages
-      only); the eruv listing still opens its Change screens; email
-      linking and confirmation emails (the later step above).
+95. **Kept current: what's left is "later, or not at all"** (agreed Nov
+    25). An email from an unknown sender linked by its domain or postal
+    address when exactly one place matches, otherwise To do with the guess
+    picked; "confirm your subscription" emails to To do. Everything else
+    in it is built (Nov 25–28); the record is in `docs/history.md`,
+    "Kept current, on Add and the listing".
 - **Fixed Nov 26, the seed's About was a test's marker.** The committed
   seed's About body was "Mid-regeneration check … round 2", left by a
   cache run cut off before its `finally` and copied in by the backup the
@@ -308,52 +215,18 @@ old number can still be looked up. When an item is done, move it to
     step is gone (nothing to set up), and Read now looks in Resend's received mail (14
     days, `receivedEmail.ts`) before the Gmail script. Each received email counts against Resend's send quota
     (Free: 100 a day, 3,000 a month), and Resend keeps it 30 days.
-101. **Guess the kind of a new place from Google** (agreed Nov 27, a
-    follow-up to 99): adding a place from a screen with no category
-    (home, You) asks "What kind of place?". When the place came from
-    Google search, preselect the category its Google type points to
-    (a restaurant, Food) instead of the list's first; the person still
-    confirms, and a category page keeps skipping the question.
 
 103. **Who hears what, the gaps** (found Nov 27 while mapping mail
-    for 100). Today: admins get an email for each person-sent
-    submission and intake request, and the nightly digest; a visitor
-    gets a confirmation, and a decision email when an admin approves or
-    rejects, reply-to the community email. Missing:
-    - a "+ Add" post the AI couldn't file reaches the To do list with no
-      email to the admins;
-    - "Email me when it's on the site" on a post the AI couldn't file
-      is kept with the post, but nothing is ever sent to it: the admin
-      makes the change themselves and marks the post Done, and Done
-      emails no one. (Nothing a visitor sends goes live without an
-      admin, so there is no automatic approval to cover.)
+    for 100). The first two are built (Nov 28): a "+ Add" post the AI
+    couldn't file emails the admins (through "Something new to decide"),
+    and marking it Done emails the visitor who asked. Left:
     - the To do screen's reject has no reason field, so the visitor's
       email can't say why;
     - a form response's Reply is a plain mailto link from the admin's
       own address (100's forwarding covers the visitor answering back,
       not the admin writing first).
-    My recommendation: the first two, small and worth doing (the first
-    following the Team tab's "Something new to decide" switch); the reason
-    field when rejects are common; leave Reply as it is.
-
-104. **The phone home jumps on a Friday** (found Nov 27, CI on PR 469;
-    shipping first was the user's call). The home is built ahead of time,
-    so Right now's placeholder is a weekday's height (176px). On a
-    Friday the candles card and Shabbos shopping are about 437px, so
-    half a second after the page shows, the category tiles drop about
-    210px (0.148 against the 0.1 target, every run). On the live site
-    since the candles card. Shabbos moves less (0.048), a weekday hardly
-    at all. Fix, my recommendation: on a phone keep Friday's box a
-    weekday's height and move Shabbos shopping under the tiles (a design
-    change, to draw first); else a small script before paint that sizes
-    the placeholder by the day. Its test then joins
-    `e2e/layout-shift.spec.ts`'s days (Tuesday and Shabbos there now),
-    as a plain test: as test.fail it flipped with machine load.
-105. **An e2e shard hangs in CI** (twice: shard 4 on PR 469, Nov 27,
-    after its tests passed; shard 6 on PR 471, Nov 28, 19 minutes in
-    its test step). The job's 20-minute limit ends it, and a rerun of
-    the failed shard passes. Not looked into yet: the next one's log
-    says whether Playwright or the server is what doesn't exit.
+    My recommendation: the reason field when rejects are common; leave
+    Reply as it is.
 
 ### You do
 

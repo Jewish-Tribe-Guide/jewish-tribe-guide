@@ -4,6 +4,7 @@ import { adminRead } from '@/lib/adminRoute'
 import { UUID } from '@/lib/itemMarkRoutes'
 import { listLeftForAdmin, listUnread, markDone } from '@/lib/sentMessageStore'
 import { MAX_ATTEMPTS, readAndFile } from '@/lib/messageFiling'
+import { sendPostDoneEmail } from '@/lib/confirmationEmail'
 
 // GET  /api/admin/sent-posts — posts sent with the "+ Add" box that the AI's
 //      read couldn't file whole (Nov 27, docs/add-rethink.md): each as it
@@ -13,7 +14,8 @@ import { MAX_ATTEMPTS, readAndFile } from '@/lib/messageFiling'
 //      finished (the read after Send died, or the AI was down): the queue
 //      loading is the retry, so no job of its own is needed.
 // POST /api/admin/sent-posts   body: { id }
-//      Done: the admin dealt with it. Nothing on the site changes.
+//      Done: the admin dealt with it. Nothing on the site changes; the
+//      visitor, if they left an email, hears it's on the site (tracker 103).
 
 // The retries run in after(), inside this function's time.
 export const maxDuration = 300
@@ -45,8 +47,11 @@ export const POST = adminRead(async (request: Request, { community }) => {
   const body = (await request.json().catch(() => null)) as { id?: unknown } | null
   if (typeof body?.id !== 'string' || !UUID.test(body.id)) return Response.json({ ok: false, errors: ['Which post?'] }, { status: 400 })
   try {
-    const done = await markDone(community.slug, body.id)
-    return Response.json({ ok: true, done })
+    const post = await markDone(community.slug, body.id)
+    if (post?.email) {
+      after(() => sendPostDoneEmail(post).catch((err) => reportServerError('[admin/sent-posts] the visitor’s email failed:', err)))
+    }
+    return Response.json({ ok: true, done: !!post })
   } catch (err) {
     reportServerError('[admin/sent-posts] POST failed:', err)
     return Response.json({ ok: false, errors: ['That didn’t save. Please try again.'] }, { status: 502 })

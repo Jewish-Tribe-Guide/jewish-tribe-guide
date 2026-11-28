@@ -88,7 +88,7 @@ describe('openedPlace', () => {
     const place = shul({ pages: [], newsletters: [news], times: { key: 'minyanim', minyanim: [], schedules: [week] } })
     const o = openedPlace('p', jobs({ times: { name: 'Shul times', places: [place as never] } }), NOW)
     expect(o.boxes.map((b) => b.title)).toEqual(['This week’s schedule, Oct 23–30'])
-    expect(foot(o, o.boxes[0].key)).toMatchObject({ mail: true, links: [{ text: 'its newsletter, admin@mekorhabracha.org', url: null }], when: 'read Oct 25', change: { kind: 'newsletter', replaces: 'n1' } })
+    expect(foot(o, o.boxes[0].key)).toMatchObject({ mail: true, links: [{ text: 'its newsletter, admin@mekorhabracha.org', url: null }], when: 'read Oct 25', change: { kind: 'newsletter', replaces: 'n1' }, stop: { kind: 'watch', watchId: 'n1', what: 'its email' } })
     expect(o.pages).toBe(0)
   })
 

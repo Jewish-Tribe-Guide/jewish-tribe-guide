@@ -176,7 +176,7 @@ export function openedPlace(id: string, jobs: Jobs, now: number): Opened {
       const page = named.get('week')
       const fromNews = !!news && (!page || thisWeek.some((s) => s.postedBy !== 'website'))
       const foot: Foot = fromNews
-        ? { lead: 'Same as', links: [{ text: `its newsletter, ${news!.url.replace(/^mailto:/, '')}`, url: null }], when: read(news!.pageChangedAt), mail: true, change: { kind: 'newsletter', replaces: news!.id } }
+        ? { lead: 'Same as', links: [{ text: `its newsletter, ${news!.url.replace(/^mailto:/, '')}`, url: null }], when: read(news!.pageChangedAt), mail: true, change: { kind: 'newsletter', replaces: news!.id }, stop: { kind: 'watch', watchId: news!.id, what: 'its email' } }
         : page
           ? { lead: 'Same as', links: [pageLink(page.url)], when: read(page.lastCheck?.at), change: { kind: 'page', job: 'times', replaces: page.id }, stop: stopPage('times', page) }
           : { lead: 'Added by hand', links: [], when: thisWeek[0].postedAt ? day(thisWeek[0].postedAt) : null }

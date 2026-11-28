@@ -102,15 +102,37 @@ describe('Places', () => {
     expect(screen.queryByRole('link', { name: /Watches/ })).toBeNull()
   })
 
-  // It floats, so it's tapped from down the list; What are you adding?
-  // opens at the top, out of sight unless the page goes there too.
-  it('Add a place floats like the site’s, and goes to the top to ask what you’re adding', async () => {
+  // The user, Nov 28: on a computer, Add sits at the right of the filters'
+  // row, under the search; a window too narrow for both floats it again.
+  it('Add a place is at the end of the filters’ row on a computer', async () => {
+    renderPlaces()
+    const add = await screen.findByRole('button', { name: 'Add a place' })
+    expect(add.className).not.toContain('fixed')
+    expect(add).toHaveTextContent(/^Add$/)
+    // The filters' shape and height, in blue (the user, Nov 28).
+    const menu = screen.getByRole('button', { name: /On the site/ })
+    for (const c of ['h-11', 'rounded-[10px]']) {
+      expect(menu.className).toContain(c)
+      expect(add.className).toContain(c)
+    }
+    expect(add.className).toContain('bg-primary')
+    const row = add.closest('[data-testid="places-filters"]')
+    expect(row).not.toBeNull()
+    expect(within(row as HTMLElement).getByRole('button', { name: /On the site/ })).toBeTruthy()
+    expect(row!.lastElementChild).toBe(add)
+  })
+
+  // Narrow, it floats, so it's tapped from down the list; What are you
+  // adding? opens at the top, out of sight unless the page goes there too.
+  it('Add a place floats in a narrow window, and goes to the top to ask what you’re adding', async () => {
     const user = userEvent.setup()
     const scrollTo = vi.fn()
     vi.stubGlobal('scrollTo', scrollTo)
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('1023px'), addEventListener: () => {}, removeEventListener: () => {} }))
     renderPlaces()
     const add = await screen.findByRole('button', { name: 'Add a place' })
     expect(add.className).toContain('fixed')
+    expect(add.closest('[data-testid="places-filters"]')).toBeNull()
     expect(add).toHaveTextContent(/^Add$/)
     await user.click(add)
     expect(scrollTo).toHaveBeenCalledWith(0, 0)
@@ -405,6 +427,39 @@ describe('Places', () => {
       await user.click(screen.getByRole('button', { name: 'Add listing' }))
       expect(posted).toEqual([{ action: 'add', name: 'New Eruv' }])
       expect(await screen.findByRole('region', { name: 'Places' })).toBeInTheDocument()
+    })
+
+    // Item 95 (Nov 28): its status and map are given in their rows, as a
+    // place's sources are, kept by Done; no screen over them. Its status can
+    // be an email; its map only a page.
+    it('Add a place: its status and map are given in their rows, kept by Done', async () => {
+      const user = userEvent.setup()
+      renderEruvs()
+      await screen.findByRole('button', { name: 'Open Center City Eruv' })
+      await choose(/^Category/, /^Eruv/)
+      await user.click(screen.getByRole('button', { name: /Add a place/ }))
+      await user.click(await screen.findByTestId('editor-row-name'))
+      await user.type(screen.getByLabelText('Name'), 'New Eruv')
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+
+      await user.click(screen.getByTestId('editor-add-map'))
+      await user.click(screen.getByRole('button', { name: 'Add a page' }))
+      await user.type(screen.getByTestId('source-field'), 'eruv@ccEruv.org')
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      expect(screen.getByTestId('editor-open-map')).toHaveTextContent('This takes a page’s link, not an email')
+      await user.clear(screen.getByTestId('source-field'))
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+
+      await user.click(screen.getByTestId('editor-add-status'))
+      expect(screen.queryByRole('heading', { name: 'Add a source' })).toBeNull()
+      await user.click(screen.getByRole('button', { name: 'Add a page or an email' }))
+      await user.type(screen.getByTestId('source-field'), 'eruv@cceruv.org')
+      expect(screen.getByTestId('source-field-email')).toHaveTextContent('Sign up with the guide’s email to get its emails')
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      await waitFor(() => expect(screen.queryByTestId('editor-open-status')).toBeNull())
+      expect(screen.getByTestId('editor-row-status')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Add listing' }))
+      await waitFor(() => expect(posted).toEqual([{ action: 'add', name: 'New Eruv' }, { action: 'save', id: 'new-eruv', edit: { statusEmail: 'eruv@cceruv.org' } }]))
     })
 
     // The user, Nov 9: a field made on the Eruv page is filled in while

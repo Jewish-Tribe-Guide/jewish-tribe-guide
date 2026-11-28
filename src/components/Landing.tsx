@@ -348,6 +348,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
           timezone={timezone}
           schedule={schedule}
           zmanim={zmanim.data}
+          zmanimLoading={zmanim.status === 'loading'}
           from={coords ?? center}
           items={settings.beforeCandleItems}
           onOpenListing={openListing}
@@ -682,6 +683,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, initialQuery }
                   timezone={timezone}
                   schedule={schedule}
                   zmanim={zmanim.data}
+                  zmanimLoading={zmanim.status === 'loading'}
                   from={coords ?? center}
                   items={settings.beforeCandleItems}
                   onOpenListing={openListing}

@@ -22,7 +22,7 @@ vi.mock('./email', () => ({ sendEmail: mockSendEmail, escapeHtml: (v: unknown) =
 // configured. These three functions are the only senders that go straight
 // to the public (an intake form, a directory submission, and its approve/
 // reject decision), so they're the ones that need to route per-community.
-import { sendRequestConfirmation, sendDecisionEmail, sendSubmissionConfirmation } from './confirmationEmail'
+import { sendRequestConfirmation, sendDecisionEmail, sendSubmissionConfirmation, sendPostDoneEmail } from './confirmationEmail'
 
 const minimalContact: SubmissionPayload['contact'] = {
   fullName: 'Jane Doe',
@@ -197,6 +197,28 @@ describe('what the public-facing emails actually say', () => {
     vi.stubEnv('RESEND_FROM', '')
     await sendSubmissionConfirmation(makeSubmission())
     await sendDecisionEmail(makeSubmission(), 'approved')
+    expect(mockSendEmail).not.toHaveBeenCalled()
+  })
+})
+
+// Tracker 103: a "+ Add" post an admin dealt with by hand.
+describe('a post an admin marked Done', () => {
+  const post = { id: 'p1', community: 'baltimore', text: 'Seven Mile Market has challah on Fridays', email: 'them@example.com' }
+
+  it('tells the visitor it’s on the site, from the community, once per post', async () => {
+    await sendPostDoneEmail(post)
+    expect(mockSendEmail).toHaveBeenCalledTimes(1)
+    const sent = mockSendEmail.mock.calls[0][0]
+    expect(sent).toMatchObject({ to: 'them@example.com', community: 'baltimore', idempotencyKey: 'post-done/p1', subject: 'What you sent is on the site' })
+    expect(sent.replyTo).toBeTruthy()
+    expect(sent.bcc).toBeUndefined()
+    expect(sent.html).toContain('Seven Mile Market has challah on Fridays')
+  })
+
+  it('sends nothing without an email, or from the sandbox sender', async () => {
+    await sendPostDoneEmail({ ...post, email: null })
+    vi.stubEnv('RESEND_FROM', '')
+    await sendPostDoneEmail(post)
     expect(mockSendEmail).not.toHaveBeenCalled()
   })
 })

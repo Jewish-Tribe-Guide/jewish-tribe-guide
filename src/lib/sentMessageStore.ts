@@ -156,9 +156,11 @@ export async function listUnread(community: string, olderThanMs: number, maxAtte
   return (data as Row[]).map(fromRow)
 }
 
-/** An admin dealt with what was left. */
-export async function markDone(community: string, id: string): Promise<boolean> {
-  const { data, error } = await getAdminClient().from(TABLE).update({ status: 'done' }).eq('community_id', community).eq('id', id).eq('status', 'left').select('id')
+/** An admin dealt with what was left: the post, or null when it wasn't
+ *  waiting (already done, or another community's). */
+export async function markDone(community: string, id: string): Promise<SentMessage | null> {
+  const { data, error } = await getAdminClient().from(TABLE).update({ status: 'done' }).eq('community_id', community).eq('id', id).eq('status', 'left').select('*')
   if (error) throw new Error(`Failed to mark it done: ${error.message}`)
-  return (data ?? []).length > 0
+  const row = (data as Row[] | null)?.[0]
+  return row ? fromRow(row) : null
 }

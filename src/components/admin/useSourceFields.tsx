@@ -23,14 +23,33 @@ export type FieldSpec = {
   value: string
   placeholder: string
   attempt: Attempt
-  /** "Stop reading it", beside the field once it's opened from Change. */
-  stop?: () => Promise<void>
+  /** Takes an email as well as a page; by default, as `takesEmail(row)`
+   *  says (an eruv's status does too). */
+  emails?: boolean
 }
 
 /** What a row's field asks for: this week's schedule can come from an
  *  email; usual times and the rest only from a page (Nov 25). */
+export function takesEmail(row: EditorRow): boolean {
+  return !!row.week || row.id === 'minyans:this_week' || row.id === 'minyans:next_week'
+}
+
 export function sourcePlaceholder(row: EditorRow): string {
-  return row.week || row.id === 'minyans:this_week' || row.id === 'minyans:next_week' ? 'A page’s link or an email' : 'A page’s link'
+  return takesEmail(row) ? 'A page’s link or an email' : 'A page’s link'
+}
+
+/** Typed as an email address (a "mailto:" too), not a page. */
+export function looksLikeEmail(value: string): boolean {
+  return /^(mailto:)?[^\s@/]+@[^\s@/]+\.[^\s@/]+$/i.test(value.trim())
+}
+
+/** What the field says under an email (item 95, Nov 25): on this week's
+ *  schedule, the address to sign up with (no Copy); anywhere else, that it
+ *  takes a page, and Done refuses it. */
+export function emailNote(takes: boolean, value: string, account: string | null): { refused: boolean; text: string } | null {
+  if (!looksLikeEmail(value)) return null
+  if (!takes) return { refused: true, text: 'This takes a page’s link, not an email' }
+  return { refused: false, text: account ? `Sign up as ${account} to get its emails` : 'Sign up with the guide’s email to get its emails' }
 }
 
 /** The link that opens a row's field when it has no source yet (Nov 25:
@@ -39,9 +58,9 @@ export function addSourceWords(row: EditorRow): string {
   return sourcePlaceholder(row) === 'A page’s link or an email' ? 'Add a page or an email' : 'Add a page'
 }
 
-type Open = { value: string; first: string; attempt: Attempt; stop?: () => Promise<void> }
+type Open = { value: string; first: string; attempt: Attempt; emails?: boolean }
 
-export function useSourceFields() {
+export function useSourceFields({ account = null }: { account?: string | null } = {}) {
   // Per row, by key: the fields showing and what they hold.
   const [open, setOpen] = useState<Record<string, Record<string, Open>>>({})
   const [error, setError] = useState<{ row: string; text: string } | null>(null)
@@ -78,7 +97,7 @@ export function useSourceFields() {
   /** Change on a line: its field, filled in. */
   function reveal(row: EditorRow, spec: FieldSpec) {
     openedAt.current = performance.now()
-    set(row.id, spec.key, { value: spec.value, first: spec.value, attempt: spec.attempt, ...(spec.stop ? { stop: spec.stop } : {}) })
+    set(row.id, spec.key, { value: spec.value, first: spec.value, attempt: spec.attempt, emails: spec.emails })
   }
 
   const isOpen = (row: EditorRow, key: string) => !!open[row.id]?.[key]
@@ -89,14 +108,13 @@ export function useSourceFields() {
     const now = open[row.id]?.[spec.key]
     if (!now && !shown) return null
     const value = now?.value ?? ''
-    const stop = now?.stop
     return (
       <div className="space-y-1.5" data-source-field>
         <input
           value={value}
           onChange={(e) => {
             setError(null)
-            set(row.id, spec.key, { value: e.target.value, first: now?.first ?? '', attempt: now?.attempt ?? spec.attempt, ...(stop ? { stop } : {}) })
+            set(row.id, spec.key, { value: e.target.value, first: now?.first ?? '', attempt: now?.attempt ?? spec.attempt, emails: spec.emails })
           }}
           onKeyDown={(e) => {
             if (e.key !== 'Escape') return
@@ -112,20 +130,15 @@ export function useSourceFields() {
           className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-[0.9375rem] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none"
           data-testid="source-field"
         />
-        {stop && (
-          <button
-            type="button"
-            onClick={() =>
-              void stop().then(
-                () => set(row.id, spec.key, null),
-                (err: unknown) => setError({ row: row.id, text: err instanceof Error ? err.message : 'Could not stop it.' }),
-              )
-            }
-            className="cursor-pointer text-[0.8125rem] font-semibold text-red-700 hover:underline"
-          >
-            Stop reading it
-          </button>
-        )}
+        {(() => {
+          const note = emailNote(spec.emails ?? takesEmail(row), value, account)
+          if (!note || (error?.row === row.id && error.text === note.text)) return null
+          return (
+            <p className={`m-0 text-[0.8125rem] [overflow-wrap:anywhere] ${note.refused ? 'font-semibold text-red-700' : 'text-slate-500'}`} data-testid="source-field-email">
+              {note.text}
+            </p>
+          )
+        })()}
         {error?.row === row.id && <p className="m-0 text-[0.8125rem] font-semibold text-red-700">{error.text}</p>}
       </div>
     )
@@ -134,12 +147,17 @@ export function useSourceFields() {
   /** Done: each field the row holds, saved; the row stays open, saying
    *  why, if one couldn't be. `shown`: the fields it offers untapped. */
   async function done(row: EditorRow, shown: FieldSpec[] = []): Promise<boolean> {
-    const fields: Record<string, Open> = { ...Object.fromEntries(shown.map((f) => [f.key, { value: '', first: '', attempt: f.attempt }])), ...(open[row.id] ?? {}) }
+    const fields: Record<string, Open> = { ...Object.fromEntries(shown.map((f) => [f.key, { value: '', first: '', attempt: f.attempt, emails: f.emails }])), ...(open[row.id] ?? {}) }
     for (const [key, f] of Object.entries(fields)) {
       const value = f.value.trim()
       if (!value || value === f.first.trim()) {
         set(row.id, key, null)
         continue
+      }
+      const note = emailNote(f.emails ?? takesEmail(row), value, account)
+      if (note?.refused) {
+        setError({ row: row.id, text: note.text })
+        return false
       }
       try {
         const result = await f.attempt(value)

@@ -87,3 +87,21 @@ export function kindOf(category: { id: string; placeKind?: PlaceKind }): PlaceKi
 export function idsOfKind(categories: readonly { id: string; placeKind?: PlaceKind }[], kind: PlaceKind): string[] {
   return categories.filter((c) => kindOf(c) === kind).map((c) => c.id)
 }
+
+/** Google's place types that mean a kind (Places API table A; a Mikvah has
+ *  none). Checked in this order, so a hotel's restaurant is still a hotel. */
+const KIND_BY_GOOGLE: [Exclude<PlaceKind, 'plain'>, RegExp][] = [
+  ['shuls', /^synagogue$/],
+  ['hospitals', /^(hospital|general_hospital)$/],
+  ['hotels', /^(lodging|hotel|motel|inn|resort_hotel|extended_stay_hotel|bed_and_breakfast|guest_house|hostel)$/],
+  ['groceries', /^(grocery_store|supermarket|grocery_or_supermarket|butcher_shop|food_store|convenience_store|asian_grocery_store)$/],
+  ['food', /^(restaurant|.+_restaurant|cafe|coffee_shop|tea_house|bakery|bagel_shop|deli|meal_takeaway|meal_delivery|food_court|diner|cafeteria|bar_and_grill|confectionery|dessert_shop|ice_cream_shop|juice_shop|donut_shop|sandwich_shop|chocolate_shop|candy_store)$/],
+]
+
+/** The kind Google's `types` for a place point to (tracker 101): a
+ *  restaurant, Food. null when they point to none, or Google gave none. */
+export function kindFromGoogleTypes(types: readonly string[] | null | undefined): PlaceKind | null {
+  if (!types?.length) return null
+  for (const [kind, re] of KIND_BY_GOOGLE) if (types.some((t) => re.test(t))) return kind
+  return null
+}

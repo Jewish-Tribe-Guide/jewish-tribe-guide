@@ -2,6 +2,7 @@
 
 import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
+import { kindFromGoogleTypes, kindOf } from '@/lib/placeKinds'
 import { resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { changeableFields, changeLines, DAYS } from '@/lib/fieldChanges'
 import { dayLabel, fmt12, isStructuredHours, type DayKey, type StructuredHours } from '@/lib/hours'
@@ -345,7 +346,7 @@ export function TellUsBody({
   // where Back goes from there.
   const [listings, setListings] = useState<DirectoryResource[] | null>(null)
   const [editing, setEditing] = useState<DirectoryResource | null>(null)
-  const [adding, setAdding] = useState<{ category: CategoryConfig; place?: PlaceSelectResult; address?: string; coords?: { lat: number; lng: number } | null; name?: string } | null>(null)
+  const [adding, setAdding] = useState<{ category: CategoryConfig; place?: PlaceSelectResult; address?: string; coords?: { lat: number; lng: number } | null; name?: string; guessed?: boolean } | null>(null)
   const [findFrom, setFindFrom] = useState<Step>(root)
   const setStep = (next: Step, title: string | null = null) => {
     setStepOnly(next)
@@ -392,7 +393,10 @@ export function TellUsBody({
       setAdding({ ...start, category })
       setStep('add', addTitle(category))
     } else {
-      setAdding({ ...start, category: addable[0] })
+      // Google's type says what it likely is (tracker 101): that kind comes
+      // first and filled, and the person still picks.
+      const kind = kindFromGoogleTypes(start.place?.types)
+      setAdding({ ...start, category: (kind && addable.find((c) => kindOf(c) === kind)) || addable[0], guessed: !!kind })
       setStep('kind', 'What kind of place?')
     }
   }
@@ -1131,15 +1135,18 @@ export function TellUsBody({
         <div className="space-y-2" data-testid="pick-kind">
           <p className="text-[0.90625rem] text-slate-700">{(adding.place?.name ?? adding.name) ? `What kind of place is ${adding.place?.name ?? adding.name}?` : 'What kind of place is it?'}</p>
           <div className="flex flex-wrap gap-2">
-            {addable.map((c) => (
+            {(adding.guessed ? [adding.category, ...addable.filter((c) => c.id !== adding.category.id)] : addable).map((c) => (
               <button
                 key={c.id}
                 type="button"
+                data-guessed={adding.guessed && c.id === adding.category.id ? '' : undefined}
                 onClick={() => {
                   setAdding({ ...adding, category: c })
                   setStep('add', addTitle(c))
                 }}
-                className="cursor-pointer rounded-full border border-slate-300 px-3.5 py-1.5 text-[0.875rem] font-semibold text-slate-800 hover:bg-slate-50"
+                className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-[0.875rem] font-semibold ${
+                  adding.guessed && c.id === adding.category.id ? 'border-primary bg-primary text-white hover:bg-primary-dark' : 'border-slate-300 text-slate-800 hover:bg-slate-50'
+                }`}
               >
                 {c.label}
               </button>
