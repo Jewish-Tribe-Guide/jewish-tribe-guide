@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isPlaceKind, kindKey, kindKeyById, placeKindFromSlug } from './placeKinds'
+import { isPlaceKind, kindKey, kindKeyById, placeKindFromSlug, kindFromGoogleTypes } from './placeKinds'
 import { schemaTypeForCategory } from './structuredData'
 
 // A category's kind (brief, question 8): Philly's categories take theirs
@@ -36,5 +36,27 @@ describe('place kinds', () => {
     expect(isPlaceKind('food')).toBe(true)
     expect(isPlaceKind('restaurant')).toBe(false)
     expect(isPlaceKind(null)).toBe(false)
+  })
+})
+
+// Tracker 101: Google's types for a place picked from search.
+describe('kindFromGoogleTypes', () => {
+  it('reads the kind Google’s types point to', () => {
+    expect(kindFromGoogleTypes(['synagogue', 'place_of_worship', 'establishment'])).toBe('shuls')
+    expect(kindFromGoogleTypes(['pizza_restaurant', 'restaurant', 'food'])).toBe('food')
+    expect(kindFromGoogleTypes(['bakery', 'store', 'food'])).toBe('food')
+    expect(kindFromGoogleTypes(['supermarket', 'grocery_store', 'food', 'store'])).toBe('groceries')
+    expect(kindFromGoogleTypes(['hospital', 'health'])).toBe('hospitals')
+  })
+
+  it('takes the place for what it is first: a hotel with a restaurant is a hotel', () => {
+    expect(kindFromGoogleTypes(['restaurant', 'lodging', 'hotel'])).toBe('hotels')
+  })
+
+  it('guesses nothing from types that mean no kind, or none', () => {
+    expect(kindFromGoogleTypes(['point_of_interest', 'establishment'])).toBeNull()
+    expect(kindFromGoogleTypes(['barber_shop', 'store'])).toBeNull()
+    expect(kindFromGoogleTypes([])).toBeNull()
+    expect(kindFromGoogleTypes(undefined)).toBeNull()
   })
 })

@@ -23,6 +23,10 @@ export type PlaceSelectResult = {
    *  while deciding whether to approve, and stops a brand-new listing sitting
    *  with no status at all until the nightly sync first reaches it. */
   businessStatus: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' | null
+  /** Google's types for it ("restaurant", "synagogue"…), as the suggestion
+   *  carried them: what kind of place it is, for "What kind of place?"
+   *  (tracker 101). No field of its own is fetched for it. */
+  types?: string[]
 }
 
 type Props = {
@@ -219,6 +223,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
             p.businessStatus === 'CLOSED_PERMANENTLY'
               ? p.businessStatus
               : null,
+          types: s.prediction.types ?? [],
         })
       }
     } finally {
