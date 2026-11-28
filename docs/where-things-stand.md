@@ -411,8 +411,15 @@ old number can still be looked up. When an item is done, move it to
     at the right; L2h replaces that.
     L2h (Nov 28, the user): on the computer each list's row ends in a
     grey pencil and ×, always shown; hovering one darkens it in a circle
-    and names it. Open: a place's source still shows its actions in
-    words, and should follow.
+    and names it.
+    L2i (Nov 28, the user): a place's source line ends in the same
+    icons, ↻ Read now, pencil Edit (was Change), × Remove, on the
+    computer and the phone. Read now stays on a place's sources (the
+    user: "those sources should have read now"); kosher lists have none.
+    **The user OK'd building all of it (Nov 28: "this all sounds
+    good"):** the Watches list by what visitors see, each job's page
+    (Watching card, line, From, Runs when…), the kosher page, the
+    source icons, and Places' Watch and Source filters.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
