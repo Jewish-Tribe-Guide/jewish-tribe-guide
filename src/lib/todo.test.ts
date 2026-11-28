@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { EnrichedSubmission } from '@/types'
 import type { ClassifiedMiss } from './missedSearches'
 import { makeCategory } from '@/test/providerFixtures'
-import { changeWhat, isNewPlace, openSearches, readWhen, responseSummary, splitSubmissions, submissionLine, teachable, unmatchedPlaces, watchesLine, type TodoReading } from './todo'
+import { changeWhat, isNewPlace, openSearches, readWhen, responseSummary, splitSubmissions, submissionLine, teachable, unmatchedPlaces, type TodoReading } from './todo'
 
 function sub(overrides: Partial<EnrichedSubmission> = {}): EnrichedSubmission {
   return {
@@ -136,24 +136,6 @@ describe('responseSummary', () => {
     expect(r.title).toBe('Meal sign-up')
     expect(r.line.length).toBe(80)
     expect(r.line.endsWith('…')).toBe(true)
-  })
-})
-
-describe('watchesLine', () => {
-  const at = (h: number, m = 0) => new Date(2026, 9, 29, h, m).toISOString()
-  const noon = new Date(2026, 9, 29, 12).getTime()
-  it('counts the pages read and says it read last night', () => {
-    expect(watchesLine([
-      { active: true, lastRunAt: at(3, 58) },
-      { active: true, lastRunAt: at(4) },
-      { active: false, lastRunAt: at(9) },
-    ], noon)).toBe('2 pages · read last night')
-  })
-  it('names the day once a night has been missed', () => {
-    expect(watchesLine([{ active: true, lastRunAt: at(4) }], noon + 3 * 86400000)).toBe('1 page · read Oct 29')
-  })
-  it('says only the count before anything has run', () => {
-    expect(watchesLine([{ active: true, lastRunAt: null }], noon)).toBe('1 page')
   })
 })
 

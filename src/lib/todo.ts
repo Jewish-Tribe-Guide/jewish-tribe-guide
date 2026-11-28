@@ -112,16 +112,6 @@ export function changeWhat(s: EnrichedSubmission, category: CategoryConfig | und
   return `${labels.slice(0, 2).join(', ')} and ${labels.length - 2} more`
 }
 
-/** The Watches row's line: how many pages are read, and when they last
- *  were. "115 pages read each night · last run 4:00 AM". */
-export function watchesLine(watches: { active: boolean; lastRunAt: string | null }[], now: number): string {
-  const active = watches.filter((w) => w.active)
-  const pages = `${active.length} ${active.length === 1 ? 'page' : 'pages'}`
-  const last = active.map((w) => w.lastRunAt).filter((t): t is string => !!t).sort().at(-1)
-  if (!last) return pages
-  return `${pages} · ${readWhen(last, now)}`
-}
-
 /** "read last night" within a day and a bit of a nightly read, else "read Nov 20". */
 export function readWhen(iso: string, now: number): string {
   return now - Date.parse(iso) < 30 * 60 * 60 * 1000 ? 'read last night' : `read ${shortDay(iso)}`

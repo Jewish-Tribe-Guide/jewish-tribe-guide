@@ -59,15 +59,12 @@ describe('ReportsPanel', () => {
     expect(screen.getByRole('button', { name: 'Month' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  // Moved from the top of Places on Nov 25 (item 95): what keeps the guide
-  // current is a report, not a place.
-  it('has Watches first, ringed, with how many pages it reads', async () => {
+  // Watches was the first row here from Nov 25 to Nov 28; it's a tab of
+  // its own now (tracker 108).
+  it('has no Watches row: Watches is its own tab', async () => {
     await renderPanel()
-    const watches = screen.getByTestId('reports-watches')
-    expect(watches).toHaveAttribute('href', '/philly/admin/watches')
-    expect(watches.className).toContain('border-emerald-600')
-    expect(watches.compareDocumentPosition(screen.getByRole('button', { name: 'Month' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    await within(watches).findByText('2 pages')
+    expect(screen.queryByTestId('reports-watches')).toBeNull()
+    expect(screen.queryByRole('link', { name: /Watches/ })).toBeNull()
   })
 
   it('draws a bar a day, with the total since the first', async () => {

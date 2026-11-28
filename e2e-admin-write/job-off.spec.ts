@@ -2,11 +2,12 @@ import { expect, test } from '@playwright/test'
 import { TEST_COMMUNITY } from '../scripts/testCommunity.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Turns a job off and on for real (the user, Oct 31): Turn off this job says
-// what it costs and asks once; its Watches row then says Turned off, and its
-// page turns it back on (board W4, Nov 25: + Add a watch went). Links, as every community has it and turning
-// it off here runs nothing: this suite starts no nightly run. Puts it back on
-// in `finally`, whatever happens.
+// Turns a job off and on for real (the user, Oct 31; the switch since Nov
+// 28, boards L2b and L1): the Watching switch turns it off with nothing
+// asked, its Watches row then says Off, and the same switch on its page
+// turns it back on. Broken links, as every community has it and turning
+// it off here runs nothing: this suite starts no nightly run. Puts it back
+// on in `finally`, whatever happens.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Watches' read again is held back after Turn on, so Links has to show on
@@ -20,26 +21,30 @@ test('a job turned off says so on Watches, and turns back on from its page', asy
   await page.goto(`/${TEST_COMMUNITY}/admin/watches/job/links`)
   let release = () => {}
   try {
-    await page.getByRole('button', { name: 'Turn off this job' }).click()
-    await expect(page.getByText(/^Turn off Links\?/)).toBeVisible()
-    await page.getByRole('button', { name: 'Turn it off' }).click()
+    const watching = page.getByRole('switch', { name: 'Broken links on' })
+    await expect(watching).toHaveAttribute('aria-checked', 'true')
+    await watching.click()
+    await expect(watching).toHaveAttribute('aria-checked', 'false')
+    await expect(page.getByTestId('watching-state')).toHaveText(/^Off/)
 
+    await page.getByRole('link', { name: '‹ Watches' }).click()
     await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/watches$`))
-    const row = page.getByRole('main').getByRole('link', { name: /^Links/ })
-    await expect(row).toContainText('Turned off')
+    const row = page.getByRole('main').getByRole('link', { name: /^Broken links/ })
+    await expect(row).toContainText('Off')
     await row.click()
-    const button = page.getByRole('button', { name: 'Turn it back on' })
-    await expect(button).toBeVisible()
+    await expect(watching).toHaveAttribute('aria-checked', 'false')
 
     const held = new Promise<void>((resolve) => (release = resolve))
     await page.route(jobsRead, async (route) => {
       await held
       await route.continue().catch(() => {})
     })
-    await button.click()
+    await watching.click()
+    await expect(watching).toHaveAttribute('aria-checked', 'true')
 
+    await page.getByRole('link', { name: '‹ Watches' }).click()
     await expect(page).toHaveURL(new RegExp(`/${TEST_COMMUNITY}/admin/watches$`))
-    await expect(page.getByRole('main').getByRole('link', { name: /^Links/ })).not.toContainText('Turned off')
+    await expect(page.getByRole('main').getByRole('link', { name: /^Broken links/ })).not.toContainText('Off')
   } finally {
     release()
     await page.unrouteAll({ behavior: 'ignoreErrors' })

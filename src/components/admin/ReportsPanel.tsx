@@ -1,15 +1,12 @@
 'use client'
 
-import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { useAdminApi } from './useAdminApi'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { shortDay, type ReportPeriod } from '@/lib/reports'
 import type { Report } from '@/lib/reportsStore'
-import type { AdminApi } from '@/lib/adminApi'
-import { watchesLine } from '@/lib/todo'
 import { AdminBox, AdminRow } from './AdminUI'
 
 // Reports (the admin redesign's board "Reports"): a week, a month or a year
@@ -28,42 +25,6 @@ const DECIDED: { key: keyof Report['decided']; label: string }[] = [
   { key: 'removals', label: 'Removals' },
 ]
 
-/** "142 pages · read last night", for Watches at the top of Reports. */
-function useWatchesLine(api: AdminApi, now: number): string | undefined {
-  const [line, setLine] = useState<string>()
-  useEffect(() => {
-    let live = true
-    api.get<{ watches: { active: boolean; lastRunAt: string | null }[] }>('/api/admin/watches', '')
-      .then((body) => live && setLine(watchesLine(body.watches, now)))
-      .catch(() => {})
-    return () => {
-      live = false
-    }
-  }, [api, now])
-  return line
-}
-
-/** Ringed, as it was at the top of Places (WatchE19, Nov 1); in Reports
- *  since Nov 25 (item 95): what checks the guide is something to look at,
- *  not a place. No chevron, as drawn. */
-function WatchesRow({ href, line }: { href: string; line: string | undefined }) {
-  return (
-    <Link href={href} data-testid="reports-watches" className="flex items-center gap-3 rounded-2xl border-[1.5px] border-emerald-600 bg-white px-3.5 py-3 transition-colors hover:bg-emerald-50">
-      <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
-        <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" />
-          <circle cx="8" cy="8" r="2" />
-        </svg>
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-base font-extrabold text-ink">Watches</span>
-        {/* Keeps its height while the count loads, so the list doesn't jump. */}
-        <span className="mt-0.5 block min-h-[1.3em] text-[0.875rem] leading-snug text-slate-700">{line}</span>
-      </span>
-    </Link>
-  )
-}
-
 export default function ReportsPanel({ token }: { token: string }) {
   const community = useCommunitySlug()
   const base = adminBase(community)
@@ -71,8 +32,6 @@ export default function ReportsPanel({ token }: { token: string }) {
   const [period, setPeriod] = useState<ReportPeriod>('month')
   const [report, setReport] = useState<{ period: ReportPeriod; report: Report } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [now] = useState(() => Date.now())
-  const watches = useWatchesLine(api, now)
 
   const load = useCallback(
     async (p: ReportPeriod) => {
@@ -98,7 +57,6 @@ export default function ReportsPanel({ token }: { token: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <WatchesRow href={`${base}/watches`} line={watches} />
       <div role="group" aria-label="Over" className="self-start inline-flex rounded-lg border border-slate-300 bg-white p-0.5">
         {PERIODS.map((p) => (
           <button

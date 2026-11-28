@@ -37,6 +37,7 @@ export type AdminTab =
   | 'categories'
   | 'responses'
   | 'places'
+  | 'watches'
   | 'home'
   | 'forms'
   | 'pages'
@@ -55,7 +56,7 @@ export type AdminTabLink = { tab: AdminTab; href: string; label: string }
 // (adminNavPosition below). An area with more than one page shows them as
 // tabs under its heading, until the later steps fold them together. To do
 // shows none: its other pages open from its list, with a way back.
-export type AdminArea = 'todo' | 'places' | 'site' | 'reports' | 'settings'
+export type AdminArea = 'todo' | 'places' | 'watches' | 'site' | 'reports' | 'settings'
 
 export type AdminAreaLinks = { area: AdminArea; label: string; href: string; tabs: AdminTabLink[] }
 
@@ -79,8 +80,15 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
       area: 'places',
       label: 'Places',
       // Every listing in one list; archived ones are a filter on it
-      // (board Places11). Watches opens from Reports (Nov 25, item 95).
+      // (board Places11).
       tabs: [{ tab: 'places', href: `${base}/places`, label: 'Places' }],
+    },
+    {
+      area: 'watches',
+      label: 'Watches',
+      // Its own area since Nov 28 (tracker 108, board L1): what keeps the
+      // guide current, by what visitors see. It was under Reports from Nov 25.
+      tabs: [{ tab: 'watches', href: `${base}/watches`, label: 'Watches' }],
     },
     {
       area: 'site',
@@ -102,8 +110,8 @@ export function adminAreas(community: string, isSuperAdmin: boolean): AdminAreaL
       area: 'reports',
       label: 'Reports',
       tabs: [
-        // One page (step 5); Watches, History, Searches and What changed
-        // open from its rows.
+        // One page (step 5); History, Searches and What changed open from
+        // its rows.
         { tab: 'metrics', href: `${base}/metrics`, label: 'Reports' },
       ],
     },
@@ -127,14 +135,13 @@ export function adminTabs(community: string, isSuperAdmin: boolean): AdminTabLin
   return adminAreas(community, isSuperAdmin).flatMap((a) => a.tabs)
 }
 
-// Paths a tab covers besides its own: Watches and its jobs (/watches),
-// History (/history/approved and /history/rejected), every search nobody
+// Paths a tab covers besides its own: History (/history/approved and /history/rejected), every search nobody
 // found (/searches) and What changed (/changes) are part of Reports, which
 // opens them.
 // /site is Site on a phone: a list of its screens (board 21), and Site's
 // own tab there.
 const TAB_ALSO_COVERS: Partial<Record<AdminTab, string[]>> = {
-  metrics: ['/watches', '/history', '/searches', '/changes'],
+  metrics: ['/history', '/searches', '/changes'],
   home: ['/site'],
   // Forms has no tab while it's held back (see features.ts).
   categories: ['/forms'],

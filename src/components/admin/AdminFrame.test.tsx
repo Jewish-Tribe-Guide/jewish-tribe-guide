@@ -45,9 +45,9 @@ function show(pathname: string, isSuperAdmin = false) {
 // The admin redesign's shell (boards 1, 2, 5, 10, 11): four areas, then
 // Settings and View the site; the open area's name is the screen's heading.
 describe('AdminFrame', () => {
-  it('lists the four areas, then Settings and View the site, and lights the open one', () => {
+  it('lists the five areas, then Settings and View the site, and lights the open one', () => {
     const { sidebar, lit, heading } = show('/philly/admin/categories/cat:abc')
-    expect(sidebar).toEqual(['To do', 'Places', 'Site', 'Reports', 'Settings', 'View the site'])
+    expect(sidebar).toEqual(['To do', 'Places', 'Watches', 'Site', 'Reports', 'Settings', 'View the site'])
     expect(lit).toEqual(['Site'])
     // The open tab is the heading, with the way back to Site's list on a
     // phone, where Site's tabs don't fit (board 21).
@@ -58,9 +58,9 @@ describe('AdminFrame', () => {
     expect(screen.getByRole('navigation', { name: 'Site' })).toHaveClass('hidden', 'md:flex')
   })
 
-  it('puts only the four areas in the phone bar, Settings behind the gear', () => {
+  it('puts only the five areas in the phone bar, Settings behind the gear', () => {
     const { phoneBar } = show('/philly/admin')
-    expect(phoneBar).toEqual(['To do', 'Places', 'Site', 'Reports'])
+    expect(phoneBar).toEqual(['To do', 'Places', 'Watches', 'Site', 'Reports'])
     expect(screen.getByLabelText('Settings')).toHaveAttribute('href', '/philly/admin/team')
   })
 
@@ -88,8 +88,8 @@ describe('AdminFrame', () => {
   it("counts what To do holds on To do alone, in the sidebar and the phone's bar", () => {
     nav.count = 18
     const { sidebar, phoneBar } = show('/philly/admin/team')
-    expect(sidebar).toEqual(['To do18', 'Places', 'Site', 'Reports', 'Settings', 'View the site'])
-    expect(phoneBar).toEqual(['To do · 18', 'Places', 'Site', 'Reports'])
+    expect(sidebar).toEqual(['To do18', 'Places', 'Watches', 'Site', 'Reports', 'Settings', 'View the site'])
+    expect(phoneBar).toEqual(['To do · 18', 'Places', 'Watches', 'Site', 'Reports'])
     cleanup()
     nav.count = 0
     expect(show('/philly/admin').phoneBar[0]).toBe('To do')

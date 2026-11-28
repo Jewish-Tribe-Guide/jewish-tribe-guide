@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
@@ -144,63 +144,63 @@ const row = (name: RegExp | string) => screen.getByRole('link', { name })
 
 const read = [{ name: 'x', status: '', bad: false, page: '' }]
 
-// Boards W1 and W2 (Nov 25): what's kept current, one row each, with where
-// it's read from and when; nothing else.
+// Board L1 (Nov 28): every job under what visitors see, names only, with
+// "Off" or "Runs when…" on the right; a search for a job or a source.
 describe('WatchesManager', () => {
-  it('one list, Kept current: each row with where it’s read from and when, opening its job (W1)', async () => {
-    const kinds = [
-      view({ id: 'google', tracked: [...read, ...read] }),
-      view({ id: 'times', name: 'Minyan times', tracked: [{ name: 'Mekor', status: '', bad: false, page: '' }] }),
-      view({ id: 'kosher', tracked: [{ name: 'Keystone-K', status: '', bad: false, page: '' }, { name: 'KCL', status: '', bad: false, page: '' }] }),
-      view({ id: 'links', lastAt: ago(40), tracked: read, fixes: [{ name: 'Links', why: 'Didn’t run since Oct 15', page: 'job/links', whole: true }] }),
-    ]
-    await renderTab([], { categories: [shulCategory], runs: { available: true, off: [], kinds } })
-    expect(screen.getByRole('link', { name: /‹ Reports/ })).toHaveAttribute('href', '/philly/admin/metrics')
-    const box = within(screen.getByRole('region', { name: 'Kept current' }))
-    expect(box.getByRole('link', { name: /^Open or closed/ })).toHaveTextContent('Open or closedGoogle · 2 placesLast night')
-    expect(box.getByRole('link', { name: /^Hours, phone and website/ })).toHaveAttribute('href', '/philly/admin/watches/job/google')
-    expect(box.getByRole('link', { name: /^Minyan times/ })).toHaveTextContent('1 shul’s websites')
-    expect(box.getByRole('link', { name: /^Minyan times/ })).toHaveAttribute('href', '/philly/admin/watches/job/times')
-    expect(box.getByRole('link', { name: /^Kosher certification/ })).toHaveTextContent('Keystone-K and KCL')
-    expect(box.getByRole('link', { name: /^Links/ })).toHaveTextContent('Didn’t run since Oct 15')
+  const groups = () => screen.getAllByRole('region').map((r) => `${r.getAttribute('aria-label')}: ${within(r).getAllByRole('link').map((a) => a.textContent).join(', ')}`)
+
+  it('every job under what visitors see, each opening its page; running well, a name alone (L1)', async () => {
+    const kinds = [view({ id: 'google', tracked: [...read, ...read] }), view({ id: 'times', tracked: read }), view({ id: 'kosher', tracked: read }), view({ id: 'hours', tracked: read }), view({ id: 'hospitals', tracked: read }), view({ id: 'eruvs', tracked: read }), view({ id: 'menus', tracked: read }), view({ id: 'links', tracked: read })]
+    await renderTab([], { categories: [shulCategory], runs: { available: true, off: ['links'], kinds } })
+    expect(groups()).toEqual([
+      'Every place: Hours and phone',
+      'Shuls: Minyan times',
+      'Food: Menus, Kosher certification',
+      'Mikvahs: Mikvah hours',
+      'Hospitals: Hospital details',
+      'Eruv: Eruv status',
+      'Links: Broken linksOff',
+    ])
+    expect(row(/^Hours and phone/)).toHaveAttribute('href', '/philly/admin/watches/job/google')
+    expect(row(/^Minyan times/)).toHaveAttribute('href', '/philly/admin/watches/job/times')
+    // Its own tab: no way back to Reports.
+    expect(screen.queryByRole('link', { name: /Reports/ })).toBeNull()
   })
 
-  it('the To do card opens To do', async () => {
-    await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ tracked: read })] } })
-    expect(screen.getByRole('link', { name: /What they found waits on To do/ })).toHaveAttribute('href', '/philly/admin')
-  })
-
-  // The user, Nov 25: "a box waiting to explode".
-  it('none of what it used to have: the sentence, Needs fixing, Add a watch, How watches work, Look again, Needs one step', async () => {
+  it('a job not running says why on its row', async () => {
     const whole = { name: 'Minyan times', why: 'Last run failed', page: 'job/times', whole: true }
-    const run = { id: 'r', job: 'look-again', startedAt: ago(0.3), finishedAt: ago(0.29), ok: false, summary: '', warning: null, error: 'boom' }
-    await renderTab([], {
-      categories: [shulCategory],
-      runs: { available: true, off: [], kinds: [view({ tracked: read }), view({ id: 'times', name: 'Minyan times', tracked: read, fixes: [whole] })] },
-      lookAgain: { available: true, items: [], leftOut: [], runs: [run] },
-    })
-    expect(screen.queryByTestId('watches-sentence')).toBeNull()
-    for (const gone of ['Needs fixing', 'Look again', 'Needs one step', 'Google', 'Websites', 'Email']) expect(screen.queryByRole('region', { name: gone })).toBeNull()
-    expect(screen.queryByRole('link', { name: '+ Add a watch' })).toBeNull()
-    expect(screen.queryByRole('link', { name: 'How watches work' })).toBeNull()
-    // A job failing says so on its own row.
-    expect(screen.getByRole('link', { name: /^Minyan times/ })).toHaveTextContent('Last run failed')
+    await renderTab([], { categories: [shulCategory], runs: { available: true, off: [], kinds: [view({ id: 'times', tracked: read, fixes: [whole] })] } })
+    expect(row(/^Minyan times/)).toHaveTextContent('Minyan timesLast run failed')
   })
 
-  it('a new community: every row, greyed, with what it has none of, and the community email first (W2)', async () => {
+  it('a new community: each row says when it runs, and the community email comes first (L2f)', async () => {
     await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [] }, own: { email: null, canSave: true, checkedAt: null, lastEmailAt: null } })
     const card = await screen.findByRole('link', { name: /The community email/ })
-    expect(card).toHaveTextContent('Needed for the shuls’ and eruvs’ emails')
     expect(card).toHaveAttribute('href', '/philly/admin/team/email')
-    const rows = within(screen.getByRole('region', { name: 'Kept current' })).getAllByRole('link')
-    expect(rows).toHaveLength(10)
-    expect(screen.getByRole('link', { name: /^Minyan times/ })).toHaveTextContent('No shuls yet')
-    expect(screen.queryByRole('link', { name: /What they found/ })).toBeNull()
+    expect(row(/^Hours and phone/)).toHaveTextContent('Runs when the first place is added')
+    expect(row(/^Minyan times/)).toHaveTextContent('Runs once the first shul has a website or newsletter')
+    expect(row(/^Kosher certification/)).toHaveTextContent('Runs when a kosher list is added')
+    expect(row(/^Hospital details/)).toHaveTextContent('Runs when the first hospital is added')
+  })
+
+  it('the search finds a job by its name, or a source it reads', async () => {
+    const kinds = [view({ id: 'google', tracked: read }), view({ id: 'kosher', tracked: [{ name: 'KCL’s list', status: '', bad: false, page: '' }] })]
+    await renderTab([], { categories: [], runs: { available: true, off: [], kinds } })
+    const box = screen.getByRole('searchbox', { name: 'Find a job, or a source like Google' })
+    fireEvent.change(box, { target: { value: 'google' } })
+    expect(within(screen.getByRole('region', { name: 'Found' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Hours and phoneFrom Google'])
+    fireEvent.change(box, { target: { value: 'KCL' } })
+    expect(within(screen.getByRole('region', { name: 'Found' })).getByRole('link')).toHaveAttribute('href', '/philly/admin/watches/job/kosher')
+    fireEvent.change(box, { target: { value: 'minyan' } })
+    expect(within(screen.getByRole('region', { name: 'Found' })).getByRole('link')).toHaveTextContent(/^Minyan times/)
+    fireEvent.change(box, { target: { value: 'zzz' } })
+    expect(screen.getByText('No job or source called that.')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Shuls' })).toBeNull()
   })
 
   it('no community email card once it’s set up', async () => {
     await renderTab([], { categories: [], runs: { available: true, off: [], kinds: [view({ tracked: read })] } })
-    await screen.findByRole('link', { name: /What they found/ })
+    await screen.findByRole('link', { name: /^Hours and phone/ })
     expect(screen.queryByRole('link', { name: /The community email/ })).toBeNull()
   })
 
@@ -223,6 +223,6 @@ describe('WatchesManager', () => {
     cleanup()
     vi.mocked(fetchJson).mockImplementation(() => new Promise(() => {}))
     renderWithProviders(<WatchesManager token="tok" />, { community: { slug: 'philly' } })
-    expect(row(/Open or closed/)).toBeInTheDocument()
+    expect(row(/Hours and phone/)).toBeInTheDocument()
   })
 })

@@ -33,6 +33,13 @@ const ICONS: Record<AdminArea | 'view', React.ReactNode> = {
       <circle cx="8" cy="6" r="1.8" />
     </>
   ),
+  // An eye: what's watched (board L1's tab bar).
+  watches: (
+    <>
+      <path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" />
+      <circle cx="8" cy="8" r="2" />
+    </>
+  ),
   site: (
     <>
       <rect x="2" y="3" width="12" height="10" rx="1.5" />
@@ -216,7 +223,7 @@ export default function AdminFrame({
 
       <nav
         aria-label="Admin areas"
-        className="md:hidden fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 bg-white border-t border-slate-200 px-1 pt-1.5 pb-[max(10px,env(safe-area-inset-bottom))]"
+        className="md:hidden fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 bg-white border-t border-slate-200 px-1 pt-1.5 pb-[max(10px,env(safe-area-inset-bottom))]"
       >
         {main.map((a) => {
           const current = a.area === open?.area

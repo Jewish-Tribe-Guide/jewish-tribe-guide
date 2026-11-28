@@ -70,16 +70,17 @@ describe('adminAreas', () => {
   const shape = (superAdmin: boolean) =>
     adminAreas('philly', superAdmin).map((a) => [a.label, a.tabs.map((t) => t.label)])
 
-  it('is To do, Places, Site, Reports and Settings, Communities only for a superadmin', () => {
+  it('is To do, Places, Watches, Site, Reports and Settings, Communities only for a superadmin', () => {
     expect(shape(true)).toEqual([
       ['To do', ['To do', 'Feedback']],
       ['Places', ['Places']],
+      ['Watches', ['Watches']],
       ['Site', ['Home page', 'Category pages', 'Campaigns', 'About and Privacy']],
       ['Reports', ['Reports']],
       ['Settings', ['Team', 'Default location', 'Communities']],
     ])
     expect(shape(false).at(-1)).toEqual(['Settings', ['Team', 'Default location']])
-    expect(shape(false)[2]).toEqual(['Site', ['Home page', 'Category pages', 'Campaigns']])
+    expect(shape(false)[3]).toEqual(['Site', ['Home page', 'Category pages', 'Campaigns']])
   })
 
   it('puts every tab in exactly one area', () => {
@@ -105,8 +106,9 @@ describe('adminNavPosition', () => {
   const cases: [string, AdminArea, AdminTab][] = [
     ['/philly/admin', 'todo', 'queue'],
     // Opened from Reports since Nov 25 (item 95).
-    ['/philly/admin/watches', 'reports', 'metrics'],
-    ['/philly/admin/watches/place/x', 'reports', 'metrics'],
+    // Its own area since Nov 28 (tracker 108).
+    ['/philly/admin/watches', 'watches', 'watches'],
+    ['/philly/admin/watches/place/x', 'watches', 'watches'],
     // Opened from Reports, like History; To do shows only what's waiting.
     ['/philly/admin/searches', 'reports', 'metrics'],
     ['/philly/admin/responses', 'todo', 'responses'],
