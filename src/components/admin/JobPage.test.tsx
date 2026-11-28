@@ -70,7 +70,7 @@ describe('a job on Watches, opened (boards L2b, L2f)', () => {
     // Running well, it says nothing more.
     expect(screen.queryByTestId('watching-state')).toBeNull()
     const from = screen.getByRole('region', { name: 'From' })
-    expect(within(from).getAllByTestId('from-row').map((r) => r.textContent)).toEqual(['Website', 'Newsletter'])
+    expect(within(from).getAllByTestId('job-source').map((r) => r.textContent)).toEqual(['Website', 'Newsletter'])
     expect(within(from).queryByRole('link')).toBeNull()
     expect(within(from).queryByRole('button')).toBeNull()
     // The places it covers are Places' Watch filter now.
@@ -122,7 +122,7 @@ describe('a job on Watches, opened (boards L2b, L2f)', () => {
     serve([view({ id: 'google' })])
     show('sites')
     expect(await screen.findByRole('heading', { name: 'Basic information' })).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'From' })).getAllByTestId('from-row').map((a) => a.textContent)).toEqual(['Google', 'Its own website'])
+    expect(within(screen.getByRole('region', { name: 'From' })).getAllByTestId('job-source').map((a) => a.textContent)).toEqual(['Google', 'Its own website'])
   })
 
   it('Kosher certification: each list with its site and last read, Edit and Remove at its end, and Add (L2h)', async () => {
@@ -177,14 +177,14 @@ describe('a job on Watches, opened (boards L2b, L2f)', () => {
     show('eruvs')
     expect(await screen.findByRole('heading', { name: 'Eruv status' })).toBeInTheDocument()
     expect(screen.getByTestId('watching-line')).toHaveTextContent('From the eruv’s website and emails.')
-    expect(within(screen.getByRole('region', { name: 'From' })).getAllByTestId('from-row').map((r) => r.textContent)).toEqual(['Website', 'Email'])
+    expect(within(screen.getByRole('region', { name: 'From' })).getAllByTestId('job-source').map((r) => r.textContent)).toEqual(['Website', 'Email'])
     for (const [id, from] of [['menus', ['Website']], ['hours', ['Website']], ['hospitals', ['Refuah']]] as const) {
       cleanup()
       forgetWatchJobs()
       serve([view({ id })])
       show(id)
       await screen.findByTestId('watching-line')
-      expect(within(screen.getByRole('region', { name: 'From' })).getAllByTestId('from-row').map((r) => r.textContent), id).toEqual(from)
+      expect(within(screen.getByRole('region', { name: 'From' })).getAllByTestId('job-source').map((r) => r.textContent), id).toEqual(from)
     }
     cleanup()
     forgetWatchJobs()
@@ -192,7 +192,7 @@ describe('a job on Watches, opened (boards L2b, L2f)', () => {
     serve([view({ id: 'links' })])
     show('links')
     await screen.findByTestId('watching-line')
-    expect(within(screen.getByRole('region', { name: 'From' })).getAllByTestId('from-row').map((r) => r.textContent)).toEqual(['Links on each listing'])
+    expect(within(screen.getByRole('region', { name: 'From' })).getAllByTestId('job-source').map((r) => r.textContent)).toEqual(['Links on each listing'])
   })
 })
 

@@ -142,7 +142,7 @@ export default function JobPage({ token, id }: { token: string; id: string }) {
       sources.length > 0 && (
         <AdminGroup title="From">
           {sources.map((src) => (
-            <div key={src.key} data-testid="from-row" className="flex min-h-[52px] items-center border-b border-slate-100 px-4 py-2.5 text-[0.9375rem] font-semibold text-slate-900 last:border-b-0">
+            <div key={src.key} data-testid="job-source" className="flex min-h-[52px] items-center border-b border-slate-100 px-4 py-2.5 text-[0.9375rem] font-semibold text-slate-900 last:border-b-0">
               {src.label}
             </div>
           ))}
