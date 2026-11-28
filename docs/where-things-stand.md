@@ -284,6 +284,14 @@ old number can still be looked up. When an item is done, move it to
 85. UES (made up, on dev only, 2 listings): delete it in the site
     owner's console (Communities). Harmless meanwhile; nothing relies
     on it.
+107. **Watches, part 2: a place's own kosher certificate** (the user,
+    Nov 28; after part 1, the Watches tab). Today a hechsher is checked
+    only when Keystone-K's, KCL's or Mekor's list has the place; any
+    other shows Not checked, and its certificate link is only opened on
+    Sundays. Proposed: read the certificate page weekly (agency, still
+    this place, expiry), so adding a place to the kosher watch means
+    giving it its certificate link. Count the "not listed" Food places
+    first.
 106. Everything under the website's email, not a personal Gmail (the
     user, Nov 28; later). Admin sign-in first: add the site's email to
     `SUPERADMIN_EMAILS` (Vercel) and philly's admin list (a live write,
