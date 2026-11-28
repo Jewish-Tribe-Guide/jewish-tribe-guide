@@ -122,22 +122,40 @@ describe('Places', () => {
     expect(row!.lastElementChild).toBe(add)
   })
 
-  // Narrow, it floats, so it's tapped from down the list; What are you
-  // adding? opens at the top, out of sight unless the page goes there too.
-  it('Add a place floats in a narrow window, and goes to the top to ask what you’re adding', async () => {
+  // Board l06 (Nov 28): narrow, the four menus are one Filters button,
+  // and Add sits beside it; What are you adding? opens at the top.
+  it('in a narrow window, Filters and Add share the row, and Add goes to the top to ask what you’re adding', async () => {
     const user = userEvent.setup()
     const scrollTo = vi.fn()
     vi.stubGlobal('scrollTo', scrollTo)
     vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('1023px'), addEventListener: () => {}, removeEventListener: () => {} }))
     renderPlaces()
     const add = await screen.findByRole('button', { name: 'Add a place' })
-    expect(add.className).toContain('fixed')
-    expect(add.closest('[data-testid="places-filters"]')).toBeNull()
-    expect(add).toHaveTextContent(/^Add$/)
+    const row = add.closest('[data-testid="places-filters"]') as HTMLElement
+    expect(within(row).getAllByRole('button').map((b) => b.textContent)).toEqual(['Filters', 'Add'])
+    expect(screen.queryByRole('button', { name: /^On the site/ })).toBeNull()
     await user.click(add)
     expect(scrollTo).toHaveBeenCalledWith(0, 0)
     expect(screen.getByRole('heading', { name: 'What are you adding?' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add a place' })).not.toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+
+  it('narrow, the Filters sheet picks as a draft, counts, and narrows on Show', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('1023px'), addEventListener: () => {}, removeEventListener: () => {} }))
+    renderPlaces()
+    await user.click(await screen.findByRole('button', { name: 'Filters' }))
+    const sheet = screen.getByRole('dialog', { name: 'Filters' })
+    expect(within(sheet).getAllByRole('combobox').map((c) => c.closest('label')?.firstChild?.textContent)).toEqual(['On the site', 'Category', 'Watch', 'Source'])
+    expect(within(sheet).getByRole('button', { name: 'Show 2 places' })).toBeInTheDocument()
+    await user.selectOptions(within(sheet).getByRole('combobox', { name: 'Category' }), 'networking')
+    expect(screen.getByRole('button', { name: 'Open Goldie' })).toBeInTheDocument()
+    await user.click(within(sheet).getByRole('button', { name: 'Show 1 place' }))
+    expect(screen.queryByRole('dialog', { name: 'Filters' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Open Goldie' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Filters · 1' })).toBeInTheDocument()
+    expect(window.location.search).toBe('?category=networking')
     vi.unstubAllGlobals()
   })
 
@@ -207,7 +225,7 @@ describe('Places', () => {
     expect(screen.getAllByRole('menuitemradio').map((o) => o.textContent)).toEqual(['All categories', 'Food (1)'])
   })
 
-  describe('Checked by', () => {
+  describe('Watch and Source', () => {
     const shul = makeCategory({ id: 'food', placeKind: 'shuls', label: 'Shul', pluralLabel: 'Shuls', detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
     const shuls = [place('Alpha'), place('Bravo'), place('Charlie')]
     const everyJob = (times: unknown[]): [string, Record<string, unknown>][] => [
@@ -241,40 +259,50 @@ describe('Places', () => {
       renderWithProviders(<PlacesList token="tok" />, { community: { slug: 'philly' } })
     }
 
-    it('lands from Watches on what isn’t watched, saying what isn’t', async () => {
-      renderShuls('?checked=not-watched')
-      expect(await screen.findByRole('button', { name: 'Open Bravo' })).toHaveTextContent('Not checked: minyan times')
+    // A job page's From rows land here (?watch=times&source=website).
+    it('lands from a job’s From row on its places, each saying its jobs', async () => {
+      renderShuls('?watch=times&source=website')
+      expect(await screen.findByRole('button', { name: 'Open Alpha' })).toHaveTextContent(/^AlphaMinyan timesShul$/)
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Open Bravo' })).toBeNull())
+      expect(menu(/^Watch: Minyan times/)).toBeInTheDocument()
+      expect(menu(/^Source: Website/)).toBeInTheDocument()
+    })
+
+    it('Nothing: what isn’t checked, saying what isn’t', async () => {
+      renderShuls('?watch=nothing')
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Open Bravo' })).toHaveTextContent('Not checked: minyan times'))
       expect(screen.queryByRole('button', { name: 'Open Alpha' })).toBeNull()
       expect(screen.getByText('2 places')).toBeInTheDocument()
     })
 
-    it('narrows by what checks a place, with counts, and keeps it in the address', async () => {
+    it('narrows by job and by source, with counts, and keeps both in the address', async () => {
+      const user = userEvent.setup()
       renderShuls()
       await screen.findByRole('button', { name: 'Open Alpha' })
-      await waitFor(() => expect(menu(/^Checked by/)).toBeEnabled())
-      await choose(/^Checked by/, /^Their website \(1\)/)
-      expect(screen.getByRole('button', { name: 'Open Alpha' })).toBeInTheDocument()
+      await waitFor(() => expect(menu(/^Watch/)).toBeEnabled())
+      await user.click(menu(/^Watch/))
+      expect(screen.getAllByRole('menuitemradio').map((o) => o.textContent)).toEqual(['Any watch', 'Nothing (2)Something on it isn’t checked', 'Minyan times (1)'])
+      await user.click(screen.getByRole('menuitemradio', { name: /^Minyan times/ }))
       expect(screen.queryByRole('button', { name: 'Open Bravo' })).toBeNull()
-      expect(window.location.search).toBe('?checked=website')
+      expect(window.location.search).toBe('?watch=times')
+      await user.click(menu(/^Source/))
+      expect(screen.getAllByRole('menuitemradio').map((o) => o.textContent)).toEqual(['Any source', 'Website (1)'])
+      await user.click(screen.getByRole('menuitemradio', { name: /^Website/ }))
+      expect(window.location.search).toBe('?watch=times&source=website')
+      expect(screen.getByRole('button', { name: 'Open Alpha' })).toBeInTheDocument()
     })
 
-    // Broken checks are To do's to fix, one place at a time (Nov 2), so
-    // Places no longer narrows by them, and an old link lands on Anything.
-    it('has no Check broken, and an old link to it shows every place', async () => {
-      const user = userEvent.setup()
-      renderShuls('?checked=broken')
-      jobsToServe = everyJob([page('Alpha', true)])
+    it('has no Checked by any more', async () => {
+      renderShuls('?checked=not-watched')
       await screen.findByRole('button', { name: 'Open Bravo' })
       expect(screen.getByRole('button', { name: 'Open Alpha' })).toBeInTheDocument()
-      await waitFor(() => expect(menu(/^Checked by/)).toBeEnabled())
-      await user.click(menu(/^Checked by/))
-      expect(screen.getAllByRole('menuitemradio').map((o) => o.textContent)).not.toContainEqual(expect.stringMatching(/broken/i))
+      expect(screen.queryByRole('button', { name: /^Checked by/ })).toBeNull()
     })
 
     it('an opened place’s rows name only the job that reads them', async () => {
       const user = userEvent.setup()
       renderShuls()
-      await waitFor(() => expect(menu(/^Checked by/)).toBeEnabled())
+      await waitFor(() => expect(menu(/^Watch/)).toBeEnabled())
       await user.click(screen.getByRole('button', { name: 'Open Bravo' }))
       renderWithProviders(editor.props!.rowAside!({ id: 'minyans:weekday', title: 'x', kind: 'minyans', fields: [], box: 'weekday' }) as React.ReactElement)
       expect(screen.getByTestId('row-job')).toHaveAttribute('data-job', 'Nothing')

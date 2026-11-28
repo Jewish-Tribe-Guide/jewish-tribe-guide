@@ -352,7 +352,7 @@ old number can still be looked up. When an item is done, move it to
     it keeps current, and its sources are how. Eight jobs: Hours and
     phone (Google, its own website; open or closed inside it), Minyan
     times (website, newsletter), Menus, Kosher certification (three
-    lists), Mikvah hours, Hospital details (Refuah), Eruv status, Broken
+    lists), Mikvah hours, Bikkur Cholim details (Refuah), Eruv status, Broken
     links. One switch per job, sources named on its page with none of
     their own; the Watches search finds sources too. Places' menu lists
     jobs with their sources indented ("Minyan times: Newsletter"
@@ -387,7 +387,7 @@ old number can still be looked up. When an item is done, move it to
     becomes "Runs when…", naming what starts the job, with the job's
     line left out in that state. Most: "Runs when the first place is
     added"; Minyan times: "…once the first shul has a website or
-    newsletter"; Hospital details: "…the first hospital" (Refuah is read
+    newsletter"; Bikkur Cholim details: "…the first hospital" (Refuah is read
     per hospital); Kosher certification: "Runs when a kosher list is
     added" (a list's run files every place the site lacks to To do, so
     Food needn't have any). Kosher certification's From ends with

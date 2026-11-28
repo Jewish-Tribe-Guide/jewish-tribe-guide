@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeCategory } from '@/test/providerFixtures'
 import type { CategoryConfig } from './categories'
-import { fitsCheckedBy, notCheckedLine, placeCoverage, type CoverageIn } from './fieldCoverage'
+import { notCheckedLine, placeCoverage, type CoverageIn } from './fieldCoverage'
 
 const NONE: CoverageIn = { google: [], times: [], hours: [], sites: [], dishes: [], hospitals: [], kosher: [], links: [], off: [] }
 const on = { watch: { active: true } }
@@ -63,7 +63,7 @@ describe('what checks each thing on a place', () => {
   // The user, Nov 3: To do is what to act on, Places how things stand. Each
   // way out of a broken check lands here as Not checked, saying why.
   describe('a check stopped from To do is Not checked, with why', () => {
-    const kosher = [{ id: 'a', on: ['x'] }]
+    const kosher = [{ id: 'a', on: [{ list: 'kcl' }] }]
     it('No menu online, though it has no menu link', () => {
       const c = placeCoverage({ id: 'a' }, food, { ...NONE, kosher, dishes: [{ id: 'a', menuUrl: null, reading: { status: 'no_menu' } }] })
       expect(notCheckedLine(c)).toBe('Not checked: menu (no menu online)')
@@ -105,23 +105,15 @@ describe('what checks each thing on a place', () => {
 
   it('a food place’s hechsher is its main thing, checked by the certifier’s list', () => {
     expect(placeCoverage({ id: 'a' }, food, NONE)).toMatchObject({ notWatched: ['hechsher'], mainMissing: true })
-    const c = placeCoverage({ id: 'a' }, food, { ...NONE, kosher: [{ id: 'a', on: ['x'] }] })
+    const c = placeCoverage({ id: 'a' }, food, { ...NONE, kosher: [{ id: 'a', on: [{ list: 'kcl' }] }] })
     expect(c.sources).toEqual(['certifier'])
   })
 })
 
-describe('the Checked by menu', () => {
-  const c = placeCoverage({ id: 'a' }, food, { ...NONE, kosher: [{ id: 'a', on: ['x'] }] })
-  it('by what checks a place, and what doesn’t', () => {
-    expect(fitsCheckedBy(c, 'any')).toBe(true)
-    expect(fitsCheckedBy(c, 'certifier')).toBe(true)
-    expect(fitsCheckedBy(c, 'google')).toBe(false)
-    expect(fitsCheckedBy(c, 'not-watched')).toBe(false)
-    expect(fitsCheckedBy(undefined, 'not-watched')).toBe(false)
-  })
-  it('link check only means nothing else checks it', () => {
-    const only = { fields: [], notWatched: [], mainMissing: false, nameBy: [], sources: ['links' as const] }
-    expect(fitsCheckedBy(only, 'links-only')).toBe(true)
-    expect(fitsCheckedBy({ ...only, sources: ['links', 'google'] }, 'links-only')).toBe(false)
+describe('the kosher lists that check it', () => {
+  it('by name, once each, and none while the job is off', () => {
+    const on = [{ id: 'a', on: [{ list: 'kcl' }, { list: 'keystone' }, { list: 'kcl' }] }]
+    expect(placeCoverage({ id: 'a' }, food, { ...NONE, kosher: on }).lists).toEqual(['KCL’s list', 'Keystone-K’s list'])
+    expect(placeCoverage({ id: 'a' }, food, { ...NONE, kosher: on, off: ['kosher'] }).lists).toEqual([])
   })
 })

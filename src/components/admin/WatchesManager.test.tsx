@@ -157,7 +157,7 @@ describe('WatchesManager', () => {
       'Shuls: Minyan times',
       'Food: Menus, Kosher certification',
       'Mikvahs: Mikvah hours',
-      'Hospitals: Hospital details',
+      'Hospitals: Bikkur Cholim details',
       'Eruv: Eruv status',
       'Links: Broken linksOff',
     ])
@@ -180,7 +180,7 @@ describe('WatchesManager', () => {
     expect(row(/^Hours and phone/)).toHaveTextContent('Runs when the first place is added')
     expect(row(/^Minyan times/)).toHaveTextContent('Runs once the first shul has a website or newsletter')
     expect(row(/^Kosher certification/)).toHaveTextContent('Runs when a kosher list is added')
-    expect(row(/^Hospital details/)).toHaveTextContent('Runs when the first hospital is added')
+    expect(row(/^Bikkur Cholim details/)).toHaveTextContent('Runs when the first hospital is added')
   })
 
   it('the search finds a job by its name, or a source it reads', async () => {

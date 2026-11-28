@@ -89,23 +89,40 @@ test('the old Archived tab opens Places on Archived', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'On the site: Archived' })).toBeVisible()
 })
 
-// The user, Nov 2: Checked by opened off the screen, and the page could then
-// be moved sideways. jsdom has no layout, so this runs on a phone's width.
+// The user, Nov 2: a menu opened off the screen, and the page could then
+// be moved sideways. jsdom has no layout, so this runs in a real browser:
+// on the narrowest computer window that has the four menus, each opens on
+// the screen; on a phone they're in the Filters sheet (board l06).
+test('on the narrowest computer window, each Places menu opens on the screen', async ({ page }) => {
+  const width = 1024
+  await page.setViewportSize({ width, height: 800 })
+  await page.goto(`/${TEST_COMMUNITY}/admin/places`)
+  for (const name of ['On the site', 'Category', 'Watch', 'Source']) {
+    const button = page.getByRole('button', { name: new RegExp(`^${name}:`) })
+    await expect(button).toBeEnabled({ timeout: 30_000 })
+    await button.click()
+    const box = (await page.getByRole('menu', { name }).boundingBox())!
+    expect(box.x, `${name} starts off the screen`).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width, `${name} ends off the screen`).toBeLessThanOrEqual(width)
+    await page.keyboard.press('Escape')
+  }
+})
+
 for (const width of [390, 320]) {
-  test(`on a ${width}px phone, each Places menu opens on the screen`, async ({ page }) => {
+  test(`on a ${width}px phone, Filters and Add share a row and the sheet fits`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 })
     await page.goto(`/${TEST_COMMUNITY}/admin/places`)
-    for (const name of ['On the site', 'Category', 'Checked by']) {
-      const button = page.getByRole('button', { name: new RegExp(`^${name}:`) })
-      await expect(button).toBeEnabled({ timeout: 30_000 })
-      await button.click()
-      const box = (await page.getByRole('menu', { name }).boundingBox())!
-      expect(box.x, `${name} starts off the screen`).toBeGreaterThanOrEqual(0)
-      expect(box.x + box.width, `${name} ends off the screen`).toBeLessThanOrEqual(width)
-      const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-      // Below zero on CI's browser, which keeps a scrollbar's width.
-      expect(sideways, `${name} lets the page move sideways`).toBeLessThanOrEqual(0)
-      await page.keyboard.press('Escape')
-    }
+    const add = page.getByRole('button', { name: 'Add a place' })
+    await expect(add).toBeVisible({ timeout: 30_000 })
+    const filters = page.getByRole('button', { name: /^Filters/ })
+    expect((await filters.boundingBox())!.y).toBe((await add.boundingBox())!.y)
+    await filters.click()
+    const sheet = page.getByRole('dialog', { name: 'Filters' })
+    for (const name of ['On the site', 'Category', 'Watch', 'Source']) await expect(sheet.getByRole('combobox', { name })).toBeVisible()
+    const box = (await sheet.boundingBox())!
+    expect(box.x + box.width, 'the sheet ends off the screen').toBeLessThanOrEqual(width)
+    const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    // Below zero on CI's browser, which keeps a scrollbar's width.
+    expect(sideways, 'the page moves sideways').toBeLessThanOrEqual(0)
   })
 }

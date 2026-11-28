@@ -3,7 +3,7 @@ import { contactFields } from './contactRead'
 import { websiteKeyOf, type GooglePlace } from './googleJob'
 import { hoursJobCategories } from './hoursJob'
 import type { NightKindId } from './jobRuns'
-import { isKosherJobCategory } from './kosherJob'
+import { isKosherJobCategory, KOSHER_LIST_NAMES, type KosherList } from './kosherJob'
 import { pageReadsFor } from './listingPageWatch'
 import type { LinkStanding } from './linkCheck'
 import { kindOf } from './placeKinds'
@@ -39,6 +39,8 @@ export type PlaceCoverage = {
   /** Its main thing is among them. */
   mainMissing: boolean
   sources: CoverageBy[]
+  /** The kosher lists that check its hechsher, by name ("KCL’s list"). */
+  lists: string[]
   /** What keeps its name: never Not checked, since a name rarely goes out of date. */
   nameBy: CoverageBy[]
 }
@@ -54,7 +56,8 @@ export type CoverageIn = {
   sites: readonly PagesIn[] | null
   dishes: readonly { id: string; menuUrl: string | null; menuWatch?: { active: boolean } | null; pages?: readonly Pick<Watch, 'active'>[]; menuAt?: string | null; reading?: { status: string; readAt?: string; note?: string | null } | null }[] | null
   hospitals: readonly { id: string; watch: Pick<Watch, 'active'> | null; notOnRefuah: boolean }[] | null
-  kosher: readonly { id: string; on: readonly unknown[] }[] | null
+  /** `list`: which list has it (KosherList), named by KOSHER_LIST_NAMES. */
+  kosher: readonly { id: string; on: readonly { list?: string }[] }[] | null
   links: readonly Pick<LinkStanding, 'resourceId' | 'field'>[] | null
   off: readonly NightKindId[]
 }
@@ -115,7 +118,8 @@ export function placeCoverage(listing: Listing, category: CategoryConfig, input:
     const why = h?.notOnRefuah ? 'not on Refuah' : h?.watch && !h.watch.active ? STOPPED : h?.watch && !on('hospitals') ? JOB_OFF : undefined
     add('hospital', 'hospital contacts', on('hospitals') && h?.watch?.active && !h.notOnRefuah ? ['refuah'] : [], true, why)
   }
-  if (isKosherJobCategory(category)) add('hechsher', 'hechsher', on('kosher') && find(input.kosher)?.on.length ? ['certifier'] : [], true)
+  const onLists = on('kosher') && isKosherJobCategory(category) ? (find(input.kosher)?.on ?? []) : []
+  if (isKosherJobCategory(category)) add('hechsher', 'hechsher', onLists.length ? ['certifier'] : [], true)
   // No menu online (Ben & Jerry's, Nov 2) left To do and was nowhere on Places.
   // One that can't be read isn't checked either, though its watch runs
   // (the user, Nov 4), until its dishes are given by hand.
@@ -141,36 +145,14 @@ export function placeCoverage(listing: Listing, category: CategoryConfig, input:
     notCheckedWhy: ordered.map((f) => f.why ?? null),
     mainMissing: missing.some((f) => f.main),
     sources: [...new Set(fields.flatMap((f) => f.by))],
+    lists: [...new Set(onLists.flatMap((o) => (o.list && o.list in KOSHER_LIST_NAMES ? [KOSHER_LIST_NAMES[o.list as KosherList]] : [])))],
     nameBy: on('google') && google?.fields.find((f) => f.field === 'name')?.by.kind === 'google' ? ['google'] : [],
   }
 }
 
-// ── Places' Checked by menu ─────────────────────────────────────────────────
-
-export type CheckedBy = 'any' | 'not-watched' | 'google' | 'website' | 'newsletter' | 'certifier' | 'refuah' | 'links-only'
-
-export const CHECKED_BY: { key: CheckedBy; label: string }[] = [
-  { key: 'any', label: 'Anything' },
-  { key: 'not-watched', label: 'Not checked' },
-  { key: 'google', label: 'Google' },
-  { key: 'website', label: 'Their website' },
-  { key: 'newsletter', label: 'Newsletter' },
-  { key: 'certifier', label: 'Certifier’s list' },
-  { key: 'refuah', label: 'Refuah' },
-  { key: 'links-only', label: 'Link check only' },
-]
-
-export const isCheckedBy = (v: unknown): v is CheckedBy => CHECKED_BY.some((c) => c.key === v)
-
-/** Whether a place fits the menu's choice. A broken check isn't one: those
- *  are fixed on To do (Nov 2). */
-export function fitsCheckedBy(c: PlaceCoverage | undefined, choice: CheckedBy): boolean {
-  if (choice === 'any') return true
-  if (!c) return false
-  if (choice === 'not-watched') return c.notWatched.length > 0
-  if (choice === 'links-only') return c.sources.length === 1 && c.sources[0] === 'links'
-  return c.sources.includes(choice)
-}
+// ── Places' Watch menu ──────────────────────────────────────────────────────
+// Places narrows by the Watches jobs now (watchList.ts, placeWatches); a
+// place with something unchecked is its Nothing, said as this line.
 
 /** "Not checked: menu (no menu online), phone". */
 export const notCheckedLine = (c: Pick<PlaceCoverage, 'notWatched' | 'notCheckedWhy'>) =>

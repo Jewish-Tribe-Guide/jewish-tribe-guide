@@ -8,29 +8,33 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { ADMIN_AREA_TAPPED } from '@/lib/adminNav'
 import { stepCount, withoutSteps } from '@/lib/stepAddress'
 import { eruvPlace, filterPlaces, isPlaceShow, nameKey, placeCounts, placeLine, sharedNames, streetOf, PLACE_SHOWS, type AdminPlace, type PlaceShow } from '@/lib/adminPlaces'
-import { CHECKED_BY, fitsCheckedBy, isCheckedBy, notCheckedLine, type CheckedBy } from '@/lib/fieldCoverage'
+import { notCheckedLine } from '@/lib/fieldCoverage'
+import { fitsPlaceWatch, isPlaceSourceChoice, isPlaceWatchChoice, listedJobs, placeWatches, placeWatchLine, sourceChoices, sourceLabel, type PlaceSourceChoice, type PlaceWatchChoice, type PlaceWatched, type WatchSourceKey } from '@/lib/watchList'
+import { websiteWatchOf } from '@/lib/eruvJob'
 import AddPlace from './AddPlace'
 import AddWhat from './AddWhat'
 import { AdminEmpty, AdminMenu, AdminRow } from './AdminUI'
 import EruvListing, { AddEruv } from './EruvListing'
 import PlaceListing from './PlaceListing'
-import { AddButton } from '@/components/AddButton'
 import { PlusIcon } from '@/components/icons'
 import { useMeasuredIsMobile } from '@/lib/useIsMobile'
 import { coverageOf, useWatchJobsAndReload } from './useWatchJobs'
 import { moveBackTo, moveTo } from './useScreenHistory'
 import { useAdminApi } from './useAdminApi'
+import { FiltersButton, PlacesFiltersSheet, type PlacesMenu } from './PlacesFilters'
 
 // Places (the admin redesign's step 3, board 5): every listing in one list.
-// Find one by name, narrow by three menus (what's on the site, its category,
-// what checks it), open it to edit it on the spot (no suggest-then-approve),
+// Find one by name, narrow by four menus (what's on the site, its category,
+// the Watches job checking it and where it reads it from; on a phone, in a
+// Filters sheet), open it to edit it on the spot (no suggest-then-approve),
 // archive it, or bring an archived one back.
 
 const field = 'min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-[0.9375rem] text-slate-900'
 
 /** How many rows show before "Show all". */
-/** Too narrow for the filters and Add on one row: the sidebar and three
- *  menus need about 1024px. A phone's short side counts, as desktop: does. */
+/** Too narrow for the four menus and Add on one row, which then share it
+ *  as Filters and Add (board l06): the sidebar and the menus need about
+ *  1024px. A phone's short side counts, as desktop: does. */
 const NARROW = '(max-width: 1023px), (max-height: 639px)'
 
 const SHOWN = 50
@@ -50,12 +54,18 @@ function categoryFromAddress(): string {
   return new URLSearchParams(window.location.search).get('category') ?? ''
 }
 
-/** What the address narrows by what checks it: `?checked=` (Watches' "23
- *  places" lands on not-watched). */
-function checkedFromAddress(): CheckedBy {
-  const checked = new URLSearchParams(window.location.search).get('checked')
-  return isCheckedBy(checked) ? checked : 'any'
+/** The job and the source the address narrows to: `?watch=` and
+ *  `?source=` (a job page's From rows land there). */
+function watchFromAddress(): { watch: PlaceWatchChoice; source: PlaceSourceChoice } {
+  const params = new URLSearchParams(window.location.search)
+  const watch = params.get('watch')
+  const source = params.get('source')
+  return { watch: isPlaceWatchChoice(watch) ? watch : 'any', source: isPlaceSourceChoice(source) ? source : 'any' }
 }
+
+/** What the four menus have picked. */
+type Choice = { show: PlaceShow; category: string; watch: PlaceWatchChoice; source: PlaceSourceChoice }
+const ANY: Choice = { show: 'site', category: '', watch: 'any', source: 'any' }
 
 /** The place open (`?place=`) or the category being added to (`?add=`):
  *  each a screen of its own, with its own address and entry, so Back,
@@ -92,9 +102,9 @@ function setAddressParam(name: string, value: string, fallback: string) {
 export default function PlacesList({ token }: { token: string }) {
   const api = useAdminApi(token)
   const router = useRouter()
-  // Add: at the end of the filters' row while there's room for both, else
-  // floating (the user, Nov 28). Nothing till the window's measured, so a
-  // phone never paints the computer's.
+  // Add: at the end of the filters' row, after the four menus while
+  // there's room, else after Filters (board l06). Nothing till the window's
+  // measured, so a phone never paints the computer's.
   const narrow = useMeasuredIsMobile(NARROW)
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -105,7 +115,9 @@ export default function PlacesList({ token }: { token: string }) {
   const [show, setShow] = useState<PlaceShow>('site')
   const [category, setCategory] = useState('')
   const [query, setQuery] = useState('')
-  const [checked, setChecked] = useState<CheckedBy>('any')
+  const [watch, setWatch] = useState<PlaceWatchChoice>('any')
+  const [source, setSource] = useState<PlaceSourceChoice>('any')
+  const [sheet, setSheet] = useState(false)
   const [all, setAll] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   // Adding: What are you adding? (''), then the editor for that category.
@@ -123,7 +135,9 @@ export default function PlacesList({ token }: { token: string }) {
       // and the category menu keep the two in step after that.
       setShow(showFromAddress())
       setCategory(categoryFromAddress())
-      setChecked(checkedFromAddress())
+      const w = watchFromAddress()
+      setWatch(w.watch)
+      setSource(w.source)
       const open = openFromAddress()
       setOpenId(open.place)
       setAdding(open.add)
@@ -249,20 +263,97 @@ export default function PlacesList({ token }: { token: string }) {
   if (opened && openedEruv) return <EruvListing key={opened.id} place={opened} eruv={openedEruv} category={categoriesById.get(opened.category)} token={token} jobs={jobs} reload={reload} now={now} onClose={close} onSaved={changedEruv} />
   if (opened) return <PlaceListing key={opened.id} place={opened} category={categoriesById.get(opened.category)} token={token} jobs={jobs} reload={reload} now={now} onClose={close} onSaved={changed} />
 
-  const counts = placeCounts(places, category || undefined)
-  const narrowed = filterPlaces(places, { show, category: category || undefined, query })
-  const fits = (p: AdminPlace, choice: CheckedBy) => fitsCheckedBy(coverage?.get(p.id), choice)
-  const checkedCount = (choice: CheckedBy) => narrowed.filter((p) => fits(p, choice)).length
-  // Not checked: its main thing first, then by name as they already are.
-  const rows = narrowed.filter((p) => fits(p, checked))
-  if (checked === 'not-watched') rows.sort((a, b) => Number(!!coverage?.get(b.id)?.mainMissing) - Number(!!coverage?.get(a.id)?.mainMissing))
+  // What checks each place, by the Watches jobs (watchList.ts). An eruv
+  // is Eruv status's while its website is read.
+  const off = jobs.runs?.off ?? []
+  const eruvWatched = (id: string): PlaceWatched | undefined => {
+    const e = eruvs.find((x) => x.id === id)
+    if (!e || !coverage) return undefined
+    const read = !off.includes('eruvs') && !!websiteWatchOf(e, jobs.eruvim?.watches ?? [])?.active
+    return read ? { jobs: ['eruvs'], sources: ['website'], unchecked: false } : { jobs: [], sources: [], unchecked: true }
+  }
+  const watchedOf = (p: AdminPlace): PlaceWatched | undefined => {
+    const c = coverage?.get(p.id)
+    if (!c) return eruvWatched(p.id)
+    return { ...placeWatches(c), unchecked: c.notWatched.length > 0 }
+  }
+  const choice: Choice = { show, category, watch, source }
+  /** The places a choice leaves, `leave` a menu not counted: each menu
+   *  counts what the others and the search leave it. */
+  const placesFor = (c: Choice, leave?: 'category' | 'watch' | 'source') =>
+    filterPlaces(places, { show: c.show, category: leave === 'category' ? undefined : c.category || undefined, query }).filter((p) =>
+      fitsPlaceWatch(watchedOf(p), leave === 'watch' ? 'any' : c.watch, leave === 'source' ? 'any' : c.source),
+    )
+  const menusFor = (c: Choice): (PlacesMenu & { line?: Record<string, string> })[] => {
+    const counts = placeCounts(places, c.category || undefined)
+    // Category, Watch and Source: only what the other menus and the search
+    // leave something in, with how many (the user, Nov 4), and the one
+    // picked even once it's emptied.
+    const besideCategory = placesFor(c, 'category')
+    const inCategory = (id: string) => besideCategory.filter((p) => p.category === id).length
+    const besideWatch = placesFor(c, 'watch').map(watchedOf)
+    const byJob = (id: PlaceWatchChoice) => besideWatch.filter((w) => fitsPlaceWatch(w, id, 'any')).length
+    const besideSource = placesFor(c, 'source').map(watchedOf)
+    const bySource = (key: WatchSourceKey) => besideSource.filter((w) => w?.sources.includes(key)).length
+    const sources = sourceChoices([...besideSource.flatMap((w) => w?.sources ?? []), ...(c.source === 'any' ? [] : [c.source])])
+    return [
+      { key: 'show', name: 'On the site', value: c.show, options: PLACE_SHOWS.map((s) => ({ value: s.show, label: s.label, count: counts[s.show] })) },
+      {
+        key: 'category',
+        name: 'Category',
+        value: c.category,
+        options: [{ value: '', label: 'All categories' }, ...listingCategories.filter((x) => x.id === c.category || inCategory(x.id) > 0).map((x) => ({ value: x.id, label: x.pluralLabel, count: inCategory(x.id) }))],
+      },
+      {
+        key: 'watch',
+        name: 'Watch',
+        value: c.watch,
+        options: [
+          { value: 'any', label: 'Any watch' },
+          { value: 'nothing', label: 'Nothing', count: byJob('nothing') },
+          ...listedJobs([]).filter((j) => j.id === c.watch || byJob(j.id) > 0).map((j) => ({ value: j.id, label: j.name, count: byJob(j.id) })),
+        ],
+        line: { nothing: 'Something on it isn’t checked' },
+      },
+      { key: 'source', name: 'Source', value: c.source, options: [{ value: 'any', label: 'Any source' }, ...sources.map((k) => ({ value: k, label: sourceLabel(k), count: bySource(k) }))] },
+    ]
+  }
+  const rowsFor = (c: Choice) => {
+    const out = placesFor(c)
+    // Nothing: its main thing first, then by name as they already are.
+    if (c.watch === 'nothing') out.sort((a, b) => Number(!!coverage?.get(b.id)?.mainMissing) - Number(!!coverage?.get(a.id)?.mainMissing))
+    return out
+  }
+  const rows = rowsFor(choice)
+  const menus = menusFor(choice)
+  const narrowing = (Object.keys(ANY) as (keyof Choice)[]).filter((k) => choice[k] !== ANY[k]).length
+  /** Sets one menu's choice, and the address with it. */
+  function choose(key: string, v: string) {
+    setAll(false)
+    if (key === 'show') return pick(v as PlaceShow)
+    if (key === 'category') setCategory(v)
+    if (key === 'watch') setWatch(v as PlaceWatchChoice)
+    if (key === 'source') setSource(v as PlaceSourceChoice)
+    setAddressParam(key, v, key === 'category' ? '' : 'any')
+  }
   // Every place, not just the ones showing: a name another place has
   // says its street even when the other is filtered out.
   const shared = sharedNames(places)
-  const lineOf = (p: AdminPlace): { text: string; warn: boolean } => {
+  const lineOf = (p: AdminPlace) => {
+    const w = watchedOf(p)
     const c = coverage?.get(p.id)
-    if (checked === 'not-watched' && c) return { text: notCheckedLine(c), warn: true }
-    return { text: placeLine(p, shared.has(nameKey(p.name))), warn: p.status === 'approved' && !p.hasAddress }
+    if (watch === 'nothing' && c) return <span className="text-amber-800">{notCheckedLine(c)}</span>
+    const own = placeLine(p, shared.has(nameKey(p.name)))
+    const warn = p.status === 'approved' && !p.hasAddress
+    const jobsLine = w?.jobs.length ? placeWatchLine(w.jobs) : ''
+    if (!own && !jobsLine) return undefined
+    return (
+      <>
+        {own && <span className={warn ? 'text-amber-800' : ''}>{own}</span>}
+        {own && jobsLine && ' · '}
+        {jobsLine}
+      </>
+    )
   }
   const labelOf = (p: AdminPlace) => {
     const street = shared.has(nameKey(p.name)) && p.hasAddress ? streetOf(p.listing.address) : ''
@@ -278,16 +369,8 @@ export default function PlacesList({ token }: { token: string }) {
       window.scrollTo?.(0, 0)
     }
   }
-  // Category, as Checked by: only the categories the other menus and the
-  // search leave something in, with how many (the user, Nov 4), and the one
-  // picked even once it's emptied.
-  const besideCategory = filterPlaces(places, { show, query }).filter((p) => fits(p, checked))
-  const inCategory = (id: string) => besideCategory.filter((p) => p.category === id).length
-  const categoryChoices = listingCategories.filter((c) => c.id === category || inCategory(c.id) > 0)
-
   return (
-    // pb-14: the floating Add clears the last row and Show all.
-    <div className={`flex flex-col gap-4 ${narrow === false ? '' : 'pb-14'}`}>
+    <div className="flex flex-col gap-4">
       <label className={`${field} flex items-center gap-2`}>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#64748b" strokeWidth="1.8" aria-hidden="true">
           <circle cx="7" cy="7" r="4.5" />
@@ -307,33 +390,21 @@ export default function PlacesList({ token }: { token: string }) {
       </label>
 
       <div className="flex gap-1.5 sm:gap-2" data-testid="places-filters">
-        <AdminMenu name="On the site" value={show} options={PLACE_SHOWS.map((s) => ({ value: s.show, label: s.label, count: counts[s.show] }))} onChange={pick} />
-        <AdminMenu
-          name="Category"
-          value={category}
-          options={[{ value: '', label: 'All categories' }, ...categoryChoices.map((c) => ({ value: c.id, label: c.pluralLabel, count: inCategory(c.id) }))]}
-          onChange={(v) => {
-            setCategory(v)
-            setAll(false)
-            setAddressParam('category', v, '')
-          }}
-        />
-        <AdminMenu
-          name="Checked by"
-          value={checked}
-          disabled={!coverage}
-          options={CHECKED_BY.filter((c) => c.key === 'any' || c.key === checked || c.key === 'not-watched' || checkedCount(c.key) > 0).map((c) => ({
-            value: c.key,
-            label: c.label,
-            count: c.key === 'any' ? undefined : checkedCount(c.key),
-          }))}
-          onChange={(v) => {
-            setChecked(v)
-            setAll(false)
-            setAddressParam('checked', v, 'any')
-          }}
-        />
-        {adding === null && narrow === false && (
+        {narrow === true ? (
+          <FiltersButton narrowing={narrowing} onClick={() => setSheet(true)} />
+        ) : (
+          menus.map((m) => (
+            <AdminMenu
+              key={m.key}
+              name={m.name}
+              value={m.value}
+              disabled={(m.key === 'watch' || m.key === 'source') && !coverage}
+              options={m.options.map((o) => ({ ...o, line: m.line?.[o.value] }))}
+              onChange={(v) => choose(m.key, v)}
+            />
+          ))
+        )}
+        {adding === null && narrow !== undefined && (
           <button
             type="button"
             onClick={add}
@@ -345,13 +416,25 @@ export default function PlacesList({ token }: { token: string }) {
           </button>
         )}
       </div>
+      {sheet && (
+        <PlacesFiltersSheet
+          start={choice}
+          menus={(c) => menusFor(c as Choice)}
+          count={(c) => rowsFor(c as Choice).length}
+          onClose={() => setSheet(false)}
+          onShow={(c) => {
+            for (const key of Object.keys(ANY) as (keyof Choice)[]) if (c[key] !== choice[key]) choose(key, c[key])
+            setSheet(false)
+          }}
+        />
+      )}
 
       <p className="-mb-2 m-0 text-sm font-semibold text-slate-600">
         {rows.length} {rows.length === 1 ? 'place' : 'places'}
       </p>
 
       {rows.length === 0 ? (
-        <AdminEmpty>{query || category || checked !== 'any' ? 'No places match.' : show === 'site' ? 'No places yet.' : 'Nothing to do.'}</AdminEmpty>
+        <AdminEmpty>{query || category || watch !== 'any' || source !== 'any' ? 'No places match.' : show === 'site' ? 'No places yet.' : 'Nothing to do.'}</AdminEmpty>
       ) : (
         <section aria-label="Places" className="bg-white border border-slate-200 rounded-[10px]">
           {shown.map((p) => (
@@ -360,7 +443,7 @@ export default function PlacesList({ token }: { token: string }) {
               onClick={() => openPlace(p.id)}
               label={labelOf(p)}
               name={p.name}
-              line={lineOf(p).text ? <span className={lineOf(p).warn ? 'text-amber-800' : ''}>{lineOf(p).text}</span> : undefined}
+              line={lineOf(p)}
               aside={categoriesById.get(p.category)?.label}
             />
           ))}
@@ -376,7 +459,6 @@ export default function PlacesList({ token }: { token: string }) {
           </div>
         </section>
       )}
-      {adding === null && narrow === true && <AddButton label="Add a place" onClick={add} />}
     </div>
   )
 }

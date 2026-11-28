@@ -378,7 +378,8 @@ export function AdminMenu<V extends string>({
 }: {
   name: string
   value: V
-  options: { value: V; label: string; count?: number }[]
+  /** `line`: a few words under the choice ("Something on it isn’t checked"). */
+  options: { value: V; label: string; count?: number; line?: string }[]
   onChange: (value: V) => void
   disabled?: boolean
   several?: V[]
@@ -469,9 +470,12 @@ export function AdminMenu<V extends string>({
                   )}
                 </span>
               )}
-              <span>
-                {o.label}
-                {o.count !== undefined && ` (${o.count})`}
+              <span className="flex flex-col">
+                <span>
+                  {o.label}
+                  {o.count !== undefined && ` (${o.count})`}
+                </span>
+                {o.line && <span className="text-[0.8125rem] font-normal text-slate-600">{o.line}</span>}
               </span>
             </button>
           ))}

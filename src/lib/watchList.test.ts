@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { NightKindView } from './nightKinds'
 import { NIGHT_KINDS } from './nightKinds'
-import { findWatches, listedJobs, WATCH_JOBS, watchAside, watchJobOf, watchSources, watchState } from './watchList'
+import { findWatches, fitsPlaceWatch, isPlaceSourceChoice, isPlaceWatchChoice, listedJobs, placeWatches, placeWatchLine, sourceChoices, WATCH_JOBS, watchAside, watchJobOf, watchSources, watchState } from './watchList'
+import type { FieldCoverage } from './fieldCoverage'
 
 const view = (over: Partial<NightKindView>): NightKindView => ({ id: 'times', name: '', about: '', when: null, count: '', trouble: null, misses: [], tracked: [], nights: [], fixes: [], lastAt: null, schedule: '', ...over })
 const read = (name: string) => ({ name, status: 'Read', bad: false, page: '' })
@@ -19,7 +20,7 @@ describe('the Watches jobs', () => {
       'Food: Menus',
       'Food: Kosher certification',
       'Mikvahs: Mikvah hours',
-      'Hospitals: Hospital details',
+      'Hospitals: Bikkur Cholim details',
       'Eruv: Eruv status',
       'Links: Broken links',
     ])
@@ -67,7 +68,39 @@ describe('sources and search', () => {
     expect(findWatches('minyan', jobs, kosher)).toEqual([{ job: job('times'), line: null }])
     expect(findWatches('google', jobs, kosher)).toEqual([{ job: job('google'), line: 'From Google' }])
     expect(findWatches('kcl', jobs, kosher)).toEqual([{ job: job('kosher'), line: 'From KCL’s list' }])
-    expect(findWatches('refuah', jobs, kosher).map((r) => r.job.name)).toEqual(['Hospital details'])
+    expect(findWatches('refuah', jobs, kosher).map((r) => r.job.name)).toEqual(['Bikkur Cholim details'])
     expect(findWatches('  ', jobs, kosher)).toEqual([])
+  })
+})
+
+describe('a place, by the jobs that check it', () => {
+  const f = (key: string, by: FieldCoverage['by'], main = false): FieldCoverage => ({ key, label: key, by, main })
+  it('a website read for times is Minyan times; for a phone, Hours and phone', () => {
+    const shul = placeWatches({ fields: [f('times', ['website', 'newsletter'], true), f('phone', ['google']), f('email', ['website'])], lists: [] })
+    expect(shul).toEqual({ jobs: ['google', 'times'], sources: ['website', 'newsletter', 'google'] })
+    expect(placeWatchLine(shul.jobs)).toBe('Hours and phone · Minyan times')
+  })
+  it('a mikvah’s hours, a menu, a hechsher by its lists, Refuah, links', () => {
+    expect(placeWatches({ fields: [f('hours', ['website'], true)], lists: [] }).jobs).toEqual(['hours'])
+    expect(placeWatches({ fields: [f('hours', ['website'])], lists: [] }).jobs).toEqual(['google'])
+    expect(placeWatches({ fields: [f('menu', ['website']), f('hechsher', ['certifier'], true)], lists: ['KCL’s list'] })).toEqual({ jobs: ['menus', 'kosher'], sources: ['website', 'list:KCL’s list'] })
+    expect(placeWatches({ fields: [f('hospital', ['refuah'], true), f('website', ['links'])], lists: [] })).toEqual({ jobs: ['hospitals', 'links'], sources: ['refuah'] })
+    expect(placeWatches({ fields: [f('hechsher', [], true)], lists: [] })).toEqual({ jobs: [], sources: [] })
+  })
+  it('the menus: a job, Nothing, a source; both at once', () => {
+    const w = { jobs: ['google', 'kosher'] as const, sources: ['google', 'list:KCL’s list'] as const, unchecked: true }
+    expect(fitsPlaceWatch(w, 'any', 'any')).toBe(true)
+    expect(fitsPlaceWatch(w, 'kosher', 'list:KCL’s list')).toBe(true)
+    expect(fitsPlaceWatch(w, 'times', 'any')).toBe(false)
+    expect(fitsPlaceWatch(w, 'nothing', 'any')).toBe(true)
+    expect(fitsPlaceWatch({ ...w, unchecked: false }, 'nothing', 'any')).toBe(false)
+    expect(fitsPlaceWatch(w, 'any', 'newsletter')).toBe(false)
+    expect(fitsPlaceWatch(undefined, 'any', 'any')).toBe(true)
+    expect(fitsPlaceWatch(undefined, 'nothing', 'any')).toBe(false)
+  })
+  it('what an address may ask for, and the sources in the drawn order', () => {
+    expect([isPlaceWatchChoice('times'), isPlaceWatchChoice('nothing'), isPlaceWatchChoice('nope')]).toEqual([true, true, false])
+    expect([isPlaceSourceChoice('list:KCL’s list'), isPlaceSourceChoice('list:'), isPlaceSourceChoice('refuah'), isPlaceSourceChoice('x')]).toEqual([true, false, true, false])
+    expect(sourceChoices(['refuah', 'list:KCL’s list', 'newsletter', 'google', 'website', 'list:Keystone-K’s list'])).toEqual(['google', 'website', 'newsletter', 'list:KCL’s list', 'list:Keystone-K’s list', 'refuah'])
   })
 })
