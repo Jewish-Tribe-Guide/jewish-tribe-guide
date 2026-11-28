@@ -338,9 +338,9 @@ export default function PlacesList({ token }: { token: string }) {
             type="button"
             onClick={add}
             aria-label="Add a place"
-            className="ml-auto flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-primary pl-3.5 pr-4 text-[0.9375rem] font-semibold text-white hover:bg-primary-dark active:scale-95"
+            className="ml-auto flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-[10px] border border-primary bg-primary pl-3 pr-3.5 text-[0.8125rem] font-semibold text-white hover:bg-primary-dark active:scale-95"
           >
-            <PlusIcon className="h-[18px] w-[18px] shrink-0" />
+            <PlusIcon className="h-4 w-4 shrink-0" />
             Add
           </button>
         )}

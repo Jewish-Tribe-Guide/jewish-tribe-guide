@@ -109,6 +109,13 @@ describe('Places', () => {
     const add = await screen.findByRole('button', { name: 'Add a place' })
     expect(add.className).not.toContain('fixed')
     expect(add).toHaveTextContent(/^Add$/)
+    // The filters' shape and height, in blue (the user, Nov 28).
+    const menu = screen.getByRole('button', { name: /On the site/ })
+    for (const c of ['h-11', 'rounded-[10px]']) {
+      expect(menu.className).toContain(c)
+      expect(add.className).toContain(c)
+    }
+    expect(add.className).toContain('bg-primary')
     const row = add.closest('[data-testid="places-filters"]')
     expect(row).not.toBeNull()
     expect(within(row as HTMLElement).getByRole('button', { name: /On the site/ })).toBeTruthy()
