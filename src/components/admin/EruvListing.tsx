@@ -548,11 +548,6 @@ export function AddEruv({ token, category, onBack, onAdded }: { token: string; c
     const source = draft.status.trim()
     const email = sourceKind(source) === 'email'
     const page = email ? source : shortUrl(source)
-    const link = (words: string, onClick: () => void) => (
-      <button type="button" onClick={onClick} className={LINE_LINK}>
-        {words}
-      </button>
-    )
     const change = fields.isOpen(rowOf('status'), 'status') ? [] : [<IconAction key="edit" kind="edit" onClick={reveal('status')} />]
     const idle = <SourceWords line={{ text: page }} controls={[<IconAction key="read" kind="read" onClick={() => void readStatusNow()} />, ...change]} />
     if (statusRead?.state === 'done') status.word = statusRead.words
