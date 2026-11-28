@@ -348,6 +348,16 @@ old number can still be looked up. When an item is done, move it to
     only, grouped ("Off" the one word on a row); each opens its own page
     with its one line and its switch. Places' menu keeps the names under
     the same headings, with a line only on Nothing. Not built.
+    L1–L4 (same page, the user's idea): a watch is a job, named by what
+    it keeps current, and its sources are how. Eight jobs: Hours and
+    phone (Google, its own website; open or closed inside it), Minyan
+    times (website, newsletter), Menus, Kosher certification (three
+    lists), Mikvah hours, Hospital details (Refuah), Eruv status, Broken
+    links. One switch per job, sources named on its page with none of
+    their own; the Watches search finds sources too. Places' menu lists
+    jobs with their sources indented ("Minyan times: Newsletter"
+    answers which newsletters), rows name jobs only, and a place's
+    "Kept current by" is grouped by job. Not built.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
