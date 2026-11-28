@@ -16,7 +16,8 @@ import { communityOfRecipients, inboundDomain, isAutomatic, readableAttachment, 
 //   Reply-To the sender. Automatic mail (out-of-office, bounces) and a
 //   sender an admin chose to ignore are dropped.
 //
-// Signed by Resend (Svix): RESEND_WEBHOOK_SECRET, from the webhook's page
+// Signed by Resend (Svix): RESEND_WEBHOOK_SECRET; read with
+// RESEND_RECEIVING_API_KEY, a full-access key (else RESEND_API_KEY), from the webhook's page
 // in Resend. Without it, or without INBOUND_EMAIL_DOMAIN, the route is
 // closed: it forwards mail and spends model calls. The webhook carries only
 // who and what; the words and attachments are fetched from Resend's API.
@@ -37,7 +38,10 @@ const closed = (why: string) => Response.json({ ok: false, error: why }, { statu
 export async function POST(request: Request) {
   const secret = process.env.RESEND_WEBHOOK_SECRET
   const domain = inboundDomain()
-  const apiKey = process.env.RESEND_API_KEY
+  // Reading received mail needs a full-access key; the site's sending key
+  // is usually restricted to sending (Resend: "restricted_api_key"), so it
+  // has a key of its own, kept to this route.
+  const apiKey = process.env.RESEND_RECEIVING_API_KEY || process.env.RESEND_API_KEY
   if (!secret || !domain || !apiKey) return closed('Receiving email isn’t set up here.')
 
   const payload = await request.text()
@@ -67,8 +71,10 @@ export async function POST(request: Request) {
 
   const { data: received, error } = await resend.emails.receiving.get(data.email_id)
   if (error || !received) {
-    reportServerError('[inbound/email] couldn’t fetch the email from Resend:', error)
-    return Response.json({ ok: false, error: 'Couldn’t fetch it.' }, { status: 502 })
+    // Said plainly, since Resend's webhook log is where it'll be read.
+    const why = error?.name === 'restricted_api_key' ? 'The Resend key can only send: set RESEND_RECEIVING_API_KEY to a full-access key.' : 'Couldn’t fetch it.'
+    reportServerError(`[inbound/email] couldn’t fetch the email from Resend: ${why}`, error)
+    return Response.json({ ok: false, error: why }, { status: 502 })
   }
 
   try {

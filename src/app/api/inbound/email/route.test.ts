@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // person's email passed to the admins.
 const m = vi.hoisted(() => ({
   verify: vi.fn(),
+  keys: [] as string[],
   get: vi.fn(),
   listAttachments: vi.fn(),
   listCommunities: vi.fn(),
@@ -15,6 +16,9 @@ const m = vi.hoisted(() => ({
 }))
 vi.mock('resend', () => ({
   Resend: class {
+    constructor(key: string) {
+      m.keys.push(key)
+    }
     webhooks = { verify: m.verify }
     emails = { receiving: { get: m.get, attachments: { list: m.listAttachments } } }
   },
@@ -141,6 +145,16 @@ describe('POST /api/inbound/email', () => {
     m.receiveNewsletter.mockResolvedValue({ status: 'ignored' })
     expect(await (await POST(req())).json()).toMatchObject({ status: 'ignored' })
     expect(m.sendForwardedEmail).not.toHaveBeenCalled()
+  })
+
+  // Nov 27: the live sending key could only send, so every email stopped here.
+  it('reads with its own key, and says when the key can only send', async () => {
+    vi.stubEnv('RESEND_RECEIVING_API_KEY', 're_full')
+    m.get.mockResolvedValue({ data: null, error: { name: 'restricted_api_key', message: 'This API key is restricted to only send emails' } })
+    const res = await POST(req())
+    expect(res.status).toBe(502)
+    expect((await res.json()).error).toMatch(/RESEND_RECEIVING_API_KEY/)
+    expect(m.keys.at(-1)).toBe('re_full')
   })
 
   it('asks Resend to send it again when forwarding fails', async () => {

@@ -358,7 +358,10 @@ old number can still be looked up. When an item is done, move it to
        for `email.received`; put its signing secret in Vercel as
        `RESEND_WEBHOOK_SECRET`, and `INBOUND_EMAIL_DOMAIN` =
        `phillyjewishguide.com`; redeploy. From then on the site's
-       emails come from `philly@phillyjewishguide.com` too.
+       emails come from `philly@phillyjewishguide.com` too. Also
+       `RESEND_RECEIVING_API_KEY`: a full-access key (Resend › API
+       Keys); the sending key can't read received mail (found Nov 27,
+       the first test email).
     3. Send one email to `philly@phillyjewishguide.com` and tell me;
        I read the server name from it for `INBOUND_AUTH_SERVERS`.
     4. Move JCOR's groups.io list and each shul newsletter to the new
