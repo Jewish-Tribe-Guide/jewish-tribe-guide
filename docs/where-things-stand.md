@@ -299,6 +299,10 @@ old number can still be looked up. When an item is done, move it to
     (Edit on the heading, a swipe on a phone, Undo instead of a confirm);
     a row opens the place in Places; one watch per kosher list; the
     Watches list as names with a count on the right.
+    Third pass (W11–W12): the list grouped by what visitors see (Every
+    place, Shuls, Food, Mikvahs, Hospitals, Eruv, Links), each row with
+    its coverage ("12 of 16 shuls", "All 4"); a watch opens with the
+    places it doesn't watch first, marked Not watched. Not built.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
