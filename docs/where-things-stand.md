@@ -420,6 +420,11 @@ old number can still be looked up. When an item is done, move it to
     good"):** the Watches list by what visitors see, each job's page
     (Watching card, line, From, Runs when…), the kosher page, the
     source icons, and Places' Watch and Source filters.
+    Hover labels (Nov 28, the user: "sometimes your hovers take a long
+    time"): the admin's ~45 `title=` labels wait on the browser's own
+    ~1s delay. Build one label component (shows after ~0.15s, instant
+    between neighbouring icons, on keyboard focus too) for the new
+    icons, and move the other `title=` labels onto it in the same build.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
