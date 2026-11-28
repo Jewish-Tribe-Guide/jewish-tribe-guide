@@ -284,6 +284,17 @@ old number can still be looked up. When an item is done, move it to
 85. UES (made up, on dev only, 2 listings): delete it in the site
     owner's console (Communities). Harmless meanwhile; nothing relies
     on it.
+108. **Watches, part 1: a tab of its own** (the user, Nov 28). DRAWN,
+    not built, waiting on the user: canvas "Watches tab, part 1"
+    (https://claude.ai/artifact/K1cEQ8ECRiwCqeJrkR73v9), boards W1–W7.
+    Watches leaves Reports for the sidebar and the phone's bottom bar; the
+    tab is one list with a search ("Is it watched?"). A watch is a switch,
+    one line on what it does, and what it watches (search, Add, rows that
+    open one place: Read now · Change · Stop watching). A place nothing
+    reads isn't in the watch (Places' Not checked has it), and read
+    problems and a watch that didn't run go to To do. Kosher shows its
+    lists and the places they matched, with "Not this place" and no Add
+    (item 107). Hospitals gets Add a hospital.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
