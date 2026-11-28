@@ -284,6 +284,14 @@ old number can still be looked up. When an item is done, move it to
 85. UES (made up, on dev only, 2 listings): delete it in the site
     owner's console (Communities). Harmless meanwhile; nothing relies
     on it.
+106. Everything under the website's email, not a personal Gmail (the
+    user, Nov 28; later). Admin sign-in first: add the site's email to
+    `SUPERADMIN_EMAILS` (Vercel) and philly's admin list (a live write,
+    so a yes first), sign in with it, then take the Gmail off. Then
+    list who owns and pays for each service (Vercel, Supabase live and
+    dev, Resend and the domain, Google Cloud, PostHog), moving any on a
+    personal account. Goes with item 6 above (retiring the Gmail
+    script).
 
 ### Waiting on others
 
