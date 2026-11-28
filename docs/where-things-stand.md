@@ -316,6 +316,10 @@ old number can still be looked up. When an item is done, move it to
     W14b, W12b, W15: no Not watched on a watch's page; the heading is a
     plain count ("127 places", "12 shuls") and Add lists what isn't
     watched yet (W15 for Hours and phone, W4a for shuls).
+    W14c + W16: Hours and phone opens its two watches (Google, Their
+    own websites), as Kosher certification opens its lists; Google has
+    a page and switch of its own. The Watches search should match watch
+    names too.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
