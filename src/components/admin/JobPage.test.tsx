@@ -122,7 +122,7 @@ describe('a job on Watches, opened (boards L2b, L2f)', () => {
     forgetWatchJobs()
     serve([view({ id: 'google' })])
     show('sites')
-    expect(await screen.findByRole('heading', { name: 'Hours and phone' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Basic information' })).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'From' })).getAllByRole('link').map((a) => a.textContent)).toEqual(['Google', 'Its own website'])
   })
 

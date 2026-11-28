@@ -8,7 +8,7 @@ import type { PlaceCoverage } from './fieldCoverage'
 // its name, and on the right "Off" or "Runs when…" when it isn't running;
 // a search finds a job by its name or a source it reads ("Google").
 //
-// Some jobs here are two nightly jobs: Hours and phone is Google and a
+// Some jobs here are two nightly jobs: Basic information is Google and a
 // place's own website (when Google hasn't got it), Minyan times is the
 // shuls' websites and their newsletters. The switch turns both.
 
@@ -37,8 +37,8 @@ export const WATCH_JOBS: readonly WatchJob[] = [
     id: 'google',
     kinds: ['google', 'sites'],
     heading: 'Every place',
-    name: 'Hours and phone',
-    line: 'Open or closed, hours and phone. From Google, or the place’s own website when Google doesn’t have it.',
+    name: 'Basic information',
+    line: 'Its name, hours, phone and website, and whether it’s open. From Google, or the place’s own website when Google doesn’t have it.',
     runsWhen: FIRST_PLACE,
     from: [
       { key: 'google', label: 'Google' },
@@ -116,7 +116,7 @@ export function listedJobs(views: readonly NightKindView[]): WatchJob[] {
 }
 
 /** A search: a job by its name or heading, or one reading a source by
- *  that source ("Google" finds Hours and phone, "From Google"). */
+ *  that source ("Google" finds Basic information, "From Google"). */
 export function findWatches(query: string, jobs: readonly WatchJob[], views: readonly NightKindView[]): { job: WatchJob; line: string | null }[] {
   const q = query.trim().toLowerCase()
   if (!q) return []
@@ -135,7 +135,7 @@ export function findWatches(query: string, jobs: readonly WatchJob[], views: rea
 
 // ── Places' Watch and Source menus (board L1, l05, l06) ─────────────────────
 // A place is narrowed by the jobs that check something on it and where they
-// read it from, the same words Watches uses: Hours and phone, From Google.
+// read it from, the same words Watches uses: Basic information, From Google.
 // Nothing is a place with something no job checks.
 
 /** The jobs checking something on a place, in Watches' order, and where
@@ -168,7 +168,7 @@ export function placeWatches(c: Pick<PlaceCoverage, 'fields' | 'lists'>): { jobs
   return { jobs: WATCH_JOBS.filter((j) => jobs.has(j.id)).map((j) => j.id), sources: [...sources] }
 }
 
-/** "Hours and phone · Minyan times". */
+/** "Basic information · Minyan times". */
 export const placeWatchLine = (jobs: readonly NightKindId[]) => jobs.map((id) => WATCH_JOBS.find((j) => j.id === id)?.name ?? id).join(' · ')
 
 /** The Watch menu: every place, a place with something nothing checks, or

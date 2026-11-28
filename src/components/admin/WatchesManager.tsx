@@ -17,7 +17,7 @@ import { forgetWatchJobs, useWatchJobsAndReload } from './useWatchJobs'
 // place, Shuls, Food…), each row its name, with "Off" or "Runs when…" on
 // the right when it isn't running (or why, when it should be and isn't).
 // The search finds a job by its name, or by a source it reads ("Google"
-// finds Hours and phone, "From Google"). A community without its email set
+// finds Basic information, "From Google"). A community without its email set
 // up is asked for it first: the shuls' and eruvs' emails need it.
 //
 // What a job finds waits on To do, as before; the card saying so went with

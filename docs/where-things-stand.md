@@ -428,6 +428,23 @@ old number can still be looked up. When an item is done, move it to
     rich-text toolbar, the drag handle and Save without updating use it.
     `IconAction` is the ↻ / pencil / × button, and a place's and an
     eruv's source line (and Add a place's) end in it (L2i).
+    **Built Nov 28 (all of it):** Watches is its own sidebar item and
+    phone tab, between Places and Site (gone from Reports), grouped as
+    drawn with a search for jobs and sources (`watchList.ts`). Each
+    job's page is the Watching card (switch, line, Off · last read, or
+    Runs when…) and From; From rows open Places filtered to that job and
+    source. Kosher certification's lists have Edit and Remove (pencil
+    and × on a computer, a swipe on a phone), Undo and "+ Add a kosher
+    list" (`KosherLists.tsx`). Places has Watch and Source in place of
+    Checked by, each row saying its jobs, and on a phone one Filters
+    sheet with Add beside it. Renamed on the way (the user, Nov 28):
+    Hospital details → Bikkur Cholim details; Hours and phone → Basic
+    information, its line naming name, hours, phone and website. Where
+    the build differs from the boards: From rows and the Watches rows
+    are links, with a chevron only on a phone (the admin's rows lift on
+    hover on a computer); the community email card stays at the top of
+    Watches while the email isn't set up; job pages no longer list
+    places (Places does, filtered).
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any

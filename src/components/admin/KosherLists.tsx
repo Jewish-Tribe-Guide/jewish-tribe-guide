@@ -27,7 +27,6 @@ function site(url: string): string {
 
 type List = { id: string; name: string; url: string; status: string; bad: boolean }
 
-const HOVER = '[@media(hover:hover)_and_(pointer:fine)]'
 const button = 'inline-flex items-center justify-center min-h-10 px-3.5 rounded-lg text-sm font-semibold cursor-pointer disabled:opacity-60'
 
 function AddressField({ start, busy, error, onDone, onCancel, done }: { start: string; busy: boolean; error: string | null; onDone: (url: string) => void; onCancel: () => void; done: string }) {
@@ -139,7 +138,7 @@ export default function KosherLists({ views, token, onChanged }: { views: readon
                     </span>
                   </span>
                   {!editing && (
-                    <span className={`hidden ${HOVER}:inline-flex items-center gap-1`}>
+                    <span className="hidden pointer-fine:inline-flex items-center gap-1">
                       <IconAction kind="edit" of={l.name} disabled={busy} onClick={() => setOpen(l.id)} />
                       <IconAction kind="remove" of={l.name} disabled={busy} onClick={() => void remove(l)} />
                     </span>

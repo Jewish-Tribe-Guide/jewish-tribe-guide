@@ -15,7 +15,7 @@ describe('the Watches jobs', () => {
 
   it('in the drawn order, under what visitors see', () => {
     expect(listedJobs([]).map((j) => `${j.heading}: ${j.name}`)).toEqual([
-      'Every place: Hours and phone',
+      'Every place: Basic information',
       'Shuls: Minyan times',
       'Food: Menus',
       'Food: Kosher certification',
@@ -29,7 +29,7 @@ describe('the Watches jobs', () => {
 
   it('an old address opens the job it is part of', () => {
     expect(watchJobOf('newsletters')?.name).toBe('Minyan times')
-    expect(watchJobOf('sites')?.name).toBe('Hours and phone')
+    expect(watchJobOf('sites')?.name).toBe('Basic information')
     expect(watchJobOf('nope')).toBeUndefined()
   })
 })
@@ -75,10 +75,10 @@ describe('sources and search', () => {
 
 describe('a place, by the jobs that check it', () => {
   const f = (key: string, by: FieldCoverage['by'], main = false): FieldCoverage => ({ key, label: key, by, main })
-  it('a website read for times is Minyan times; for a phone, Hours and phone', () => {
+  it('a website read for times is Minyan times; for a phone, Basic information', () => {
     const shul = placeWatches({ fields: [f('times', ['website', 'newsletter'], true), f('phone', ['google']), f('email', ['website'])], lists: [] })
     expect(shul).toEqual({ jobs: ['google', 'times'], sources: ['website', 'newsletter', 'google'] })
-    expect(placeWatchLine(shul.jobs)).toBe('Hours and phone · Minyan times')
+    expect(placeWatchLine(shul.jobs)).toBe('Basic information · Minyan times')
   })
   it('a mikvah’s hours, a menu, a hechsher by its lists, Refuah, links', () => {
     expect(placeWatches({ fields: [f('hours', ['website'], true)], lists: [] }).jobs).toEqual(['hours'])
