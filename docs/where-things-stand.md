@@ -305,7 +305,7 @@ old number can still be looked up. When an item is done, move it to
     are all in place): each admin adds the address to their contacts.
     The admin pages no longer ask for a Gmail once the address is set
     (Nov 28): Team and Community email show the address, the setup
-    step is done, and Read now looks in Resend's received mail (14
+    step is gone (nothing to set up), and Read now looks in Resend's received mail (14
     days, `receivedEmail.ts`) before the Gmail script. Each received email counts against Resend's send quota
     (Free: 100 a day, 3,000 a month), and Resend keeps it 30 days.
 101. **Guess the kind of a new place from Google** (agreed Nov 27, a
