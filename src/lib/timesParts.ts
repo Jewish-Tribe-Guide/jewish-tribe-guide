@@ -1,4 +1,5 @@
 import type { Minyan } from './davening'
+import { addDays } from './isoDay'
 import { mergeMinyanimBox, minyanimForBox } from './minyanimBox'
 import { seasonFromNotes } from './scheduleUpdate'
 import { scheduleProposal, usualProposal } from './timesProposal'
@@ -97,6 +98,34 @@ export function splitParts(listingDetails: Record<string, unknown>, readDetails:
     const details = { ...listingDetails, [key]: t.minyanim, [schedulesKey(key)]: t.schedules }
     return [{ part, details, source, size: partSize(source, details) }]
   })
+}
+
+/** Whether a week part changes a time someone could still go to: on a day
+ *  from `today` on, a minyan added, taken off or moved, or the week's own
+ *  terms (whole, replace or add, which parts) changed. A note alone isn't
+ *  filed, nor a day already past (the user, Nov 28): the AI words a
+ *  calendar's event text a little differently each night, so Sons of
+ *  Israel's Teen Minyan note came back after it was turned down, and a
+ *  read on Shabbos morning "took off" Friday's Mincha. A note still goes
+ *  along with a change that is filed. What it can't read a day at a time
+ *  (a Yom Tov schedule, a minyan on a weekday rather than a date) counts
+ *  as a change, as before. */
+export function weekChangesTimes(source: PartSource, listingDetails: Record<string, unknown>, details: Record<string, unknown>, today: string): boolean {
+  if (source.part !== 'week') return true
+  const about = new Set(source.schedules)
+  const was = timesOf(listingDetails, source.field).schedules.filter((s) => about.has(s.id))
+  const now = timesOf(details, source.field).schedules.filter((s) => about.has(s.id))
+  const all = [...was, ...now]
+  if (all.some((s) => s.kind !== 'week' || s.to < s.from || s.minyanim.some((m) => !m.on.length || !m.on.every((d) => DATED.test(d))))) return true
+  const days = new Set<string>()
+  for (const s of all) for (let d = s.from < today ? today : s.from; d <= s.to; d = addDays(d, 1)) days.add(d)
+  const onDay = (list: readonly SpecialSchedule[], day: string) => {
+    const covering = list.filter((s) => s.from <= day && day <= s.to)
+    const terms = covering.map((s) => JSON.stringify([s.mode, !!s.whole, [...(s.parts ?? [])].sort()])).sort()
+    const times = covering.flatMap((s) => s.minyanim.filter((m) => m.on.includes(day)).map(({ notes: _notes, on: _on, ...m }) => JSON.stringify(canon(m))))
+    return JSON.stringify([terms, [...new Set(times)].sort()])
+  }
+  return [...days].some((d) => onDay(was, d) !== onDay(now, d))
 }
 
 /** A part finding's details, put on the listing as it is now: its part as

@@ -29,7 +29,7 @@ import { dateText, readSchedules, schedulesKey, type SpecialSchedule } from '@/l
 import { buildCatalog, readMessage } from '@/lib/messageReader'
 import { fieldsEdit, readFieldChanges } from '@/lib/fieldChanges'
 import { replacePendingSuggestion, submitListingUpdate } from '@/lib/submissionStore'
-import { TIMES_PART_LABELS, isHomePage, pageOfNote, partKey, partLines, partSize, readPartSource, scheduleTakesPart, splitParts, type PartGiven, type PartReading, type PartSource } from '@/lib/timesParts'
+import { TIMES_PART_LABELS, isHomePage, pageOfNote, partKey, partLines, partSize, readPartSource, scheduleTakesPart, splitParts, weekChangesTimes, type PartGiven, type PartReading, type PartSource } from '@/lib/timesParts'
 import { hoursSections, readSectionSource, splitSections, type HoursSection, type SectionSource } from '@/lib/hoursSections'
 import { CONTACT_SECTION, contactBoxName, contactFields, googleKeeps, pageContacts, readContacts, type ContactField, type ContactReading, type PageContacts } from '@/lib/contactRead'
 import { confirmFromSource } from '@/lib/sourceConfirm'
@@ -567,10 +567,12 @@ async function readAndFileOnce(
   if (!proposal || opts.compareOnly) return { ok: true, filed: 0, pageHash, check: check(null) }
   // A shul's times: filed as the parts they change, each on its own.
   const [timesKey, sk] = proposal.keys
-  const parts =
-    reads.kind === 'times' && proposal.keys.length === 2 && sk === schedulesKey(timesKey)
-      ? splitParts({ ...proposal.submission.details, [timesKey]: listing[timesKey] ?? null, [sk]: listing[sk] ?? null }, proposal.submission.details, timesKey)
-      : []
+  const listed = { ...proposal.submission.details, [timesKey]: listing[timesKey] ?? null, [sk]: listing[sk] ?? null }
+  const split = reads.kind === 'times' && proposal.keys.length === 2 && sk === schedulesKey(timesKey) ? splitParts(listed, proposal.submission.details, timesKey) : []
+  // A week that differs only in a note or on a day gone by isn't filed.
+  const today = dayInTimezone(opts.where.timezone, opts.now ?? Date.now())
+  const parts = split.filter((p) => weekChangesTimes(p.source, listed, p.details, today))
+  if (split.length && !parts.length) return { ok: true, filed: 0, pageHash, check: check(null) }
   if (parts.length) {
     // A home page leaves a usual part to the shul's own schedule page.
     const pages = isHomePage(watch.url) && listing.id ? await otherShulPages(watch.communityId, listing.id, watch.url) : []
