@@ -308,6 +308,9 @@ old number can still be looked up. When an item is done, move it to
     W11c: names only (and "Off"): the tab is for setting up and looking
     up, not a queue. Gaps live inside each watch, a broken watch goes to
     To do.
+    W11d + W13: seven rows (Hours and phone, one row for Google and
+    the website reads; Kosher certification opens its three lists; Eruv
+    "Status").
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
