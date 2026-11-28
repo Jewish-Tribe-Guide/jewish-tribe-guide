@@ -405,6 +405,10 @@ old number can still be looked up. When an item is done, move it to
     Read now too.
     L2f (Nov 28, the user): in "Runs when…" the job's own line stays,
     so a new admin sees what the job does before it has run.
+    L2g (Nov 28, the user): "Edit", not "Change". The phone swipe is
+    today's SwipeRow: round buttons with a caption, Edit (blue, a new
+    pencil glyph) and Remove (red, ×). Computer: Edit · Remove as words
+    at the right, pending the user's call on something sleeker.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
