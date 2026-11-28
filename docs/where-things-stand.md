@@ -408,7 +408,11 @@ old number can still be looked up. When an item is done, move it to
     L2g (Nov 28, the user): "Edit", not "Change". The phone swipe is
     today's SwipeRow: round buttons with a caption, Edit (blue, a new
     pencil glyph) and Remove (red, ×). Computer: Edit · Remove as words
-    at the right, pending the user's call on something sleeker.
+    at the right; L2h replaces that.
+    L2h (Nov 28, the user): on the computer each list's row ends in a
+    grey pencil and ×, always shown; hovering one darkens it in a circle
+    and names it. Open: a place's source still shows its actions in
+    words, and should follow.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
