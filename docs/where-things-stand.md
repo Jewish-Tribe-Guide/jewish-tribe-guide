@@ -391,7 +391,13 @@ old number can still be looked up. When an item is done, move it to
     per hospital); Kosher certification: "Runs when a kosher list is
     added" (a list's run files every place the site lacks to To do, so
     Food needn't have any). Kosher certification's From ends with
-    "+ Add a kosher list"; each list opens its own page.
+    "+ Add a kosher list".
+    L2d (Nov 28, the user): a list has no switch and opens nothing.
+    Its row is name, site and last read, then Read now · Change ·
+    Remove, as a place's source has; Remove shows Undo. Today's page
+    (/admin/watches/job/kosher) has "Stop" per list and "Turn off this
+    job" at the bottom: Stop becomes Remove, Turn off becomes the
+    Watching switch.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
