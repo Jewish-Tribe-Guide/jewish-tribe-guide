@@ -320,6 +320,12 @@ old number can still be looked up. When an item is done, move it to
     own websites), as Kosher certification opens its lists; Google has
     a page and switch of its own. The Watches search should match watch
     names too.
+    Compiled Nov 28 on the canvas page "Going with" (earlier boards
+    moved to "How we got here"): 28 boards, 1-18, the set to build
+    from, gaps drawn (Their own websites, Menus, Mikvah hours, Eruv
+    status, Links, Edit with a grey bin, swipe, Undo, Add steps). Not
+    built. Still open: a new community's first day, kosher
+    certificates (107).
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
