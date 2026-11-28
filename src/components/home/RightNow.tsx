@@ -80,21 +80,22 @@ export function placeholderDayScript(timezone: string): string {
  *  script is in the page as built, and in the render that hydrates it; a
  *  placeholder drawn later in the browser has no use for one (React
  *  doesn't run it). */
-function Placeholder({ timezone }: { timezone: string }) {
+function Placeholder({ timezone, wide }: { timezone: string; wide: boolean }) {
   const hydrated = useHydrated()
   return (
-    <>
+    <div aria-hidden="true" data-testid="right-now-placeholder" data-wide={wide || undefined}>
+      {/* The label's room too: without it the tiles moved 27px once the
+          answer came (CI on PR 472, a weekday). */}
+      {!wide && <p className={HOME_LABEL}>Right now</p>}
       <div
-        aria-hidden="true"
-        data-testid="right-now-placeholder"
         // The script adds data-day before React hydrates it.
         suppressHydrationWarning
         // A weekday's rows; Friday's candles card with Shabbos shopping
         // under it (measured on a phone, tracker 104).
-        className="h-[176px] animate-pulse rounded-2xl bg-slate-100 data-[day=erev]:h-[437px]"
+        className="h-[176px] animate-pulse rounded-2xl bg-slate-100 data-[day=erev]:h-[410px]"
       />
       {!hydrated && <script dangerouslySetInnerHTML={{ __html: placeholderDayScript(timezone) }} />}
-    </>
+    </div>
   )
 }
 
@@ -104,7 +105,7 @@ export default function RightNow(props: Props) {
   const previewDay = usePreviewDay()
   // Held open until the clock and the kind of day are known, so the tiles
   // under it don't jump once they arrive.
-  if (!schedule || !listings || props.zmanimLoading) return <Placeholder timezone={timezone} />
+  if (!schedule || !listings || props.zmanimLoading) return <Placeholder timezone={timezone} wide={wide} />
   const now = previewNow(previewDay, zmanim, schedule.now, timezone)
   const nowMinutes = now === schedule.now ? schedule.nowMinutes : dayAndMinutesInTimezone(now, timezone).minutes
   const moment = shabbosMoment(zmanim, now, timezone)

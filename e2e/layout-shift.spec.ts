@@ -97,6 +97,30 @@ test.describe('the home page on each kind of day', () => {
       await expectSteady(page, '/philly')
     })
   }
+
+  // The same, without timing: where the tiles sit under the placeholder is
+  // where they stay once Right now is drawn. CI on PR 472 (a weekday,
+  // 0.150) caught the placeholder without the label's 27px; on a fast
+  // machine that step and the tiles' own drawing came apart and passed.
+  for (const day of ['tuesday', 'friday'] as const) {
+    test(`the tiles stay where the placeholder put them: ${day}`, { tag: '@mobile' }, async ({ page }) => {
+      let release = () => {}
+      const held = new Promise<void>((r) => (release = r))
+      await page.route('**/api/zmanim?**', async (route) => {
+        await held
+        await route.fulfill({ json: { ok: true, data: DAYS[day].zmanim } })
+      })
+      await page.clock.setFixedTime(new Date(DAYS[day].at))
+      await page.goto('/philly')
+      // The phone's (the computer's is drawn too until the size is known).
+      await expect(page.locator('[data-testid="right-now-placeholder"]:not([data-wide])')).toBeVisible()
+      const tiles = page.getByTestId('home-browse-list')
+      const before = (await tiles.boundingBox())!.y
+      release()
+      await expect(page.locator('[data-testid="right-now"]:not([data-wide])')).toBeVisible()
+      expect(Math.abs((await tiles.boundingBox())!.y - before), `tiles moved from ${before}`).toBeLessThanOrEqual(2)
+    })
+  }
 })
 
 test('a category page with a map doesn’t jump as it loads', async ({ page, request }) => {
