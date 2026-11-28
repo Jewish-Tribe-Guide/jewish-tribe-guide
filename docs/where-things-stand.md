@@ -358,6 +358,13 @@ old number can still be looked up. When an item is done, move it to
     jobs with their sources indented ("Minyan times: Newsletter"
     answers which newsletters), rows name jobs only, and a place's
     "Kept current by" is grouped by job. Not built.
+    The model, agreed: Watches are jobs, a job has several sources,
+    and sources belong to places; admins add sources, never jobs. M1–M5
+    (phone): a place's "+ Add a source" asks what it keeps current
+    (only that kind of place's jobs), then from where (only that job's
+    sources), then the page or the sender's email. Open: the user finds
+    the one menu with sources indented under jobs confusing, and
+    suggests two filters, a job and a source.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
