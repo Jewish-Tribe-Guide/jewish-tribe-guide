@@ -374,6 +374,9 @@ old number can still be looked up. When an item is done, move it to
     built. L3cp (phone, Nov 28) replaces L3bp: the chosen filters are
     not written beside Filters (its count says how many), and Add sits
     at the end of that row.
+    Going with (user, Nov 28): L1, L2, L3b and L3cp. The canvas now
+    holds only those ten boards on one page, "Going with" (version 37);
+    the earlier rounds are in its version history.
 107. **Watches, part 2: a place's own kosher certificate** (the user,
     Nov 28; after part 1, the Watches tab). Today a hechsher is checked
     only when Keystone-K's, KCL's or Mekor's list has the place; any
