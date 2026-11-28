@@ -6,6 +6,16 @@ that file.
 
 ## Kept current, on Add and the listing (Nov 25–28)
 
+**A shul's week isn't filed for a note or a day gone by** (Nov 28, the
+user: Sons of Israel's To do item). Its calendar's Mincha notes come
+from the event text, which the AI words a little differently each
+night, so a Teen Minyan note turned down on Nov 24 and 25 came back on
+Nov 28, and a read at 2am Saturday "took off" Friday's Mincha. The
+website watch now files a week only when a time on a day from today on
+is added, taken off or moved, or the week's own terms change
+(`weekChangesTimes`, `src/lib/timesParts.ts`); notes still go along with
+a change that is filed. A newsletter's weeks are filed as before.
+
 **Item 95, as it stood on the tracker** (agreed with the user Nov
     25, branch `claude/kept-current`, boards M1–M6 and N2–N4 on the
     design canvas). Watches stop being a chore the admin sets up and

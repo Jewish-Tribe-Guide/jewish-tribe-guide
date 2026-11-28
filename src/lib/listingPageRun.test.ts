@@ -1133,6 +1133,25 @@ describe('runListingPageWatch: a shul’s calendar, a week at a time', () => {
     expect(m.submitListingUpdate).not.toHaveBeenCalled()
   })
 
+  // Nov 28 (Sons of Israel): a week that differs from the listing's only in
+  // a note isn't filed: the AI words an event's text a little differently
+  // each night, and one turned down came back.
+  it('files nothing for a week that differs only in a note', async () => {
+    const whole = (weeks: Record<string, TimesUpdate>) =>
+      m.readShulWeek.mockImplementation(async (_l: unknown, _k: unknown, _s: unknown, _a: unknown, opts: { week: { from: string } }) => ({ update: weeks[opts.week.from], model: 'cheap', shape: 'schedule' }))
+    m.fetchPublic.mockResolvedValue(page)
+    whole({ '2026-10-18': thisWeek })
+    await run()
+    const posted = m.submitListingUpdate.mock.calls[0][2].details
+    vi.clearAllMocks()
+    m.getResourceRowById.mockResolvedValue({ ...rodeph, details: posted })
+    m.fetchPublic.mockResolvedValue(page)
+    const noted = (w: TimesUpdate) => ({ ...w, rows: w.rows.map((r) => (r.tefillah === 'shacharis' ? { ...r, notes: 'Join for Mincha, stay for Seudah Shlishit' } : r)) })
+    whole({ '2026-10-18': noted(thisWeek) })
+    expect(await run({ full: true })).toMatchObject({ ok: true, filed: 0 })
+    expect(m.submitListingUpdate).not.toHaveBeenCalled()
+  })
+
   // Nov 19: what a page files is decided part by part (shulTimes.ts), and
   // filed as that part's week (shulWeekFiling.ts).
   it('files the weekdays’ change as the weekdays’ week, from the website, and keeps the read for the shul’s other pages', async () => {

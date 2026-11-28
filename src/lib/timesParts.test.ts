@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Minyan } from './davening'
 import type { SpecialSchedule } from './schedules'
-import { isHomePage, pageOfNote, partKey, partLines, partSize, partsFromRead, partsGiven, readPartSource, rebasePart, scheduleTakesPart, splitParts, withPart } from './timesParts'
+import { isHomePage, pageOfNote, partKey, partLines, partSize, partsFromRead, partsGiven, readPartSource, rebasePart, scheduleTakesPart, splitParts, weekChangesTimes, withPart } from './timesParts'
 
 const K = 'minyanim'
 const SK = 'minyanim_schedules'
@@ -60,6 +60,70 @@ describe('splitParts', () => {
   it('the same week read again under a new id is no change', () => {
     const on = { ...listing, [SK]: [week] }
     expect(splitParts(on, { ...on, [SK]: [{ ...week, id: 'w2', postedAt: '2026-10-21', minyanim: [{ ...week.minyanim[0], id: 'z' }] }] }, K)).toEqual([])
+  })
+})
+
+// Sons of Israel, Nov 28: its calendar read again on Shabbos morning, the
+// Mincha notes worded from the event text and Friday already gone.
+describe('weekChangesTimes', () => {
+  const shabbosWeek: SpecialSchedule = {
+    id: 'old',
+    name: 'Times for Nov 22 – Nov 28',
+    from: '2026-11-27',
+    to: '2026-11-28',
+    mode: 'replace',
+    kind: 'week',
+    whole: true,
+    parts: ['shabbos'],
+    postedBy: 'website',
+    minyanim: [
+      { id: '1', tefillah: 'mincha_maariv', on: ['2026-11-27'], time: '4:20pm', notes: 'Winter only' },
+      { id: '2', tefillah: 'shacharis', on: ['2026-11-28'], time: '9:00am' },
+      { id: '3', tefillah: 'mincha', on: ['2026-11-28'], time: '4:00pm', notes: 'Teen Minyan' },
+    ],
+  }
+  const on = { ...listing, [SK]: [shabbosWeek] }
+  const reread = (minyanim: SpecialSchedule['minyanim'], also: Partial<SpecialSchedule> = {}) => {
+    const [p] = splitParts(on, { ...on, [SK]: [{ ...shabbosWeek, id: 'new', minyanim, ...also }] }, K)
+    return p
+  }
+  const today = '2026-11-28'
+  const sat = shabbosWeek.minyanim.slice(1)
+
+  it('a note worded again, and Friday gone by, is a part but not a change worth filing', () => {
+    const p = reread([sat[0], { ...sat[1], id: '9', notes: 'Teen Minyan; Join for Mincha, stay for special Seudah Shlishit just for teens.' }])
+    expect(p.part).toBe('week')
+    expect(weekChangesTimes(p.source, on, p.details, today)).toBe(false)
+  })
+
+  it('a time moved, added or taken off from today on is', () => {
+    expect(weekChangesTimes(reread([sat[0], { ...sat[1], time: '4:10pm' }]).source, on, reread([sat[0], { ...sat[1], time: '4:10pm' }]).details, today)).toBe(true)
+    const added = reread([...sat, { id: '4', tefillah: 'maariv', on: ['2026-11-28'], time: '5:20pm' }])
+    expect(weekChangesTimes(added.source, on, added.details, today)).toBe(true)
+    const gone = reread([sat[0]])
+    expect(weekChangesTimes(gone.source, on, gone.details, today)).toBe(true)
+  })
+
+  it('Friday taken off is a change while it’s still Friday', () => {
+    const p = reread(sat)
+    expect(weekChangesTimes(p.source, on, p.details, '2026-11-27')).toBe(true)
+    expect(weekChangesTimes(p.source, on, p.details, today)).toBe(false)
+  })
+
+  it('the week’s own terms changing is a change', () => {
+    const p = reread(shabbosWeek.minyanim, { whole: undefined })
+    expect(weekChangesTimes(p.source, on, p.details, today)).toBe(true)
+  })
+
+  it('a new week is a change; a week wholly gone by is not', () => {
+    const [p] = splitParts(listing, { ...listing, [SK]: [shabbosWeek] }, K)
+    expect(weekChangesTimes(p.source, listing, p.details, today)).toBe(true)
+    expect(weekChangesTimes(p.source, listing, p.details, '2026-11-29')).toBe(false)
+  })
+
+  it('a usual part is always filed by it', () => {
+    const [p] = splitParts(listing, { ...listing, [K]: [{ ...shacharis, time: '7:00am' }, mincha, shabbos] }, K)
+    expect(weekChangesTimes(p.source, listing, p.details, today)).toBe(true)
   })
 })
 
