@@ -106,6 +106,19 @@ describe('the Playwright container tag tracks the installed version', () => {
 // worker (the user, Oct 19: "PRs are taking a really long time"). Guarded so
 // a later edit putting `needs: unit` back, or folding e2e onto one runner
 // again, fails here rather than as a slow PR nobody connects to the change.
+// Tracker 105: e2e shards 4 (Nov 27) and 6 (Nov 28) passed every test, then
+// never exited, until the job's 20-minute limit cancelled them. Without
+// --init, npm is the container's PID 1, and nothing reaps what Playwright
+// kills when it stops the web server; Playwright's Docker docs recommend
+// --init for exactly this.
+describe('every Playwright container can exit', () => {
+  it('runs with an init process', () => {
+    const runs = WORKFLOW.match(/docker run[^\n]*/g) ?? []
+    expect(runs.length).toBeGreaterThan(0)
+    for (const run of runs) expect(run, run).toMatch(/\s--init\b/)
+  })
+})
+
 describe('a PR’s checks start at once and e2e is split', () => {
   function job(name: string): string {
     const body = WORKFLOW.slice(WORKFLOW.indexOf('\njobs:'))
