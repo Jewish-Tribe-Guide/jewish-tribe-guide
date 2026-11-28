@@ -8,6 +8,7 @@ const m = vi.hoisted(() => ({
   unread: vi.fn(),
   done: vi.fn(),
   readAndFile: vi.fn(),
+  doneEmail: vi.fn(),
   afterCallbacks: [] as (() => unknown)[],
 }))
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => m.afterCallbacks.push(fn) }))
@@ -16,6 +17,7 @@ vi.mock('@/lib/communityStore', () => ({ communitySlugFromRequest: () => 'philly
 vi.mock('@/lib/serverError', () => ({ reportServerError: vi.fn() }))
 vi.mock('@/lib/sentMessageStore', () => ({ listLeftForAdmin: m.left, listUnread: m.unread, markDone: m.done }))
 vi.mock('@/lib/messageFiling', () => ({ readAndFile: m.readAndFile, MAX_ATTEMPTS: 3 }))
+vi.mock('@/lib/confirmationEmail', () => ({ sendPostDoneEmail: m.doneEmail }))
 
 const { GET, POST } = await import('./route')
 const ID = '00000000-aaaa-4aaa-8aaa-000000000001'
@@ -41,10 +43,25 @@ describe('/api/admin/sent-posts', () => {
   })
 
   it('marks one done', async () => {
-    m.done.mockResolvedValue(true)
+    m.done.mockResolvedValue({ id: ID, community: 'philly', text: 'TJ has challah', email: null })
     expect(await (await POST(req('POST', { id: ID }))).json()).toEqual({ ok: true, done: true })
     expect(m.done).toHaveBeenCalledWith('philly', ID)
+    expect(m.afterCallbacks).toHaveLength(0)
     expect((await POST(req('POST', { id: 'nope' }))).status).toBe(400)
+    m.done.mockResolvedValue(null)
+    expect(await (await POST(req('POST', { id: ID }))).json()).toEqual({ ok: true, done: false })
+  })
+
+  // Tracker 103: "Email me when it's on the site" on a post left for an
+  // admin was kept, and Done emailed no one.
+  it('emails the visitor who asked, once it’s done', async () => {
+    const post = { id: ID, community: 'philly', text: 'TJ has challah', email: 'them@x.co' }
+    m.done.mockResolvedValue(post)
+    m.doneEmail.mockRejectedValue(new Error('Resend down'))
+    expect(await (await POST(req('POST', { id: ID }))).json()).toEqual({ ok: true, done: true })
+    expect(m.doneEmail).not.toHaveBeenCalled()
+    await m.afterCallbacks[0]()
+    expect(m.doneEmail).toHaveBeenCalledWith(post)
   })
 
   it('is for admins only', async () => {

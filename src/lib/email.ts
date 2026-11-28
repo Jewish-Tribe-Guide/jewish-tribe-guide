@@ -411,6 +411,33 @@ export async function sendForwardedEmail(
   })
 }
 
+/** A "+ Add" post the AI's read couldn't file whole (tracker 103): it
+ *  waits on To do, so the admins hear of it as they do of a submission,
+ *  through the same "Something new to decide" switch. Sent once per post
+ *  (`postId`): a read tried again says nothing twice. */
+export async function sendPostLeftNotification(
+  communitySlug: string,
+  post: { id: string; text: string; photos: number; left: string[] },
+): Promise<void> {
+  const appUrl = adminAppUrl()
+  const words = post.text.trim()
+  const shown = words.length > 600 ? `${words.slice(0, 600)}…` : words
+  const photos = post.photos ? `<p style="color:#64748b;font-size:13px">With ${post.photos} photo${post.photos === 1 ? '' : 's'}.</p>` : ''
+  await sendEmail({
+    to: await notificationRecipients(communitySlug),
+    community: communitySlug,
+    idempotencyKey: `post-left/${post.id}`,
+    subject: 'A post to deal with by hand',
+    html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;color:#0f172a">
+    <h2 style="color:#1d4ed8;margin-bottom:8px;">A post to deal with by hand</h2>
+    <ul style="font-size:14px;color:#334155;padding-left:18px">${post.left.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul>
+    ${shown ? `<div style="white-space:pre-wrap;font-size:14px;line-height:1.5;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px">${escapeHtml(shown)}</div>` : ''}
+    ${photos}
+    ${appUrl ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}${adminBase(communitySlug)}" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open To do →</a></p>` : ''}
+  </div>`,
+  })
+}
+
 // Emails an admin sign-in link. Used by /api/admin/request-link AFTER the
 // email has been verified against the allowlist, so only admins ever receive
 // a link.

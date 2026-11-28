@@ -10,13 +10,14 @@ const m = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   notify: vi.fn(),
+  left: vi.fn(),
   listings: vi.fn(),
   categories: vi.fn(),
   time: vi.fn(),
 }))
 vi.mock('./sentMessageStore', () => ({ claimRead: m.claim, finishRead: m.finish }))
 vi.mock('./submissionStore', () => ({ submitListingCreate: m.create, submitListingUpdate: m.update }))
-vi.mock('./email', () => ({ sendSubmissionNotification: m.notify }))
+vi.mock('./email', () => ({ sendSubmissionNotification: m.notify, sendPostLeftNotification: m.left }))
 vi.mock('./resourceStore', () => ({ listApprovedResources: m.listings }))
 vi.mock('./categoryStore', () => ({ listCategories: m.categories }))
 vi.mock('./messageReadTime', () => ({ saveMessageReadTime: m.time }))
@@ -115,6 +116,7 @@ describe('readAndFile', () => {
     m.update.mockResolvedValue({ id: 's1' })
     m.create.mockResolvedValue({ id: 's2' })
     m.notify.mockResolvedValue(undefined)
+    m.left.mockResolvedValue(undefined)
     m.finish.mockResolvedValue(undefined)
     m.read.mockResolvedValue({ proposals: [items(ACME)], model: 'm', effort: BACKGROUND_EFFORT, ms: 1, usage: { input: 1, cachedInput: 0, output: 1 } })
   })
@@ -125,6 +127,7 @@ describe('readAndFile', () => {
     expect(m.update).toHaveBeenCalledWith('philly', ACME, expect.objectContaining({ source: { readBy: 'ai', from: 'a message', original: 'ACME has challah now' } }), expect.any(String), { email: 'me@x.co' })
     expect(m.finish).toHaveBeenCalledWith('m1', ['s1'], [])
     expect(m.notify).toHaveBeenCalledTimes(1)
+    expect(m.left).not.toHaveBeenCalled()
   })
 
   it('tells the reader which listing the box was opened from', async () => {
@@ -146,11 +149,21 @@ describe('readAndFile', () => {
     m.claim.mockResolvedValue({ ...sent, attempts: MAX_ATTEMPTS })
     expect(await readAndFile(community, { ...sent, attempts: MAX_ATTEMPTS - 1 }, { apiKey: 'k' })).toBe('left')
     expect(m.finish).toHaveBeenCalledWith('m1', [], ['The AI couldn’t read it.'])
+    expect(m.left).toHaveBeenCalledWith('philly', { id: 'm1', text: 'ACME has challah now', photos: 0, left: ['The AI couldn’t read it.'] })
   })
 
   it('says what it left, beside what it filed', async () => {
     m.read.mockResolvedValue({ proposals: [items(ACME), { kind: 'ask_others', listingId: null, question: 'Which bakery?', ...q }], model: 'm', effort: 'high', ms: 1, usage: null })
     expect(await readAndFile(community, sent, { apiKey: 'k' })).toBe('left')
     expect(m.finish).toHaveBeenCalledWith('m1', ['s1'], ['Not sure: Which bakery?'])
+  })
+
+  // Tracker 103: a post left on To do used to reach it with no email.
+  it('emails the admins about what it left, once, and the read stands if that email fails', async () => {
+    m.read.mockResolvedValue({ proposals: [{ kind: 'ask_others', listingId: null, question: 'Which bakery?', ...q }], model: 'm', effort: 'high', ms: 1, usage: null })
+    m.left.mockRejectedValue(new Error('Resend down'))
+    expect(await readAndFile(community, sent, { apiKey: 'k' })).toBe('left')
+    expect(m.left).toHaveBeenCalledTimes(1)
+    expect(m.left).toHaveBeenCalledWith('philly', { id: 'm1', text: 'ACME has challah now', photos: 0, left: ['Not sure: Which bakery?'] })
   })
 })

@@ -336,6 +336,38 @@ export async function sendDecisionEmail(
   await sendEmail({ to, subject, html, replyTo, bcc, community: submission.community_id })
 }
 
+// ── A "+ Add" post an admin dealt with by hand (tracker 103) ─────────────────
+
+/** A post the AI couldn't file whole waits on To do; the admin makes the
+ *  change themselves and marks it Done. The visitor who ticked "Email me
+ *  when it's on the site" hears then. Whatever the read did file reaches
+ *  them as ordinary decision emails; this covers the rest. No copy to the
+ *  admins: one of them just did it. */
+export async function sendPostDoneEmail(post: { id: string; community: string; text: string; email: string | null }): Promise<void> {
+  const to = post.email?.trim()
+  if (!to) return
+  if (isSandbox()) {
+    console.log('[confirmationEmail] Skipping post-done email — RESEND_FROM is the sandbox sender.')
+    return
+  }
+  const words = post.text.trim()
+  const shown = words.length > 300 ? `${words.slice(0, 300)}…` : words
+  const { replyTo } = await communityContact(post.community)
+  await sendEmail({
+    to,
+    replyTo,
+    community: post.community,
+    idempotencyKey: `post-done/${post.id}`,
+    subject: 'What you sent is on the site',
+    html: wrap(`
+      <h2 style="${HEADING_STYLE}">Thanks for what you sent</h2>
+      <p style="${TEXT_STYLE}">Someone on our team went through it and updated the guide.</p>
+      ${shown ? `<p style="${TEXT_STYLE}white-space:pre-wrap;border-left:3px solid #e2e8f0;padding-left:12px;">${escapeHtml(shown)}</p>` : ''}
+      <p style="${TEXT_STYLE}">Have questions? Just reply to this email.</p>
+    `),
+  })
+}
+
 // ── Resource directory submission confirmations ───────────────────────────────
 
 // Sends a confirmation email to the person who submitted a resource directory
