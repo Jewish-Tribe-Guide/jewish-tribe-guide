@@ -36,15 +36,21 @@ export default function SiteAddButton() {
   const community = useOptionalCommunitySlug()
   const categories = useCategories()
   const [open, setOpen] = useState(false)
+  // What it opens already searching for: a search that found nothing.
+  const [query, setQuery] = useState<string | undefined>(undefined)
   // Kept on the page once opened, so it slides and fades away when closed,
   // as a listing does, instead of vanishing in one frame (the user, Oct 27).
   const [mounted, setMounted] = useState(false)
   if (open && !mounted) setMounted(true)
   // "How do I add a listing?" in the home search opens this same box
   // (searchLands.ts), as tapping "+" would, and so does the computer's
-  // header button where the screen has no Add of its own.
+  // header button where the screen has no Add of its own, and the home
+  // search's nothing-found card, already searching (openSiteAdd).
   useEffect(() => {
-    const onOpen = () => setOpen(true)
+    const onOpen = (e: Event) => {
+      setQuery((e as CustomEvent<{ query?: string } | undefined>).detail?.query)
+      setOpen(true)
+    }
     document.addEventListener(OPEN_ADD, onOpen)
     return () => document.removeEventListener(OPEN_ADD, onOpen)
   }, [])
@@ -53,8 +59,16 @@ export default function SiteAddButton() {
   const shows = showsSiteAdd(pathname, community, (categories ?? []).map((c) => c.id))
   return (
     <>
-      {shows && <AddButton phoneOnly onClick={() => setOpen(true)} />}
-      {mounted && <TellUsSheet isOpen={open} onClose={() => setOpen(false)} findFirst />}
+      {shows && (
+        <AddButton
+          phoneOnly
+          onClick={() => {
+            setQuery(undefined)
+            setOpen(true)
+          }}
+        />
+      )}
+      {mounted && <TellUsSheet isOpen={open} onClose={() => setOpen(false)} findFirst query={query} />}
     </>
   )
 }

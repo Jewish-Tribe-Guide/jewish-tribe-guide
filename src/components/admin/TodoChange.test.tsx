@@ -76,7 +76,31 @@ describe('To do’s answers, not ChangeReview’s', () => {
     show(change({ minyanim: [{ ...usual[0], time: '9:30am' }] }), { onModerate })
     const decide = screen.getByRole('group', { name: 'Decide' })
     await user().click(within(decide).getAllByRole('button')[1])
-    expect(onModerate).toHaveBeenCalledWith('s1', 'rejected', undefined)
+    expect(onModerate).toHaveBeenCalledWith('s1', 'rejected', undefined, undefined)
+  })
+
+  // Tracker 103: the email telling them can say why.
+  it('sent with an email, it asks why first, and the why goes with it', async () => {
+    const onModerate = vi.fn()
+    const s = { ...change({ minyanim: [{ ...usual[0], time: '9:30am' }] }), submitted_by: { name: 'Sarah', email: 'sarah@example.com' } } as EnrichedSubmission
+    show(s, { onModerate })
+    const no = within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button')[1]
+    const label = no.textContent!
+    await user().click(no)
+    expect(onModerate).not.toHaveBeenCalled()
+    await user().type(screen.getByRole('textbox', { name: /email to Sarah/ }), 'They moved it back to 9am')
+    await user().click(within(screen.getByRole('group', { name: 'Decide' })).getByRole('button', { name: label }))
+    expect(onModerate).toHaveBeenCalledWith('s1', 'rejected', undefined, 'They moved it back to 9am')
+  })
+
+  it('Back from the why leaves it waiting', async () => {
+    const onModerate = vi.fn()
+    const s = { ...change({ minyanim: [{ ...usual[0], time: '9:30am' }] }), submitted_by: { email: 'sarah@example.com' } } as EnrichedSubmission
+    show(s, { onModerate })
+    await user().click(within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button')[1])
+    await user().click(within(screen.getByRole('group', { name: 'Decide' })).getByRole('button', { name: 'Back' }))
+    expect(onModerate).not.toHaveBeenCalled()
+    expect(screen.queryByRole('textbox', { name: /email to/ })).not.toBeInTheDocument()
   })
 })
 
@@ -110,7 +134,7 @@ describe('a change with more than one part', () => {
     await user().click(tabs[1])
     expect(screen.getAllByRole('tab')[1]).toHaveAttribute('aria-selected', 'true')
     await user().click(within(screen.getByRole('group', { name: 'Decide' })).getAllByRole('button')[1])
-    expect(onModerate).toHaveBeenCalledWith('s1', 'rejected', 'minyanim:shabbos')
+    expect(onModerate).toHaveBeenCalledWith('s1', 'rejected', 'minyanim:shabbos', undefined)
   })
 
   it('read again once a part is answered: the next one opens, the answered one ticked', async () => {

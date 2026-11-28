@@ -616,7 +616,7 @@ export default function PlaceListing({
           busy={changeBusy}
           error={changeError}
           token={token}
-          onModerate={(id, status, part) => void answer(id, status, undefined, part)}
+          onModerate={(id, status, part, reason) => void answer(id, status, reason, part)}
           onUpdated={(id, partial) => void (partial ? partAnswered(id, true) : changeAnswered(true))}
         />
       )}

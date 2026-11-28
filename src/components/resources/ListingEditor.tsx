@@ -118,6 +118,8 @@ type Props = {
   /** See useListingSubmit. */
   via?: SendVia
   onSent?: (body: unknown) => void
+  /** See useListingSubmit. */
+  onSubmitted?: () => void
   /** The admin console's Add a place (Places): Send puts it live straight away
    *  (/api/admin/listings, see useListingSubmit), with no challenge, and
    *  closes the editor once it's in, or hands `onAdded` the new listing. */
@@ -294,6 +296,7 @@ export default function ListingEditor({
   reopen,
   via,
   onSent,
+  onSubmitted,
   adminSubmit,
   onlyRows,
   onHasChanges,
@@ -344,6 +347,7 @@ export default function ListingEditor({
     sharedTurnstile,
     via: adminSave?.via ?? via,
     onSent: adminSave ? () => adminSave.onSaved() : onSent,
+    onSubmitted,
     adminSubmit,
     onAdminSubmitted: (body) => {
       const added = (body as { listing?: DirectoryResource } | null)?.listing

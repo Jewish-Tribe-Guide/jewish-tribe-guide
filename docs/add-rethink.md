@@ -161,11 +161,17 @@ them:
   cards (and their "Change something else about …"). Its Send files the
   edit as a change to that listing, through `/api/message/send`
   (`targetId`), which refuses one that changes nothing.
-- **The home page's nothing-found card has no Add**: R2 drew a
-  category's, and from the home page there's no category to add to.
+- **The home page's nothing-found card** now has R2's Add too (Nov 28,
+  not drawn on its own): "Add {what was searched}" opens the site's Add
+  box already searching for it, and What kind of place? asks the
+  category, as the header's "+" does.
 - **`?action=create` links** (the old deep link into the add form) still
   open the form directly.
-- Step 1, **counting it**, isn't built.
+- Step 1, **counting it**, BUILT Nov 28 (`src/lib/addCounting.ts`,
+  Vercel Analytics): `add_opened` (from a category or the site, searched
+  or not), `add_way` (a place we have, Google, by hand, a post) and
+  `add_sent` with the way it was sent. Only the Add box counts, not a
+  listing's own update box.
 - **Found on the way:** on a phone, the box drew the computer's dialog
   for its first frame, then the phone's sheet in its place. Once Find
   the place's field took the focus on opening, closing gave the focus
@@ -283,5 +289,4 @@ nearest today's box. It costs a photo-only sender one more tap.
 
 ## Waiting on the user
 
-- Counting Add (step 1): build it or not.
 - The phone number for forwarding: which service, and when.

@@ -358,6 +358,32 @@ describe('Landing', () => {
     expect(mockRouter.push).not.toHaveBeenCalled()
   })
 
+  // Nov 28 (board R2, as a category page's card): Add what was searched
+  // for, opening the site's own Add already searching; not where the
+  // community takes no additions.
+  it('a search that finds nothing offers to add it', async () => {
+    const user = userEvent.setup()
+    const opened: unknown[] = []
+    const take = (e: Event) => opened.push((e as CustomEvent).detail)
+    document.addEventListener('jpc:open-add', take)
+    try {
+      renderLanding(undefined, { content: { categories: [makeCategory()] } }, [])
+      await user.type(screen.getAllByLabelText('Search resources')[0]!, 'Bagel Factory')
+      await user.click(screen.getAllByRole('button', { name: 'Add Bagel Factory' })[0]!)
+      expect(opened).toEqual([{ query: 'Bagel Factory' }])
+    } finally {
+      document.removeEventListener('jpc:open-add', take)
+    }
+  })
+
+  it('offers no Add where the community takes no additions', async () => {
+    const user = userEvent.setup()
+    renderLanding(undefined, { content: { categories: [makeCategory()] }, community: { ui: { contributions: { add: false } } } as never }, [])
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'Bagel Factory')
+    expect(screen.getAllByRole('button', { name: 'Ask in a WhatsApp group' }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: 'Add Bagel Factory' })).not.toBeInTheDocument()
+  })
+
   // Not only on Enter: most people never press it (the user, Oct 27).
   it('a search that finds nothing says so as it is typed, without Enter', async () => {
     const user = userEvent.setup()

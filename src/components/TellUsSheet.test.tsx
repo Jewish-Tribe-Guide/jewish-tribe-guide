@@ -6,6 +6,7 @@ import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import SiteAddButton, { showsSiteAdd } from './SiteAddButton'
+import { openSiteAdd } from '@/lib/addHere'
 import TellUsSheet, { addableCategories, readForEditor } from './TellUsSheet'
 import { track } from '@vercel/analytics'
 
@@ -676,6 +677,36 @@ describe('Saw something? Tell us', () => {
       expect(screen.getByRole('dialog', { name: 'Add to Food' })).toBeInTheDocument()
     })
 
+    // Counting Add (the plan's step 1, Nov 28): opened once and from where,
+    // each way taken, and the send, by the way it went.
+    it('counts the open, each way taken, and the send', async () => {
+      const counts = () => vi.mocked(track).mock.calls.filter(([e]) => String(e).startsWith('add_'))
+      vi.mocked(track).mockClear()
+      respond = (url) => (url.includes('/api/resources') ? { ok: true, resources: [bagels] } : url.includes('/api/message/queue') ? { ok: true, id: 'm1' } : { ok: true })
+      add({ query: 'Bagel' })
+      fireEvent.click(await screen.findByTestId('in-guide'))
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      fireEvent.click(screen.getByRole('button', { name: /not on Google/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Or tell us in your own words' }))
+      fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'Bagel Factory on 5th is kosher' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+      await screen.findByTestId('tell-us-sent')
+      expect(counts()).toEqual([
+        ['add_opened', { from: 'category', searched: true }],
+        ['add_way', { way: 'place_we_have' }],
+        ['add_way', { way: 'by_hand' }],
+        ['add_way', { way: 'post' }],
+        ['add_sent', { way: 'post' }],
+      ])
+    })
+
+    it('counts nothing for a listing’s own update box', () => {
+      vi.mocked(track).mockClear()
+      renderWithProviders(<TellUsSheet isOpen onClose={() => {}} about={{ id: 'pb', name: 'Philly Bagels' }} />, { community: { slug: 'philly' }, content: { categories: [food] } })
+      expect(vi.mocked(track).mock.calls.filter(([e]) => String(e).startsWith('add_'))).toEqual([])
+    })
+
     it('has the AI box a row under the list, saying it’s AI before anything is typed, with Back to the search', async () => {
       add()
       // Sent as it is (Nov 27, S1b): the row says who checks it, not "for
@@ -853,6 +884,13 @@ describe('SiteAddButton — opened by the search', () => {
     fireEvent(document, new CustomEvent('jpc:open-add'))
     // Add's one way in (Nov 27, board R3b).
     expect(await screen.findByRole('dialog', { name: 'Add or update' })).toBeInTheDocument()
+  })
+  // Nov 28: the home search's nothing-found card opens it already
+  // searching for what was typed (openSiteAdd); the + opens it empty.
+  it('opens already searching when the home card asks, and empty from its +', async () => {
+    renderWithProviders(<SiteAddButton />, { content: { categories: [makeCategory()] }, community: { slug: 'philly' } })
+    act(() => openSiteAdd('Bagel Factory'))
+    expect(await screen.findByPlaceholderText('Search by name or address…')).toHaveValue('Bagel Factory')
   })
   // Nov 27 (board U1c): a round blue +, on a phone only.
   it('is a round blue + on a phone only', () => {
